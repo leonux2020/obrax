@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { emptySlots } from './lib/photos.js';
 import { photoStore } from './lib/photoStore.js';
 import { I18nProvider } from './lib/i18n.jsx';
-import { getRegion } from './lib/regions.js';
+import { getRegion, LANGS } from './lib/regions.js';
 import {
   loadSettings,
   saveSettings,
@@ -77,8 +77,8 @@ export default function App() {
   }, [settings.region]);
 
   const logout = useCallback(() => setUser(null), []);
-  const toggleLang = useCallback(
-    () => setSettings((s) => ({ ...s, lang: s.lang === 'es' ? 'en' : 'es' })),
+  const changeLang = useCallback(
+    (lang) => LANGS.includes(lang) && setSettings((s) => ({ ...s, lang })),
     []
   );
 
@@ -88,6 +88,7 @@ export default function App() {
         <RegionSelect
           initial={settings.region}
           onConfirm={confirmRegion}
+          onChangeLang={changeLang}
           onCancel={region ? () => setPickingRegion(false) : undefined}
         />
       ) : !user ? (
@@ -100,7 +101,7 @@ export default function App() {
             company={company}
             onEditCompany={() => setEditingCompany(true)}
             onChangeRegion={() => setPickingRegion(true)}
-            onToggleLang={toggleLang}
+            onChangeLang={changeLang}
             onLogout={logout}
           />
           <Wizard

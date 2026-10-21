@@ -54,31 +54,31 @@ const RAW = [
   ['AR', 'Argentina', 'Argentina', 'AM', 'ARS', '$', 0, 'es-AR', 'es', 1250, 0.9, 21, 'IVA', [['Easy', 1.02], ['Sodimac', 1.0], ['Blaisten', 0.97]]],
   ['UY', 'Uruguay', 'Uruguay', 'AM', 'UYU', '$U', 2, 'es-UY', 'es', 40, 1.0, 22, 'IVA', GENERIC_ES, { generic: true }],
   ['PY', 'Paraguay', 'Paraguay', 'AM', 'PYG', '₲', 0, 'es-PY', 'es', 7800, 0.8, 10, 'IVA', GENERIC_ES, { generic: true }],
-  ['BR', 'Brasil', 'Brazil', 'AM', 'BRL', 'R$', 2, 'pt-BR', 'en', 5.5, 0.85, 17, 'ICMS', [['Leroy Merlin', 1.0], ['Telhanorte', 1.04], ['C&C', 0.98]], { taxEditable: true }],
+  ['BR', 'Brasil', 'Brazil', 'AM', 'BRL', 'R$', 2, 'pt-BR', 'pt', 5.5, 0.85, 17, 'ICMS', [['Leroy Merlin', 1.0], ['Telhanorte', 1.04], ['C&C', 0.98]], { taxEditable: true }],
 
   // ---------------- Europe ----------------
-  ['AT', 'Austria', 'Austria', 'EU', 'EUR', '€', 2, 'de-AT', 'en', 0.92, 1.15, 20, 'USt', [['Bauhaus', 0.99], ['Hornbach', 1.0], ['OBI', 1.02]]],
-  ['BE', 'Bélgica', 'Belgium', 'EU', 'EUR', '€', 2, 'nl-BE', 'en', 0.92, 1.15, 21, 'TVA/BTW', [['Brico', 1.0], ['Gamma', 1.01], ['Hubo', 0.98]]],
+  ['AT', 'Austria', 'Austria', 'EU', 'EUR', '€', 2, 'de-AT', 'de', 0.92, 1.15, 20, 'USt', [['Bauhaus', 0.99], ['Hornbach', 1.0], ['OBI', 1.02]]],
+  ['BE', 'Bélgica', 'Belgium', 'EU', 'EUR', '€', 2, 'fr-BE', 'fr', 0.92, 1.15, 21, 'TVA/BTW', [['Brico', 1.0], ['Gamma', 1.01], ['Hubo', 0.98]]],
   ['BG', 'Bulgaria', 'Bulgaria', 'EU', 'EUR', '€', 2, 'bg-BG', 'en', 0.92, 0.7, 20, 'DDS', [['Bauhaus', 1.0], ['Mr. Bricolage', 1.03], ['Praktis', 0.96]]],
   ['HR', 'Croacia', 'Croatia', 'EU', 'EUR', '€', 2, 'hr-HR', 'en', 0.92, 0.85, 25, 'PDV', [['Bauhaus', 1.0], ['Hornbach', 1.02], ['Merkur', 0.98]]],
   ['CZ', 'Chequia', 'Czechia', 'EU', 'CZK', 'Kč', 2, 'cs-CZ', 'en', 23, 0.85, 21, 'DPH', [['Hornbach', 1.0], ['OBI', 1.02], ['Bauhaus', 0.99]]],
   ['DK', 'Dinamarca', 'Denmark', 'EU', 'DKK', 'kr.', 2, 'da-DK', 'en', 6.9, 1.35, 25, 'Moms', [['Bauhaus', 1.0], ['Jem & Fix', 0.97], ['XL-BYG', 1.03]]],
   ['EE', 'Estonia', 'Estonia', 'EU', 'EUR', '€', 2, 'et-EE', 'en', 0.92, 0.95, 24, 'KM', [['Bauhaus', 1.0], ['K-Rauta', 1.02], ['Ehituse ABC', 0.97]]],
   ['FI', 'Finlandia', 'Finland', 'EU', 'EUR', '€', 2, 'fi-FI', 'en', 0.92, 1.25, 25.5, 'ALV', [['K-Rauta', 1.02], ['Bauhaus', 1.0], ['Stark', 0.98]]],
-  ['FR', 'Francia', 'France', 'EU', 'EUR', '€', 2, 'fr-FR', 'en', 0.92, 1.15, 20, 'TVA', [['Leroy Merlin', 1.02], ['Castorama', 1.0], ['Brico Dépôt', 0.93], ['Bricomarché', 0.99]]],
-  ['DE', 'Alemania', 'Germany', 'EU', 'EUR', '€', 2, 'de-DE', 'en', 0.92, 1.15, 19, 'MwSt', [['OBI', 1.02], ['Bauhaus', 0.99], ['Hornbach', 1.0], ['Hagebau', 1.03]]],
+  ['FR', 'Francia', 'France', 'EU', 'EUR', '€', 2, 'fr-FR', 'fr', 0.92, 1.15, 20, 'TVA', [['Leroy Merlin', 1.02], ['Castorama', 1.0], ['Brico Dépôt', 0.93], ['Bricomarché', 0.99]]],
+  ['DE', 'Alemania', 'Germany', 'EU', 'EUR', '€', 2, 'de-DE', 'de', 0.92, 1.15, 19, 'MwSt', [['OBI', 1.02], ['Bauhaus', 0.99], ['Hornbach', 1.0], ['Hagebau', 1.03]]],
   ['GR', 'Grecia', 'Greece', 'EU', 'EUR', '€', 2, 'el-GR', 'en', 0.92, 0.95, 24, 'FPA', [['Leroy Merlin', 1.0], ['Bauhaus', 0.99]]],
   ['HU', 'Hungría', 'Hungary', 'EU', 'HUF', 'Ft', 0, 'hu-HU', 'en', 365, 0.8, 27, 'AFA', [['Bauhaus', 1.0], ['OBI', 1.02], ['Leroy Merlin', 0.99]]],
   ['IS', 'Islandia', 'Iceland', 'EU', 'ISK', 'kr', 0, 'is-IS', 'en', 138, 1.4, 24, 'VSK', [['Byko', 1.0], ['Húsasmiðjan', 1.02]]],
   ['IE', 'Irlanda', 'Ireland', 'EU', 'EUR', '€', 2, 'en-IE', 'en', 0.92, 1.2, 23, 'VAT', [["Woodie's", 1.0], ['Chadwicks', 0.98], ['Screwfix', 0.96]]],
-  ['IT', 'Italia', 'Italy', 'EU', 'EUR', '€', 2, 'it-IT', 'en', 0.92, 1.05, 22, 'IVA', [['Leroy Merlin', 1.02], ['Brico io', 0.98], ['OBI', 1.0], ['Bricocenter', 0.99]]],
+  ['IT', 'Italia', 'Italy', 'EU', 'EUR', '€', 2, 'it-IT', 'it', 0.92, 1.05, 22, 'IVA', [['Leroy Merlin', 1.02], ['Brico io', 0.98], ['OBI', 1.0], ['Bricocenter', 0.99]]],
   ['LV', 'Letonia', 'Latvia', 'EU', 'EUR', '€', 2, 'lv-LV', 'en', 0.92, 0.95, 21, 'PVN', [['Depo', 0.97], ['K-Rauta', 1.02], ['Bauhaus', 1.0]]],
   ['LT', 'Lituania', 'Lithuania', 'EU', 'EUR', '€', 2, 'lt-LT', 'en', 0.92, 0.95, 21, 'PVM', [['Senukai', 1.0], ['Bauhaus', 1.01], ['Ermitažas', 0.98]]],
   ['LU', 'Luxemburgo', 'Luxembourg', 'EU', 'EUR', '€', 2, 'fr-LU', 'en', 0.92, 1.2, 17, 'TVA', [['Bauhaus', 1.0], ['Hornbach', 1.02], ['Hubo', 0.99]]],
   ['NL', 'Países Bajos', 'Netherlands', 'EU', 'EUR', '€', 2, 'nl-NL', 'en', 0.92, 1.15, 21, 'BTW', [['Gamma', 1.0], ['Karwei', 1.01], ['Praxis', 0.98], ['Hornbach', 1.02]]],
   ['NO', 'Noruega', 'Norway', 'EU', 'NOK', 'kr', 2, 'nb-NO', 'en', 10.7, 1.45, 25, 'Mva', [['Byggmax', 0.95], ['Obs Bygg', 1.0], ['Maxbo', 1.03], ['Montér', 1.02]]],
   ['PL', 'Polonia', 'Poland', 'EU', 'PLN', 'zł', 2, 'pl-PL', 'en', 4.0, 0.8, 23, 'VAT', [['Leroy Merlin', 1.0], ['Castorama', 1.02], ['OBI', 1.03], ['Bricomarché', 0.97]]],
-  ['PT', 'Portugal', 'Portugal', 'EU', 'EUR', '€', 2, 'pt-PT', 'en', 0.92, 0.95, 23, 'IVA', [['Leroy Merlin', 1.0], ['Maxmat', 0.97], ['Bricomarché', 0.98], ['Aki', 1.02]]],
+  ['PT', 'Portugal', 'Portugal', 'EU', 'EUR', '€', 2, 'pt-PT', 'pt', 0.92, 0.95, 23, 'IVA', [['Leroy Merlin', 1.0], ['Maxmat', 0.97], ['Bricomarché', 0.98], ['Aki', 1.02]]],
   ['RO', 'Rumanía', 'Romania', 'EU', 'RON', 'lei', 2, 'ro-RO', 'en', 4.6, 0.75, 21, 'TVA', [['Dedeman', 0.95], ['Leroy Merlin', 1.02], ['Hornbach', 1.03]]],
   ['SK', 'Eslovaquia', 'Slovakia', 'EU', 'EUR', '€', 2, 'sk-SK', 'en', 0.92, 0.9, 23, 'DPH', [['Bauhaus', 1.0], ['Hornbach', 1.02], ['OBI', 1.03]]],
   ['SI', 'Eslovenia', 'Slovenia', 'EU', 'EUR', '€', 2, 'sl-SI', 'en', 0.92, 0.95, 22, 'DDV', [['Merkur', 1.0], ['Bauhaus', 0.99], ['Hornbach', 1.02]]],
@@ -112,15 +112,59 @@ function build([code, es, en, continent, currency, symbol, digits, locale, lang,
 
 export const REGIONS = Object.freeze(Object.fromEntries(RAW.map((r) => [r[0], Object.freeze(build(r))])));
 export const REGION_CODES = Object.freeze(Object.keys(REGIONS));
-export const LANGS = Object.freeze(['es', 'en']);
+export const LANGS = Object.freeze(['es', 'en', 'pt', 'fr', 'it', 'de']);
+
+/** Native language names for the language selector (never translated, so users can always find theirs). */
+export const LANG_NAMES = Object.freeze({
+  es: 'Español',
+  en: 'English',
+  pt: 'Português',
+  fr: 'Français',
+  it: 'Italiano',
+  de: 'Deutsch',
+});
+
+/** Default number/date locale per language (used when the region's own locale speaks another language). */
+export const LANG_LOCALES = Object.freeze({
+  es: 'es-ES',
+  en: 'en-US',
+  pt: 'pt-PT',
+  fr: 'fr-FR',
+  it: 'it-IT',
+  de: 'de-DE',
+});
+
+/** Language bound to a country: the language the app switches to when that country is picked. */
+export function langForRegion(code) {
+  return REGIONS[code]?.lang || 'en';
+}
 export const CONTINENTS = Object.freeze(['AM', 'EU']);
 
 export function getRegion(code) {
   return REGIONS[code] || null;
 }
 
+const displayNames = {};
+function intlName(code, lang) {
+  try {
+    displayNames[lang] ??= new Intl.DisplayNames([lang], { type: 'region' });
+    const n = displayNames[lang].of(code);
+    return n && n !== code ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Country name in the requested language (es/en hand-curated; pt/fr/it/de via Intl.DisplayNames). */
 export function regionName(region, lang) {
-  return region.name[lang] || region.name.es;
+  return region.name[lang] || intlName(region.code, lang) || region.name.en || region.name.es;
+}
+
+/** Localised label of a reference chain (generic chains are translated; brand names stay as they are). */
+export function chainLabel(chain, t) {
+  const key = `chain.${chain.id}`;
+  const v = t(key);
+  return v === key ? chain.name : v;
 }
 
 /** Accent/case-insensitive text normaliser used by the country search. */
@@ -140,7 +184,7 @@ export function searchRegions(query, lang = 'es') {
   const all = Object.values(REGIONS);
   const hits = q
     ? all.filter((r) => {
-        const hay = [r.name.es, r.name.en, r.code, r.currency, r.symbol, ...r.chains.map((c) => c.name)].map(normalizeSearch);
+        const hay = [r.name.es, r.name.en, regionName(r, lang), r.code, r.currency, r.symbol, ...r.chains.map((c) => c.name)].map(normalizeSearch);
         return hay.some((h) => h.includes(q));
       })
     : all;

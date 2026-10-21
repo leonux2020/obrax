@@ -42,7 +42,7 @@ export default function Wizard({ draft, setDraft, photos, setPhotos, company, on
 
   return (
     <div className="mx-auto w-full max-w-5xl px-3 pb-32 pt-4 sm:px-4">
-      <nav aria-label="Progress" className="no-print mb-5">
+      <nav aria-label={t('nav.progress')} className="no-print mb-5">
         <ol className="flex items-center gap-1 sm:gap-2">
           {steps.map((s, i) => {
             const done = i < step;

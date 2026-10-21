@@ -26,7 +26,7 @@ export function memoryBackend() {
   };
 }
 
-function idbBackend(factory) {
+export function idbBackend(factory) {
   let dbPromise;
   const open = () =>
     (dbPromise ??= new Promise((resolve, reject) => {

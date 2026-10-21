@@ -17,7 +17,7 @@ export default class ErrorBoundary extends Component {
 
   render() {
     if (!this.state.failed) return this.props.children;
-    const d = document.documentElement.lang === 'en' ? DICT.en : DICT.es;
+    const d = DICT[document.documentElement.lang] || DICT.es;
     return (
       <main role="alert" className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 text-center">
         <h1 className="text-2xl font-extrabold">{d['err.title']}</h1>

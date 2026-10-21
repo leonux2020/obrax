@@ -411,3 +411,37 @@ Object.assign(EXTRA.en, {
   'photo.pdfTitle': 'Visual field record',
   'photo.pdfClientTitle': 'Photographic record',
 });
+
+// ---- language switcher, live camera, PDF file names -------------------------------------------
+Object.assign(EXTRA.es, {
+  'lang.label': 'Idioma',
+  'lang.switch': 'Cambiar idioma',
+  'photo.camera': 'Tomar foto',
+  'photo.shoot': 'Disparar',
+  'photo.upload': 'Subir archivo',
+  'photo.cameraTitle': 'Cámara',
+  'photo.cameraFor': 'Foto: {slot}',
+  'photo.cameraStarting': 'Iniciando cámara…',
+  'photo.cameraHint': 'Encuadra la zona y pulsa Disparar.',
+  'photo.cameraDenied': 'No se pudo acceder a la cámara. Sube un archivo desde tu dispositivo.',
+  'pdf.file.client': 'Presupuesto',
+  'pdf.file.tech': 'Tecnico',
+});
+Object.assign(EXTRA.en, {
+  'lang.label': 'Language',
+  'lang.switch': 'Change language',
+  'photo.camera': 'Take photo',
+  'photo.shoot': 'Shoot',
+  'photo.upload': 'Upload file',
+  'photo.cameraTitle': 'Camera',
+  'photo.cameraFor': 'Photo: {slot}',
+  'photo.cameraStarting': 'Starting camera…',
+  'photo.cameraHint': 'Frame the area and press Shoot.',
+  'photo.cameraDenied': 'Camera unavailable. Upload a file from your device.',
+  'pdf.file.client': 'Quotation',
+  'pdf.file.tech': 'Technical',
+});
+
+Object.assign(EXTRA.es, {'nav.progress': 'Progreso', 'chain.ferreterialocal': 'Ferretería local', 'chain.mayoristadeconstruccion': 'Mayorista de construcción', 'chain.localhardwarestore': 'Ferretería local', 'chain.buildingsupplywholesaler': 'Mayorista de construcción'});
+
+Object.assign(EXTRA.en, {'nav.progress': 'Progress', 'chain.ferreterialocal': 'Local hardware store', 'chain.mayoristadeconstruccion': 'Building supply wholesaler', 'chain.localhardwarestore': 'Local hardware store', 'chain.buildingsupplywholesaler': 'Building supply wholesaler'});

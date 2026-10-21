@@ -1,7 +1,17 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
-import { MAX_PHOTOS, PHOTO_SLOTS, PhotoError, compressImage, countPhotos, putPhoto, removePhoto } from '../lib/photos.js';
+import {
+  MAX_PHOTOS,
+  PHOTO_SLOTS,
+  PhotoError,
+  compressImage,
+  countPhotos,
+  putPhoto,
+  removePhoto,
+  shouldUseLiveCamera,
+} from '../lib/photos.js';
 import { photoStore } from '../lib/photoStore.js';
+import CameraModal from './CameraModal.jsx';
 
 /**
  * Field photo evidence: exactly MAX_PHOTOS named slots, camera or gallery, compressed on the device
@@ -9,16 +19,28 @@ import { photoStore } from '../lib/photoStore.js';
  */
 export default function PhotoGallery({ photos, setPhotos }) {
   const { t } = useI18n();
-  const cameraRef = useRef(null);
-  const galleryRef = useRef(null);
+  const cameraRef = useRef(null); // mobile: native camera via capture="environment"
+  const galleryRef = useRef(null); // file picker (also the fallback when the live camera is unavailable)
   const pending = useRef(0);
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState('');
+  const [live, setLive] = useState(null); // slot index while the in-app camera modal is open
+
+  // Mobile keeps the OS camera app; desktop with getUserMedia gets the in-app live camera.
+  const liveCamera = useMemo(() => shouldUseLiveCamera(), []);
+
+  const persist = async (slot, compressed) => {
+    const saved = await photoStore.save({ ...compressed, slot });
+    setPhotos((prev) => putPhoto(prev, slot, saved));
+  };
+
+  const fail = (err) => setError(err instanceof PhotoError ? t(`photo.err.${err.code}`) : t('photo.err.store'));
 
   const pick = (slot, source) => {
     pending.current = slot;
     setError('');
-    (source === 'camera' ? cameraRef : galleryRef).current?.click();
+    if (source === 'camera' && liveCamera) setLive(slot);
+    else (source === 'camera' ? cameraRef : galleryRef).current?.click();
   };
 
   const onFile = async (e) => {
@@ -28,14 +50,31 @@ export default function PhotoGallery({ photos, setPhotos }) {
     if (!file || !(slot >= 0 && slot < MAX_PHOTOS)) return;
     setBusy(slot);
     try {
-      const compressed = await compressImage(file);
-      const saved = await photoStore.save({ ...compressed, slot });
-      setPhotos((prev) => putPhoto(prev, slot, saved));
+      await persist(slot, await compressImage(file));
     } catch (err) {
-      setError(err instanceof PhotoError ? t(`photo.err.${err.code}`) : t('photo.err.store'));
+      fail(err);
     } finally {
       setBusy(null);
     }
+  };
+
+  const onLiveCapture = async (photo) => {
+    const slot = live;
+    setLive(null);
+    setBusy(slot);
+    try {
+      await persist(slot, photo);
+    } catch (err) {
+      fail(err);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // Fallback from the modal: close it and open the plain file picker (fresh user gesture = allowed).
+  const uploadInstead = () => {
+    setLive(null);
+    galleryRef.current?.click();
   };
 
   const remove = async (slot) => {
@@ -72,7 +111,15 @@ export default function PhotoGallery({ photos, setPhotos }) {
             <li key={key} className="overflow-hidden rounded-xl border border-neutral-800 bg-black">
               <div className="relative flex aspect-[4/3] items-center justify-center bg-neutral-950">
                 {photo ? (
-                  <img src={photo.dataUrl} alt={label} className="h-full w-full object-cover" draggable="false" />
+                  <img
+                    src={photo.dataUrl}
+                    alt={label}
+                    width={photo.width}
+                    height={photo.height}
+                    decoding="async"
+                    className="h-full w-full bg-black object-cover"
+                    draggable="false"
+                  />
                 ) : (
                   <span className="px-2 text-center text-sm text-neutral-500">{working ? t('photo.processing') : t('photo.empty')}</span>
                 )}
@@ -116,6 +163,14 @@ export default function PhotoGallery({ photos, setPhotos }) {
         <p role="alert" className="text-sm font-semibold text-red-400">
           {error}
         </p>
+      )}
+      {live !== null && (
+        <CameraModal
+          slotLabel={t(`photo.slot.${PHOTO_SLOTS[live]}`)}
+          onCapture={onLiveCapture}
+          onClose={() => setLive(null)}
+          onUpload={uploadInstead}
+        />
       )}
     </section>
   );

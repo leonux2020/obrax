@@ -43,8 +43,8 @@ export function pdfSafe(input) {
 }
 
 /** "CLP 1.234.567" - ISO code + localised number: unambiguous and always printable in a PDF. */
-export function pdfMoneyFormatter(region) {
-  const fmt = new Intl.NumberFormat(region.locale, {
+export function pdfMoneyFormatter(region, locale = region.locale) {
+  const fmt = new Intl.NumberFormat(locale, {
     minimumFractionDigits: region.digits,
     maximumFractionDigits: region.digits,
   });
@@ -58,7 +58,9 @@ export function pdfFileName(prefix, projectName, date = new Date()) {
     .replace(/[^A-Za-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 40);
-  const d = date.toISOString().slice(0, 10);
+  // Local calendar date (toISOString would be UTC and shift the day late in the evening).
+  const pad = (n) => String(n).padStart(2, '0');
+  const d = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   return `${prefix}${slug ? `-${slug}` : ''}-${d}.pdf`;
 }
 
@@ -388,7 +390,7 @@ export async function renderClientPdf(model, { money, logo = null, appName = 'Ob
 
 // ---- TECHNICAL dossier ------------------------------------------------------------------------------------
 /** @param model buildTechModel() result @param ctx {t, money, logo, appName} */
-export async function renderTechPdf(model, { t, money, logo = null, appName = 'Obrax', photos = [] }) {
+export async function renderTechPdf(model, { t, money, num = (n) => String(n), logo = null, appName = 'Obrax', photos = [] }) {
   const doc = await newDoc(`${model.heading} - ${model.project}`, model.company.name);
   const w = new Writer(doc, appName);
   w.header(model, { logo, title: model.heading.toUpperCase() });
@@ -480,7 +482,7 @@ export async function renderTechPdf(model, { t, money, logo = null, appName = 'O
       [`${t('fin.laborLine')} (${c.laborPct}%)`, money(c.labor)],
       [`${t('fin.transportLine')} (${c.transportPct}%)`, money(c.transport)],
       [t('com.subtotalNet'), money(c.subtotal)],
-      [t('com.taxLine', { name: c.taxName, rate: new Intl.NumberFormat('es', { maximumFractionDigits: 2 }).format(c.taxRate * 100) }), money(c.tax)],
+      [t('com.taxLine', { name: c.taxName, rate: num(c.taxRate * 100) }), money(c.tax)],
     ],
     { size: 9, footerRow: [t('fin.total'), money(c.total)] }
   );

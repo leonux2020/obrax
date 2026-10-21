@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { MAX_PRICE } from '../../lib/pricing.js';
 import { createRateLimiter, humanVerified } from '../../lib/shield.js';
+import { chainLabel } from '../../lib/regions.js';
 import { Badge, Button, NumberField } from '../ui.jsx';
 
 export default function StepPrices({ draft, setDraft, result, now, onRefresh }) {
@@ -13,7 +14,7 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh }) 
 
   if (!result.valid) return null;
 
-  const chainName = (id) => region.chains.find((c) => c.id === id)?.name ?? id;
+  const chainName = (id) => chainLabel(region.chains.find((x) => x.id === id) || { id, name: id }, t);
   const cheapest = Math.min(...region.chains.map((c) => result.chainTotals[c.id]));
 
   const setOverride = (id, n) =>
@@ -34,7 +35,7 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh }) 
 
   const chips = [
     { id: 'best', label: t('prices.best'), total: result.chainTotals.best },
-    ...region.chains.map((c) => ({ id: c.id, label: c.name, total: result.chainTotals[c.id] })),
+    ...region.chains.map((c) => ({ id: c.id, label: chainLabel(c, t), total: result.chainTotals[c.id] })),
   ];
 
   return (

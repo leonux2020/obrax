@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { REGIONS, regionName } from '../lib/regions.js';
+import { REGIONS, regionName, chainLabel } from '../lib/regions.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { Button, Logo } from './ui.jsx';
 import RegionCombobox from './RegionCombobox.jsx';
+import LangSelect from './LangSelect.jsx';
 
 const pct = (rate) => `${Math.round(rate * 1000) / 10}%`;
 
-export default function RegionSelect({ initial, onConfirm, onCancel }) {
+export default function RegionSelect({ initial, onConfirm, onCancel, onChangeLang }) {
   const { t, lang } = useI18n();
   const [code, setCode] = useState(initial || null);
   const region = code ? REGIONS[code] : null;
@@ -15,10 +16,11 @@ export default function RegionSelect({ initial, onConfirm, onCancel }) {
     <main className="mx-auto flex min-h-screen w-full max-w-xl flex-col px-4 py-8">
       <header className="mb-6 flex items-center gap-4">
         <Logo size={56} />
-        <div>
+        <div className="mr-auto">
           <h1 className="text-2xl font-extrabold tracking-tight">{t('app.name')}</h1>
           <p className="text-neutral-300">{t('app.tagline')}</p>
         </div>
+        {onChangeLang && <LangSelect onChange={onChangeLang} />}
       </header>
 
       <p className="mb-4 text-neutral-300">{t('region.subtitle')}</p>
@@ -41,7 +43,7 @@ export default function RegionSelect({ initial, onConfirm, onCancel }) {
           </div>
           <p className="mt-3 text-sm text-neutral-300">
             <span className="font-semibold text-white">{t('region.chains')}:</span>{' '}
-            {region.chains.map((c) => c.name).join(' · ')}
+            {region.chains.map((c) => chainLabel(c, t)).join(' · ')}
           </p>
           {region.generic && <p className="mt-1 text-xs text-neutral-400">{t('region.genericChains')}</p>}
         </section>

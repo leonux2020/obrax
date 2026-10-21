@@ -1,4 +1,8 @@
 import { EXTRA } from './dict2.js';
+import { PT } from './dict_pt.js';
+import { FR } from './dict_fr.js';
+import { IT } from './dict_it.js';
+import { DE } from './dict_de.js';
 
 export const DICT = {
   es: {
@@ -465,3 +469,13 @@ export const DICT = {
 // v2 additions (multi-partida projects, new tasks, country combobox, PDFs, local profile)
 Object.assign(DICT.es, EXTRA.es);
 Object.assign(DICT.en, EXTRA.en);
+
+// v3: six-language engine. company.taxId.* are language-independent legal terms
+// (national tax-ID names), so every language reuses the ES set.
+const TAX_KEYS = Object.keys(DICT.es).filter((k) => k.startsWith('company.taxId.'));
+for (const [code, dict] of Object.entries({ pt: PT, fr: FR, it: IT, de: DE })) {
+  DICT[code] = { ...dict };
+  for (const k of TAX_KEYS) DICT[code][k] = DICT.es[k];
+}
+
+export const LANG_CODES = ['es', 'en', 'pt', 'fr', 'it', 'de'];

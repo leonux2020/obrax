@@ -1,13 +1,19 @@
 import { createContext, useContext, useMemo } from 'react';
 import { DICT } from './dict.js';
-import { getRegion } from './regions.js';
+import { getRegion, LANG_LOCALES } from './regions.js';
+
+/** Number/date locale for the active language: the region's own locale when it speaks that language. */
+export function effectiveLocale(lang, region) {
+  if (region && region.locale.split('-')[0] === lang) return region.locale;
+  return LANG_LOCALES[lang] || LANG_LOCALES.es;
+}
 
 const I18nContext = createContext(null);
 
 export function makeI18n(lang, regionCode) {
   const region = getRegion(regionCode);
   const dict = DICT[lang] || DICT.es;
-  const locale = region ? region.locale : lang === 'en' ? 'en-US' : 'es-ES';
+  const locale = effectiveLocale(DICT[lang] ? lang : 'es', region);
   const digits = region ? region.digits : 2;
 
   const t = (key, params) => {

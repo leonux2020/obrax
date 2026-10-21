@@ -7,6 +7,7 @@
 //                      breakdown, waste, leftovers inventory and the internal cost structure.
 
 import { TASKS } from './tasks.js';
+import { chainLabel } from './regions.js';
 
 export const partidaTitle = (p, t) => p.name || t(`task.${p.task}`);
 
@@ -104,7 +105,7 @@ export function clientSummaryText(model, money, appName) {
 /** Technical dossier for the contractor / foreman. */
 export function buildTechModel({ draft, result, company, region, t, num, unit, money, date }) {
   const q = result.quote;
-  const chainName = (id) => region.chains.find((c) => c.id === id)?.name ?? id;
+  const chainName = (id) => chainLabel(region.chains.find((x) => x.id === id) || { id, name: id }, t);
   const qty = (n, base, digits = 2) => `${num(n, digits)} ${unit(base)}`;
 
   const partidas = result.partidas.map((p, k) => {

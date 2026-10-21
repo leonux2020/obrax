@@ -7,7 +7,8 @@ export const PHOTO_SLOTS = Object.freeze(['panoramic', 'existing', 'details', 'l
 
 export const PHOTO_LIMITS = Object.freeze({
   maxSide: 1200, // px, width or height
-  targetBytes: 150_000, // ~120-150 KB per image
+  targetBytes: 150_000, // quality loop aims here (~100-150 KB per image)
+  acceptBytes: 160_000, // upper bound accepted before shrinking the image further
   startQuality: 0.82,
   minQuality: 0.45,
   maxInputBytes: 40 * 1024 * 1024, // refuse absurd inputs before decoding
@@ -112,66 +113,170 @@ export class PhotoError extends Error {
   }
 }
 
+/** Default canvas factory; tests inject their own so the pipeline runs in Node. */
+const domCanvas = () => document.createElement('canvas');
+
+/**
+ * Draw `source` into a NEW canvas of exactly dw x dh. The canvas size is always set explicitly
+ * (an unsized canvas is 300x150 and produces the classic pixelated/cropped result) and the smoothing
+ * flags are applied AFTER resizing, because changing width/height resets the 2D context state.
+ */
+export function drawScaled(source, dw, dh, makeCanvas = domCanvas) {
+  const canvas = makeCanvas();
+  canvas.width = dw;
+  canvas.height = dh;
+  const ctx = canvas.getContext('2d', { alpha: false });
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.fillStyle = '#ffffff'; // JPEG has no alpha
+  ctx.fillRect(0, 0, dw, dh);
+  ctx.drawImage(source, 0, 0, dw, dh);
+  return canvas;
+}
+
+/**
+ * High quality downscale. Browsers sample only a few source pixels when a big image is shrunk in one
+ * go (aliasing / "pixelated" look), so we halve repeatedly until the last step is < 2x.
+ */
+export function downscale(source, sw, sh, tw, th, makeCanvas = domCanvas) {
+  let cur = source;
+  let cw = sw;
+  let ch = sh;
+  let temp = null;
+  while (cw / 2 >= tw && ch / 2 >= th) {
+    const nw = Math.max(tw, Math.floor(cw / 2));
+    const nh = Math.max(th, Math.floor(ch / 2));
+    const next = drawScaled(cur, nw, nh, makeCanvas);
+    if (temp) releaseCanvas(temp);
+    temp = next;
+    cur = next;
+    cw = nw;
+    ch = nh;
+  }
+  const out = drawScaled(cur, tw, th, makeCanvas);
+  if (temp) releaseCanvas(temp);
+  return out;
+}
+
+function releaseCanvas(c) {
+  try {
+    c.width = 0;
+    c.height = 0;
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Encode a canvas as JPEG starting at quality 0.82 and lowering it until the target size is met. */
+export function encodeJpeg(canvas, { targetBytes = PHOTO_LIMITS.targetBytes } = {}) {
+  let q = PHOTO_LIMITS.startQuality;
+  let dataUrl = canvas.toDataURL('image/jpeg', q);
+  while (dataUrlBytes(dataUrl) > targetBytes && q > PHOTO_LIMITS.minQuality) {
+    q = Math.max(PHOTO_LIMITS.minQuality, Math.round((q - 0.07) * 100) / 100);
+    dataUrl = canvas.toDataURL('image/jpeg', q);
+  }
+  return { dataUrl, quality: q };
+}
+
+/**
+ * Shared compressor for BOTH inputs (file picker and live camera frame). `source` must already be
+ * decoded (ImageBitmap, loaded <img>, <video> with a frame) and `width/height` its intrinsic size.
+ * Output: proportional size, longest side <= 1200 px, JPEG ~100-160 KB.
+ */
+export function compressSource(source, width, height, { now = Date.now(), makeCanvas = domCanvas } = {}) {
+  let { width: tw, height: th } = fitSize(width, height);
+  if (!tw) throw new PhotoError('decode');
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const canvas = downscale(source, width, height, tw, th, makeCanvas);
+    const { dataUrl } = encodeJpeg(canvas);
+    releaseCanvas(canvas);
+    const bytes = dataUrlBytes(dataUrl);
+    if (bytes <= PHOTO_LIMITS.acceptBytes || attempt === 5) {
+      const photo = normalizePhoto({ slot: 0, dataUrl, width: tw, height: th, at: now });
+      if (!photo) throw new PhotoError('decode');
+      return photo;
+    }
+    // Still too heavy at minimum quality: shrink a little (keeps proportions) and retry from the ORIGINAL.
+    tw = Math.max(1, Math.round(tw * 0.85));
+    th = Math.max(1, Math.round(th * 0.85));
+  }
+  throw new PhotoError('decode');
+}
+
+/** Decode an <img> fully before anyone measures it (img.decode(), with an onload fallback). */
+export async function loadImageElement(url, ImageCtor = globalThis.Image) {
+  const el = new ImageCtor();
+  el.decoding = 'async';
+  const loaded = new Promise((resolve, reject) => {
+    el.onload = () => resolve();
+    el.onerror = () => reject(new PhotoError('decode'));
+  });
+  el.src = url;
+  if (typeof el.decode === 'function') {
+    try {
+      await el.decode();
+    } catch {
+      await loaded; // decode() can reject for some formats that still load fine
+    }
+  } else {
+    await loaded;
+  }
+  if (!(el.naturalWidth > 0 && el.naturalHeight > 0)) throw new PhotoError('decode');
+  return el;
+}
+
 async function decode(file) {
   if (typeof createImageBitmap === 'function') {
     try {
       // 'from-image' applies the EXIF orientation so phone photos are never rotated wrongly.
       const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
-      return { source: bmp, width: bmp.width, height: bmp.height, close: () => bmp.close?.() };
+      if (bmp.width > 0 && bmp.height > 0) {
+        return { source: bmp, width: bmp.width, height: bmp.height, close: () => bmp.close?.() };
+      }
     } catch {
       /* fall through to <img> */
     }
   }
   const url = URL.createObjectURL(file);
   try {
-    const img = await new Promise((resolve, reject) => {
-      const el = new Image();
-      el.onload = () => resolve(el);
-      el.onerror = () => reject(new PhotoError('decode'));
-      el.src = url;
-    });
+    const img = await loadImageElement(url); // fully decoded before measuring / drawing
     return { source: img, width: img.naturalWidth, height: img.naturalHeight, close: () => {} };
   } finally {
     URL.revokeObjectURL(url);
   }
 }
 
-/**
- * Resize to at most 1200 px and re-encode as JPEG, lowering quality (and, as a last resort, size)
- * until the file is ~150 KB. Keeps mobile RAM, storage and battery under control.
- */
-export async function compressImage(file, now = Date.now()) {
+/** File picker / gallery / mobile camera capture -> compressed photo. */
+export async function compressImage(file, now = Date.now(), env = {}) {
   if (!file || typeof file.type !== 'string' || !file.type.startsWith('image/')) throw new PhotoError('type');
   if (file.size > PHOTO_LIMITS.maxInputBytes) throw new PhotoError('size');
-
-  const img = await decode(file);
+  const img = await (env.decode || decode)(file);
   try {
-    let { width, height } = fitSize(img.width, img.height);
-    if (!width) throw new PhotoError('decode');
-    const canvas = document.createElement('canvas');
-    for (let attempt = 0; attempt < 6; attempt += 1) {
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#ffffff'; // JPEG has no alpha
-      ctx.fillRect(0, 0, width, height);
-      ctx.drawImage(img.source, 0, 0, width, height);
-      let q = PHOTO_LIMITS.startQuality;
-      let dataUrl = canvas.toDataURL('image/jpeg', q);
-      while (dataUrlBytes(dataUrl) > PHOTO_LIMITS.targetBytes && q > PHOTO_LIMITS.minQuality) {
-        q = Math.max(PHOTO_LIMITS.minQuality, q - 0.07);
-        dataUrl = canvas.toDataURL('image/jpeg', q);
-      }
-      if (dataUrlBytes(dataUrl) <= PHOTO_LIMITS.targetBytes * 1.2 || attempt === 5) {
-        const photo = normalizePhoto({ slot: 0, dataUrl, width, height, at: now });
-        if (!photo) throw new PhotoError('decode');
-        return photo;
-      }
-      width = Math.max(1, Math.round(width * 0.85));
-      height = Math.max(1, Math.round(height * 0.85));
-    }
-    throw new PhotoError('decode');
+    return compressSource(img.source, img.width, img.height, { now, makeCanvas: env.makeCanvas });
   } finally {
-    img.close();
+    img.close?.();
   }
+}
+
+/** Live camera frame (<video>) -> compressed photo, using exactly the same pipeline. */
+export function compressVideoFrame(video, now = Date.now(), env = {}) {
+  const width = video?.videoWidth;
+  const height = video?.videoHeight;
+  if (!(width > 0 && height > 0)) throw new PhotoError('decode');
+  return compressSource(video, width, height, { now, makeCanvas: env.makeCanvas });
+}
+
+/**
+ * Desktop-class device with a webcam API => in-app live camera modal.
+ * Phones/tablets (coarse pointer) keep the native camera via <input capture="environment">.
+ * Without getUserMedia (insecure origin, old browser) we fall back to the file input.
+ */
+export function shouldUseLiveCamera(nav = globalThis.navigator, matchMedia = globalThis.matchMedia) {
+  if (!nav?.mediaDevices || typeof nav.mediaDevices.getUserMedia !== 'function') return false;
+  try {
+    if (typeof matchMedia === 'function' && matchMedia.call(globalThis, '(pointer: coarse)').matches) return false;
+  } catch {
+    /* ignore */
+  }
+  return true;
 }

@@ -264,7 +264,7 @@ function TechView({ model, photos, onEditCompany }) {
 
 export default function StepReport({ draft, setDraft, result, photos, company, onEditCompany, onNewProject }) {
   const i18n = useI18n();
-  const { t, region } = i18n;
+  const { t, region, locale, num } = i18n;
   const [view, setView] = useState('client');
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(null); // 'client' | 'tech' | null
@@ -313,7 +313,7 @@ export default function StepReport({ draft, setDraft, result, photos, company, o
     try {
       // pdf.js loads the jsPDF engine on demand, so it never weighs on the first paint.
       const logo = await rasterizeLogo(ICON_DATA_URI);
-      const money = pdfMoneyFormatter(region);
+      const money = pdfMoneyFormatter(region, locale);
       const appName = t('app.name');
       const base = { money, logo, appName };
       let doc;
@@ -324,9 +324,9 @@ export default function StepReport({ draft, setDraft, result, photos, company, o
           photosTitle: t('photo.pdfClientTitle'),
         });
       } else {
-        doc = await renderTechPdf(buildTechModel({ ...ctx, money }), { ...base, t, photos: reportPhotos });
+        doc = await renderTechPdf(buildTechModel({ ...ctx, money }), { ...base, t, num, photos: reportPhotos });
       }
-      savePdf(doc, pdfFileName(kind === 'client' ? 'Presupuesto' : 'Tecnico', draft.project.name));
+      savePdf(doc, pdfFileName(kind === 'client' ? t('pdf.file.client') : t('pdf.file.tech'), draft.project.name));
     } catch {
       setPdfError(true);
     } finally {

@@ -96,7 +96,7 @@ export default function CompanyModal({ company, onSave, onClose }) {
           <TextField label={taxLabel} value={form.taxId} onChange={set('taxId')} maxLength={20} sanitize={sanitizeTaxId} placeholder={t(`company.taxId.ph.${region.code}`)} />
           <TextField label={t('company.phone')} value={form.phone} onChange={set('phone')} maxLength={24} sanitize={sanitizePhone} placeholder="+00 000 000 000" />
           <div>
-            <TextField label={t('company.email')} value={form.email} onChange={set('email')} maxLength={120} sanitize={sanitizeEmailInput} placeholder="nombre@empresa.com" />
+            <TextField label={t('company.email')} value={form.email} onChange={set('email')} maxLength={120} sanitize={sanitizeEmailInput} placeholder="name@company.com" />
             {emailError && (
               <p role="alert" className="mt-1.5 text-sm font-semibold text-red-400">
                 {t('company.emailInvalid')}

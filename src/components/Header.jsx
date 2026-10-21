@@ -1,8 +1,9 @@
 import { useI18n } from '../lib/i18n.jsx';
 import { regionName } from '../lib/regions.js';
+import LangSelect from './LangSelect.jsx';
 import { Logo } from './ui.jsx';
 
-export default function Header({ user, company, onEditCompany, onChangeRegion, onToggleLang, onLogout, pwa }) {
+export default function Header({ user, company, onEditCompany, onChangeRegion, onChangeLang, onLogout, pwa }) {
   const { t, region, lang } = useI18n();
   return (
     <>
@@ -62,15 +63,7 @@ export default function Header({ user, company, onEditCompany, onChangeRegion, o
             <span className="hidden sm:inline"> · {region.currency} {region.symbol}</span>
             <span className="sr-only"> {regionName(region, lang)}</span>
           </button>
-          <button
-            type="button"
-            onClick={onToggleLang}
-            className="min-h-[44px] rounded-lg border border-neutral-700 px-3 text-sm font-bold uppercase hover:border-brand"
-            aria-label={t('lang.switch')}
-            title={t('lang.switch')}
-          >
-            {lang === 'es' ? 'EN' : 'ES'}
-          </button>
+          <LangSelect onChange={onChangeLang} />
           <button
             type="button"
             onClick={onLogout}
