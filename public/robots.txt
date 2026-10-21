@@ -1,0 +1,36 @@
+# Cubicador Pro - the pricing/calculation engine is proprietary.
+User-agent: *
+Allow: /
+Disallow: /assets/
+
+# AI training / bulk scrapers
+User-agent: GPTBot
+Disallow: /
+User-agent: ChatGPT-User
+Disallow: /
+User-agent: OAI-SearchBot
+Disallow: /
+User-agent: CCBot
+Disallow: /
+User-agent: anthropic-ai
+Disallow: /
+User-agent: ClaudeBot
+Disallow: /
+User-agent: Google-Extended
+Disallow: /
+User-agent: PerplexityBot
+Disallow: /
+User-agent: Bytespider
+Disallow: /
+User-agent: Amazonbot
+Disallow: /
+User-agent: Applebot-Extended
+Disallow: /
+User-agent: FacebookBot
+Disallow: /
+User-agent: Diffbot
+Disallow: /
+User-agent: omgili
+Disallow: /
+User-agent: ImagesiftBot
+Disallow: /
