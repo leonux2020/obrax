@@ -2,7 +2,7 @@ import { EXTRA } from './dict2.js';
 
 export const DICT = {
   es: {
-    'app.name': 'Cubicador Pro',
+    'app.name': 'Obrax',
     'app.tagline': 'Cubicación y presupuestos de obra',
     'common.next': 'Siguiente',
     'common.back': 'Atrás',
@@ -176,7 +176,7 @@ export const DICT = {
     'report.copied': 'Copiado',
     'report.newProject': 'Nuevo proyecto',
     'report.confirmNew': '¿Borrar este proyecto y empezar uno nuevo?',
-    'report.generatedBy': 'Generado con Cubicador Pro',
+    'report.generatedBy': 'Generado con Obrax',
     'tech.heading': 'Reporte técnico de obra',
     'tech.task': 'Trabajo',
     'tech.measures': 'Medidas ingresadas',
@@ -232,7 +232,7 @@ export const DICT = {
   },
 
   en: {
-    'app.name': 'Cubicador Pro',
+    'app.name': 'Obrax',
     'app.tagline': 'Construction takeoff & quotes',
     'common.next': 'Next',
     'common.back': 'Back',
@@ -406,7 +406,7 @@ export const DICT = {
     'report.copied': 'Copied',
     'report.newProject': 'New project',
     'report.confirmNew': 'Delete this project and start a new one?',
-    'report.generatedBy': 'Generated with Cubicador Pro',
+    'report.generatedBy': 'Generated with Obrax',
     'tech.heading': 'Technical site report',
     'tech.task': 'Job',
     'tech.measures': 'Entered measures',

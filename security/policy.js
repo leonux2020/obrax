@@ -7,7 +7,7 @@ export const CSP_DIRECTIVES = {
   'default-src': ["'self'"],
   'script-src': ["'self'", 'https://accounts.google.com/gsi/client'],
   'style-src': ["'self'", 'https://accounts.google.com/gsi/style'],
-  'img-src': ["'self'", 'data:', 'https://*.googleusercontent.com'],
+  'img-src': ["'self'", 'data:', 'blob:', 'https://*.googleusercontent.com'],
   'font-src': ["'self'"],
   'connect-src': ["'self'", 'https://accounts.google.com/gsi/'],
   'frame-src': ['https://accounts.google.com/gsi/'],

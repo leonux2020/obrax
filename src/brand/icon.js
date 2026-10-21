@@ -3,8 +3,10 @@
 // This file must stay free of browser/node-only imports (it is imported by the Vite plugin too).
 
 export const BRAND = Object.freeze({
-  name: 'Cubicador Pro',
-  shortName: 'Cubicador',
+  name: 'Obrax',
+  shortName: 'Obrax',
+  appId: 'com.obrax.app',
+  title: 'Obrax - Cubicación & Presupuestos de Obra',
   description:
     'Cubicación, materiales y presupuestos de obra para profesionales de la construcción. Funciona sin conexión.',
   green: '#22c55e',
@@ -55,7 +57,7 @@ export function buildIconSvg({ maskable = false } = {}) {
     : art;
 
   return (
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Cubicador Pro">' +
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Obrax">' +
     '<defs><linearGradient id="hat" x1="0" y1="0" x2="0" y2="1">' +
     '<stop offset="0" stop-color="#4ade80"/><stop offset="1" stop-color="#16a34a"/></linearGradient></defs>' +
     `<rect width="512" height="512" rx="${maskable ? 0 : 112}" fill="#000000"/>` +
@@ -82,7 +84,7 @@ export const PNG_ICONS = Object.freeze([
 /** Manifest generated from brand data, so name/icons never drift apart. */
 export function buildManifest() {
   return {
-    id: './',
+    id: BRAND.appId,
     name: BRAND.name,
     short_name: BRAND.shortName,
     description: BRAND.description,

@@ -1,8 +1,8 @@
 {
-  "name": "cubicador-pro",
+  "name": "obrax",
   "private": true,
   "version": "1.0.0",
-  "description": "Cubicador Pro - PWA de cubicación y presupuestos para profesionales de la construcción",
+  "description": "Obrax - PWA de cubicación y presupuestos para profesionales de la construcción",
   "type": "module",
   "engines": {
     "node": ">=18.17"

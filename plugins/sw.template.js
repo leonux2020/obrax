@@ -1,6 +1,6 @@
-/* Cubicador Pro service worker. Generated at build: version + precache list are injected below. */
+/* Obrax service worker. Generated at build: version + precache list are injected below. */
 const VERSION = '__VERSION__';
-const CACHE = `cubicador-${VERSION}`;
+const CACHE = `obrax-${VERSION}`;
 const PRECACHE = __PRECACHE__;
 const SHELL = './index.html';
 
@@ -19,7 +19,7 @@ self.addEventListener('activate', (event) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((k) => k.startsWith('cubicador-') && k !== CACHE).map((k) => caches.delete(k)))
+        Promise.all(keys.filter((k) => (k.startsWith('obrax-') || k.startsWith('cubicador-')) && k !== CACHE).map((k) => caches.delete(k)))
       )
   );
 });

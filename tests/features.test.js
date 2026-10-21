@@ -308,7 +308,7 @@ describe('client budget: strict confidentiality', () => {
   });
 
   it('the copy/share text is equally confidential', () => {
-    const text = clientSummaryText(model, base.money, 'Cubicador Pro').toLowerCase();
+    const text = clientSummaryText(model, base.money, 'Obrax').toLowerCase();
     for (const chain of REGIONS.CL.chains) expect(text.includes(chain.name.toLowerCase())).toBe(false);
     expect(text).toContain('partida 1');
   });
@@ -357,7 +357,7 @@ describe('PDF generation', () => {
     const base = ctxFor(projectDraft('CL'));
     const model = buildClientModel(base);
     const money = pdfMoneyFormatter(base.region);
-    const doc = await renderClientPdf(model, { money, appName: 'Cubicador Pro' });
+    const doc = await renderClientPdf(model, { money, appName: 'Obrax' });
     const s = text(doc);
     expect(s.startsWith('%PDF')).toBe(true);
     expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(1);
@@ -380,7 +380,7 @@ describe('PDF generation', () => {
     const base = ctxFor(projectDraft('CL'));
     const money = pdfMoneyFormatter(base.region);
     const model = buildTechModel({ ...base, money });
-    const doc = await renderTechPdf(model, { t: base.t, money, appName: 'Cubicador Pro' });
+    const doc = await renderTechPdf(model, { t: base.t, money, appName: 'Obrax' });
     const s = text(doc);
     expect(s.startsWith('%PDF')).toBe(true);
     const names = REGIONS.CL.chains.map((c) => c.name);

@@ -103,6 +103,7 @@ export function newDraft(regionCode, mode = 'quick') {
     finance: { labor: FINANCE_LIMITS.labor.default, transport: FINANCE_LIMITS.transport.default, tax: null },
     chainId: 'best',
     overrides: {},
+    attachPhotos: false, // also print the field photos on the client budget (they are always in the technical dossier)
     regionCode: region ? region.code : null,
   };
 }
@@ -167,6 +168,7 @@ export function normalizeDraft(obj, regionCode) {
     finance,
     chainId,
     overrides,
+    attachPhotos: obj.attachPhotos === true,
     regionCode,
   };
 }

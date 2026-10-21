@@ -4,9 +4,10 @@ import { sanitizeText } from '../../lib/sanitize.js';
 import { newPartida } from '../../lib/draft.js';
 import { Segmented, TextField } from '../ui.jsx';
 import TaskPicker from '../TaskPicker.jsx';
+import PhotoGallery from '../PhotoGallery.jsx';
 
 /** Step 0: choose the working mode, then the task (quick) or the project identity (accumulated). */
-export default function StepStart({ draft, setDraft }) {
+export default function StepStart({ draft, setDraft, photos, setPhotos }) {
   const { t } = useI18n();
 
   const setMode = (mode) =>
@@ -84,6 +85,8 @@ export default function StepStart({ draft, setDraft }) {
           />
         </div>
       </div>
+
+      <PhotoGallery photos={photos} setPhotos={setPhotos} />
     </section>
   );
 }

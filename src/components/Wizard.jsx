@@ -14,7 +14,7 @@ const STEPS = {
   project: ['project', 'partidas', 'prices', 'finance', 'report'],
 };
 
-export default function Wizard({ draft, setDraft, company, onEditCompany, onNewProject }) {
+export default function Wizard({ draft, setDraft, photos, setPhotos, company, onEditCompany, onNewProject }) {
   const { t } = useI18n();
   const [now, setNow] = useState(() => Date.now());
   const [showErrors, setShowErrors] = useState(false);
@@ -78,7 +78,7 @@ export default function Wizard({ draft, setDraft, company, onEditCompany, onNewP
         </ol>
       </nav>
 
-      {step === 0 && <StepStart draft={draft} setDraft={setDraft} />}
+      {step === 0 && <StepStart draft={draft} setDraft={setDraft} photos={photos} setPhotos={setPhotos} />}
       {step === 1 && draft.mode === 'quick' && (
         <StepDims draft={draft} setDraft={setDraft} result={result} showErrors={showErrors} />
       )}
@@ -90,7 +90,15 @@ export default function Wizard({ draft, setDraft, company, onEditCompany, onNewP
       )}
       {step === 3 && <StepFinance draft={draft} setDraft={setDraft} result={result} />}
       {step === 4 && (
-        <StepReport draft={draft} result={result} company={company} onEditCompany={onEditCompany} onNewProject={onNewProject} />
+        <StepReport
+          draft={draft}
+          setDraft={setDraft}
+          result={result}
+          photos={photos}
+          company={company}
+          onEditCompany={onEditCompany}
+          onNewProject={onNewProject}
+        />
       )}
 
       <div className="no-print fixed inset-x-0 bottom-0 z-20 border-t border-neutral-800 bg-black/95 px-3 py-3 backdrop-blur [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">

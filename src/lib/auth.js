@@ -54,7 +54,7 @@ export function userFromCredential(credential, { clientId = GOOGLE_CLIENT_ID, no
   };
 }
 
-export const demoUser = () => ({ provider: 'demo', name: 'Usuario Demo', email: 'demo@cubicador.pro', picture: '' });
+export const demoUser = () => ({ provider: 'demo', name: 'Usuario Demo', email: 'demo@obrax.app', picture: '' });
 export const guestUser = () => ({ provider: 'guest', name: 'Invitado', email: '', picture: '' });
 
 /** Local profile: no account, no network. Name is optional and stays on this device. */

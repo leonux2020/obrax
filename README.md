@@ -1,4 +1,4 @@
-# Cubicador Pro
+# Obrax
 
 PWA (React + Vite + Tailwind) para cubicación y presupuestos de obra. Tema OLED (negro puro, texto blanco, acentos verdes), instalable y 100 % funcional sin conexión.
 
@@ -11,6 +11,8 @@ PWA (React + Vite + Tailwind) para cubicación y presupuestos de obra. Tema OLED
 - **Formatos comerciales indivisibles**: la necesidad geométrica se convierte en unidades de venta enteras (paños de malla, rollos, planchas, perfiles de 2,40 m, sacos, cajas, bolsones, galones y tinetas), siempre hacia arriba, con sobrante reutilizable y su valor (`src/lib/catalog.js`, `src/lib/pricing.js`).
 - Motor de precios simulados por cadena con corrección manual por ítem.
 - **Dos PDF independientes**: *PDF Cliente* (A4 blanco corporativo: cabecera de empresa con RUT/CIF/RFC según país, partidas, subtotal neto, impuesto oficial, total, validez y firmas; **sin tiendas, sin precios unitarios y sin sobrantes**) y *PDF Técnico* (métricas, plan de compra en unidades comerciales, compras por tienda, mermas, **Inventario de Sobrantes Reutilizables** y estructura de costos interna). Se generan con jsPDF, cargado bajo demanda (`src/lib/pdf.js`, modelos puros en `src/lib/reports.js`).
+- **Evidencia visual en terreno** (máx. 4 fotos por proyecto: panorámica, estructura existente, encuentros/detalles, logística/acceso): cámara (`capture="environment"`) o galería, compresión en el dispositivo a máx. 1200 px y ≈150 KB (JPEG), guardado local en IndexedDB y galería OLED con reemplazo y borrado rápido. Van en una cuadrícula 2×2 del PDF Técnico y, opcionalmente, del PDF Cliente (`src/lib/photos.js`, `src/lib/photoStore.js`).
+- Contrapiso nivelante opcional en pisos: su cemento y arena se suman a los del radier y la albañilería en una sola línea de compra.
 - Configuración de empresa/profesional guardada solo en el dispositivo.
 - **Perfil local sin fricción**: entras directo (nombre opcional, todo queda en el dispositivo). El botón de Google solo aparece si defines `VITE_GOOGLE_CLIENT_ID`.
 

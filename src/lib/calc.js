@@ -139,25 +139,30 @@ export function calcRoof({ length, width, slope, overhang = 0, roofing = 'zinc',
 }
 
 // ---- floors / coverings ----------------------------------------------------------
-export const FLOOR = Object.freeze({ adhesiveKgPerM2: 4.5, groutKgPerM2: 0.5 });
+// screedThicknessM: levelling screed (carpeta nivelante) under the tiles, mortar 1:4 -> shares cement and sand with slabs and walls.
+export const FLOOR = Object.freeze({ adhesiveKgPerM2: 4.5, groutKgPerM2: 0.5, screedThicknessM: 0.04 });
 export const FLOOR_FORMATS = Object.freeze(['30', '45', '60']);
 
-export function calcFloor({ length, width, openings = 0, format = '45' }) {
+export function calcFloor({ length, width, openings = 0, format = '45', screed = 0 }) {
   const gross = length * width;
   const net = Math.max(0, gross - openings);
   const id = `floor_${FLOOR_FORMATS.includes(String(format)) ? format : '45'}`;
-  return {
-    metrics: [
-      { key: 'grossArea', value: r2(gross), unit: 'm2' },
-      { key: 'netArea', value: r2(net), unit: 'm2' },
-    ],
-    // The cut-waste % of the partida is applied by the purchase planner; boxes are always whole.
-    lines: [
-      { id, qty: net },
-      { id: 'adhesive', qty: net * FLOOR.adhesiveKgPerM2 },
-      { id: 'grout', qty: net * FLOOR.groutKgPerM2 },
-    ],
-  };
+  const screedM3 = Number(screed) === 1 ? net * FLOOR.screedThicknessM : 0;
+  const metrics = [
+    { key: 'grossArea', value: r2(gross), unit: 'm2' },
+    { key: 'netArea', value: r2(net), unit: 'm2' },
+  ];
+  // The cut-waste % of the partida is applied by the purchase planner; boxes are always whole.
+  const lines = [
+    { id, qty: net },
+    { id: 'adhesive', qty: net * FLOOR.adhesiveKgPerM2 },
+    { id: 'grout', qty: net * FLOOR.groutKgPerM2 },
+  ];
+  if (screedM3 > 0) {
+    metrics.push({ key: 'screedVolume', value: r2(screedM3), unit: 'm3' });
+    lines.push({ id: 'cement_bag', qty: screedM3 * MORTAR.cementBagsPerM3 }, { id: 'sand', qty: screedM3 * MORTAR.sandM3PerM3 });
+  }
+  return { metrics, lines };
 }
 
 // ---- paints / finishes --------------------------------------------------------------

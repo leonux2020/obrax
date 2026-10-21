@@ -71,7 +71,10 @@ export const TASKS = Object.freeze({
       { key: 'width', unit: 'm', min: 0.1, max: 500, decimals: 2, required: true },
       { key: 'openings', unit: 'm2', min: 0, max: 500, decimals: 2, required: false, default: 0 },
     ],
-    options: [{ key: 'format', values: ['30', '45', '60'], default: '45' }],
+    options: [
+      { key: 'format', values: ['30', '45', '60'], default: '45' },
+      { key: 'screed', values: YES_NO, default: 0 },
+    ],
   },
   paint: {
     id: 'paint',

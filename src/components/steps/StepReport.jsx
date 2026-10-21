@@ -10,7 +10,26 @@ import {
   savePdf,
 } from '../../lib/pdf.js';
 import { ICON_DATA_URI } from '../../brand/icon.js';
+import { photosForReport, countPhotos } from '../../lib/photos.js';
 import { Button, Logo } from '../ui.jsx';
+
+/** On-screen 2x2 photo grid (also what gets printed). */
+function PhotoGrid({ title, photos }) {
+  if (!photos.length) return null;
+  return (
+    <section className="mt-6 break-inside-avoid">
+      <h3 className="mb-2 text-lg font-bold text-brand">{title}</h3>
+      <ul className="grid grid-cols-2 gap-3">
+        {photos.map((p) => (
+          <li key={p.slot}>
+            <img src={p.dataUrl} alt={p.label} className="aspect-[4/3] w-full rounded-lg border border-neutral-800 object-cover" />
+            <p className="mt-1 text-sm text-neutral-300">{p.label}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 function CompanyBlock({ company, onEditCompany }) {
   const { t } = useI18n();
@@ -67,8 +86,8 @@ function Row({ label, value, strong, muted }) {
 }
 
 /** What the CLIENT receives: chapters, net subtotal, official tax, total. No stores, unit prices or leftovers. */
-function ClientView({ model, onEditCompany }) {
-  const { money } = useI18n();
+function ClientView({ model, photos, onEditCompany }) {
+  const { t, money } = useI18n();
   return (
     <article className="report-sheet card" aria-label={model.heading}>
       <Heading model={model} onEditCompany={onEditCompany} />
@@ -99,6 +118,7 @@ function ClientView({ model, onEditCompany }) {
         <span className="text-3xl font-black tabular-nums">{money(model.total)}</span>
       </div>
       <p className="mt-4 text-sm text-neutral-300">{model.validity}</p>
+      <PhotoGrid title={t('photo.pdfClientTitle')} photos={photos} />
       <div className="mt-10 grid gap-8 sm:grid-cols-2">
         <div className="border-t border-neutral-500 pt-1 text-sm text-neutral-300">{model.signCompany}</div>
         <div className="border-t border-neutral-500 pt-1 text-sm text-neutral-300">{model.signClient}</div>
@@ -108,7 +128,7 @@ function ClientView({ model, onEditCompany }) {
 }
 
 /** Contractor / foreman dossier. Internal: contains stores, unit prices, leftovers and cost structure. */
-function TechView({ model, onEditCompany }) {
+function TechView({ model, photos, onEditCompany }) {
   const { t, money, num } = useI18n();
   return (
     <article className="report-sheet card" aria-label={model.heading}>
@@ -225,6 +245,8 @@ function TechView({ model, onEditCompany }) {
       />
       <Row label={t('fin.totalWithTax')} value={money(model.costs.total)} strong />
 
+      <PhotoGrid title={t('photo.pdfTitle')} photos={photos} />
+
       {model.notes.length > 0 && (
         <section className="mt-6">
           <h3 className="mb-1 text-lg font-bold text-brand">{t('tech.assumptions')}</h3>
@@ -240,7 +262,7 @@ function TechView({ model, onEditCompany }) {
   );
 }
 
-export default function StepReport({ draft, result, company, onEditCompany, onNewProject }) {
+export default function StepReport({ draft, setDraft, result, photos, company, onEditCompany, onNewProject }) {
   const i18n = useI18n();
   const { t, region } = i18n;
   const [view, setView] = useState('client');
@@ -259,6 +281,9 @@ export default function StepReport({ draft, result, company, onEditCompany, onNe
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [draft, result, company, i18n]
   );
+
+  const reportPhotos = useMemo(() => photosForReport(photos, i18n.t), [photos, i18n.t]);
+  const photoCount = countPhotos(photos);
 
   if (!result.valid) return null;
 
@@ -293,9 +318,13 @@ export default function StepReport({ draft, result, company, onEditCompany, onNe
       const base = { money, logo, appName };
       let doc;
       if (kind === 'client') {
-        doc = await renderClientPdf(buildClientModel(ctx), base);
+        doc = await renderClientPdf(buildClientModel(ctx), {
+          ...base,
+          photos: draft.attachPhotos ? reportPhotos : [],
+          photosTitle: t('photo.pdfClientTitle'),
+        });
       } else {
-        doc = await renderTechPdf(buildTechModel({ ...ctx, money }), { ...base, t });
+        doc = await renderTechPdf(buildTechModel({ ...ctx, money }), { ...base, t, photos: reportPhotos });
       }
       savePdf(doc, pdfFileName(kind === 'client' ? 'Presupuesto' : 'Tecnico', draft.project.name));
     } catch {
@@ -332,9 +361,25 @@ export default function StepReport({ draft, result, company, onEditCompany, onNe
       </div>
 
       {view === 'client' ? (
-        <ClientView model={clientModel} onEditCompany={onEditCompany} />
+        <ClientView model={clientModel} photos={draft.attachPhotos ? reportPhotos : []} onEditCompany={onEditCompany} />
       ) : (
-        <TechView model={techModel} onEditCompany={onEditCompany} />
+        <TechView model={techModel} photos={reportPhotos} onEditCompany={onEditCompany} />
+      )}
+
+      {photoCount > 0 && (
+        <label className="no-print card flex cursor-pointer items-start gap-3">
+          <input
+            type="checkbox"
+            role="switch"
+            checked={!!draft.attachPhotos}
+            onChange={(e) => setDraft((d) => ({ ...d, attachPhotos: e.target.checked }))}
+            className="mt-1 h-6 w-6 shrink-0 accent-green-500"
+          />
+          <span>
+            <span className="block font-bold">{t('photo.attach')}</span>
+            <span className="block text-sm text-neutral-400">{t('photo.attach.desc')}</span>
+          </span>
+        </label>
       )}
 
       <div className="no-print grid gap-3 sm:grid-cols-2">

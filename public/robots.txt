@@ -1,4 +1,4 @@
-# Cubicador Pro - the pricing/calculation engine is proprietary.
+# Obrax - the pricing/calculation engine is proprietary.
 User-agent: *
 Allow: /
 Disallow: /assets/

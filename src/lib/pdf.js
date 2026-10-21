@@ -265,6 +265,40 @@ class Writer {
     this.color(C.text);
   }
 
+  /** Balanced 2x2 photo grid (images are contained in equal cells, captions below). */
+  photoGrid(title, photos) {
+    if (!photos || photos.length === 0) return;
+    const gutter = 6;
+    const cellW = (CONTENT_W - gutter) / 2;
+    const imgH = 56;
+    const cellH = imgH + 8;
+    this.ensure(14 + cellH);
+    this.section(title);
+    photos.slice(0, 4).forEach((p, i) => {
+      const col = i % 2;
+      if (col === 0 && i > 0) this.y += cellH + 2;
+      if (col === 0) this.ensure(cellH);
+      const x = MARGIN + col * (cellW + gutter);
+      const y = this.y;
+      this.doc.setDrawColor(...C.line);
+      this.doc.setLineWidth(0.3);
+      this.doc.rect(x, y, cellW, imgH);
+      const k = Math.min(cellW / p.width, imgH / p.height);
+      const w = p.width * k;
+      const h = p.height * k;
+      try {
+        this.doc.addImage(p.dataUrl, 'JPEG', x + (cellW - w) / 2, y + (imgH - h) / 2, w, h, undefined, 'FAST');
+      } catch {
+        /* an undecodable photo must never break the document */
+      }
+      this.font('normal', 8.5);
+      this.color(C.muted);
+      this.text(p.label, x, y + imgH + 4.5, { maxWidth: cellW });
+    });
+    this.y += cellH + 4;
+    this.color(C.text);
+  }
+
   footers(leftText) {
     const total = this.doc.getNumberOfPages();
     for (let i = 1; i <= total; i += 1) {
@@ -283,13 +317,13 @@ class Writer {
 async function newDoc(title, author) {
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: typeof document !== 'undefined' }); // readable (uncompressed) in Node so tests can assert on the text
-  doc.setProperties({ title: pdfSafe(title), author: pdfSafe(author || ''), creator: 'Cubicador Pro' });
+  doc.setProperties({ title: pdfSafe(title), author: pdfSafe(author || ''), creator: 'Obrax' });
   return doc;
 }
 
 // ---- CLIENT budget ---------------------------------------------------------------------------------
 /** @param model buildClientModel() result @param ctx {money, logo, appName} */
-export async function renderClientPdf(model, { money, logo = null, appName = 'Cubicador Pro' }) {
+export async function renderClientPdf(model, { money, logo = null, appName = 'Obrax', photos = [], photosTitle = '' }) {
   const doc = await newDoc(`${model.heading} - ${model.project}`, model.company.name);
   const w = new Writer(doc, appName);
   w.header(model, { logo, title: model.heading.toUpperCase() });
@@ -333,6 +367,7 @@ export async function renderClientPdf(model, { money, logo = null, appName = 'Cu
   w.color(C.text);
 
   w.paragraph(model.validity, { size: 8.5, color: C.muted });
+  w.photoGrid(photosTitle, photos); // only when the caller opted in
 
   // signature lines
   w.ensure(38);
@@ -353,7 +388,7 @@ export async function renderClientPdf(model, { money, logo = null, appName = 'Cu
 
 // ---- TECHNICAL dossier ------------------------------------------------------------------------------------
 /** @param model buildTechModel() result @param ctx {t, money, logo, appName} */
-export async function renderTechPdf(model, { t, money, logo = null, appName = 'Cubicador Pro' }) {
+export async function renderTechPdf(model, { t, money, logo = null, appName = 'Obrax', photos = [] }) {
   const doc = await newDoc(`${model.heading} - ${model.project}`, model.company.name);
   const w = new Writer(doc, appName);
   w.header(model, { logo, title: model.heading.toUpperCase() });
@@ -449,6 +484,9 @@ export async function renderTechPdf(model, { t, money, logo = null, appName = 'C
     ],
     { size: 9, footerRow: [t('fin.total'), money(c.total)] }
   );
+
+  // visual field record
+  w.photoGrid(t('photo.pdfTitle'), photos);
 
   // assumptions
   w.section(t('tech.assumptions'));

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import { emptySlots } from './lib/photos.js';
+import { photoStore } from './lib/photoStore.js';
 import { I18nProvider } from './lib/i18n.jsx';
 import { getRegion } from './lib/regions.js';
 import {
@@ -29,6 +31,16 @@ export default function App() {
   const [pickingRegion, setPickingRegion] = useState(false);
   const [company, setCompany] = useState(loadCompany);
   const [editingCompany, setEditingCompany] = useState(false);
+  const [photos, setPhotos] = useState(emptySlots);
+
+  // Photos live in IndexedDB (not in the draft): load them once on start.
+  useEffect(() => {
+    let alive = true;
+    photoStore.load().then((p) => alive && setPhotos(p)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const region = getRegion(settings.region);
 
@@ -47,7 +59,11 @@ export default function App() {
       const r = getRegion(code);
       const changed = code !== settings.region;
       setSettings({ region: code, lang: changed ? r.lang : settings.lang });
-      if (changed || !draft) setDraft(newDraft(code, draft?.mode));
+      if (changed || !draft) {
+        setDraft(newDraft(code, draft?.mode));
+        photoStore.clear().catch(() => {});
+        setPhotos(emptySlots());
+      }
       setPickingRegion(false);
     },
     [settings, draft]
@@ -55,6 +71,8 @@ export default function App() {
 
   const newProject = useCallback(() => {
     clearDraft();
+    photoStore.clear().catch(() => {});
+    setPhotos(emptySlots());
     setDraft((d) => newDraft(settings.region, d?.mode));
   }, [settings.region]);
 
@@ -88,6 +106,8 @@ export default function App() {
           <Wizard
             draft={draft}
             setDraft={setDraft}
+            photos={photos}
+            setPhotos={setPhotos}
             company={company}
             onEditCompany={() => setEditingCompany(true)}
             onNewProject={newProject}
