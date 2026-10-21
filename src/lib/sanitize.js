@@ -68,3 +68,32 @@ export function sanitizeAvatarUrl(raw) {
 export function oneOf(value, allowed, fallback) {
   return allowed.includes(value) ? value : fallback;
 }
+
+/** Tax / fiscal id (RUT, NIF, RFC, NIT, RUC, EIN ...): letters, digits and . - / only. */
+export function sanitizeTaxId(raw, maxLen = 20) {
+  return String(raw ?? '')
+    .normalize('NFKC')
+    .replace(/[^A-Za-z0-9.\-/]/g, '')
+    .toUpperCase()
+    .slice(0, maxLen);
+}
+
+/** Phone: digits, one leading +, spaces, dashes and parentheses. */
+export function sanitizePhone(raw, maxLen = 24) {
+  const s = String(raw ?? '')
+    .normalize('NFKC')
+    .replace(/[^0-9+\-() ]/g, '')
+    .replace(/(?!^)\+/g, '')
+    .replace(/\s+/g, ' ')
+    .trimStart();
+  return s.slice(0, maxLen);
+}
+
+/** Live typing filter for an e-mail box (keeps partial input). Use sanitizeEmail for the final value. */
+export function sanitizeEmailInput(raw, maxLen = 120) {
+  return String(raw ?? '')
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^a-z0-9._%+\-@]/g, '')
+    .slice(0, maxLen);
+}

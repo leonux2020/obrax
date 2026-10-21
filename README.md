@@ -6,7 +6,9 @@ PWA (React + Vite + Tailwind) para cubicación y presupuestos de obra. Tema OLED
 
 - Selector de país al iniciar (Chile, España, México, Colombia, Perú, EE. UU.): fija moneda, idioma y cadenas de referencia.
 - Asistente paso a paso: Radier/losa, albañilería (bloques) y tabiquería drywall.
-- Motor de precios simulados por cadena, con corrección manual por ítem.
+- Formatos comerciales indivisibles: la necesidad geométrica se convierte en unidades de venta enteras (paños de malla 2,4×6 m, rollos de polietileno, planchas de drywall, perfiles de 2,40 m, sacos, cajas, rollos, baldes, bolsones de áridos), siempre redondeadas hacia arriba. El desglose muestra necesidad real, compra sugerida y sobrante reutilizable con su valor (`src/lib/catalog.js`, `planPurchase` en `src/lib/pricing.js`). Los montantes se agrupan por corte dentro de cada perfil.
+- Motor de precios simulados por cadena, con corrección manual por ítem (el precio manual es por unidad de venta).
+- Configuración de empresa/profesional (nombre, RUT/NIF/RFC según país, teléfono, correo, ciudad), guardada solo en el dispositivo e impresa en la cabecera de ambos reportes.
 - Parámetros financieros: mano de obra %, transporte %, merma %.
 - Reporte doble: **Vista técnica** (obra) y **Vista comercial** (cliente), con imprimir/PDF, compartir y copiar.
 - Login con Google: simulación por defecto; Google Identity Services real si defines `VITE_GOOGLE_CLIENT_ID`.

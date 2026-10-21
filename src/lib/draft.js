@@ -5,9 +5,17 @@ import { REGIONS, LANGS, getRegion } from './regions.js';
 import { TASKS, TASK_IDS, defaultDims } from './tasks.js';
 import { MATERIAL_IDS } from './catalog.js';
 import { MAX_PRICE } from './pricing.js';
-import { coerceNumber, sanitizeText, sanitizeEmail, sanitizeAvatarUrl, oneOf } from './sanitize.js';
+import {
+  coerceNumber,
+  sanitizeText,
+  sanitizeEmail,
+  sanitizeAvatarUrl,
+  sanitizeTaxId,
+  sanitizePhone,
+  oneOf,
+} from './sanitize.js';
 
-const KEYS = { settings: 'cp.settings.v1', user: 'cp.user.v1', draft: 'cp.draft.v1' };
+const KEYS = { settings: 'cp.settings.v1', user: 'cp.user.v1', draft: 'cp.draft.v1', company: 'cp.company.v1' };
 
 export const FINANCE_LIMITS = Object.freeze({
   labor: { min: 0, max: 150, step: 1, default: 35 },
@@ -57,6 +65,23 @@ export function normalizeUser(obj) {
 }
 export const loadUser = () => normalizeUser(read(KEYS.user));
 export const saveUser = (u) => write(KEYS.user, u);
+
+// ---- company / professional profile (printed on both reports) -------------
+export const EMPTY_COMPANY = Object.freeze({ name: '', taxId: '', phone: '', email: '', city: '' });
+
+export function normalizeCompany(obj) {
+  if (!obj || typeof obj !== 'object') return { ...EMPTY_COMPANY };
+  return {
+    name: sanitizeText(obj.name, 80).trim(),
+    taxId: sanitizeTaxId(obj.taxId),
+    phone: sanitizePhone(obj.phone).trim(),
+    email: sanitizeEmail(obj.email),
+    city: sanitizeText(obj.city, 60).trim(),
+  };
+}
+export const isCompanyEmpty = (c) => !c || Object.values(c).every((v) => !v);
+export const loadCompany = () => normalizeCompany(read(KEYS.company));
+export const saveCompany = (c) => write(KEYS.company, isCompanyEmpty(c) ? null : normalizeCompany(c));
 
 // ---- draft (project in progress) -------------------------------------------
 export function newDraft(regionCode) {

@@ -2,7 +2,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { regionName } from '../lib/regions.js';
 import { Logo } from './ui.jsx';
 
-export default function Header({ user, onChangeRegion, onToggleLang, onLogout, pwa }) {
+export default function Header({ user, company, onEditCompany, onChangeRegion, onToggleLang, onLogout, pwa }) {
   const { t, region, lang } = useI18n();
   return (
     <>
@@ -37,6 +37,20 @@ export default function Header({ user, onChangeRegion, onToggleLang, onLogout, p
               {t('pwa.install')}
             </button>
           )}
+          <button
+            type="button"
+            onClick={onEditCompany}
+            aria-label={t('company.open')}
+            title={company?.name || t('company.open')}
+            className={`flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-lg border px-3 text-sm font-bold hover:border-brand ${
+              company?.name ? 'border-brand/60' : 'border-neutral-700'
+            }`}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5M9 10h.01M15 10h.01M12 10h.01" />
+            </svg>
+            <span className="hidden md:inline">{t('company.short')}</span>
+          </button>
           <button
             type="button"
             onClick={onChangeRegion}

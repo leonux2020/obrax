@@ -3,32 +3,89 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { TASKS } from '../../lib/tasks.js';
 import { Button, Logo } from '../ui.jsx';
 
-function Heading({ title, project, subtitle }) {
-  const { t, date } = useI18n();
-  return (
-    <header className="mb-5 flex items-start gap-4 border-b border-neutral-700 pb-4">
-      <Logo size={56} className="shrink-0" />
-      <div className="min-w-0 flex-1">
-        <h2 className="text-xl font-extrabold leading-tight sm:text-2xl">{title}</h2>
-        {project && <p className="break-words text-lg font-semibold text-brand">{project}</p>}
-        <p className="text-sm text-neutral-300">{date()}</p>
-        {subtitle}
+function CompanyBlock({ company, onEditCompany }) {
+  const { t, region } = useI18n();
+  const has = company && Object.values(company).some(Boolean);
+  if (!has) {
+    return (
+      <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dashed border-neutral-700 px-4 py-3">
+        <p className="text-sm text-neutral-300">{t('company.empty')}</p>
+        <Button variant="secondary" className="!min-h-[44px] text-sm" onClick={onEditCompany}>
+          {t('company.configure')}
+        </Button>
       </div>
-      <span className="sr-only">{t('app.name')}</span>
-    </header>
+    );
+  }
+  const taxLabel = t(`company.taxId.${region.code}`);
+  const details = [
+    company.taxId && `${taxLabel}: ${company.taxId}`,
+    company.phone && `${t('company.phone')}: ${company.phone}`,
+    company.email && `${t('company.email')}: ${company.email}`,
+    company.city,
+  ].filter(Boolean);
+  return (
+    <div className="mb-4 rounded-xl border border-neutral-800 px-4 py-3" data-testid="company-block">
+      {company.name && <p className="break-words text-lg font-extrabold">{company.name}</p>}
+      {details.length > 0 && (
+        <p className="break-words text-sm text-neutral-300">
+          {details.map((d, i) => (
+            <span key={d}>
+              {i > 0 && <span aria-hidden="true"> · </span>}
+              {d}
+            </span>
+          ))}
+        </p>
+      )}
+    </div>
   );
 }
 
-function Technical({ draft, result }) {
+function Heading({ title, project, subtitle, company, onEditCompany }) {
+  const { t, date } = useI18n();
+  return (
+    <>
+      <CompanyBlock company={company} onEditCompany={onEditCompany} />
+      <header className="mb-5 flex items-start gap-4 border-b border-neutral-700 pb-4">
+        <Logo size={56} className="shrink-0" />
+        <div className="min-w-0 flex-1">
+          <h2 className="text-xl font-extrabold leading-tight sm:text-2xl">{title}</h2>
+          {project && <p className="break-words text-lg font-semibold text-brand">{project}</p>}
+          <p className="text-sm text-neutral-300">{date()}</p>
+          {subtitle}
+        </div>
+        <span className="sr-only">{t('app.name')}</span>
+      </header>
+    </>
+  );
+}
+
+function LeftoverText({ item }) {
+  const { num, unit } = useI18n();
+  if (item.leftover / item.saleSize < 0.01) return <span className="text-neutral-500">—</span>;
+  return (
+    <span>
+      {num(item.leftover, 2)} {unit(item.baseUnit)}
+    </span>
+  );
+}
+
+function Technical({ draft, result, company, onEditCompany }) {
   const { t, money, num, unit, region } = useI18n();
   const { quote, calc, values } = result;
   const chainLabel =
     draft.chainId === 'best' ? t('prices.best') : region.chains.find((c) => c.id === draft.chainId)?.name;
   const task = TASKS[draft.task];
+  // Remnants worth reusing: at least 1% of a sale unit (ignore floating-point crumbs).
+  const reusable = quote.items.filter((i) => i.leftover / i.saleSize >= 0.01);
 
   return (
     <article className="report-sheet card" aria-label={t('report.technical')}>
-      <Heading title={t('tech.heading')} project={draft.project.name || t(`task.${draft.task}`)} />
+      <Heading
+        title={t('tech.heading')}
+        project={draft.project.name || t(`task.${draft.task}`)}
+        company={company}
+        onEditCompany={onEditCompany}
+      />
 
       <div className="grid gap-5 md:grid-cols-2">
         <section>
@@ -71,7 +128,8 @@ function Technical({ draft, result }) {
       </div>
 
       <section className="mt-6">
-        <h3 className="mb-2 text-lg font-bold text-brand">{t('tech.materials')}</h3>
+        <h3 className="mb-1 text-lg font-bold text-brand">{t('tech.materials')}</h3>
+        <p className="mb-2 text-sm text-neutral-300">{t('tech.materials.hint')}</p>
         <ul className="divide-y divide-neutral-800 sm:hidden">
           {quote.items.map((i) => (
             <li key={i.id} className="py-3">
@@ -80,25 +138,40 @@ function Technical({ draft, result }) {
                 <span className="shrink-0 font-bold tabular-nums">{money(i.total)}</span>
               </div>
               <p className="mt-1 text-sm text-neutral-300">
-                {t('tech.col.net')}: {num(i.net)} {unit(i.unit)} · {t('tech.col.qty')}:{' '}
-                <b className="text-white">
-                  {num(i.qty)} {unit(i.unit)}
-                </b>
+                {t('tech.col.need')}: {num(i.need, 3)} {unit(i.baseUnit)} · {t('tech.col.qty')}: {num(i.needWaste, 3)}{' '}
+                {unit(i.baseUnit)}
               </p>
               <p className="text-sm text-neutral-300">
-                {t('tech.col.price')}: {money(i.unitPrice)}
+                {t('tech.col.buy')}:{' '}
+                <b className="text-white">
+                  {num(i.packs)} {unit(i.saleUnit)}
+                </b>
+                {i.saleSize !== 1 && (
+                  <span>
+                    {' '}
+                    ({num(i.purchased, 2)} {unit(i.baseUnit)})
+                  </span>
+                )}
+              </p>
+              <p className="text-sm text-brand-light">
+                {t('tech.col.leftover')}: <LeftoverText item={i} />
+              </p>
+              <p className="text-sm text-neutral-300">
+                {t('tech.col.price')}: {money(i.unitPrice)} / {unit(i.saleUnit)}
                 {i.source === 'manual' && ' *'}
               </p>
             </li>
           ))}
         </ul>
         <div className="hidden overflow-x-auto sm:block">
-          <table className="w-full min-w-[560px] text-left text-sm">
+          <table className="w-full min-w-[760px] text-left text-sm">
             <thead>
               <tr className="border-b border-neutral-600 text-neutral-300">
                 <th className="py-2 pr-2 font-semibold">{t('tech.col.material')}</th>
-                <th className="px-2 text-right font-semibold">{t('tech.col.net')}</th>
+                <th className="px-2 text-right font-semibold">{t('tech.col.need')}</th>
                 <th className="px-2 text-right font-semibold">{t('tech.col.qty')}</th>
+                <th className="px-2 text-right font-semibold">{t('tech.col.buy')}</th>
+                <th className="px-2 text-right font-semibold">{t('tech.col.leftover')}</th>
                 <th className="px-2 text-right font-semibold">{t('tech.col.price')}</th>
                 <th className="pl-2 text-right font-semibold">{t('tech.col.total')}</th>
               </tr>
@@ -108,13 +181,25 @@ function Technical({ draft, result }) {
                 <tr key={i.id} className="border-b border-neutral-800 align-top">
                   <td className="py-2 pr-2 font-semibold">{t(`mat.${i.id}`)}</td>
                   <td className="px-2 text-right tabular-nums">
-                    {num(i.net)} {unit(i.unit)}
+                    {num(i.need, 3)} {unit(i.baseUnit)}
+                  </td>
+                  <td className="px-2 text-right tabular-nums">
+                    {num(i.needWaste, 3)} {unit(i.baseUnit)}
                   </td>
                   <td className="px-2 text-right font-bold tabular-nums">
-                    {num(i.qty)} {unit(i.unit)}
+                    {num(i.packs)} {unit(i.saleUnit)}
+                    {i.saleSize !== 1 && (
+                      <span className="block text-xs font-normal text-neutral-400">
+                        {num(i.purchased, 2)} {unit(i.baseUnit)}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-2 text-right tabular-nums text-brand-light">
+                    <LeftoverText item={i} />
                   </td>
                   <td className="px-2 text-right tabular-nums">
                     {money(i.unitPrice)}
+                    <span className="block text-xs text-neutral-400">/ {unit(i.saleUnit)}</span>
                     {i.source === 'manual' && <span title={t('tech.manualPrice')}> *</span>}
                   </td>
                   <td className="pl-2 text-right font-bold tabular-nums">{money(i.total)}</td>
@@ -126,6 +211,31 @@ function Technical({ draft, result }) {
         <p className="mt-2 text-xs text-neutral-400">
           * {t('tech.manualPrice')} · {t('tech.chain')}: {chainLabel}
         </p>
+      </section>
+
+      <section className="mt-6 rounded-xl border border-brand/40 bg-brand/5 p-4" data-testid="leftover-summary">
+        <h3 className="mb-1 text-lg font-bold text-brand">{t('tech.leftover.title')}</h3>
+        {reusable.length === 0 ? (
+          <p className="text-sm text-neutral-300">{t('tech.leftover.none')}</p>
+        ) : (
+          <>
+            <ul className="space-y-1 text-sm">
+              {reusable.map((i) => (
+                <li key={i.id} className="flex justify-between gap-3">
+                  <span className="text-neutral-200">{t(`mat.${i.id}`)}</span>
+                  <span className="shrink-0 font-bold tabular-nums">
+                    {num(i.leftover, 2)} {unit(i.baseUnit)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 flex justify-between gap-3 border-t border-brand/30 pt-2 font-bold">
+              <span>{t('tech.leftover.value')}</span>
+              <span className="tabular-nums text-brand">{money(quote.leftoverValue)}</span>
+            </p>
+            <p className="mt-2 text-xs text-neutral-300">{t('tech.leftover.tip')}</p>
+          </>
+        )}
       </section>
 
       <section className="mt-6 grid gap-5 md:grid-cols-2">
@@ -175,7 +285,7 @@ function Technical({ draft, result }) {
   );
 }
 
-function Commercial({ draft, result }) {
+function Commercial({ draft, result, company, onEditCompany }) {
   const { t, money, num, region } = useI18n();
   const { quote, calc, values } = result;
   const metric = (k) => calc.metrics.find((m) => m.key === k)?.value ?? 0;
@@ -194,7 +304,7 @@ function Commercial({ draft, result }) {
 
   return (
     <article className="report-sheet card" aria-label={t('report.commercial')}>
-      <Heading title={t('com.heading')} project={draft.project.name} />
+      <Heading title={t('com.heading')} project={draft.project.name} company={company} onEditCompany={onEditCompany} />
 
       <dl className="mb-5 grid gap-2 sm:grid-cols-2">
         <div>
@@ -247,9 +357,16 @@ function Commercial({ draft, result }) {
   );
 }
 
-function summaryText({ draft, result, t, money, date }) {
+function summaryText({ draft, result, company, region, t, money, date }) {
   const q = result.quote;
+  const c = company || {};
   return [
+    c.name || null,
+    c.taxId ? `${t(`company.taxId.${region.code}`)}: ${c.taxId}` : null,
+    c.phone ? `${t('company.phone')}: ${c.phone}` : null,
+    c.email ? `${t('company.email')}: ${c.email}` : null,
+    c.city || null,
+    c.name || c.taxId || c.phone || c.email || c.city ? '' : null,
     `${t('app.name')} - ${t('com.heading')}`,
     `${t('com.project')}: ${draft.project.name || t(`task.${draft.task}`)}`,
     draft.project.client ? `${t('com.client')}: ${draft.project.client}` : null,
@@ -265,7 +382,7 @@ function summaryText({ draft, result, t, money, date }) {
     .join('\n');
 }
 
-export default function StepReport({ draft, result, onNewProject }) {
+export default function StepReport({ draft, result, company, onEditCompany, onNewProject }) {
   const i18n = useI18n();
   const { t } = i18n;
   const [view, setView] = useState('technical');
@@ -273,7 +390,7 @@ export default function StepReport({ draft, result, onNewProject }) {
 
   if (!result.valid) return null;
 
-  const text = () => summaryText({ draft, result, ...i18n });
+  const text = () => summaryText({ draft, result, company, ...i18n });
   const share = async () => {
     try {
       if (navigator.share) await navigator.share({ title: t('app.name'), text: text() });
@@ -315,7 +432,11 @@ export default function StepReport({ draft, result, onNewProject }) {
         ))}
       </div>
 
-      {view === 'technical' ? <Technical draft={draft} result={result} /> : <Commercial draft={draft} result={result} />}
+      {view === 'technical' ? (
+        <Technical draft={draft} result={result} company={company} onEditCompany={onEditCompany} />
+      ) : (
+        <Commercial draft={draft} result={result} company={company} onEditCompany={onEditCompany} />
+      )}
 
       <div className="no-print grid gap-2 sm:grid-cols-3">
         <Button onClick={() => window.print()}>{t('report.print')}</Button>

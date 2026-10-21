@@ -10,12 +10,16 @@ import {
   saveDraft,
   clearDraft,
   newDraft,
+  loadCompany,
+  saveCompany,
+  normalizeCompany,
 } from './lib/draft.js';
 import { usePWA } from './pwa/usePWA.js';
 import RegionSelect from './components/RegionSelect.jsx';
 import Login from './components/Login.jsx';
 import Header from './components/Header.jsx';
 import Wizard from './components/Wizard.jsx';
+import CompanyModal from './components/CompanyModal.jsx';
 
 export default function App() {
   const pwa = usePWA();
@@ -23,11 +27,14 @@ export default function App() {
   const [user, setUser] = useState(loadUser);
   const [draft, setDraft] = useState(() => loadDraft(loadSettings().region));
   const [pickingRegion, setPickingRegion] = useState(false);
+  const [company, setCompany] = useState(loadCompany);
+  const [editingCompany, setEditingCompany] = useState(false);
 
   const region = getRegion(settings.region);
 
   useEffect(() => saveSettings(settings), [settings]);
   useEffect(() => saveUser(user), [user]);
+  useEffect(() => saveCompany(company), [company]);
   useEffect(() => {
     if (draft) saveDraft(draft);
   }, [draft]);
@@ -72,11 +79,29 @@ export default function App() {
           <Header
             user={user}
             pwa={pwa}
+            company={company}
+            onEditCompany={() => setEditingCompany(true)}
             onChangeRegion={() => setPickingRegion(true)}
             onToggleLang={toggleLang}
             onLogout={logout}
           />
-          <Wizard draft={draft} setDraft={setDraft} onNewProject={newProject} />
+          <Wizard
+            draft={draft}
+            setDraft={setDraft}
+            company={company}
+            onEditCompany={() => setEditingCompany(true)}
+            onNewProject={newProject}
+          />
+          {editingCompany && (
+            <CompanyModal
+              company={company}
+              onClose={() => setEditingCompany(false)}
+              onSave={(c) => {
+                setCompany(normalizeCompany(c));
+                setEditingCompany(false);
+              }}
+            />
+          )}
         </>
       )}
     </I18nProvider>

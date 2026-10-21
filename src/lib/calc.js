@@ -68,8 +68,9 @@ export function calcDrywall({ length, height, thickness, openings = 0, faces = 2
   const gross = length * height;
   const net = Math.max(0, gross - openings);
   const plateArea = net * faces;
-  const studsPerRow = Math.floor(length / DRYWALL.studSpacing) + 1;
-  const rows = Math.ceil(height / DRYWALL.profileLength);
+  const studs = Math.floor(length / DRYWALL.studSpacing) + 1;
+  // Needs are expressed in the catalog BASE unit (m2, m, units, kg). Conversion to whole sale
+  // formats (boards, 2.4 m profiles, boxes, rolls, buckets) happens in planPurchase().
   return {
     metrics: [
       { key: 'grossArea', value: r2(gross), unit: 'm2' },
@@ -77,12 +78,13 @@ export function calcDrywall({ length, height, thickness, openings = 0, faces = 2
       { key: 'plateArea', value: r2(plateArea), unit: 'm2' },
     ],
     lines: [
-      { id: thickness <= 13 ? 'plate_125' : 'plate_15', qty: plateArea / DRYWALL.plateArea },
-      { id: 'stud', qty: studsPerRow * rows },
-      { id: 'track', qty: 2 * Math.ceil(length / DRYWALL.profileLength) },
-      { id: 'screws', qty: (plateArea * DRYWALL.screwsPerM2) / DRYWALL.screwsPerBox },
-      { id: 'tape', qty: (plateArea * DRYWALL.tapeMetersPerM2) / DRYWALL.tapeRollMeters },
-      { id: 'compound', qty: (plateArea * DRYWALL.compoundKgPerM2) / DRYWALL.compoundBucketKg },
+      { id: thickness <= 13 ? 'plate_125' : 'plate_15', qty: plateArea },
+      // Studs are cut pieces: the purchase plan packs them into 2.4 m profiles (offcuts become leftover).
+      { id: 'stud', qty: studs * height, cut: { count: studs, length: height } },
+      { id: 'track', qty: 2 * length },
+      { id: 'screws', qty: plateArea * DRYWALL.screwsPerM2 },
+      { id: 'tape', qty: plateArea * DRYWALL.tapeMetersPerM2 },
+      { id: 'compound', qty: plateArea * DRYWALL.compoundKgPerM2 },
     ],
   };
 }

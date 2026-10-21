@@ -88,10 +88,19 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh }) 
                 <div className="min-w-0">
                   <p className="font-bold leading-snug">{t(`mat.${item.id}`)}</p>
                   <p className="text-sm text-neutral-300">
+                    {t('prices.need')}: {num(item.needWaste, 2)} {unit(item.baseUnit)}
+                  </p>
+                  <p className="text-sm text-neutral-300">
                     {t('prices.qty')}:{' '}
                     <b className="text-white">
-                      {num(item.qty)} {unit(item.unit)}
+                      {num(item.packs)} {unit(item.saleUnit)}
                     </b>
+                    {item.saleSize !== 1 && (
+                      <span>
+                        {' '}
+                        ({num(item.purchased, 2)} {unit(item.baseUnit)})
+                      </span>
+                    )}
                   </p>
                 </div>
                 <p className="shrink-0 text-lg font-extrabold tabular-nums">{money(item.total)}</p>
@@ -116,7 +125,7 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh }) 
               </div>
               <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-neutral-300">
                 <Badge tone={manual ? 'white' : 'green'}>{manual ? t('prices.manual') : t('prices.ref')}</Badge>
-                {t('prices.ref')} {money(item.refPrice)} · {chainName(item.chainId)}
+                {t('prices.ref')} {money(item.refPrice)} / {unit(item.saleUnit)} · {chainName(item.chainId)}
               </p>
             </li>
           );

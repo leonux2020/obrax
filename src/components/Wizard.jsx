@@ -10,7 +10,7 @@ import StepReport from './steps/StepReport.jsx';
 
 const STEPS = ['task', 'dims', 'prices', 'finance', 'report'];
 
-export default function Wizard({ draft, setDraft, onNewProject }) {
+export default function Wizard({ draft, setDraft, company, onEditCompany, onNewProject }) {
   const { t } = useI18n();
   const [now, setNow] = useState(() => Date.now());
   const [showErrors, setShowErrors] = useState(false);
@@ -79,7 +79,9 @@ export default function Wizard({ draft, setDraft, onNewProject }) {
         <StepPrices draft={draft} setDraft={setDraft} result={result} now={now} onRefresh={() => setNow(Date.now())} />
       )}
       {step === 3 && <StepFinance draft={draft} setDraft={setDraft} result={result} />}
-      {step === 4 && <StepReport draft={draft} result={result} onNewProject={onNewProject} />}
+      {step === 4 && (
+        <StepReport draft={draft} result={result} company={company} onEditCompany={onEditCompany} onNewProject={onNewProject} />
+      )}
 
       <div className="no-print fixed inset-x-0 bottom-0 z-20 border-t border-neutral-800 bg-black/95 px-3 py-3 backdrop-blur [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto flex max-w-5xl gap-3">

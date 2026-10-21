@@ -7,12 +7,15 @@ import {
   sanitizeText,
   sanitizeEmail,
   sanitizeAvatarUrl,
+  sanitizeTaxId,
+  sanitizePhone,
+  sanitizeEmailInput,
 } from '../src/lib/sanitize.js';
 import { calcSlab, calcMasonry, calcDrywall } from '../src/lib/calc.js';
 import { validateDims } from '../src/lib/tasks.js';
-import { resolvePrices, buildQuote, referencePrice, applyWaste } from '../src/lib/pricing.js';
+import { resolvePrices, buildQuote, referencePrice, planPurchase, withWaste } from '../src/lib/pricing.js';
 import { REGIONS } from '../src/lib/regions.js';
-import { normalizeDraft, normalizeUser, newDraft } from '../src/lib/draft.js';
+import { normalizeDraft, normalizeUser, newDraft, normalizeCompany, isCompanyEmpty } from '../src/lib/draft.js';
 import { computeAll } from '../src/lib/engine.js';
 import { createRateLimiter } from '../src/lib/shield.js';
 import { buildManifest, buildIconSvg } from '../src/brand/icon.js';
@@ -121,10 +124,9 @@ describe('pricing & quote', () => {
     const bad = resolvePrices({ ids: ['sand'], regionCode: 'CL', chainId: 'sodimac', overrides: { sand: -5 }, bucket: 1 });
     expect(bad.sand.source).toBe('ref');
   });
-  it('waste rounds discrete items up', () => {
-    expect(applyWaste(10, 5, true)).toBe(11);
-    expect(applyWaste(10, 0, true)).toBe(10);
-    expect(applyWaste(1, 10, false)).toBe(1.1);
+  it('waste is applied on top of the geometric need', () => {
+    expect(withWaste(10, 5)).toBeCloseTo(10.5);
+    expect(withWaste(10, 0)).toBe(10);
   });
   it('quote adds labor, transport and tax', () => {
     const lines = calcSlab({ length: 5, width: 4, thickness: 10 }).lines;
@@ -141,6 +143,102 @@ describe('pricing & quote', () => {
     expect(r.valid).toBe(true);
     expect(r.quote.total).toBeGreaterThan(0);
     expect(computeAll(newDraft('MX')).valid).toBe(false);
+  });
+});
+
+describe('commercial formats (indivisible units + leftovers)', () => {
+  it('mesh: 22 m2 + 5% waste needs 2 panels of 14.4 m2, leaving 5.7 m2', () => {
+    const p = planPurchase({ id: 'mesh', qty: 22 }, 5);
+    expect(p.packs).toBe(2);
+    expect(p.purchased).toBeCloseTo(28.8);
+    expect(p.leftover).toBeCloseTo(28.8 - 23.1);
+  });
+  it('drywall boards: 14.4 m2 needs 5 whole boards', () => {
+    const lines = calcDrywall({ length: 6, height: 2.4, thickness: 12.5, faces: 1 }).lines;
+    const board = lines.find((l) => l.id === 'plate_125');
+    const p = planPurchase(board, 0);
+    expect(p.need).toBeCloseTo(14.4);
+    expect(p.packs).toBe(5);
+    expect(p.leftover).toBeCloseTo(5 * 1.22 * 2.44 - 14.4, 3);
+  });
+  it('an exact multiple of the sale format leaves no leftover', () => {
+    const p = planPurchase({ id: 'poly', qty: 200 }, 0);
+    expect(p.packs).toBe(2);
+    expect(p.leftover).toBe(0);
+  });
+  it('cement, blocks, screws, tape and compound are bought as whole units', () => {
+    expect(planPurchase({ id: 'cement_bag', qty: 12.2 }, 0).packs).toBe(13);
+    expect(planPurchase({ id: 'block_14', qty: 312.5 }, 0).packs).toBe(313);
+    expect(planPurchase({ id: 'screws', qty: 1001 }, 0).packs).toBe(2);
+    expect(planPurchase({ id: 'tape', qty: 90.5 }, 0).packs).toBe(2);
+    expect(planPurchase({ id: 'compound', qty: 25.1 }, 0).packs).toBe(2);
+  });
+  it('steel profiles: short studs share a 2.4 m profile, tall ones need several', () => {
+    const studs = (height) => ({ id: 'stud', qty: 11 * height, cut: { count: 11, length: height } });
+    expect(planPurchase(studs(1.2), 0).packs).toBe(6); // 2 pieces per profile -> ceil(11/2)
+    expect(planPurchase(studs(2.4), 0).packs).toBe(11);
+    expect(planPurchase(studs(3), 0).packs).toBe(22); // 2 profiles per stud
+    expect(planPurchase(studs(1.2), 0).leftover).toBeCloseTo(6 * 2.4 - 11 * 1.2);
+  });
+  it('invariants: whole packs, purchase covers the need, leftover is never negative', () => {
+    for (const id of Object.keys(CATALOG)) {
+      for (const qty of [0.01, 0.5, 1, 3.7, 14.4, 99.99, 1234.5]) {
+        for (const waste of [0, 5, 30]) {
+          const p = planPurchase({ id, qty }, waste);
+          expect(Number.isInteger(p.packs)).toBe(true);
+          expect(p.packs).toBeGreaterThanOrEqual(1);
+          expect(p.purchased + 1e-6).toBeGreaterThanOrEqual(p.needWaste);
+          expect(p.leftover).toBeGreaterThanOrEqual(0);
+          expect(p.leftover).toBeLessThan(p.purchased);
+        }
+      }
+    }
+  });
+  it('quote bills whole packs: total = packs x unit price, never less than the geometric cost', () => {
+    for (const task of ['slab', 'masonry', 'drywall']) {
+      const d = newDraft('CL');
+      d.task = task;
+      d.dims = { length: 7.3, width: 4.1, height: 2.7, thickness: task === 'drywall' ? 12.5 : 12, openings: 1.5, faces: 2 };
+      const r = computeAll(d, 1_700_000_000_000);
+      expect(r.valid).toBe(true);
+      for (const i of r.quote.items) {
+        expect(Number.isInteger(i.packs)).toBe(true);
+        expect(i.total).toBe(Math.round(i.packs * i.unitPrice));
+        const geometricCost = (i.need / i.saleSize) * i.unitPrice;
+        expect(i.total + 1).toBeGreaterThanOrEqual(geometricCost);
+        expect(i.leftoverValue).toBeGreaterThanOrEqual(0);
+      }
+      expect(r.quote.materials).toBe(r.quote.items.reduce((sum, i) => sum + i.total, 0));
+      expect(r.quote.leftoverValue).toBeLessThanOrEqual(r.quote.materials);
+    }
+  });
+});
+
+describe('company profile', () => {
+  it('sanitizes every field and drops hostile content', () => {
+    const c = normalizeCompany({
+      name: '<img src=x onerror=alert(1)> ACME  SpA',
+      taxId: "76.123.456-7'; DROP TABLE--",
+      phone: '+56 9 1234-5678 <script>',
+      email: 'Info@Acme.CL',
+      city: 'Santiago'.repeat(30),
+    });
+    expect(c.name).not.toMatch(/[<>]/);
+    expect(c.taxId).toMatch(/^[A-Z0-9.\-/]+$/);
+    expect(c.phone).toBe('+56 9 1234-5678');
+    expect(c.email).toBe('info@acme.cl');
+    expect(c.city.length).toBe(60);
+  });
+  it('rejects invalid e-mail and bad input types', () => {
+    expect(normalizeCompany({ email: 'not-an-email' }).email).toBe('');
+    expect(isCompanyEmpty(normalizeCompany(null))).toBe(true);
+    expect(isCompanyEmpty(normalizeCompany('x'))).toBe(true);
+    expect(isCompanyEmpty(normalizeCompany({ name: 'A' }))).toBe(false);
+  });
+  it('field sanitizers keep only allowed characters', () => {
+    expect(sanitizeTaxId('b-12.345/678 ;')).toBe('B-12.345/678');
+    expect(sanitizePhone('+34 (600) 11-22-33abc+')).toBe('+34 (600) 11-22-33');
+    expect(sanitizeEmailInput('A B<c>@x.com')).toBe('abc@x.com');
   });
 });
 

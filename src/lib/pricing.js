@@ -68,38 +68,79 @@ export function resolvePrices({ ids, regionCode, chainId, overrides = {}, bucket
   return out;
 }
 
-export function applyWaste(qty, wastePct, discrete) {
-  const gross = qty * (1 + wastePct / 100);
-  if (discrete) return Math.ceil(gross - 1e-9);
-  return Math.ceil(gross * 100 - 1e-9) / 100;
+const EPS = 1e-9;
+const round4 = (n) => Math.round(n * 10000) / 10000;
+
+/** Geometric need plus the waste allowance (still in base units, not yet rounded to sale units). */
+export const withWaste = (qty, wastePct) => qty * (1 + wastePct / 100);
+
+/**
+ * Convert one takeoff line (geometric need in BASE units) into a real store purchase.
+ *  - sale formats are indivisible => packs are rounded UP to a whole number
+ *  - `cut` lines (steel profiles) pack cut pieces into stock lengths: several short pieces fit in one
+ *    profile, and pieces longer than the profile need several profiles each
+ *  - leftover = purchased - needed (with waste): reusable remnant, never negative
+ */
+export function planPurchase(line, wastePct) {
+  const mat = CATALOG[line.id];
+  const need = line.qty;
+  let needWaste = withWaste(need, wastePct);
+  let packs;
+
+  if (line.cut && line.cut.length > 0) {
+    const pieces = Math.ceil(withWaste(line.cut.count, wastePct) - EPS);
+    const len = line.cut.length;
+    needWaste = pieces * len;
+    packs =
+      len <= mat.size
+        ? Math.ceil(pieces / Math.max(1, Math.floor(mat.size / len + EPS)) - EPS)
+        : pieces * Math.ceil(len / mat.size - EPS);
+  } else {
+    packs = Math.ceil(needWaste / mat.size - EPS);
+  }
+
+  if (need > 0) packs = Math.max(1, packs);
+  const purchased = round4(packs * mat.size);
+  const leftover = Math.max(0, round4(purchased - needWaste));
+  return {
+    need: round4(need),
+    needWaste: round4(needWaste),
+    packs,
+    purchased,
+    leftover,
+    leftoverPct: purchased > 0 ? leftover / purchased : 0,
+  };
 }
 
-/** Build the full quote: line items + labor/transport/tax totals. */
+/** Build the full quote: purchase lines (whole sale units) + labor/transport/tax totals. */
 export function buildQuote({ lines, prices, finance, regionCode }) {
   const region = getRegion(regionCode);
   const items = lines.map((l) => {
     const mat = CATALOG[l.id];
-    const qty = applyWaste(l.qty, finance.waste, mat.discrete);
+    const plan = planPurchase(l, finance.waste);
     const { price, ref, source, chainId } = prices[l.id];
     return {
       id: l.id,
-      unit: mat.unit,
-      net: mat.discrete ? Math.ceil(l.qty - 1e-9) : Math.round(l.qty * 100) / 100,
-      qty,
-      unitPrice: price,
+      baseUnit: mat.base,
+      saleUnit: mat.sale,
+      saleSize: mat.size,
+      ...plan,
+      unitPrice: price, // per SALE unit
       refPrice: ref,
       source,
       chainId,
-      total: roundMoney(qty * price, region),
+      total: roundMoney(plan.packs * price, region),
+      leftoverValue: roundMoney((plan.leftover / mat.size) * price, region),
     };
   });
   const materials = roundMoney(items.reduce((s, i) => s + i.total, 0), region);
+  const leftoverValue = roundMoney(items.reduce((s, i) => s + i.leftoverValue, 0), region);
   const labor = roundMoney((materials * finance.labor) / 100, region);
   const transport = roundMoney((materials * finance.transport) / 100, region);
   const subtotal = roundMoney(materials + labor + transport, region);
   const tax = roundMoney(subtotal * region.taxRate, region);
   const total = roundMoney(subtotal + tax, region);
-  return { items, materials, labor, transport, subtotal, tax, total, taxRate: region.taxRate };
+  return { items, materials, leftoverValue, labor, transport, subtotal, tax, total, taxRate: region.taxRate };
 }
 
 /** Estimated materials total for each chain (for the comparison chips). */
