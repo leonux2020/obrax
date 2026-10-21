@@ -58,8 +58,8 @@ export default function Header({ user, company, onEditCompany, onChangeRegion, o
             title={t('region.change')}
             className="min-h-[44px] whitespace-nowrap rounded-lg border border-neutral-700 px-3 text-sm font-bold hover:border-brand"
           >
-            {region.code}
-            <span className="hidden sm:inline"> · {region.currency}</span>
+            <span aria-hidden="true">{region.flag}</span> {region.code}
+            <span className="hidden sm:inline"> · {region.currency} {region.symbol}</span>
             <span className="sr-only"> {regionName(region, lang)}</span>
           </button>
           <button
@@ -76,7 +76,7 @@ export default function Header({ user, company, onEditCompany, onChangeRegion, o
             onClick={onLogout}
             className="min-h-[44px] rounded-lg border border-neutral-700 px-3 text-sm font-bold hover:border-red-500"
           >
-            {t('login.logout')}
+            {t('login.switch')}
           </button>
         </div>
       </header>

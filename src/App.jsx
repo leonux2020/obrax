@@ -47,7 +47,7 @@ export default function App() {
       const r = getRegion(code);
       const changed = code !== settings.region;
       setSettings({ region: code, lang: changed ? r.lang : settings.lang });
-      if (changed || !draft) setDraft(newDraft(code));
+      if (changed || !draft) setDraft(newDraft(code, draft?.mode));
       setPickingRegion(false);
     },
     [settings, draft]
@@ -55,7 +55,7 @@ export default function App() {
 
   const newProject = useCallback(() => {
     clearDraft();
-    setDraft(newDraft(settings.region));
+    setDraft((d) => newDraft(settings.region, d?.mode));
   }, [settings.region]);
 
   const logout = useCallback(() => setUser(null), []);

@@ -1,10 +1,16 @@
 import { useI18n } from '../../lib/i18n.jsx';
-import { FINANCE_LIMITS } from '../../lib/draft.js';
-import { Slider } from '../ui.jsx';
+import { FINANCE_LIMITS, TAX_LIMITS } from '../../lib/draft.js';
+import { WASTE_LIMITS } from '../../lib/tasks.js';
+import { partidaTitle } from '../../lib/reports.js';
+import { NumberField, Slider } from '../ui.jsx';
 
 export default function StepFinance({ draft, setDraft, result }) {
-  const { t, money } = useI18n();
+  const { t, money, num, region } = useI18n();
   const set = (key) => (value) => setDraft((d) => ({ ...d, finance: { ...d.finance, [key]: value } }));
+  const setWaste = (id) => (waste) =>
+    setDraft((d) => ({ ...d, partidas: d.partidas.map((p) => (p.id === id ? { ...p, waste } : p)) }));
+  const officialPct = num(region.taxRate * 100);
+  const many = draft.partidas.length > 1;
 
   return (
     <section aria-labelledby="fin-title" className="space-y-4">
@@ -12,7 +18,7 @@ export default function StepFinance({ draft, setDraft, result }) {
         {t('fin.title')}
       </h2>
 
-      {['labor', 'transport', 'waste'].map((k) => (
+      {['labor', 'transport'].map((k) => (
         <Slider
           key={k}
           label={t(`fin.${k}`)}
@@ -25,23 +31,65 @@ export default function StepFinance({ draft, setDraft, result }) {
         />
       ))}
 
+      {draft.partidas.map((p, i) => (
+        <Slider
+          key={p.id}
+          label={many ? t('fin.wasteFor', { title: `${i + 1}. ${partidaTitle(p, t)}` }) : t('fin.waste')}
+          description={t('fin.waste.desc')}
+          value={p.waste}
+          min={WASTE_LIMITS.min}
+          max={WASTE_LIMITS.max}
+          step={WASTE_LIMITS.step}
+          onChange={setWaste(p.id)}
+        />
+      ))}
+
+      <div className="card">
+        {region.taxEditable ? (
+          <NumberField
+            label={t('fin.tax', { name: region.taxName })}
+            unit="%"
+            decimals={TAX_LIMITS.decimals}
+            placeholder={officialPct}
+            value={draft.finance.tax}
+            onChange={set('tax')}
+            hint={t('fin.tax.desc', { name: region.taxName, rate: officialPct })}
+          />
+        ) : (
+          <p className="text-lg">
+            <span aria-hidden="true">{region.flag} </span>
+            {t('fin.taxOfficial', { name: region.taxName, rate: officialPct })}
+          </p>
+        )}
+      </div>
+
       {result.valid && (
         <div className="card border-brand/50" aria-live="polite">
           <h3 className="mb-3 text-lg font-bold text-brand">{t('fin.summary')}</h3>
           <dl className="space-y-2 text-lg">
             {[
-              ['fin.materials', result.quote.materials],
-              ['fin.laborLine', result.quote.labor],
-              ['fin.transportLine', result.quote.transport],
-            ].map(([k, v]) => (
-              <div key={k} className="flex justify-between gap-3">
-                <dt className="text-neutral-300">{t(k)}</dt>
+              [t('fin.materials'), result.quote.materials],
+              [t('fin.laborLine'), result.quote.labor],
+              [t('fin.transportLine'), result.quote.transport],
+            ].map(([label, v]) => (
+              <div key={label} className="flex justify-between gap-3">
+                <dt className="text-neutral-300">{label}</dt>
                 <dd className="font-bold tabular-nums">{money(v)}</dd>
               </div>
             ))}
             <div className="flex justify-between gap-3 border-t border-neutral-700 pt-2">
-              <dt className="text-neutral-300">{t('fin.subtotal')}</dt>
+              <dt className="text-neutral-300">{t('com.subtotalNet')}</dt>
               <dd className="font-bold tabular-nums">{money(result.quote.subtotal)}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-neutral-300">
+                {t('fin.taxLine', { name: region.taxName, rate: num(result.quote.taxRate * 100) })}
+              </dt>
+              <dd className="font-bold tabular-nums">{money(result.quote.tax)}</dd>
+            </div>
+            <div className="flex justify-between gap-3 border-t border-neutral-700 pt-2 text-xl">
+              <dt className="font-bold">{t('fin.totalWithTax')}</dt>
+              <dd className="font-extrabold tabular-nums text-brand">{money(result.quote.total)}</dd>
             </div>
           </dl>
         </div>

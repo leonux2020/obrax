@@ -2,7 +2,7 @@
 // Anything read from localStorage is treated as untrusted input.
 
 import { REGIONS, LANGS, getRegion } from './regions.js';
-import { TASKS, TASK_IDS, defaultDims } from './tasks.js';
+import { TASKS, TASK_IDS, WASTE_LIMITS, defaultDims, pickOption } from './tasks.js';
 import { MATERIAL_IDS } from './catalog.js';
 import { MAX_PRICE } from './pricing.js';
 import {
@@ -15,13 +15,15 @@ import {
   oneOf,
 } from './sanitize.js';
 
-const KEYS = { settings: 'cp.settings.v1', user: 'cp.user.v1', draft: 'cp.draft.v1', company: 'cp.company.v1' };
+const KEYS = { settings: 'cp.settings.v1', user: 'cp.user.v1', draft: 'cp.draft.v2', company: 'cp.company.v1' };
 
 export const FINANCE_LIMITS = Object.freeze({
   labor: { min: 0, max: 150, step: 1, default: 35 },
   transport: { min: 0, max: 30, step: 1, default: 5 },
-  waste: { min: 0, max: 30, step: 1, default: 5 },
 });
+export const TAX_LIMITS = Object.freeze({ min: 0, max: 50, decimals: 2 });
+export const MAX_PARTIDAS = 30;
+export const MODES = Object.freeze(['quick', 'project']);
 
 function read(key) {
   try {
@@ -54,11 +56,11 @@ export const saveSettings = (s) => write(KEYS.settings, s);
 // ---- user -----------------------------------------------------------------
 export function normalizeUser(obj) {
   if (!obj || typeof obj !== 'object') return null;
-  const provider = oneOf(obj.provider, ['google', 'demo', 'guest'], null);
+  const provider = oneOf(obj.provider, ['google', 'local', 'demo', 'guest'], null);
   if (!provider) return null;
   return {
     provider,
-    name: sanitizeText(obj.name, 60) || (provider === 'guest' ? 'Invitado' : 'Usuario'),
+    name: sanitizeText(obj.name, 60).trim() || (provider === 'guest' ? 'Invitado' : 'Usuario'),
     email: sanitizeEmail(obj.email),
     picture: sanitizeAvatarUrl(obj.picture),
   };
@@ -84,43 +86,68 @@ export const loadCompany = () => normalizeCompany(read(KEYS.company));
 export const saveCompany = (c) => write(KEYS.company, isCompanyEmpty(c) ? null : normalizeCompany(c));
 
 // ---- draft (project in progress) -------------------------------------------
-export function newDraft(regionCode) {
+const ID_RE = /^[a-z0-9]{1,16}$/;
+export const newPartidaId = () => Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+
+export function newPartida(task = 'slab') {
+  return { id: newPartidaId(), name: '', task, dims: defaultDims(task), waste: TASKS[task].defaultWaste };
+}
+
+export function newDraft(regionCode, mode = 'quick') {
   const region = getRegion(regionCode);
   return {
-    task: 'slab',
+    mode,
     step: 0,
     project: { name: '', client: '' },
-    dims: defaultDims('slab'),
-    finance: {
-      labor: FINANCE_LIMITS.labor.default,
-      transport: FINANCE_LIMITS.transport.default,
-      waste: TASKS.slab.defaultWaste,
-    },
+    partidas: mode === 'quick' ? [newPartida('slab')] : [],
+    finance: { labor: FINANCE_LIMITS.labor.default, transport: FINANCE_LIMITS.transport.default, tax: null },
     chainId: 'best',
     overrides: {},
     regionCode: region ? region.code : null,
   };
 }
 
-export function normalizeDraft(obj, regionCode) {
-  const base = newDraft(regionCode);
-  if (!obj || typeof obj !== 'object' || obj.regionCode !== regionCode) return base;
-  const task = oneOf(obj.task, TASK_IDS, 'slab');
+export function normalizePartida(obj, usedIds = new Set()) {
+  if (!obj || typeof obj !== 'object') return null;
+  const task = oneOf(obj.task, TASK_IDS, null);
+  if (!task) return null;
+  const def = TASKS[task];
   const dims = defaultDims(task);
-  for (const f of TASKS[task].fields) {
+  for (const f of def.fields) {
     const v = coerceNumber(obj.dims?.[f.key], { min: f.min, max: f.max, decimals: f.decimals, fallback: null });
     if (v !== null) dims[f.key] = v;
     else if (f.key === 'length' || f.key === 'width') dims[f.key] = null;
   }
-  dims.faces = oneOf(Number(obj.dims?.faces), [1, 2], 2);
+  for (const o of def.options) dims[o.key] = pickOption(o, obj.dims?.[o.key]);
+  let id = typeof obj.id === 'string' && ID_RE.test(obj.id) && !usedIds.has(obj.id) ? obj.id : newPartidaId();
+  while (usedIds.has(id)) id = newPartidaId();
+  usedIds.add(id);
+  const waste = coerceNumber(obj.waste, { min: WASTE_LIMITS.min, max: WASTE_LIMITS.max, decimals: 0, fallback: null });
+  return { id, name: sanitizeText(obj.name, 60).trim(), task, dims, waste: waste === null ? def.defaultWaste : waste };
+}
+
+export function normalizeDraft(obj, regionCode) {
+  const base = newDraft(regionCode);
+  if (!obj || typeof obj !== 'object' || obj.regionCode !== regionCode) return base;
+  const region = getRegion(regionCode);
+  const mode = oneOf(obj.mode, MODES, 'quick');
+
+  const used = new Set();
+  let partidas = Array.isArray(obj.partidas)
+    ? obj.partidas.slice(0, MAX_PARTIDAS).map((p) => normalizePartida(p, used)).filter(Boolean)
+    : [];
+  if (mode === 'quick') partidas = partidas.length ? partidas.slice(0, 1) : [newPartida('slab')];
 
   const finance = {};
   for (const [k, lim] of Object.entries(FINANCE_LIMITS)) {
     finance[k] = coerceNumber(obj.finance?.[k], { min: lim.min, max: lim.max, decimals: 0, fallback: null });
-    if (finance[k] === null) finance[k] = k === 'waste' ? TASKS[task].defaultWaste : lim.default;
+    if (finance[k] === null) finance[k] = lim.default;
   }
+  // Tax rate is only user-adjustable where there is no single national rate (US, CA, BR).
+  finance.tax = region.taxEditable
+    ? coerceNumber(obj.finance?.tax, { ...TAX_LIMITS, fallback: null })
+    : null;
 
-  const region = getRegion(regionCode);
   const chainId =
     obj.chainId === 'best' || region.chains.some((c) => c.id === obj.chainId) ? obj.chainId : 'best';
 
@@ -133,10 +160,10 @@ export function normalizeDraft(obj, regionCode) {
   }
 
   return {
-    task,
+    mode,
     step: Math.min(4, Math.max(0, Number.isInteger(obj.step) ? obj.step : 0)),
     project: { name: sanitizeText(obj.project?.name, 80), client: sanitizeText(obj.project?.client, 80) },
-    dims,
+    partidas,
     finance,
     chainId,
     overrides,

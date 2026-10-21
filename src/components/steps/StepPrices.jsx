@@ -50,6 +50,7 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh }) 
           ↻ {t('prices.refresh')}
         </Button>
       </div>
+      {draft.partidas.length > 1 && <p className="text-sm text-brand">{t('part.consolidated')}</p>}
       {limited && (
         <p role="alert" className="text-sm font-semibold text-red-400">
           {t('prices.rateLimited')}
@@ -125,7 +126,7 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh }) 
               </div>
               <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-neutral-300">
                 <Badge tone={manual ? 'white' : 'green'}>{manual ? t('prices.manual') : t('prices.ref')}</Badge>
-                {t('prices.ref')} {money(item.refPrice)} / {unit(item.saleUnit)} · {chainName(item.chainId)}
+                {money(item.refPrice)} / {unit(item.saleUnit)} · {chainName(item.chainId)}
               </p>
             </li>
           );

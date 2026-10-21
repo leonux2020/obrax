@@ -74,85 +74,219 @@ const round4 = (n) => Math.round(n * 10000) / 10000;
 /** Geometric need plus the waste allowance (still in base units, not yet rounded to sale units). */
 export const withWaste = (qty, wastePct) => qty * (1 + wastePct / 100);
 
-/**
- * Convert one takeoff line (geometric need in BASE units) into a real store purchase.
- *  - sale formats are indivisible => packs are rounded UP to a whole number
- *  - `cut` lines (steel profiles) pack cut pieces into stock lengths: several short pieces fit in one
- *    profile, and pieces longer than the profile need several profiles each
- *  - leftover = purchased - needed (with waste): reusable remnant, never negative
- */
-export function planPurchase(line, wastePct) {
-  const mat = CATALOG[line.id];
-  const need = line.qty;
-  let needWaste = withWaste(need, wastePct);
-  let packs;
-
-  if (line.cut && line.cut.length > 0) {
-    const pieces = Math.ceil(withWaste(line.cut.count, wastePct) - EPS);
-    const len = line.cut.length;
-    needWaste = pieces * len;
-    packs =
-      len <= mat.size
-        ? Math.ceil(pieces / Math.max(1, Math.floor(mat.size / len + EPS)) - EPS)
-        : pieces * Math.ceil(len / mat.size - EPS);
-  } else {
-    packs = Math.ceil(needWaste / mat.size - EPS);
+function packCuts(groups, size) {
+  let packs = 0;
+  for (const [len, pieces] of groups) {
+    packs +=
+      len <= size
+        ? Math.ceil(pieces / Math.max(1, Math.floor(size / len + EPS)) - EPS)
+        : pieces * Math.ceil(len / size - EPS);
   }
-
-  if (need > 0) packs = Math.max(1, packs);
-  const purchased = round4(packs * mat.size);
-  const leftover = Math.max(0, round4(purchased - needWaste));
-  return {
-    need: round4(need),
-    needWaste: round4(needWaste),
-    packs,
-    purchased,
-    leftover,
-    leftoverPct: purchased > 0 ? leftover / purchased : 0,
-  };
+  return packs;
 }
 
-/** Build the full quote: purchase lines (whole sale units) + labor/transport/tax totals. */
-export function buildQuote({ lines, prices, finance, regionCode }) {
-  const region = getRegion(regionCode);
-  const items = lines.map((l) => {
-    const mat = CATALOG[l.id];
-    const plan = planPurchase(l, finance.waste);
-    const { price, ref, source, chainId } = prices[l.id];
+/**
+ * Plan the purchase of ONE material from all the parts that need it (one part per partida).
+ *  - sale formats are indivisible => packs are rounded UP to a whole number
+ *  - `cut` parts (steel profiles) pack cut pieces into stock lengths: several short pieces fit in one
+ *    profile, and pieces longer than the profile need several profiles each
+ *  - materials with a `bulk` format (paint) are filled with big units first and finished with small ones
+ *  - leftover = purchased - needed (with waste): reusable remnant, never negative
+ * Quantities from different partidas are SUMMED before rounding (shared materials, one purchase line).
+ * Returns one plan (two for bulk-split materials). `shares[idx]` = fraction of the line used by partida idx.
+ *
+ * @param {string} id catalog id
+ * @param {{idx:number, qty:number, wastePct:number, cut?:{count:number,length:number}}[]} parts
+ */
+export function planMaterial(id, parts) {
+  const mat = CATALOG[id];
+  let need = 0;
+  let needWaste = 0;
+  let nonCut = 0;
+  const cutGroups = new Map();
+  const partWaste = {};
+
+  for (const part of parts) {
+    need += part.qty;
+    let w;
+    if (part.cut && part.cut.length > 0) {
+      const pieces = Math.ceil(withWaste(part.cut.count, part.wastePct) - EPS);
+      const key = round4(part.cut.length);
+      cutGroups.set(key, (cutGroups.get(key) || 0) + pieces);
+      w = pieces * part.cut.length;
+    } else {
+      w = withWaste(part.qty, part.wastePct);
+      nonCut += w;
+    }
+    needWaste += w;
+    partWaste[part.idx] = (partWaste[part.idx] || 0) + w;
+  }
+
+  const shares = {};
+  for (const [idx, w] of Object.entries(partWaste)) shares[idx] = needWaste > 0 ? w / needWaste : 1 / parts.length;
+
+  const finish = (planId, planNeed, planNeedWaste, packs, size) => {
+    const purchased = round4(packs * size);
+    const leftover = Math.max(0, round4(purchased - planNeedWaste));
     return {
-      id: l.id,
+      id: planId,
+      need: round4(planNeed),
+      needWaste: round4(planNeedWaste),
+      packs,
+      purchased,
+      leftover,
+      leftoverPct: purchased > 0 ? leftover / purchased : 0,
+      shares,
+    };
+  };
+
+  // Bulk + small format (paint): big units first, small units for the remainder.
+  if (mat.bulk && cutGroups.size === 0) {
+    const big = CATALOG[mat.bulk];
+    let full = Math.floor(needWaste / big.size + EPS);
+    const rem = needWaste - full * big.size;
+    let small = rem > EPS ? Math.ceil(rem / mat.size - EPS) : 0;
+    if (small * mat.size >= big.size - EPS && small > 0) {
+      full += 1; // buying the big unit is never worse than a full set of small ones
+      small = 0;
+    }
+    const plans = [];
+    const bigNeedWaste = Math.min(needWaste, full * big.size);
+    const portion = needWaste > 0 ? bigNeedWaste / needWaste : 0;
+    if (full > 0) plans.push(finish(mat.bulk, need * portion, bigNeedWaste, full, big.size));
+    if (small > 0) plans.push(finish(id, need * (1 - portion), needWaste - bigNeedWaste, small, mat.size));
+    if (plans.length) return plans;
+  }
+
+  let packs = nonCut > 0 ? Math.ceil(nonCut / mat.size - EPS) : 0;
+  packs += packCuts(cutGroups, mat.size);
+  if (need > 0) packs = Math.max(1, packs);
+  return [finish(id, need, needWaste, packs, mat.size)];
+}
+
+/** Single-line convenience wrapper (one partida). For bulk-split materials returns the first plan. */
+export function planPurchase(line, wastePct) {
+  const [plan] = planMaterial(line.id, [{ idx: 0, qty: line.qty, wastePct, cut: line.cut }]);
+  return plan;
+}
+
+/**
+ * Consolidate the takeoff lines of every partida into ONE purchase plan.
+ * @param {{lines:{id:string,qty:number,cut?:object}[], waste:number}[]} partidas
+ */
+export function planAll(partidas) {
+  const byId = new Map();
+  partidas.forEach((p, idx) => {
+    for (const l of p.lines) {
+      if (!byId.has(l.id)) byId.set(l.id, []);
+      byId.get(l.id).push({ idx, qty: l.qty, wastePct: p.waste, cut: l.cut });
+    }
+  });
+  const plans = [];
+  for (const [id, parts] of byId) plans.push(...planMaterial(id, parts));
+  return plans;
+}
+
+/** Tax rate actually applied: the user's value for editable regions, otherwise the official rate. */
+export function taxRateFor(region, finance) {
+  const custom = finance && typeof finance.tax === 'number' ? finance.tax : null;
+  if (region.taxEditable && custom !== null && custom >= 0 && custom <= 50) return custom / 100;
+  return region.taxRate;
+}
+
+/** Accept the multi-partida shape, or the legacy single-list shape used by older callers/tests. */
+function toPartidas({ partidas, lines, finance }) {
+  if (partidas) return partidas;
+  return [{ lines, waste: finance.waste ?? 0 }];
+}
+
+/**
+ * Build the full quote: consolidated purchase lines (whole sale units), labor/transport,
+ * official VAT breakdown and the amount allocated to every partida (chapter).
+ */
+export function buildQuote({ partidas, lines, plan, prices, finance, regionCode }) {
+  const region = getRegion(regionCode);
+  const parts = toPartidas({ partidas, lines, finance });
+  const planned = plan || planAll(parts);
+  const items = planned.map((pl) => {
+    const mat = CATALOG[pl.id];
+    const { price, ref, source, chainId } = prices[pl.id];
+    const total = roundMoney(pl.packs * price, region);
+    return {
+      id: pl.id,
       baseUnit: mat.base,
       saleUnit: mat.sale,
       saleSize: mat.size,
-      ...plan,
+      need: pl.need,
+      needWaste: pl.needWaste,
+      packs: pl.packs,
+      purchased: pl.purchased,
+      leftover: pl.leftover,
+      leftoverPct: pl.leftoverPct,
+      shares: pl.shares,
       unitPrice: price, // per SALE unit
       refPrice: ref,
       source,
       chainId,
-      total: roundMoney(plan.packs * price, region),
-      leftoverValue: roundMoney((plan.leftover / mat.size) * price, region),
+      total,
+      leftoverValue: roundMoney((pl.leftover / mat.size) * price, region),
     };
   });
+
   const materials = roundMoney(items.reduce((s, i) => s + i.total, 0), region);
   const leftoverValue = roundMoney(items.reduce((s, i) => s + i.leftoverValue, 0), region);
   const labor = roundMoney((materials * finance.labor) / 100, region);
   const transport = roundMoney((materials * finance.transport) / 100, region);
   const subtotal = roundMoney(materials + labor + transport, region);
-  const tax = roundMoney(subtotal * region.taxRate, region);
+  const taxRate = taxRateFor(region, finance);
+  const tax = roundMoney(subtotal * taxRate, region);
   const total = roundMoney(subtotal + tax, region);
-  return { items, materials, leftoverValue, labor, transport, subtotal, tax, total, taxRate: region.taxRate };
+
+  // Allocate materials and net amount to partidas by their share of each consolidated line.
+  const raw = parts.map(() => 0);
+  for (const i of items) for (const [idx, f] of Object.entries(i.shares)) raw[Number(idx)] += i.total * f;
+  const rawSum = raw.reduce((s, v) => s + v, 0);
+  const weights = raw.map((v) => (rawSum > 0 ? v / rawSum : 1 / parts.length));
+  const allocate = (amount) => {
+    let acc = 0;
+    return weights.map((w, k) => {
+      const v = k === weights.length - 1 ? roundMoney(amount - acc, region) : roundMoney(amount * w, region);
+      acc += v;
+      return v;
+    });
+  };
+  const matAlloc = allocate(materials);
+  const netAlloc = allocate(subtotal);
+  const partidaTotals = parts.map((_, k) => ({ index: k, materials: matAlloc[k], amount: netAlloc[k] }));
+
+  return {
+    items,
+    materials,
+    leftoverValue,
+    labor,
+    transport,
+    subtotal,
+    tax,
+    total,
+    taxRate,
+    taxName: region.taxName,
+    partidas: partidaTotals,
+  };
 }
 
 /** Estimated materials total for each chain (for the comparison chips). */
-export function chainTotals({ lines, regionCode, wastePct, overrides, bucket = marketBucket() }) {
+export function chainTotals({ partidas, lines, regionCode, wastePct = 0, overrides, bucket = marketBucket() }) {
   const region = getRegion(regionCode);
-  const ids = lines.map((l) => l.id);
+  const parts = partidas || [{ lines, waste: wastePct }];
+  const plan = planAll(parts);
+  const ids = plan.map((p) => p.id);
   const totalFor = (chainId) => {
     const prices = resolvePrices({ ids, regionCode, chainId, overrides, bucket });
     return buildQuote({
-      lines,
+      partidas: parts,
+      plan,
       prices,
-      finance: { waste: wastePct, labor: 0, transport: 0 },
+      finance: { labor: 0, transport: 0, tax: null },
       regionCode,
     }).materials;
   };

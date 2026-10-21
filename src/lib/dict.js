@@ -1,3 +1,5 @@
+import { EXTRA } from './dict2.js';
+
 export const DICT = {
   es: {
     'app.name': 'Cubicador Pro',
@@ -132,7 +134,7 @@ export const DICT = {
     'fin.summary': 'Resumen en vivo',
     'fin.materials': 'Materiales (con merma)',
     'fin.laborLine': 'Mano de obra',
-    'fin.transportLine': 'Transporte',
+    'fin.transportLine': 'Transporte y flete',
     'fin.subtotal': 'Subtotal',
     'fin.total': 'Total',
 
@@ -182,7 +184,7 @@ export const DICT = {
     'tech.materials': 'Lista de materiales',
     'tech.materials.hint':
       'Necesidad geométrica real y unidades de venta enteras a comprar (redondeadas hacia arriba). El sobrante queda reutilizable.',
-    'tech.leftover.title': 'Sobrantes reutilizables',
+    'tech.leftover.title': 'Inventario de Sobrantes Reutilizables',
     'tech.leftover.none': 'La compra se ajusta casi exactamente a la necesidad: no hay remanente relevante.',
     'tech.leftover.value': 'Valor del remanente',
     'tech.leftover.tip':
@@ -362,7 +364,7 @@ export const DICT = {
     'fin.summary': 'Live summary',
     'fin.materials': 'Materials (incl. waste)',
     'fin.laborLine': 'Labor',
-    'fin.transportLine': 'Transport',
+    'fin.transportLine': 'Transport & freight',
     'fin.subtotal': 'Subtotal',
     'fin.total': 'Total',
 
@@ -412,7 +414,7 @@ export const DICT = {
     'tech.materials': 'Bill of materials',
     'tech.materials.hint':
       'Actual geometric need and whole sale units to buy (rounded up). The surplus stays reusable.',
-    'tech.leftover.title': 'Reusable leftovers',
+    'tech.leftover.title': 'Reusable Leftovers Inventory',
     'tech.leftover.none': 'The purchase matches the need almost exactly: no relevant remnant.',
     'tech.leftover.value': 'Remnant value',
     'tech.leftover.tip':
@@ -459,3 +461,7 @@ export const DICT = {
     'lang.switch': 'Español',
   },
 };
+
+// v2 additions (multi-partida projects, new tasks, country combobox, PDFs, local profile)
+Object.assign(DICT.es, EXTRA.es);
+Object.assign(DICT.en, EXTRA.en);

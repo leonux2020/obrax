@@ -12,10 +12,10 @@ import {
   sanitizeEmailInput,
 } from '../src/lib/sanitize.js';
 import { calcSlab, calcMasonry, calcDrywall } from '../src/lib/calc.js';
-import { validateDims } from '../src/lib/tasks.js';
+import { validateDims, TASK_IDS } from '../src/lib/tasks.js';
 import { resolvePrices, buildQuote, referencePrice, planPurchase, withWaste } from '../src/lib/pricing.js';
 import { REGIONS } from '../src/lib/regions.js';
-import { normalizeDraft, normalizeUser, newDraft, normalizeCompany, isCompanyEmpty } from '../src/lib/draft.js';
+import { normalizeDraft, normalizeUser, newDraft, newPartida, normalizeCompany, isCompanyEmpty } from '../src/lib/draft.js';
 import { computeAll } from '../src/lib/engine.js';
 import { createRateLimiter } from '../src/lib/shield.js';
 import { buildManifest, buildIconSvg } from '../src/brand/icon.js';
@@ -138,7 +138,7 @@ describe('pricing & quote', () => {
   });
   it('engine end to end', () => {
     const d = newDraft('MX');
-    d.dims = { ...d.dims, length: 6, width: 3 };
+    d.partidas[0].dims = { ...d.partidas[0].dims, length: 6, width: 3 };
     const r = computeAll(d, 1_700_000_000_000);
     expect(r.valid).toBe(true);
     expect(r.quote.total).toBeGreaterThan(0);
@@ -195,10 +195,17 @@ describe('commercial formats (indivisible units + leftovers)', () => {
     }
   });
   it('quote bills whole packs: total = packs x unit price, never less than the geometric cost', () => {
-    for (const task of ['slab', 'masonry', 'drywall']) {
+    for (const task of TASK_IDS) {
       const d = newDraft('CL');
-      d.task = task;
-      d.dims = { length: 7.3, width: 4.1, height: 2.7, thickness: task === 'drywall' ? 12.5 : 12, openings: 1.5, faces: 2 };
+      d.partidas = [{ ...newPartida(task) }];
+      d.partidas[0].dims = {
+        ...d.partidas[0].dims,
+        length: 7.3,
+        width: 4.1,
+        height: 2.7,
+        thickness: task === 'drywall' ? 12.5 : 12,
+        openings: 1.5,
+      };
       const r = computeAll(d, 1_700_000_000_000);
       expect(r.valid).toBe(true);
       for (const i of r.quote.items) {
@@ -246,26 +253,65 @@ describe('persistence hardening', () => {
   it('rebuilds a safe draft from hostile storage content', () => {
     const evil = {
       regionCode: 'CL',
-      task: '__proto__',
+      mode: 'rm -rf',
       step: 99,
-      dims: { length: '<script>', width: 1e12, thickness: -4 },
-      finance: { labor: 9999, transport: 'x', waste: null },
+      partidas: [
+        { id: '<script>', task: '__proto__', dims: {} },
+        {
+          id: 'ok1',
+          name: '<b>hi</b>',
+          task: 'slab',
+          waste: 9999,
+          dims: { length: '<script>', width: 1e12, thickness: -4 },
+        },
+        null,
+        'x',
+      ],
+      finance: { labor: 9999, transport: 'x', tax: 99 },
       chainId: '../../etc',
       overrides: { sand: 'DROP', gravel: -1, __proto__: { x: 1 } },
       project: { name: '<b>hi</b>', client: 'x'.repeat(999) },
     };
     const d = normalizeDraft(evil, 'CL');
-    expect(d.task).toBe('slab');
+    expect(d.mode).toBe('quick');
+    expect(d.partidas.length).toBe(1); // quick mode keeps one valid partida
+    expect(d.partidas[0].task).toBe('slab');
+    expect(d.partidas[0].dims.width).toBeNull();
+    expect(d.partidas[0].dims.length).toBeNull();
+    expect(d.partidas[0].waste).toBe(5);
+    expect(d.partidas[0].name).not.toMatch(/[<>]/);
     expect(d.step).toBe(4);
-    expect(d.dims.width).toBeNull();
     expect(d.finance.labor).toBe(35);
+    expect(d.finance.tax).toBeNull(); // Chile has an official, non-editable rate
     expect(d.chainId).toBe('best');
     expect(d.overrides).toEqual({});
     expect(d.project.name).not.toMatch(/[<>]/);
     expect(d.project.client.length).toBe(80);
   });
+  it('project mode keeps many partidas with unique safe ids', () => {
+    const d = normalizeDraft(
+      {
+        regionCode: 'CL',
+        mode: 'project',
+        partidas: [
+          { id: 'same', task: 'slab', dims: { length: 5, width: 4, thickness: 10 } },
+          { id: 'same', task: 'roof', dims: { length: 6, width: 5, slope: 25 } },
+          { id: 'ZZ!', task: 'paint', dims: { length: 20, height: 2.4 } },
+        ],
+      },
+      'CL'
+    );
+    expect(d.partidas.map((p) => p.task)).toEqual(['slab', 'roof', 'paint']);
+    expect(new Set(d.partidas.map((p) => p.id)).size).toBe(3);
+    for (const p of d.partidas) expect(p.id).toMatch(/^[a-z0-9]{1,16}$/);
+  });
+  it('the tax rate is only user-adjustable where there is no single national rate', () => {
+    expect(normalizeDraft({ regionCode: 'US', finance: { tax: 6.5 } }, 'US').finance.tax).toBe(6.5);
+    expect(normalizeDraft({ regionCode: 'US', finance: { tax: 999 } }, 'US').finance.tax).toBeNull();
+    expect(normalizeDraft({ regionCode: 'ES', finance: { tax: 6.5 } }, 'ES').finance.tax).toBeNull();
+  });
   it('discards a draft from another region', () => {
-    expect(normalizeDraft({ regionCode: 'ES', task: 'masonry' }, 'CL').task).toBe('slab');
+    expect(normalizeDraft({ regionCode: 'ES', partidas: [{ task: 'masonry' }] }, 'CL').partidas[0].task).toBe('slab');
   });
   it('normalizes users', () => {
     expect(normalizeUser({ provider: 'admin' })).toBeNull();

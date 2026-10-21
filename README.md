@@ -4,14 +4,15 @@ PWA (React + Vite + Tailwind) para cubicación y presupuestos de obra. Tema OLED
 
 ## Funciones
 
-- Selector de país al iniciar (Chile, España, México, Colombia, Perú, EE. UU.): fija moneda, idioma y cadenas de referencia.
-- Asistente paso a paso: Radier/losa, albañilería (bloques) y tabiquería drywall.
-- Formatos comerciales indivisibles: la necesidad geométrica se convierte en unidades de venta enteras (paños de malla 2,4×6 m, rollos de polietileno, planchas de drywall, perfiles de 2,40 m, sacos, cajas, rollos, baldes, bolsones de áridos), siempre redondeadas hacia arriba. El desglose muestra necesidad real, compra sugerida y sobrante reutilizable con su valor (`src/lib/catalog.js`, `planPurchase` en `src/lib/pricing.js`). Los montantes se agrupan por corte dentro de cada perfil.
-- Motor de precios simulados por cadena, con corrección manual por ítem (el precio manual es por unidad de venta).
-- Configuración de empresa/profesional (nombre, RUT/NIF/RFC según país, teléfono, correo, ciudad), guardada solo en el dispositivo e impresa en la cabecera de ambos reportes.
-- Parámetros financieros: mano de obra %, transporte %, merma %.
-- Reporte doble: **Vista técnica** (obra) y **Vista comercial** (cliente), con imprimir/PDF, compartir y copiar.
-- Login con Google: simulación por defecto; Google Identity Services real si defines `VITE_GOOGLE_CLIENT_ID`.
+- **Selector de país compacto y con búsqueda** (combobox accesible, una sola línea): 53 países de América y Europa con bandera, moneda (código y símbolo), **IVA / impuesto oficial** y cadenas de referencia (Chile: Sodimac, Easy, Construmart; España: Leroy Merlin, Bricomart; México: Home Depot…). Busca por país (ES/EN), código, moneda o tienda. Datos en `src/lib/regions.js`.
+- **Impuesto por país en todos los resúmenes**: Chile 19 %, España 21 %, México 16 %, Argentina 21 %, Colombia 19 %… En EE. UU., Canadá y Brasil (sin tasa nacional única) la tasa es configurable (EE. UU. 8 % por defecto).
+- **Dos modos de trabajo**: *Faena rápida* (1 tarea → presupuesto en ~2 min) y *Proyecto acumulado* (obra con nombre, varias partidas y **una sola lista de compra consolidada**: p. ej. los sacos de cemento del radier y de la albañilería se suman antes de redondear).
+- **Seis módulos de cubicación**: radieres y losas, albañilería, tabiquería drywall, techumbres (factor de pendiente, costaneras, cubierta, caballetes, aislación, canaletas), pisos (cajas completas, adhesivo, fragüe) y pinturas (manos, galones/tinetas, imprimante, empaste).
+- **Formatos comerciales indivisibles**: la necesidad geométrica se convierte en unidades de venta enteras (paños de malla, rollos, planchas, perfiles de 2,40 m, sacos, cajas, bolsones, galones y tinetas), siempre hacia arriba, con sobrante reutilizable y su valor (`src/lib/catalog.js`, `src/lib/pricing.js`).
+- Motor de precios simulados por cadena con corrección manual por ítem.
+- **Dos PDF independientes**: *PDF Cliente* (A4 blanco corporativo: cabecera de empresa con RUT/CIF/RFC según país, partidas, subtotal neto, impuesto oficial, total, validez y firmas; **sin tiendas, sin precios unitarios y sin sobrantes**) y *PDF Técnico* (métricas, plan de compra en unidades comerciales, compras por tienda, mermas, **Inventario de Sobrantes Reutilizables** y estructura de costos interna). Se generan con jsPDF, cargado bajo demanda (`src/lib/pdf.js`, modelos puros en `src/lib/reports.js`).
+- Configuración de empresa/profesional guardada solo en el dispositivo.
+- **Perfil local sin fricción**: entras directo (nombre opcional, todo queda en el dispositivo). El botón de Google solo aparece si defines `VITE_GOOGLE_CLIENT_ID`.
 
 ## Seguridad
 

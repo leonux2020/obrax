@@ -1,27 +1,57 @@
 import { validateDims, runCalculation } from './tasks.js';
-import { resolvePrices, buildQuote, chainTotals, marketBucket } from './pricing.js';
-/** Single entry point used by the UI: draft -> validation, takeoff, prices and quote. */
+import { resolvePrices, buildQuote, chainTotals, marketBucket, planAll } from './pricing.js';
+
+/**
+ * Single entry point used by the UI: draft -> validation per partida, takeoff, ONE consolidated
+ * purchase plan, prices and quote.
+ *
+ *  - quick mode:   exactly one partida
+ *  - project mode: any number of partidas; shared materials (e.g. cement bags from a slab and a wall)
+ *                  are summed into a single purchase line before rounding to whole sale units.
+ */
 export function computeAll(draft, now = Date.now()) {
-  const validation = validateDims(draft.task, draft.dims);
-  if (!validation.valid) return { valid: false, validation };
+  const partidas = draft.partidas.map((p) => {
+    const validation = validateDims(p.task, p.dims);
+    return {
+      id: p.id,
+      name: p.name,
+      task: p.task,
+      waste: p.waste,
+      validation,
+      values: validation.values,
+      calc: validation.valid ? runCalculation(p.task, validation.values) : null,
+    };
+  });
+
+  const valid = partidas.length > 0 && partidas.every((p) => p.validation.valid);
+  if (!valid) {
+    return { valid: false, partidas, validation: partidas[0]?.validation ?? { values: {}, errors: {}, valid: false } };
+  }
 
   const bucket = marketBucket(now);
-  const calc = runCalculation(draft.task, validation.values);
-  const ids = calc.lines.map((l) => l.id);
+  const inputs = partidas.map((p) => ({ lines: p.calc.lines, waste: p.waste }));
+  const plan = planAll(inputs);
   const prices = resolvePrices({
-    ids,
+    ids: plan.map((i) => i.id),
     regionCode: draft.regionCode,
     chainId: draft.chainId,
     overrides: draft.overrides,
     bucket,
   });
-  const quote = buildQuote({ lines: calc.lines, prices, finance: draft.finance, regionCode: draft.regionCode });
+  const quote = buildQuote({ partidas: inputs, plan, prices, finance: draft.finance, regionCode: draft.regionCode });
   const totals = chainTotals({
-    lines: calc.lines,
+    partidas: inputs,
     regionCode: draft.regionCode,
-    wastePct: draft.finance.waste,
     overrides: draft.overrides,
     bucket,
   });
-  return { valid: true, validation, values: validation.values, calc, prices, quote, chainTotals: totals };
+  return {
+    valid: true,
+    mode: draft.mode,
+    partidas,
+    validation: partidas[0].validation,
+    prices,
+    quote,
+    chainTotals: totals,
+  };
 }

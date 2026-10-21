@@ -1,27 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
-import {
-  GOOGLE_CLIENT_ID,
-  googleConfigured,
-  loadGsi,
-  userFromCredential,
-  demoUser,
-  guestUser,
-} from '../lib/auth.js';
-import { Button, Logo } from './ui.jsx';
+import { GOOGLE_CLIENT_ID, googleConfigured, loadGsi, userFromCredential, localUser } from '../lib/auth.js';
+import { sanitizeText } from '../lib/sanitize.js';
+import { Button, Logo, TextField } from './ui.jsx';
 
-const GoogleG = () => (
-  <svg width="22" height="22" viewBox="0 0 48 48" aria-hidden="true">
-    <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.5 17.7 9.5 24 9.5z" />
-    <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z" />
-    <path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z" />
-    <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.9 2.3-8.4 2.3-6.3 0-11.6-4-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z" />
-  </svg>
-);
-
+/**
+ * Entry screen. The default path is a LOCAL PROFILE (name optional, nothing leaves the device), so the
+ * app never depends on an OAuth client being configured. Google sign-in is offered only when
+ * VITE_GOOGLE_CLIENT_ID is set.
+ */
 export default function Login({ onLogin }) {
   const { t } = useI18n();
   const btnRef = useRef(null);
+  const [name, setName] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -50,45 +41,55 @@ export default function Login({ onLogin }) {
           width: 280,
         });
       })
-      .catch(() => !cancelled && setError(t('login.offline')));
+      .catch(() => {
+        /* offline / blocked: the local profile below keeps working, so stay silent */
+      });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const enter = (e) => {
+    e.preventDefault();
+    onLogin(localUser(name));
+  };
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-8 text-center">
-      <Logo size={112} className="mx-auto mb-6" />
+      <Logo size={96} className="mx-auto mb-5" />
       <h1 className="text-3xl font-extrabold">{t('app.name')}</h1>
       <p className="mt-1 text-neutral-300">{t('app.tagline')}</p>
 
-      <div className="card mt-8 text-left">
-        <h2 className="text-xl font-bold">{t('login.title')}</h2>
-        <p className="mb-5 mt-1 text-sm text-neutral-300">{t('login.subtitle')}</p>
+      <form onSubmit={enter} className="card mt-7 text-left">
+        <h2 className="text-xl font-bold">{t('login.local.title')}</h2>
+        <p className="mb-4 mt-1 text-sm text-neutral-300">{t('login.local.subtitle')}</p>
+        <TextField
+          label={t('login.local.name')}
+          optional={t('common.optional')}
+          placeholder={t('login.local.namePh')}
+          maxLength={60}
+          value={name}
+          sanitize={(v) => sanitizeText(v, 60)}
+          onChange={setName}
+        />
+        <Button type="submit" className="mt-4 w-full">
+          {t('login.local.enter')}
+        </Button>
+        <p className="mt-2 text-xs text-neutral-400">{t('login.local.note')}</p>
 
-        {googleConfigured ? (
-          <div ref={btnRef} className="flex min-h-[44px] justify-center" />
-        ) : (
+        {googleConfigured && (
           <>
-            <Button variant="ghost" className="w-full !bg-white !text-black hover:!bg-neutral-200" onClick={() => onLogin(demoUser())}>
-              <GoogleG />
-              {t('login.googleDemo')}
-            </Button>
-            <p className="mt-2 text-xs text-neutral-400">{t('login.demoNote')}</p>
+            <p className="my-4 text-center text-sm text-neutral-400">— {t('login.or')} —</p>
+            <div ref={btnRef} className="flex min-h-[44px] justify-center" />
           </>
         )}
-
         {error && (
           <p role="alert" className="mt-3 text-sm font-semibold text-red-400">
             {error}
           </p>
         )}
-
-        <Button variant="secondary" className="mt-4 w-full" onClick={() => onLogin(guestUser())}>
-          {t('login.guest')}
-        </Button>
-      </div>
+      </form>
     </main>
   );
 }

@@ -89,4 +89,101 @@ export function calcDrywall({ length, height, thickness, openings = 0, faces = 2
   };
 }
 
-export const CALCULATORS = Object.freeze({ slab: calcSlab, masonry: calcMasonry, drywall: calcDrywall });
+// ---- roofs -------------------------------------------------------------------
+export const ROOF = Object.freeze({
+  sheetsPerM2: 1, // area-based: converted to whole sheets through the catalog format
+  tilesPerM2: 10,
+  purlinSpacingZinc: 1.0, // m between purlin rows (zinc)
+  purlinSpacingTile: 0.5, // m between battens/purlins (tile)
+  screwsPerM2: 6,
+  downspoutEveryM: 8, // one downspout per 8 m of eave
+});
+
+/** Pitch factor: inclined roof area = plan area / cos(slope). */
+export const pitchFactor = (slopeDeg) => 1 / Math.cos((slopeDeg * Math.PI) / 180);
+
+export function calcRoof({ length, width, slope, overhang = 0, roofing = 'zinc', insulation = 1, gutters = 1 }) {
+  const runL = length + 2 * overhang;
+  const runW = width + 2 * overhang;
+  const planArea = runL * runW;
+  const factor = pitchFactor(slope);
+  const roofArea = planArea * factor;
+  // Gable roof: ridge runs along the longest side, two slopes of (shortest side / 2) / cos(slope).
+  const ridge = Math.max(runL, runW);
+  const slopeLength = (Math.min(runL, runW) / 2) * factor;
+  const tile = roofing === 'tile';
+  const spacing = tile ? ROOF.purlinSpacingTile : ROOF.purlinSpacingZinc;
+  const rows = Math.ceil(slopeLength / spacing) + 1;
+  const eaves = 2 * ridge;
+
+  const lines = [
+    tile ? { id: 'roof_tile', qty: roofArea * ROOF.tilesPerM2 } : { id: 'roof_zinc', qty: roofArea },
+    { id: tile ? 'ridge_tile' : 'ridge_zinc', qty: ridge },
+    { id: 'purlin', qty: 2 * rows * ridge },
+  ];
+  if (!tile) lines.push({ id: 'roof_screws', qty: roofArea * ROOF.screwsPerM2 });
+  if (insulation) lines.push({ id: 'insulation', qty: roofArea });
+  if (gutters) {
+    lines.push({ id: 'gutter', qty: eaves });
+    lines.push({ id: 'downspout', qty: Math.max(2, Math.ceil(eaves / ROOF.downspoutEveryM)) });
+  }
+  return {
+    metrics: [
+      { key: 'planArea', value: r2(planArea), unit: 'm2' },
+      { key: 'roofArea', value: r2(roofArea), unit: 'm2' },
+      { key: 'slopeFactor', value: r3(factor), unit: 'x' },
+      { key: 'ridgeLength', value: r2(ridge), unit: 'm' },
+    ],
+    lines,
+  };
+}
+
+// ---- floors / coverings ----------------------------------------------------------
+export const FLOOR = Object.freeze({ adhesiveKgPerM2: 4.5, groutKgPerM2: 0.5 });
+export const FLOOR_FORMATS = Object.freeze(['30', '45', '60']);
+
+export function calcFloor({ length, width, openings = 0, format = '45' }) {
+  const gross = length * width;
+  const net = Math.max(0, gross - openings);
+  const id = `floor_${FLOOR_FORMATS.includes(String(format)) ? format : '45'}`;
+  return {
+    metrics: [
+      { key: 'grossArea', value: r2(gross), unit: 'm2' },
+      { key: 'netArea', value: r2(net), unit: 'm2' },
+    ],
+    // The cut-waste % of the partida is applied by the purchase planner; boxes are always whole.
+    lines: [
+      { id, qty: net },
+      { id: 'adhesive', qty: net * FLOOR.adhesiveKgPerM2 },
+      { id: 'grout', qty: net * FLOOR.groutKgPerM2 },
+    ],
+  };
+}
+
+// ---- paints / finishes --------------------------------------------------------------
+export const PAINT = Object.freeze({ paintM2PerLiter: 10, primerM2PerLiter: 12, puttyKgPerM2: 0.5 });
+
+export function calcPaint({ length, height, openings = 0, coats = 2, primer = 1, putty = 0 }) {
+  const gross = length * height;
+  const net = Math.max(0, gross - openings);
+  const lines = [{ id: 'paint', qty: (net * coats) / PAINT.paintM2PerLiter }];
+  if (primer) lines.push({ id: 'primer', qty: net / PAINT.primerM2PerLiter });
+  if (putty) lines.push({ id: 'putty', qty: net * PAINT.puttyKgPerM2 });
+  return {
+    metrics: [
+      { key: 'grossArea', value: r2(gross), unit: 'm2' },
+      { key: 'netArea', value: r2(net), unit: 'm2' },
+      { key: 'paintArea', value: r2(net * coats), unit: 'm2' },
+    ],
+    lines,
+  };
+}
+
+export const CALCULATORS = Object.freeze({
+  slab: calcSlab,
+  masonry: calcMasonry,
+  drywall: calcDrywall,
+  roof: calcRoof,
+  floor: calcFloor,
+  paint: calcPaint,
+});
