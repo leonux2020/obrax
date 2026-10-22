@@ -14,7 +14,7 @@ const STEPS = {
   project: ['project', 'partidas', 'prices', 'finance', 'report'],
 };
 
-export default function Wizard({ draft, setDraft, photos, setPhotos, company, onEditCompany, onNewProject }) {
+export default function Wizard({ projectId, draft, setDraft, photos, setPhotos, company, onEditCompany, onNewProject, onExit }) {
   const { t } = useI18n();
   const [now, setNow] = useState(() => Date.now());
   const [showErrors, setShowErrors] = useState(false);
@@ -78,7 +78,7 @@ export default function Wizard({ draft, setDraft, photos, setPhotos, company, on
         </ol>
       </nav>
 
-      {step === 0 && <StepStart draft={draft} setDraft={setDraft} photos={photos} setPhotos={setPhotos} />}
+      {step === 0 && <StepStart draft={draft} setDraft={setDraft} photos={photos} setPhotos={setPhotos} projectId={projectId} />}
       {step === 1 && draft.mode === 'quick' && (
         <StepDims draft={draft} setDraft={setDraft} result={result} showErrors={showErrors} />
       )}
@@ -101,10 +101,10 @@ export default function Wizard({ draft, setDraft, photos, setPhotos, company, on
         />
       )}
 
-      <div className="no-print fixed inset-x-0 bottom-0 z-20 border-t border-neutral-800 bg-black/95 px-3 py-3 backdrop-blur [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="no-print fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-black px-3 py-3 [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto flex max-w-5xl gap-3">
-          <Button variant="ghost" disabled={step === 0} onClick={() => go(step - 1)} className="min-w-[110px]">
-            ← {t('common.back')}
+          <Button variant="ghost" onClick={() => (step === 0 ? onExit() : go(step - 1))} className="min-w-[110px]" data-testid="wizard-back">
+            ← {t(step === 0 ? 'nav.projects' : 'common.back')}
           </Button>
           {step < 4 && (
             <Button className="flex-1" onClick={next}>

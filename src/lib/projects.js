@@ -1,0 +1,156 @@
+// Projects (one per client job): model, normalisation, company snapshot and the time traffic light.
+// Everything here is pure so the rules are unit-testable in Node.
+
+import { getRegion } from './regions.js';
+import { normalizeDraft, normalizeCompany, newDraft, isCompanyEmpty } from './draft.js';
+import { sanitizeText } from './sanitize.js';
+import { normalizeLogo } from './logo.js';
+
+export const MAX_PROJECTS = 200;
+const ID_RE = /^[a-z0-9]{6,24}$/;
+const DAY_MS = 86_400_000;
+
+/** Traffic-light rules (agreed): orange when <= 3 days or <= 20 % of the schedule remain. */
+export const LIGHT_RULES = Object.freeze({ orangeDays: 3, orangeFraction: 0.2 });
+
+export const newProjectId = () => Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-6);
+
+// ---- dates (YYYY-MM-DD, local calendar days) --------------------------------------------------------
+/** Parse a strict ISO date to a local-midnight Date, or null (rejects 2026-02-30, junk, etc.). */
+export function parseDay(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [y, m, d] = value.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
+  return date;
+}
+
+export function toDayString(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** Whole calendar days from a to b (DST-safe). */
+export const dayDiff = (a, b) => Math.round((b.getTime() - a.getTime()) / DAY_MS);
+
+const startOfDay = (ms) => {
+  const d = new Date(ms);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+};
+
+/**
+ * Traffic light from "Fecha de Inicio" and "Fecha de Término Estimada".
+ *  green  = on time           orange = <= 3 days or <= 20 % of the schedule left (incl. due today)
+ *  red    = past the end date none   = no (valid) end date, or end before start
+ * Returns { level, daysLeft, fractionLeft } where daysLeft < 0 means days overdue.
+ */
+export function trafficLight(startDate, endDate, now = Date.now(), rules = LIGHT_RULES) {
+  const end = parseDay(endDate);
+  const start = parseDay(startDate);
+  if (!end || (start && start > end)) return { level: 'none', daysLeft: null, fractionLeft: null };
+
+  const today = startOfDay(now);
+  const daysLeft = dayDiff(today, end);
+  const total = start ? Math.max(1, dayDiff(start, end)) : null;
+  const fractionLeft = total ? Math.min(1, Math.max(0, daysLeft / total)) : null;
+
+  let level = 'green';
+  if (daysLeft < 0) level = 'red';
+  else if (daysLeft <= rules.orangeDays || (fractionLeft !== null && fractionLeft <= rules.orangeFraction)) level = 'orange';
+  return { level, daysLeft, fractionLeft };
+}
+
+const SEVERITY = { red: 0, orange: 1, green: 2, none: 3 };
+
+/** Dashboard order: most urgent first (red, orange, green, undated), then earliest deadline, then newest. */
+export function sortProjects(list, now = Date.now()) {
+  return [...list]
+    .map((p) => ({ p, light: trafficLight(p.startDate, p.endDate, now) }))
+    .sort((a, b) => {
+      const s = SEVERITY[a.light.level] - SEVERITY[b.light.level];
+      if (s) return s;
+      const da = a.light.daysLeft ?? Infinity;
+      const db = b.light.daysLeft ?? Infinity;
+      if (da !== db) return da - db;
+      return b.p.updatedAt - a.p.updatedAt;
+    })
+    .map((x) => x.p);
+}
+
+// ---- company snapshot ----------------------------------------------------------------------------------
+/**
+ * Immutable copy of the company profile embedded in a project (name, tax id, contact data and logo).
+ * Changing the global profile later never alters a project that already carries its own copy.
+ */
+export function snapshotCompany(company, logo = '') {
+  const c = normalizeCompany(company);
+  return { ...c, logo: normalizeLogo(logo ?? company?.logo) || '' };
+}
+
+export const isSnapshotEmpty = (c) => !c || (isCompanyEmpty({ ...c, logo: '' }) && !c.logo);
+
+/**
+ * A project created BEFORE the profile existed has an empty snapshot; it adopts the profile the first
+ * time one is saved. A populated snapshot is never overwritten (that is what keeps issued quotes intact).
+ */
+export function adoptCompany(project, company, logo = '') {
+  if (!isSnapshotEmpty(project.company)) return project;
+  const snap = snapshotCompany(company, logo);
+  return isSnapshotEmpty(snap) ? project : { ...project, company: snap };
+}
+
+// ---- project model --------------------------------------------------------------------------------------
+export function newProject({ regionCode, mode = 'quick', company = null, logo = '', name = '', client = '', startDate = '', endDate = '', now = Date.now() }) {
+  const draft = newDraft(regionCode, mode);
+  draft.project = { name: sanitizeText(name, 60).trim(), client: sanitizeText(client, 60).trim() };
+  const start = parseDay(startDate) ? startDate : '';
+  const end = parseDay(endDate) && !(start && parseDay(start) > parseDay(endDate)) ? endDate : '';
+  return {
+    id: newProjectId(),
+    createdAt: now,
+    updatedAt: now,
+    startDate: start,
+    endDate: end,
+    company: snapshotCompany(company, logo),
+    draft,
+  };
+}
+
+/** Validate an untrusted stored project. Returns a clean project or null. */
+export function normalizeProject(obj) {
+  if (!obj || typeof obj !== 'object') return null;
+  if (typeof obj.id !== 'string' || !ID_RE.test(obj.id)) return null;
+  const regionCode = obj.draft?.regionCode;
+  if (!getRegion(regionCode)) return null;
+  const start = parseDay(obj.startDate) ? obj.startDate : '';
+  const endOk = parseDay(obj.endDate) && !(start && parseDay(start) > parseDay(obj.endDate));
+  const created = Number(obj.createdAt);
+  const updated = Number(obj.updatedAt);
+  return {
+    id: obj.id,
+    createdAt: Number.isFinite(created) ? created : 0,
+    updatedAt: Number.isFinite(updated) ? updated : Number.isFinite(created) ? created : 0,
+    startDate: start,
+    endDate: endOk ? obj.endDate : '',
+    company: snapshotCompany(obj.company, obj.company?.logo),
+    draft: normalizeDraft(obj.draft, regionCode),
+  };
+}
+
+export function normalizeProjects(list) {
+  if (!Array.isArray(list)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const item of list.slice(0, MAX_PROJECTS)) {
+    const p = normalizeProject(item);
+    if (p && !seen.has(p.id)) {
+      seen.add(p.id);
+      out.push(p);
+    }
+  }
+  return out;
+}
+
+/** Display helpers for cards. */
+export const projectTitle = (p) => p.draft.project.name;
+export const projectClient = (p) => p.draft.project.client;

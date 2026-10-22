@@ -55,7 +55,7 @@ export default function StepPartidas({ draft, setDraft, result, showErrors }) {
           return (
             <li key={p.id} className={`card ${open ? 'border-brand' : ''}`}>
               <div className="flex items-center gap-3">
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-neutral-800 text-brand">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black text-brand">
                   <TaskIcon id={p.task} size={30} />
                 </span>
                 <div className="min-w-0 flex-1">

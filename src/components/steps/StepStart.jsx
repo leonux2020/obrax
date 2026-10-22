@@ -7,7 +7,7 @@ import TaskPicker from '../TaskPicker.jsx';
 import PhotoGallery from '../PhotoGallery.jsx';
 
 /** Step 0: choose the working mode, then the task (quick) or the project identity (accumulated). */
-export default function StepStart({ draft, setDraft, photos, setPhotos }) {
+export default function StepStart({ draft, setDraft, photos, setPhotos, projectId }) {
   const { t } = useI18n();
 
   const setMode = (mode) =>
@@ -43,7 +43,7 @@ export default function StepStart({ draft, setDraft, photos, setPhotos }) {
               aria-checked={active}
               onClick={() => setMode(m)}
               className={`rounded-2xl border-2 p-4 text-left transition ${
-                active ? 'border-brand bg-brand/10' : 'border-neutral-800 bg-neutral-950 hover:border-neutral-600'
+                active ? 'border-brand bg-brand/10' : 'border-white/10 bg-black hover:border-white/30'
               }`}
             >
               <span className="block text-lg font-bold">{t(`mode.${m}`)}</span>
@@ -86,7 +86,7 @@ export default function StepStart({ draft, setDraft, photos, setPhotos }) {
         </div>
       </div>
 
-      <PhotoGallery photos={photos} setPhotos={setPhotos} />
+      <PhotoGallery photos={photos} setPhotos={setPhotos} projectId={projectId} />
     </section>
   );
 }

@@ -40,11 +40,11 @@ export default function TaskPicker({ value, onChange, labelledBy, compact = fals
             onClick={() => onChange(id)}
             className={`flex items-center gap-3 rounded-2xl border-2 text-left transition ${
               compact ? 'p-2.5' : 'p-4'
-            } ${active ? 'border-brand bg-brand/10' : 'border-neutral-800 bg-neutral-950 hover:border-neutral-600'}`}
+            } ${active ? 'border-brand bg-brand/10' : 'border-white/10 bg-black hover:border-white/30'}`}
           >
             <span
               className={`flex shrink-0 items-center justify-center rounded-xl ${compact ? 'h-11 w-11' : 'h-14 w-14'} ${
-                active ? 'bg-brand text-black' : 'bg-neutral-800 text-brand'
+                active ? 'bg-brand text-black' : 'border border-white/10 bg-black text-brand'
               }`}
             >
               <TaskIcon id={id} size={compact ? 26 : 34} />

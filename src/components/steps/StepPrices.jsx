@@ -70,7 +70,7 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh }) 
               aria-checked={active}
               onClick={() => setDraft((d) => ({ ...d, chainId: c.id }))}
               className={`rounded-xl border-2 p-3 text-left transition ${
-                active ? 'border-brand bg-brand/10' : 'border-neutral-800 bg-neutral-950 hover:border-neutral-600'
+                active ? 'border-brand bg-brand/10' : 'border-white/10 bg-black hover:border-white/30'
               }`}
             >
               <span className="block truncate text-sm font-bold">{c.label}</span>

@@ -3,9 +3,7 @@
 // for the session so the feature degrades instead of breaking.
 
 import { normalizePhoto, normalizePhotos } from './photos.js';
-
-const DB_NAME = 'obrax';
-const STORE = 'photos';
+import { STORE_LEGACY_PHOTOS, STORE_PHOTOS, createRunner, hasIndexedDb, openDb } from './db.js';
 
 export function memoryBackend() {
   const map = new Map();
@@ -26,33 +24,55 @@ export function memoryBackend() {
   };
 }
 
-export function idbBackend(factory) {
-  let dbPromise;
-  const open = () =>
-    (dbPromise ??= new Promise((resolve, reject) => {
-      const req = factory.open(DB_NAME, 1);
-      req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: 'slot' });
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-      req.onblocked = () => reject(new Error('blocked'));
-    }));
-  const run = async (mode, fn) => {
-    const db = await open();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE, mode);
-      const req = fn(tx.objectStore(STORE));
-      tx.oncomplete = () => resolve(req?.result);
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error);
-    });
-  };
+/**
+ * IndexedDB backend scoped to ONE project: rows are keyed "<projectId>:<slot>", so two projects can
+ * never see (or overwrite) each other's photos. Without an id it uses the neutral scope "_".
+ */
+export function idbBackend(factory, projectId = '_') {
+  const run = createRunner(factory);
+  const mine = (row) => row && row.projectId === projectId;
   return {
     kind: 'indexeddb',
-    getAll: () => run('readonly', (s) => s.getAll()),
-    put: (photo) => run('readwrite', (s) => s.put(photo)),
-    remove: (slot) => run('readwrite', (s) => s.delete(slot)),
-    clear: () => run('readwrite', (s) => s.clear()),
+    async getAll() {
+      return (await run(STORE_PHOTOS, 'readonly', (s) => s.getAll())).filter(mine);
+    },
+    put: (photo) => run(STORE_PHOTOS, 'readwrite', (s) => s.put({ ...photo, projectId, key: `${projectId}:${photo.slot}` })),
+    remove: (slot) => run(STORE_PHOTOS, 'readwrite', (s) => s.delete(`${projectId}:${slot}`)),
+    clear: () =>
+      run(STORE_PHOTOS, 'readwrite', (s) => {
+        const all = s.getAll();
+        all.onsuccess = () => all.result.filter(mine).forEach((row) => s.delete(row.key));
+        return all;
+      }),
   };
+}
+
+/**
+ * One-off migration: photos saved by the single-project versions (legacy `photos` store) become the
+ * photos of `projectId`, then the legacy rows are removed. Safe to call repeatedly.
+ */
+export async function migrateLegacyPhotos(factory, projectId) {
+  const db = await openDb(factory);
+  if (!db.objectStoreNames.contains(STORE_LEGACY_PHOTOS)) return 0;
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_LEGACY_PHOTOS, STORE_PHOTOS], 'readwrite');
+    const legacy = tx.objectStore(STORE_LEGACY_PHOTOS);
+    const target = tx.objectStore(STORE_PHOTOS);
+    let moved = 0;
+    const all = legacy.getAll();
+    all.onsuccess = () => {
+      for (const row of all.result) {
+        const clean = normalizePhoto(row);
+        if (!clean) continue;
+        target.put({ ...clean, projectId, key: `${projectId}:${clean.slot}` });
+        moved += 1;
+      }
+      legacy.clear();
+    };
+    tx.oncomplete = () => resolve(moved);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
 }
 
 /** Store with graceful fallback to memory if the primary backend fails at any point. */
@@ -87,6 +107,12 @@ export function createPhotoStore(primary = null) {
   };
 }
 
-export const photoStore = createPhotoStore(
-  typeof indexedDB !== 'undefined' && indexedDB ? idbBackend(indexedDB) : null
-);
+const cache = new Map();
+
+/** Photo store of one project (cached): IndexedDB when available, memory fallback otherwise. */
+export function photoStoreFor(projectId) {
+  if (!cache.has(projectId)) {
+    cache.set(projectId, createPhotoStore(hasIndexedDb() ? idbBackend(indexedDB, projectId) : null));
+  }
+  return cache.get(projectId);
+}

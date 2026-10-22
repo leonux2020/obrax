@@ -176,4 +176,6 @@ export function normalizeDraft(obj, regionCode) {
 export const loadDraft = (regionCode) => (regionCode ? normalizeDraft(read(KEYS.draft), regionCode) : null);
 export const saveDraft = (d) => write(KEYS.draft, d);
 export const clearDraft = () => write(KEYS.draft, null);
+/** True when a single-project draft from the pre-dashboard versions is still in localStorage (migration). */
+export const hasStoredDraft = () => read(KEYS.draft) !== null;
 export const clearAll = () => Object.values(KEYS).forEach((k) => write(k, null));

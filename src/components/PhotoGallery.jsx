@@ -10,15 +10,16 @@ import {
   removePhoto,
   shouldUseLiveCamera,
 } from '../lib/photos.js';
-import { photoStore } from '../lib/photoStore.js';
+import { photoStoreFor } from '../lib/photoStore.js';
 import CameraModal from './CameraModal.jsx';
 
 /**
  * Field photo evidence: exactly MAX_PHOTOS named slots, camera or gallery, compressed on the device
  * and persisted locally (IndexedDB). Replacing a photo reuses its slot, so the limit can never be exceeded.
  */
-export default function PhotoGallery({ photos, setPhotos }) {
+export default function PhotoGallery({ photos, setPhotos, projectId = '_' }) {
   const { t } = useI18n();
+  const photoStore = useMemo(() => photoStoreFor(projectId), [projectId]); // photos belong to ONE project
   const cameraRef = useRef(null); // mobile: native camera via capture="environment"
   const galleryRef = useRef(null); // file picker (also the fallback when the live camera is unavailable)
   const pending = useRef(0);
@@ -109,7 +110,7 @@ export default function PhotoGallery({ photos, setPhotos }) {
           const working = busy === slot;
           return (
             <li key={key} className="overflow-hidden rounded-xl border border-neutral-800 bg-black">
-              <div className="relative flex aspect-[4/3] items-center justify-center bg-neutral-950">
+              <div className="relative flex aspect-[4/3] items-center justify-center bg-black">
                 {photo ? (
                   <img
                     src={photo.dataUrl}

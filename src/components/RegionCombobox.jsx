@@ -127,7 +127,7 @@ export default function RegionCombobox({ value, onChange }) {
           {flat.length === 0 && <p className="px-4 py-3 text-neutral-400">{t('region.noResults')}</p>}
           {groups.map((g) => (
             <div key={g.id} role="group" aria-label={t(g.id === 'AM' ? 'region.america' : 'region.europe')}>
-              <p className="sticky top-0 bg-neutral-950 px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-brand">
+              <p className="sticky top-0 bg-black px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-brand">
                 {t(g.id === 'AM' ? 'region.america' : 'region.europe')}
               </p>
               {g.items.map((r) => {

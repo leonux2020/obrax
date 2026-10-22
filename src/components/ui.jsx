@@ -18,7 +18,7 @@ export function Logo({ size = 40, className = '' }) {
 const VARIANTS = {
   primary: 'bg-brand text-black hover:bg-brand-light',
   secondary: 'border-2 border-brand text-brand hover:bg-brand/10',
-  ghost: 'border border-neutral-700 text-white hover:bg-neutral-900',
+  ghost: 'border border-neutral-700 text-white hover:border-white/40',
   danger: 'border-2 border-red-500 text-red-400 hover:bg-red-500/10',
 };
 

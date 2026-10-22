@@ -52,7 +52,7 @@ describe('language bound to country', () => {
 });
 
 // Language-neutral templates and genuine ES/PT/IT cognates (identical words in the target language).
-const LEGIT_SAME = new Set(['com.taxLine', 'fin.taxLine', 'mat.stud', 'prices.qty', 'company.configure', 'report.commercial', 'report.print', 'pdf.leftoverValue', 'region.listLabel', 'photo.count']);
+const LEGIT_SAME = new Set(['com.taxLine', 'fin.taxLine', 'mat.stud', 'prices.qty', 'company.configure', 'report.commercial', 'report.print', 'pdf.leftoverValue', 'region.listLabel', 'photo.count', 'light.late']);
 
 describe('six complete dictionaries', () => {
   const esKeys = Object.keys(DICT.es).sort();

@@ -93,7 +93,7 @@ export default function CameraModal({ slotLabel, onCapture, onClose, onUpload, g
         </div>
 
         {state !== 'denied' ? (
-          <div className="relative aspect-video overflow-hidden rounded-xl bg-neutral-950">
+          <div className="relative aspect-video overflow-hidden rounded-xl border border-white/10 bg-black">
             <video ref={videoRef} playsInline muted autoPlay className="h-full w-full object-contain" data-testid="camera-video" />
             {state === 'starting' && (
               <p className="absolute inset-0 flex items-center justify-center text-sm text-neutral-300" aria-live="polite">
@@ -102,7 +102,7 @@ export default function CameraModal({ slotLabel, onCapture, onClose, onUpload, g
             )}
           </div>
         ) : (
-          <div role="alert" className="rounded-xl border border-red-500/60 bg-neutral-950 p-4 text-sm font-semibold text-red-300">
+          <div role="alert" className="rounded-xl border border-red-500/60 bg-black p-4 text-sm font-semibold text-red-300">
             {t('photo.cameraDenied')}
           </div>
         )}
@@ -115,7 +115,7 @@ export default function CameraModal({ slotLabel, onCapture, onClose, onUpload, g
         )}
 
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={onClose} className="min-h-[52px] rounded-xl border border-neutral-700 px-5 font-bold hover:bg-neutral-900">
+          <button type="button" onClick={onClose} className="min-h-[52px] rounded-xl border border-neutral-700 px-5 font-bold hover:border-white/40">
             {t('common.close')}
           </button>
           <button

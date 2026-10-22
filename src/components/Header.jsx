@@ -1,10 +1,9 @@
 import { useI18n } from '../lib/i18n.jsx';
-import { regionName } from '../lib/regions.js';
-import LangSelect from './LangSelect.jsx';
 import { Logo } from './ui.jsx';
 
-export default function Header({ user, company, onEditCompany, onChangeRegion, onChangeLang, onLogout, pwa }) {
-  const { t, region, lang } = useI18n();
+/** Slim top bar: brand only (language, country, company and profile live in the bottom navigation). */
+export default function Header({ subtitle, pwa }) {
+  const { t } = useI18n();
   return (
     <>
       {!pwa.online && (
@@ -20,57 +19,13 @@ export default function Header({ user, company, onEditCompany, onChangeRegion, o
           </button>
         </div>
       )}
-      <header className="no-print sticky top-0 z-20 border-b border-neutral-800 bg-black/95 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center gap-2 px-3 py-2 sm:gap-3 sm:px-4">
+      <header className="no-print sticky top-0 z-20 border-b border-white/10 bg-black">
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-3 py-2 sm:px-4">
           <Logo size={40} />
-          <div className="mr-auto hidden min-w-0 leading-tight min-[460px]:block">
+          <div className="min-w-0 leading-tight">
             <div className="truncate text-lg font-extrabold">{t('app.name')}</div>
-            <div className="truncate text-xs text-neutral-400">{user.name}</div>
+            {subtitle && <div className="truncate text-xs text-neutral-400">{subtitle}</div>}
           </div>
-          <div className="mr-auto min-[460px]:hidden" />
-
-          {pwa.canInstall && (
-            <button
-              type="button"
-              onClick={pwa.install}
-              className="min-h-[44px] rounded-lg bg-brand px-3 text-sm font-bold text-black"
-            >
-              {t('pwa.install')}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={onEditCompany}
-            aria-label={t('company.open')}
-            title={company?.name || t('company.open')}
-            className={`flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-lg border px-3 text-sm font-bold hover:border-brand ${
-              company?.name ? 'border-brand/60' : 'border-neutral-700'
-            }`}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5M9 10h.01M15 10h.01M12 10h.01" />
-            </svg>
-            <span className="hidden md:inline">{t('company.short')}</span>
-          </button>
-          <button
-            type="button"
-            onClick={onChangeRegion}
-            aria-label={t('region.change')}
-            title={t('region.change')}
-            className="min-h-[44px] whitespace-nowrap rounded-lg border border-neutral-700 px-3 text-sm font-bold hover:border-brand"
-          >
-            <span aria-hidden="true">{region.flag}</span> {region.code}
-            <span className="hidden sm:inline"> · {region.currency} {region.symbol}</span>
-            <span className="sr-only"> {regionName(region, lang)}</span>
-          </button>
-          <LangSelect onChange={onChangeLang} />
-          <button
-            type="button"
-            onClick={onLogout}
-            className="min-h-[44px] rounded-lg border border-neutral-700 px-3 text-sm font-bold hover:border-red-500"
-          >
-            {t('login.switch')}
-          </button>
         </div>
       </header>
     </>
