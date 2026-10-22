@@ -346,6 +346,19 @@ export async function renderClientPdf(model, { money, logo = null, appName = 'Ob
     { size: 9.5 }
   );
 
+  // opt-in: Materials / Labor / Transport totals that add up to the net subtotal (no stores, no unit prices)
+  if (model.breakdown) {
+    w.gap(2);
+    w.table(
+      [
+        { label: model.breakdown.title, width: CONTENT_W - 42 },
+        { label: model.amountLabel, width: 42, align: 'right' },
+      ],
+      model.breakdown.rows.map((r) => [r.label, money(r.amount)]),
+      { size: 9.5, zebra: false }
+    );
+  }
+
   // totals block (right aligned)
   w.ensure(34);
   const boxW = 80;
@@ -371,18 +384,43 @@ export async function renderClientPdf(model, { money, logo = null, appName = 'Ob
   w.paragraph(model.validity, { size: 8.5, color: C.muted });
   w.photoGrid(photosTitle, photos); // only when the caller opted in
 
-  // signature lines
-  w.ensure(38);
-  w.gap(18);
+  // signature lines (the client's ink sits on top of its line, with name / ID / date underneath)
+  const sig = model.signature;
+  w.ensure(sig ? 52 : 38);
+  w.gap(sig ? 28 : 18);
   const half = (CONTENT_W - 16) / 2;
+  const clientX = MARGIN + half + 16;
+  if (sig) {
+    const k = Math.min(half / sig.w, 24 / sig.h);
+    try {
+      w.doc.addImage(sig.dataUrl, 'PNG', clientX, w.y - sig.h * k - 0.5, sig.w * k, sig.h * k);
+    } catch {
+      /* an undecodable signature must never break the document */
+    }
+  }
   w.doc.setDrawColor(...C.muted);
   w.doc.setLineWidth(0.3);
   w.doc.line(MARGIN, w.y, MARGIN + half, w.y);
-  w.doc.line(MARGIN + half + 16, w.y, MARGIN + 2 * half + 16, w.y);
+  w.doc.line(clientX, w.y, clientX + half, w.y);
   w.font('normal', 8.5);
   w.color(C.muted);
   w.text(model.signCompany, MARGIN, w.y + 4.5, { maxWidth: half });
-  w.text(model.signClient, MARGIN + half + 16, w.y + 4.5, { maxWidth: half });
+  w.text(model.signClient, clientX, w.y + 4.5, { maxWidth: half });
+  if (sig) {
+    let sy = w.y + 9;
+    const extra = [
+      [sig.name, 'bold', C.text],
+      [sig.idLine, 'normal', C.muted],
+      [sig.date, 'normal', C.muted],
+    ];
+    for (const [text, style, color] of extra) {
+      if (!text) continue;
+      w.font(style, 8.5);
+      w.color(color);
+      w.text(text, clientX, sy, { maxWidth: half });
+      sy += 4;
+    }
+  }
 
   w.footers(`${model.footer}${model.company.name ? ` - ${model.company.name}` : ''}`);
   return doc;

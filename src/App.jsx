@@ -32,6 +32,7 @@ import BottomNav from './components/BottomNav.jsx';
 import ProjectSheet from './components/ProjectSheet.jsx';
 import SettingsSheet from './components/SettingsSheet.jsx';
 import CompanyProfile from './components/CompanyProfile.jsx';
+import WelcomeOnboarding from './components/WelcomeOnboarding.jsx';
 
 // Loads the saved projects and performs the one-off migration of the pre-dashboard single draft.
 // It is shared (one in-flight promise) so React StrictMode's double effect — or a quick remount —
@@ -83,6 +84,7 @@ export default function App() {
   const [activeId, setActiveId] = useState(null); // null = dashboard
   const [sheet, setSheet] = useState(null); // { type: 'new' | 'edit' | 'company' | 'settings', id? }
   const [pickingRegion, setPickingRegion] = useState(false);
+  const [welcome, setWelcome] = useState(false); // first-run onboarding while no company profile is saved
   const [photos, setPhotos] = useState(emptySlots);
 
   const region = getRegion(settings.region);
@@ -100,8 +102,13 @@ export default function App() {
   // ---- boot: logo + projects (+ one-off migration of the pre-dashboard single draft) ----------------
   useEffect(() => {
     let alive = true;
-    logoStore.load().then((l) => alive && setLogo(l)).catch(() => {});
-    bootProjects(settings.region).then((list) => alive && setProjects(list));
+    Promise.all([logoStore.load().catch(() => ''), bootProjects(settings.region)]).then(([l, list]) => {
+      if (!alive) return;
+      setLogo(l);
+      setProjects(list);
+      // No saved company profile (neither text nor logo): intercept with the welcome screen once per launch.
+      setWelcome(isCompanyEmpty(company) && !l);
+    });
     return () => {
       alive = false;
     };
@@ -196,6 +203,7 @@ export default function App() {
     next.forEach((p, i) => p !== projects[i] && projectStore.save(p).catch(() => {}));
     setProjects(next);
     setSheet(null);
+    setWelcome(false);
   };
 
   const confirmRegion = useCallback(
@@ -234,7 +242,9 @@ export default function App() {
         <>
           <Header subtitle={active ? projectTitle(active) || user.name : user.name} pwa={pwa} />
 
-          {projects === null ? null : active ? (
+          {projects === null ? null : welcome && !active ? (
+            <WelcomeOnboarding onSave={saveCompanyProfile} onSkip={() => setWelcome(false)} />
+          ) : active ? (
             <Wizard
               key={active.id}
               projectId={active.id}

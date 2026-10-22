@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useI18n, makeI18n } from '../lib/i18n.jsx';
 import { computeAll } from '../lib/engine.js';
+import { pricingTime } from '../lib/signature.js';
 import { getRegion } from '../lib/regions.js';
 import { parseDay, projectClient, projectTitle, trafficLight } from '../lib/projects.js';
 import TrafficLight from './TrafficLight.jsx';
@@ -12,7 +13,7 @@ export default function ProjectCard({ project, now, onOpen, onEdit }) {
   const light = trafficLight(project.startDate, project.endDate, now);
 
   const total = useMemo(() => {
-    const r = computeAll(project.draft, now);
+    const r = computeAll(project.draft, pricingTime(project.draft, now));
     return r.valid ? makeI18n(lang, project.draft.regionCode).money(r.quote.total) : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.draft, lang]);

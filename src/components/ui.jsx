@@ -204,6 +204,45 @@ export function Slider({ label, description, value, min, max, step = 1, suffix =
   );
 }
 
+/**
+ * Toggle switch on a pure-black card with an ultra-thin border. The whole row is the touch target
+ * (one-hand friendly) and it is exposed as role="switch" with its label and description.
+ */
+export function Switch({ checked, onChange, label, description, className = '', ...rest }) {
+  const id = useId();
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-labelledby={`${id}-l`}
+      aria-describedby={description ? `${id}-d` : undefined}
+      onClick={() => onChange(!checked)}
+      className={`no-print card flex min-h-[64px] w-full select-none items-center gap-4 text-left transition active:scale-[0.99] ${className}`}
+      {...rest}
+    >
+      <span className="min-w-0 flex-1">
+        <span id={`${id}-l`} className="block font-bold">
+          {label}
+        </span>
+        {description && (
+          <span id={`${id}-d`} className="mt-0.5 block text-sm text-neutral-400">
+            {description}
+          </span>
+        )}
+      </span>
+      <span
+        aria-hidden="true"
+        className={`relative h-8 w-14 shrink-0 rounded-full border transition-colors ${checked ? 'border-brand bg-brand/20' : 'border-white/20 bg-black'}`}
+      >
+        <span
+          className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full transition-transform ${checked ? 'translate-x-6 bg-brand' : 'translate-x-0 bg-white/40'}`}
+        />
+      </span>
+    </button>
+  );
+}
+
 export function Badge({ children, tone = 'green' }) {
   const tones = {
     green: 'bg-brand/15 text-brand-light border-brand/40',

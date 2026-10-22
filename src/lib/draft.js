@@ -5,6 +5,7 @@ import { REGIONS, LANGS, getRegion } from './regions.js';
 import { TASKS, TASK_IDS, WASTE_LIMITS, defaultDims, pickOption } from './tasks.js';
 import { MATERIAL_IDS } from './catalog.js';
 import { MAX_PRICE } from './pricing.js';
+import { normalizeSignature } from './signature.js';
 import {
   coerceNumber,
   sanitizeText,
@@ -104,6 +105,8 @@ export function newDraft(regionCode, mode = 'quick') {
     chainId: 'best',
     overrides: {},
     attachPhotos: false, // also print the field photos on the client budget (they are always in the technical dossier)
+    showBreakdown: false, // client PDF also lists the Materials / Labor / Transport totals (never stores or unit prices)
+    signature: null, // client signature + data, see lib/signature.js
     regionCode: region ? region.code : null,
   };
 }
@@ -169,6 +172,8 @@ export function normalizeDraft(obj, regionCode) {
     chainId,
     overrides,
     attachPhotos: obj.attachPhotos === true,
+    showBreakdown: obj.showBreakdown === true,
+    signature: normalizeSignature(obj.signature),
     regionCode,
   };
 }

@@ -8,6 +8,7 @@
 
 import { TASKS } from './tasks.js';
 import { chainLabel } from './regions.js';
+import { isSignatureCurrent } from './signature.js';
 
 export const partidaTitle = (p, t) => p.name || t(`task.${p.task}`);
 
@@ -75,8 +76,30 @@ export function buildClientModel({ draft, result, company, region, t, num, date 
     totalLabel: t('com.total'),
     total: q.total,
     validity: t('com.valid'),
+    // Opt-in aggregate breakdown: three totals that add up to the net subtotal. Never stores / unit prices.
+    breakdown: draft.showBreakdown
+      ? {
+          title: t('bd.title'),
+          rows: [
+            { label: t('bd.materials'), amount: q.materials },
+            { label: t('bd.labor'), amount: q.labor },
+            ...(q.transport > 0 ? [{ label: t('bd.transport'), amount: q.transport }] : []),
+          ],
+        }
+      : null,
     signClient: t('com.sign'),
     signCompany: t('com.signCompany'),
+    // The client's signature is printed only while it still matches the quote it was given on.
+    signature: isSignatureCurrent(draft.signature, q.total)
+      ? {
+          dataUrl: draft.signature.dataUrl,
+          w: draft.signature.w,
+          h: draft.signature.h,
+          name: draft.signature.name,
+          idLine: draft.signature.taxId ? `${t('sign.id')} ${draft.signature.taxId}` : '',
+          date: draft.signature.at ? date(new Date(draft.signature.at)) : '',
+        }
+      : null,
     footer: t('report.generatedBy'),
   };
 }

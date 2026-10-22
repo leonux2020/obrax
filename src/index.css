@@ -86,7 +86,16 @@ input[type='range'].slider::-moz-range-thumb {
 }
 
 /* Printing: ink-friendly white sheet with only the report */
+/* Signatures are stored as black ink on transparent (they are printed on white paper):
+   invert them on screen so they read on the pure-black background. */
+.sig-img {
+  filter: invert(1);
+}
+
 @media print {
+  .sig-img {
+    filter: none !important;
+  }
   html,
   body,
   #root {

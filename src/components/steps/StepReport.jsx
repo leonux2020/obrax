@@ -11,7 +11,8 @@ import {
 } from '../../lib/pdf.js';
 import { ICON_DATA_URI } from '../../brand/icon.js';
 import { photosForReport, countPhotos } from '../../lib/photos.js';
-import { Button, Logo } from '../ui.jsx';
+import { Button, Logo, Switch } from '../ui.jsx';
+import SignatureField from '../SignatureField.jsx';
 
 /** On-screen 2x2 photo grid (also what gets printed). */
 function PhotoGrid({ title, photos }) {
@@ -109,6 +110,14 @@ function ClientView({ model, photos, onEditCompany }) {
           </li>
         ))}
       </ul>
+      {model.breakdown && (
+        <section className="mt-4" aria-label={model.breakdown.title} data-testid="client-breakdown">
+          <h3 className="mb-1 text-lg font-bold text-brand">{model.breakdown.title}</h3>
+          {model.breakdown.rows.map((r) => (
+            <Row key={r.label} label={r.label} value={money(r.amount)} muted />
+          ))}
+        </section>
+      )}
       <div className="mt-2">
         <Row label={model.subtotalLabel} value={money(model.subtotal)} muted />
         <Row label={model.taxLabel} value={money(model.tax)} muted />
@@ -120,8 +129,27 @@ function ClientView({ model, photos, onEditCompany }) {
       <p className="mt-4 text-sm text-neutral-300">{model.validity}</p>
       <PhotoGrid title={t('photo.pdfClientTitle')} photos={photos} />
       <div className="mt-10 grid gap-8 sm:grid-cols-2">
-        <div className="border-t border-neutral-500 pt-1 text-sm text-neutral-300">{model.signCompany}</div>
-        <div className="border-t border-neutral-500 pt-1 text-sm text-neutral-300">{model.signClient}</div>
+        <div>
+          {model.signature && <div className="hidden h-16 sm:block" />}
+          <div className="border-t border-neutral-500 pt-1 text-sm text-neutral-300">{model.signCompany}</div>
+        </div>
+        <div>
+          {model.signature && (
+            <div className="flex h-16 items-end pb-1" data-testid="client-signature">
+              <img src={model.signature.dataUrl} alt="" className="sig-img max-h-16 w-auto max-w-full object-contain" />
+            </div>
+          )}
+          <div className="border-t border-neutral-500 pt-1 text-sm text-neutral-300">
+            {model.signClient}
+            {model.signature && (
+              <span className="mt-1 block text-xs">
+                {model.signature.name && <b className="block text-white">{model.signature.name}</b>}
+                {model.signature.idLine && <span className="block">{model.signature.idLine}</span>}
+                {model.signature.date && <span className="block">{model.signature.date}</span>}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
     </article>
   );
@@ -262,7 +290,7 @@ function TechView({ model, photos, onEditCompany }) {
   );
 }
 
-export default function StepReport({ draft, setDraft, result, photos, company, onEditCompany, onNewProject }) {
+export default function StepReport({ draft, setDraft, result, pricedAt, photos, company, onEditCompany, onNewProject }) {
   const i18n = useI18n();
   const { t, region, locale, num } = i18n;
   const [view, setView] = useState('client');
@@ -366,21 +394,29 @@ export default function StepReport({ draft, setDraft, result, photos, company, o
         <TechView model={techModel} photos={reportPhotos} onEditCompany={onEditCompany} />
       )}
 
+      <SignatureField
+        signature={draft.signature}
+        total={result.quote.total}
+        pricedAt={pricedAt}
+        onChange={(signature) => setDraft((d) => ({ ...d, signature }))}
+      />
+
       {photoCount > 0 && (
-        <label className="no-print card flex cursor-pointer items-start gap-3">
-          <input
-            type="checkbox"
-            role="switch"
-            checked={!!draft.attachPhotos}
-            onChange={(e) => setDraft((d) => ({ ...d, attachPhotos: e.target.checked }))}
-            className="mt-1 h-6 w-6 shrink-0 accent-green-500"
-          />
-          <span>
-            <span className="block font-bold">{t('photo.attach')}</span>
-            <span className="block text-sm text-neutral-400">{t('photo.attach.desc')}</span>
-          </span>
-        </label>
+        <Switch
+          checked={!!draft.attachPhotos}
+          onChange={(v) => setDraft((d) => ({ ...d, attachPhotos: v }))}
+          label={t('photo.attach')}
+          description={t('photo.attach.desc')}
+        />
       )}
+
+      <Switch
+        checked={!!draft.showBreakdown}
+        onChange={(v) => setDraft((d) => ({ ...d, showBreakdown: v }))}
+        label={t('bd.toggle')}
+        description={t('bd.toggle.desc')}
+        data-testid="breakdown-toggle"
+      />
 
       <div className="no-print grid gap-3 sm:grid-cols-2">
         <div>

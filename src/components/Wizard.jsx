@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { computeAll } from '../lib/engine.js';
+import { pricingTime } from '../lib/signature.js';
 import { Button } from './ui.jsx';
 import StepStart from './steps/StepStart.jsx';
 import StepDims from './steps/StepDims.jsx';
@@ -19,7 +20,9 @@ export default function Wizard({ projectId, draft, setDraft, photos, setPhotos, 
   const [now, setNow] = useState(() => Date.now());
   const [showErrors, setShowErrors] = useState(false);
 
-  const result = useMemo(() => computeAll(draft, now), [draft, now]);
+  // A signed quote keeps the prices it was signed at (see pricingTime); otherwise live market prices.
+  const priceTime = pricingTime(draft, now);
+  const result = useMemo(() => computeAll(draft, priceTime), [draft, priceTime]);
 
   const steps = STEPS[draft.mode] ?? STEPS.quick;
   const step = draft.step;
@@ -86,7 +89,7 @@ export default function Wizard({ projectId, draft, setDraft, photos, setPhotos, 
         <StepPartidas draft={draft} setDraft={setDraft} result={result} showErrors={showErrors} />
       )}
       {step === 2 && (
-        <StepPrices draft={draft} setDraft={setDraft} result={result} now={now} onRefresh={() => setNow(Date.now())} />
+        <StepPrices draft={draft} setDraft={setDraft} result={result} now={priceTime} onRefresh={() => setNow(Date.now())} />
       )}
       {step === 3 && <StepFinance draft={draft} setDraft={setDraft} result={result} />}
       {step === 4 && (
@@ -94,6 +97,7 @@ export default function Wizard({ projectId, draft, setDraft, photos, setPhotos, 
           draft={draft}
           setDraft={setDraft}
           result={result}
+          pricedAt={priceTime}
           photos={photos}
           company={company}
           onEditCompany={onEditCompany}
