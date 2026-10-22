@@ -89,8 +89,10 @@ export default function App() {
   const [projects, setProjects] = useState(null); // null while loading from IndexedDB
   const [activeId, setActiveId] = useState(null); // null = dashboard
   const [meta, setMeta] = useState(loadProfileMeta); // { onboarded, drive }
-  // 'splash' -> 'setup' only on a brand-new install (nothing saved at all); 'app' for everybody else, always.
-  const [stage, setStage] = useState(() => (!settings.region && !user && isCompanyEmpty(company) && !meta.onboarded ? 'splash' : 'app'));
+  // The welcome screen ('splash') is ALWAYS the first view of a new or signed-out user (nobody authenticated);
+  // a stored user goes straight to the app. 'setup' is the registration (first run), 'app' shows Login when
+  // there is no user.
+  const [stage, setStage] = useState(() => (user ? 'app' : 'splash'));
   const [sheet, setSheet] = useState(null); // { type: 'new' | 'edit' | 'settings' | 'profile', id? } (profile is reached from Ajustes)
   const [pickingRegion, setPickingRegion] = useState(false);
   const [paywall, setPaywall] = useState(null); // null | 'promo' | 'projects' | 'drive' | 'ai': which locked feature opened the PRO screen
@@ -116,7 +118,6 @@ export default function App() {
       if (!alive) return;
       setLogo(l);
       setProjects(list);
-      if (list.length > 0) setStage('app'); // saved work exists: never greet an existing user with the splash
     });
     return () => {
       alive = false;
@@ -269,6 +270,7 @@ export default function App() {
     setSheet(null);
     setPaywall(null);
     setUser(null);
+    setStage('splash'); // signed out: back to the welcome screen
   }, [closeProject]);
 
   const companyMissing = isCompanyEmpty(company) && !logo;
@@ -278,7 +280,11 @@ export default function App() {
   return (
     <I18nProvider lang={settings.lang} regionCode={active ? active.draft.regionCode : settings.region}>
       {stage === 'splash' ? (
-        <SplashScreen onStart={() => setStage('setup')} />
+        <SplashScreen
+          returning={meta.onboarded || !isCompanyEmpty(company)}
+          onStart={() => setStage(meta.onboarded || !isCompanyEmpty(company) ? 'app' : 'setup')}
+          onLogin={() => setStage('app')}
+        />
       ) : stage === 'setup' ? (
         !region ? (
           <RegionSelect initial={null} onConfirm={confirmRegion} onChangeLang={changeLang} onCancel={() => setStage('splash')} />

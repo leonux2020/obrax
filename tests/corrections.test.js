@@ -14,7 +14,7 @@ import { SCHEDULE, buildSchedule, planningWindow, planProject, suggestCrew, pars
 import { MACHINES, machineryRate } from '../src/lib/machinery.js';
 import { marketBucket, nextBucketAt, MARKET_WINDOW_MS, referencePrice } from '../src/lib/pricing.js';
 import { useMarketClock } from '../src/lib/marketClock.js';
-import { normalizeInk } from '../src/lib/signature.js';
+import { normalizeInk, normalizeSignature, planningTimeline, freezeSignature, pricingTime } from '../src/lib/signature.js';
 import { newProject, snapshotCompany, normalizeProject } from '../src/lib/projects.js';
 import { buildClientModel } from '../src/lib/reports.js';
 import { createReportPdf } from '../src/lib/reportPdf.js';
@@ -184,9 +184,10 @@ describe('Cronograma y cuadrillas: automatic from the project', () => {
 
   it('the wizard and the dashboard card pass the project dates to the engine', () => {
     const w = read('components/Wizard.jsx');
-    expect(w).toMatch(/computeAll\(draft, priceTime, \{ timeline: \{ startDate, endDate \} \}\)/);
+    expect(w).toMatch(/planningTimeline\(draft, \{ startDate, endDate \}\)/);
+    expect(w).toMatch(/computeAll\(draft, priceTime, \{ timeline \}\)/);
     expect(read('App.jsx')).toMatch(/startDate=\{active\.startDate\}/);
-    expect(read('components/ProjectCard.jsx')).toMatch(/timeline: \{ startDate: project\.startDate/);
+    expect(read('components/ProjectCard.jsx')).toMatch(/planningTimeline\(project\.draft, project\)/);
   });
 });
 
@@ -435,5 +436,65 @@ describe('strings of this round exist in six languages', () => {
       expect(DICT[l]['sched.deadline.ok']).toContain('{days}');
       expect(DICT[l]['pro.permonth']).toContain('{price}');
     }
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------
+describe('signed documents are frozen: later date edits cannot move crew, rentals or total', () => {
+  const SIGNED_AT = NOW;
+  const tight = { startDate: '2026-11-02', endDate: '2026-11-08' };
+  const loose = { startDate: '2026-11-02', endDate: '2026-12-30' };
+  const totalOf = (draft, live, at) => {
+    const r = computeAll(draft, pricingTime(draft, at), { timeline: planningTimeline(draft, live) });
+    return { total: r.quote.total, crew: r.schedule.crew, rent: r.machinery.total };
+  };
+  const sign = (draft, live) => {
+    const total = totalOf(draft, live, SIGNED_AT).total;
+    const sig = normalizeSignature({ dataUrl: PNG, w: 10, h: 10, name: 'Cliente', total, pricedAt: SIGNED_AT, at: SIGNED_AT });
+    return freezeSignature(draft, { ...draft, signature: sig }, live);
+  };
+
+  it('unsigned quotes follow the live dates (sanity: the dates really matter for this draft)', () => {
+    const d = bigDraft();
+    const a = totalOf(d, tight, NOW);
+    const b = totalOf(d, loose, NOW);
+    expect(a.crew).toBeGreaterThan(b.crew);
+    expect(a.total).not.toBe(b.total);
+  });
+
+  it('a new signature is stamped with the dates it was signed with; the plan then ignores new dates', () => {
+    const d = bigDraft();
+    const signed = sign(d, tight);
+    expect(signed.signature.timeline).toEqual(tight);
+    const before = totalOf(signed, tight, NOW + 5 * 86_400_000);
+    const after = totalOf(signed, loose, NOW + 9 * 86_400_000); // dates edited AND days later
+    expect(after).toEqual(before);
+    expect(after.total).toBeCloseTo(signed.signature.total, 2); // still exactly the signed amount
+  });
+
+  it('removing the signature releases the plan; a stored signature round-trips with its frozen dates', () => {
+    const signed = sign(bigDraft(), tight);
+    const released = { ...signed, signature: null };
+    expect(planningTimeline(released, loose)).toEqual(loose);
+    const back = normalizeDraft(JSON.parse(JSON.stringify(signed)), 'CL');
+    expect(back.signature.timeline).toEqual(tight);
+    expect(totalOf(back, loose, NOW)).toEqual(totalOf(signed, tight, NOW));
+  });
+
+  it('only a NEW signature is stamped: an older one (no stamp) never inherits later dates', () => {
+    const legacy = { ...bigDraft(), signature: normalizeSignature({ dataUrl: PNG, w: 10, h: 10, total: 1, pricedAt: NOW }) };
+    expect(legacy.signature.timeline).toBeUndefined();
+    expect(planningTimeline(legacy, tight)).toEqual({ startDate: '', endDate: '' });
+    const edited = { ...legacy, step: 2 }; // any later edit keeps the same signature object
+    expect(freezeSignature(legacy, edited, tight)).toBe(edited);
+    expect(freezeSignature(legacy, edited, tight).signature.timeline).toBeUndefined();
+    expect(normalizeSignature({ ...legacy.signature, timeline: { startDate: 'x', endDate: '2026-01-02' } }).timeline).toEqual({ startDate: '', endDate: '2026-01-02' });
+  });
+
+  it('the wizard stamps through every draft update and the project card uses the frozen dates', () => {
+    const w = read('components/Wizard.jsx');
+    expect(w).toMatch(/freezeSignature\(d, /);
+    expect(w).toMatch(/planningTimeline\(draft, \{ startDate, endDate \}\)/);
+    expect(read('components/ProjectCard.jsx')).toMatch(/planningTimeline\(project\.draft, project\)/);
   });
 });

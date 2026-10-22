@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMarketClock } from '../lib/marketClock.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { computeAll } from '../lib/engine.js';
-import { pricingTime } from '../lib/signature.js';
+import { pricingTime, planningTimeline, freezeSignature } from '../lib/signature.js';
 import { Button } from './ui.jsx';
 import StepStart from './steps/StepStart.jsx';
 import StepDims from './steps/StepDims.jsx';
@@ -16,15 +16,28 @@ const STEPS = {
   project: ['project', 'partidas', 'prices', 'finance', 'report'],
 };
 
-export default function Wizard({ projectId, draft, setDraft, photos, setPhotos, company, startDate = '', endDate = '', onNewProject, onExit }) {
+export default function Wizard({ projectId, draft, setDraft: setProjectDraft, photos, setPhotos, company, startDate = '', endDate = '', onNewProject, onExit }) {
   const { t } = useI18n();
   const { now, refresh } = useMarketClock(); // moves by itself every 15 minutes: prices and rentals re-price on their own
   const [showErrors, setShowErrors] = useState(false);
 
+  // Every edit flows through here: a signature applied now is stamped with the project's current dates, which
+  // freezes the crew / rental plan of that document (see planningTimeline).
+  const setDraft = useCallback(
+    (update) =>
+      setProjectDraft((d) => freezeSignature(d, typeof update === 'function' ? update(d) : update, { startDate, endDate })),
+    [setProjectDraft, startDate, endDate]
+  );
+
   // A signed quote keeps the prices it was signed at (see pricingTime); otherwise live market prices.
   const priceTime = pricingTime(draft, now);
   // The project's dates drive the automatic crew / calendar plan (see lib/schedule.js).
-  const result = useMemo(() => computeAll(draft, priceTime, { timeline: { startDate, endDate } }), [draft, priceTime, startDate, endDate]);
+  const timeline = planningTimeline(draft, { startDate, endDate });
+  const result = useMemo(
+    () => computeAll(draft, priceTime, { timeline }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [draft, priceTime, timeline.startDate, timeline.endDate]
+  );
 
   const steps = STEPS[draft.mode] ?? STEPS.quick;
   const step = draft.step;

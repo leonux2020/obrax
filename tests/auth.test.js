@@ -51,6 +51,12 @@ const mountApp = async () => {
     await new Promise((r) => setTimeout(r, 40));
   });
 };
+// A signed-out user always lands on the welcome screen first; its button leads to the access screen.
+const toAccess = async () => {
+  expect(q('splash')).not.toBeNull();
+  expect(q('login-google-card')).toBeNull();
+  await click(q('splash-start'));
+};
 const q = (id) => document.querySelector(`[data-testid="${id}"]`);
 const flush = (ms = 30) => act(async () => { await new Promise((r) => setTimeout(r, ms)); });
 const click = (el) => act(async () => { el.dispatchEvent(new MouseEvent('click', { bubbles: true })); await new Promise((r) => setTimeout(r, 5)); });
@@ -85,6 +91,7 @@ describe('Google login on the main access screen (VITE_GOOGLE_CLIENT_ID)', () =>
   it('shows the Google button FIRST, then the local profile, and initializes GIS with the env client id', async () => {
     seed({ user: null });
     await mountApp();
+    await toAccess();
     const card = q('login-google-card');
     const local = q('login-local');
     expect(card).not.toBeNull();
@@ -98,6 +105,7 @@ describe('Google login on the main access screen (VITE_GOOGLE_CLIENT_ID)', () =>
   it('a successful Google sign-in is stored and lands on the main view; it survives a relaunch', async () => {
     seed({ user: null });
     await mountApp();
+    await toAccess();
     expect(q('dash-empty')).toBeNull();
     await signInWith(credential());
     expect(q('login-google-card')).toBeNull();
@@ -115,6 +123,7 @@ describe('Google login on the main access screen (VITE_GOOGLE_CLIENT_ID)', () =>
   it('rejects a credential for another client / an expired one: error shown, still on the access screen, nothing stored', async () => {
     seed({ user: null });
     await mountApp();
+    await toAccess();
     await signInWith(credential({ aud: 'someone-else.apps.googleusercontent.com' }));
     expect(q('google-error')).not.toBeNull();
     expect(q('login-google-card')).not.toBeNull();
@@ -126,9 +135,22 @@ describe('Google login on the main access screen (VITE_GOOGLE_CLIENT_ID)', () =>
     expect(localStorage.getItem('cp.user.v1')).toBeNull();
   });
 
+  it('the welcome screen is the first view for a signed-out user even with saved projects, and a stored user skips it', async () => {
+    seed({ user: null });
+    await mountApp();
+    expect(q('splash')).not.toBeNull();
+    expect(host.querySelector('header')).toBeNull();
+    act(() => root.unmount());
+    host.remove();
+    seed();
+    await mountApp();
+    expect(q('splash')).toBeNull();
+  });
+
   it('the local profile still works next to Google', async () => {
     seed({ user: null });
     await mountApp();
+    await toAccess();
     await click(q('login-local').querySelector('button[type="submit"]'));
     expect(q('dash-empty')).not.toBeNull();
     expect(JSON.parse(localStorage.getItem('cp.user.v1')).provider).toBe('local');
@@ -144,6 +166,7 @@ describe('Google login on the main access screen (VITE_GOOGLE_CLIENT_ID)', () =>
     try {
       seed({ user: null });
       await mountApp();
+      await toAccess();
       await flush();
       expect(q('google-offline').textContent).toContain('Sin conexión');
       expect(q('login-local')).not.toBeNull();
@@ -164,6 +187,9 @@ describe('Google login on the main access screen (VITE_GOOGLE_CLIENT_ID)', () =>
     expect(q('settings-google-link')).toBeNull();
     expect(q('settings-account').textContent).toContain('ana@example.com');
     await click([...q('settings-account').querySelectorAll('button')].find((b) => b.textContent.trim()));
+    expect(q('splash')).not.toBeNull(); // signed out: the welcome screen comes first again
+    expect(q('splash-start').textContent).toBe('Acceder'); // a returning user does not re-register
+    await click(q('splash-start'));
     expect(q('login-google-card')).not.toBeNull();
   });
 });

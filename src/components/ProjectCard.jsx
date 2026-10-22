@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useI18n, makeI18n } from '../lib/i18n.jsx';
 import { computeAll } from '../lib/engine.js';
-import { pricingTime } from '../lib/signature.js';
+import { pricingTime, planningTimeline } from '../lib/signature.js';
 import { marketBucket } from '../lib/pricing.js';
 import { getRegion } from '../lib/regions.js';
 import { parseDay, projectClient, projectTitle, trafficLight } from '../lib/projects.js';
@@ -19,7 +19,8 @@ export default function ProjectCard({ project, now, onOpen, onEdit }) {
   const bucket = marketBucket(priceTime);
   const day = new Date(priceTime).toDateString();
   const total = useMemo(() => {
-    const r = computeAll(project.draft, priceTime, { timeline: { startDate: project.startDate, endDate: project.endDate } });
+    // a signed quote is frozen: it keeps the dates it was signed with, whatever the project dates say now
+    const r = computeAll(project.draft, priceTime, { timeline: planningTimeline(project.draft, project) });
     return r.valid ? makeI18n(lang, project.draft.regionCode).money(r.quote.total) : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.draft, project.startDate, project.endDate, lang, bucket, day]);

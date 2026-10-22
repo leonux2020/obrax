@@ -55,14 +55,15 @@ afterEach(() => {
 });
 
 describe('first run: splash -> setup -> dashboard', () => {
-  it('a brand-new install shows ONLY the logo, the app name and one bottom button', async () => {
+  it('a brand-new install shows ONLY the logo, the app name and the bottom buttons', async () => {
     await mountApp();
     expect(q('splash')).not.toBeNull();
     expect(host.querySelector('h1').textContent).toBe('Obrax');
     expect(host.querySelector('img')).not.toBeNull();
     const buttons = host.querySelectorAll('button');
-    expect(buttons).toHaveLength(1);
+    expect(buttons).toHaveLength(2); // registration CTA + "Ya tengo cuenta"
     expect(buttons[0].textContent).toBe('Configurar mi Empresa');
+    expect(buttons[1].textContent).toBe('Ya tengo cuenta');
     expect(buttons[0].closest('.fixed').className).toContain('bottom-0'); // bottom third, thumb zone
     expect(host.querySelector('header')).toBeNull(); // no app chrome around the splash
   });

@@ -135,6 +135,7 @@ export function normalizeSignature(obj) {
   const at = Number(obj.at);
   const total = Number(obj.total);
   const pricedAt = Number(obj.pricedAt);
+  const timeline = normalizeTimeline(obj.timeline);
   return {
     dataUrl,
     w,
@@ -144,7 +145,16 @@ export function normalizeSignature(obj) {
     at: Number.isFinite(at) ? at : 0,
     total: Number.isFinite(total) && total >= 0 ? total : 0,
     pricedAt: Number.isFinite(pricedAt) && pricedAt > 0 ? pricedAt : 0,
+    ...(timeline ? { timeline } : {}),
   };
+}
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+/** The project dates a signed quote was planned with ({startDate, endDate}, '' = none), or null when never frozen. */
+export function normalizeTimeline(obj) {
+  if (!obj || typeof obj !== 'object') return null;
+  const day = (v) => (typeof v === 'string' && DAY_RE.test(v) ? v : '');
+  return { startDate: day(obj.startDate), endDate: day(obj.endDate) };
 }
 
 /** Build the value saved inside the project: ink + client data + the quote total (and price time) it was signed for. */
@@ -158,6 +168,28 @@ export function buildSignature({ ink, name = '', taxId = '', total = 0, pricedAt
  * removing the signature releases the prices again.
  */
 export const pricingTime = (draft, now) => draft?.signature?.pricedAt || now;
+
+/**
+ * The project dates the crew / rental plan is computed with. A signed quote is FROZEN: it keeps the dates it
+ * was signed with (stamped by `freezeSignature`), so editing the project's dates afterwards cannot change its
+ * crew, rentals or total. A signature that predates the stamp plans without dates (the legacy behaviour).
+ * Unsigned quotes follow the live project dates. Removing the signature releases the plan.
+ */
+export function planningTimeline(draft, live = {}) {
+  const sig = draft?.signature;
+  if (!sig) return { startDate: live?.startDate || '', endDate: live?.endDate || '' };
+  return sig.timeline ?? { startDate: '', endDate: '' };
+}
+
+/**
+ * Stamp a freshly applied signature with the dates (and thereby the plan) it vouches for. Only a signature
+ * that is NEW in `next` (different from the one in `prev`) is stamped: older ones keep what they have.
+ */
+export function freezeSignature(prev, next, live = {}) {
+  const sig = next?.signature;
+  if (!sig || sig.timeline || sig === prev?.signature) return next;
+  return { ...next, signature: { ...sig, timeline: normalizeTimeline(live) } };
+}
 
 /** A signature only vouches for the quote it was given on: if the total changed afterwards it is stale. */
 export const isSignatureCurrent = (signature, total) => !!signature && Math.abs(signature.total - total) < 0.005;

@@ -3,6 +3,8 @@
 
 export const P5 = {
   es: {
+    'splash.enter': "Acceder",
+    'splash.login': "Ya tengo cuenta",
     'pdf.shareTextOnly': 'Se abrió el menú de compartir con el resumen. Este navegador no permite adjuntar el PDF: usa «Descargar PDF» para guardarlo.',
     'sign.pro.title': 'Firma del contratista',
     'sign.pro.hint': 'Se imprime automáticamente en tus presupuestos.',
@@ -22,6 +24,8 @@ export const P5 = {
     'prices.auto': 'Los precios de materiales y arriendos se actualizan solos cada 15 minutos.',
   },
   en: {
+    'splash.enter': "Sign in",
+    'splash.login': "I already have an account",
     'pdf.shareTextOnly': 'The share menu opened with the summary. This browser cannot attach the PDF: use "Download PDF" to save it.',
     'sign.pro.title': 'Contractor signature',
     'sign.pro.hint': 'It is printed automatically on your quotes.',
@@ -41,6 +45,8 @@ export const P5 = {
     'prices.auto': 'Material and rental prices refresh by themselves every 15 minutes.',
   },
   pt: {
+    'splash.enter': "Entrar",
+    'splash.login': "Já tenho conta",
     'pdf.shareTextOnly': 'O menu de compartilhar abriu com o resumo. Este navegador não consegue anexar o PDF: use «Baixar PDF» para salvá-lo.',
     'sign.pro.title': 'Assinatura do contratante',
     'sign.pro.hint': 'É impressa automaticamente nos seus orçamentos.',
@@ -60,6 +66,8 @@ export const P5 = {
     'prices.auto': 'Os preços de materiais e aluguéis se atualizam sozinhos a cada 15 minutos.',
   },
   fr: {
+    'splash.enter': "Se connecter",
+    'splash.login': "J'ai déjà un compte",
     'pdf.shareTextOnly': 'Le menu de partage s\'est ouvert avec le résumé. Ce navigateur ne peut pas joindre le PDF : utilisez « Télécharger le PDF » pour l\'enregistrer.',
     'sign.pro.title': 'Signature de l\'entrepreneur',
     'sign.pro.hint': 'Elle est imprimée automatiquement sur vos devis.',
@@ -79,6 +87,8 @@ export const P5 = {
     'prices.auto': 'Les prix des matériaux et des locations se mettent à jour tout seuls toutes les 15 minutes.',
   },
   it: {
+    'splash.enter': "Accedi",
+    'splash.login': "Ho già un account",
     'pdf.shareTextOnly': 'Il menu di condivisione si è aperto con il riepilogo. Questo browser non può allegare il PDF: usa «Scarica PDF» per salvarlo.',
     'sign.pro.title': 'Firma dell\'appaltatore',
     'sign.pro.hint': 'Viene stampata automaticamente nei tuoi preventivi.',
@@ -98,6 +108,8 @@ export const P5 = {
     'prices.auto': 'I prezzi di materiali e noleggi si aggiornano da soli ogni 15 minuti.',
   },
   de: {
+    'splash.enter': "Anmelden",
+    'splash.login': "Ich habe bereits ein Konto",
     'pdf.shareTextOnly': 'Das Teilen-Menü wurde mit der Zusammenfassung geöffnet. Dieser Browser kann das PDF nicht anhängen: Nutzen Sie „PDF herunterladen“, um es zu speichern.',
     'sign.pro.title': 'Unterschrift des Auftragnehmers',
     'sign.pro.hint': 'Sie wird automatisch auf Ihre Angebote gedruckt.',
