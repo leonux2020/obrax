@@ -51,9 +51,9 @@ export default function Dashboard({ projects, companyMissing, onNew, onOpen, onE
         type="button"
         onClick={() => setPaywall(true)}
         data-testid="pro-scan"
-        className="mb-4 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-[#d4af37]/60 px-4 text-sm font-bold text-[#e8c35f] transition hover:border-[#d4af37] active:scale-[0.99]"
+        className="mb-4 flex min-h-[56px] w-full items-center justify-center gap-3 rounded-xl border border-[#d4af37]/60 px-4 text-base font-bold text-[#e8c35f] transition hover:border-[#d4af37] active:scale-[0.99]"
       >
-        <HelmetIcon size={20} />
+        <HelmetIcon size={28} />
         <span>{t('pro.cta')}</span>
       </button>
       {paywall && <ProPaywall onClose={() => setPaywall(false)} />}

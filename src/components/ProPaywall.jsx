@@ -27,7 +27,7 @@ export default function ProPaywall({ onClose }) {
     <BottomSheet fullscreen title={t('pro.title')} subtitle={t('pro.subtitle')} onClose={onClose}>
       <div data-testid="pro-paywall" className="mx-auto max-w-lg pb-4">
         <div className="mb-5 mt-1 flex items-center gap-2 text-[#e8c35f]">
-          <HelmetIcon size={22} />
+          <HelmetIcon size={32} />
           <span className="rounded-md border border-[#d4af37]/60 px-1.5 text-[11px] font-extrabold tracking-wider">PRO</span>
         </div>
 

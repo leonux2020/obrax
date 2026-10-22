@@ -193,6 +193,37 @@ describe('PRO button and benefits screen', () => {
     expect(pro.className).not.toMatch(/\bbg-/);
   });
 
+  it('the hard hat is big, gold-gradient and has the crest and the curved visor', async () => {
+    await setup();
+    const svg = q('pro-scan').querySelector('svg[data-testid="helmet-icon"]');
+    expect(Number(svg.getAttribute('width'))).toBeGreaterThanOrEqual(24); // w-6 or larger, the protagonist of the button
+    expect(Number(svg.getAttribute('width'))).toBe(Number(svg.getAttribute('height')));
+    const grads = [...svg.querySelectorAll('linearGradient')];
+    expect(grads.length).toBeGreaterThanOrEqual(1);
+    const stops = [...grads[0].querySelectorAll('stop')].map((s) => s.getAttribute('stop-color').toUpperCase());
+    expect(stops).toContain('#FBBF24');
+    expect(stops).toContain('#D97706');
+    // every gradient id is unique and the fills reference them (no flat single-colour body)
+    const ids = grads.map((g) => g.getAttribute('id'));
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const part of ['shell', 'crest', 'visor']) {
+      const el = svg.querySelector(`[data-part="${part}"]`);
+      expect(el, part).not.toBeNull();
+      expect(el.getAttribute('fill')).toMatch(/^url\(#/);
+    }
+    expect(svg.querySelector('[data-part="shine"]')).not.toBeNull();
+    // the visor is wider than the shell (it projects past it) and sits below it
+    expect(svg.querySelector('[data-part="visor"]').getAttribute('d')).toMatch(/^M2 /);
+  });
+
+  it('two helmets on screen never share gradient ids', async () => {
+    await setup();
+    await click(q('pro-scan'));
+    const ids = [...document.querySelectorAll('svg[data-testid="helmet-icon"] linearGradient')].map((g) => g.id);
+    expect(ids.length).toBeGreaterThanOrEqual(6);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
   it('tapping it opens the benefits screen (no toast) with 3 benefits, 2 plans and an inactive Subscribe', async () => {
     await setup();
     expect(q('pro-paywall')).toBeNull();
