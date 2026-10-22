@@ -259,7 +259,7 @@ describe('PRO button and benefits screen', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('tapping it opens the benefits screen (no toast) with 3 benefits, 2 plans and an inactive Subscribe', async () => {
+  it('tapping it opens the benefits screen (no toast) with 2 PRO benefits, 3 plans and an inactive Subscribe', async () => {
     await setup();
     expect(q('pro-paywall')).toBeNull();
     await click(q('pro-scan'));
@@ -269,9 +269,26 @@ describe('PRO button and benefits screen', () => {
     const dialog = document.querySelector('[role="dialog"]');
     expect(dialog.className).toContain('bg-black');
     const items = [...q('pro-benefits').querySelectorAll('li p:first-child')].map((p) => p.textContent);
-    expect(items).toEqual(['Respaldo automático en Google Drive', 'Lectura de facturas con IA', 'Sin límites de proyectos']);
+    expect(items).toEqual(['Lectura de facturas con IA', 'Sin límites de proyectos']); // Drive backup is FREE now
+    expect(wall.textContent).not.toContain('Google Drive');
     expect(q('pro-plan-monthly').textContent).toContain('Mensual');
     expect(q('pro-plan-yearly').textContent).toContain('Anual');
+    expect(q('pro-plan-biennial').textContent).toContain('2 años');
+    expect(q('pro-plan-biennial').textContent).toContain('$79.99');
+    // the yearly plan is in the middle, is the featured one ("most popular", taller, gold edge) and is selected by default
+    const order = [...wall.querySelectorAll('[role="radio"]')].map((r) => r.getAttribute('data-testid'));
+    expect(order).toEqual(['pro-plan-monthly', 'pro-plan-yearly', 'pro-plan-biennial']);
+    expect(q('pro-plan-yearly').getAttribute('data-featured')).toBe('true');
+    expect(q('pro-plan-monthly').getAttribute('data-featured')).toBeNull();
+    expect(q('pro-plan-biennial').getAttribute('data-featured')).toBeNull();
+    expect(q('pro-plan-yearly').textContent).toContain('Más popular');
+    expect(q('pro-plan-yearly').textContent).toContain('Ahorra 33 %');
+    expect(q('pro-plan-yearly').className).toMatch(/min-h-\[104px\]/);
+    expect(q('pro-plan-biennial').className).toMatch(/min-h-\[72px\]/);
+    // contrast: the 2-year plan costs the same per month as the yearly one but asks for twice the commitment
+    expect(q('pro-plan-yearly').textContent).toContain('$3.33');
+    expect(q('pro-plan-biennial').textContent).toContain('$3.33');
+    expect(q('pro-plan-biennial').textContent).not.toContain('Ahorra');
     expect(q('pro-plan-yearly').getAttribute('aria-checked')).toBe('true');
     await click(q('pro-plan-monthly'));
     expect(q('pro-plan-monthly').getAttribute('aria-checked')).toBe('true');
@@ -314,7 +331,8 @@ describe('PRO button and benefits screen', () => {
   });
 
   it('paywall strings exist in six languages with the agreed Spanish wording', () => {
-    const keys = ['pro.cta', 'pro.title', 'pro.subtitle', 'pro.benefits', 'pro.b.drive', 'pro.b.ai', 'pro.b.projects', 'pro.plan.monthly', 'pro.plan.yearly', 'pro.price.monthly', 'pro.price.yearly', 'pro.subscribe', 'pro.back', 'pro.note'];
+    const keys = ['pro.cta', 'pro.title', 'pro.subtitle', 'pro.benefits', 'pro.b.ai', 'pro.b.projects', 'pro.plan.monthly', 'pro.plan.yearly', 'pro.plan.biennial', 'pro.price.monthly', 'pro.price.yearly', 'pro.price.biennial', 'pro.plan.popular', 'pro.permonth', 'pro.subscribe', 'pro.back', 'pro.note'];
+    for (const l of LANGS) expect(DICT[l]['pro.b.drive'], l).toBeUndefined();
     for (const l of LANGS) for (const k of keys) expect(DICT[l][k], `${l}:${k}`).toBeTruthy();
     expect(DICT.es['pro.cta']).toBe('Descubre PRO');
     expect(DICT.es['pro.back']).toBe('Volver');
@@ -326,7 +344,7 @@ describe('data model and copy', () => {
     const c = normalizeCompany({ name: 'A', proName: '<b>Ana</b> Ruiz', proTaxId: "1-9'; DROP" });
     expect(c.proName).not.toMatch(/[<>]/);
     expect(c.proTaxId).toMatch(/^[A-Z0-9.\-/]*$/);
-    expect(Object.keys(EMPTY_COMPANY)).toEqual(['name', 'taxId', 'phone', 'email', 'city', 'proName', 'proTaxId']);
+    expect(Object.keys(EMPTY_COMPANY)).toEqual(['name', 'taxId', 'phone', 'email', 'city', 'proName', 'proTaxId', 'signature']);
     expect(isCompanyEmpty(normalizeCompany({ proName: 'Ana' }))).toBe(false);
     expect(normalizeProfileMeta(null)).toEqual({ onboarded: false, drive: true });
     expect(normalizeProfileMeta({ onboarded: 'yes', drive: false })).toEqual({ onboarded: false, drive: false });

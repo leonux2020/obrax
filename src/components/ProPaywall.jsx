@@ -5,15 +5,18 @@ import { Button } from './ui.jsx';
 import BottomSheet from './BottomSheet.jsx';
 import HelmetIcon from './HelmetIcon.jsx';
 
+// Drive backup is FREE (a switch in Ajustes), so it is not listed here.
 const BENEFITS = [
-  { id: 'drive', icon: 'M7 18a4 4 0 0 1-.6-7.96A5.5 5.5 0 0 1 17 8.5a4.5 4.5 0 0 1 .5 9H7zm5-7v5m0-5-2 2m2-2 2 2' },
   { id: 'ai', icon: 'M4 7V5a1 1 0 0 1 1-1h2M20 7V5a1 1 0 0 0-1-1h-2M4 17v2a1 1 0 0 0 1 1h2M20 17v2a1 1 0 0 1-1 1h-2M8 12h8' },
   { id: 'projects', icon: 'M12 12c-2.2-2.7-4.5-3.3-6-2.2-1.6 1.2-1.4 4 .2 5.2 1.6 1.2 3.8.5 5.8-3zm0 0c2.2-2.7 4.5-3.3 6-2.2 1.6 1.2 1.4 4-.2 5.2-1.6 1.2-3.8.5-5.8-3z' },
 ];
 
+// Example prices. The 2-year plan costs the same per month as the yearly one but asks for a longer
+// commitment, so the yearly plan (middle, highlighted, "most popular") is the obvious choice by contrast.
 const PLANS = [
-  { id: 'yearly', name: 'pro.plan.yearly', price: 'pro.price.yearly', badge: 'pro.plan.save' },
   { id: 'monthly', name: 'pro.plan.monthly', price: 'pro.price.monthly' },
+  { id: 'yearly', name: 'pro.plan.yearly', price: 'pro.price.yearly', perMonth: '$3.33', badges: ['pro.plan.popular', 'pro.plan.save'], note: 'pro.plan.flex', featured: true },
+  { id: 'biennial', name: 'pro.plan.biennial', price: 'pro.price.biennial', perMonth: '$3.33' },
 ];
 
 /**
@@ -62,7 +65,7 @@ export default function ProPaywall({ feature = 'promo', onClose }) {
         <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-neutral-400" id="pro-plans-label">
           {t('pro.plans')}
         </h3>
-        <div role="radiogroup" aria-labelledby="pro-plans-label" className="grid grid-cols-2 gap-3">
+        <div role="radiogroup" aria-labelledby="pro-plans-label" className="flex flex-col gap-3">
           {PLANS.map((p) => {
             const on = plan === p.id;
             return (
@@ -72,16 +75,25 @@ export default function ProPaywall({ feature = 'promo', onClose }) {
                 role="radio"
                 aria-checked={on}
                 data-testid={`pro-plan-${p.id}`}
+                data-featured={p.featured ? 'true' : undefined}
                 onClick={() => setPlan(p.id)}
-                className={`relative flex min-h-[96px] flex-col items-start justify-end rounded-2xl border bg-black p-4 text-left transition active:scale-[0.99] ${
-                  on ? 'border-[#d4af37]' : 'border-white/10 hover:border-white/40'
-                }`}
+                className={`relative flex w-full items-center justify-between gap-3 rounded-2xl bg-black px-4 text-left transition active:scale-[0.99] ${
+                  p.featured ? 'min-h-[104px] border-2 py-5' : 'min-h-[72px] border py-3'
+                } ${on ? 'border-[#d4af37]' : p.featured ? 'border-[#d4af37]/50' : 'border-white/10 hover:border-white/40'}`}
               >
-                {p.badge && (
-                  <span className="absolute right-3 top-3 rounded-md border border-[#d4af37]/60 px-1.5 text-[11px] font-bold text-[#e8c35f]">{t(p.badge)}</span>
-                )}
-                <span className="text-sm font-semibold text-neutral-300">{t(p.name)}</span>
-                <span className={`mt-1 text-lg font-extrabold ${on ? 'text-[#e8c35f]' : 'text-white'}`}>{t(p.price)}</span>
+                <span className="min-w-0">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className={`${p.featured ? 'text-lg' : 'text-base'} font-bold text-white`}>{t(p.name)}</span>
+                    {p.badges?.map((bd) => (
+                      <span key={bd} className="rounded-md border border-[#d4af37]/60 px-1.5 text-[11px] font-bold text-[#e8c35f]">
+                        {t(bd)}
+                      </span>
+                    ))}
+                  </span>
+                  {p.perMonth && <span className="mt-0.5 block text-sm text-neutral-300">{t('pro.permonth', { price: p.perMonth })}</span>}
+                  {p.note && <span className="block text-xs text-neutral-400">{t(p.note)}</span>}
+                </span>
+                <span className={`shrink-0 text-right font-extrabold tabular-nums ${p.featured ? 'text-xl' : 'text-base'} ${on || p.featured ? 'text-[#e8c35f]' : 'text-white'}`}>{t(p.price)}</span>
               </button>
             );
           })}

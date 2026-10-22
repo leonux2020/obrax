@@ -219,10 +219,17 @@ describe('photo persistence', () => {
 });
 
 describe('draft keeps the client-photo toggle', () => {
-  it('defaults off and only accepts a real boolean', () => {
-    expect(newDraft('CL').attachPhotos).toBe(false);
-    expect(normalizeDraft({ regionCode: 'CL', attachPhotos: true }, 'CL').attachPhotos).toBe(true);
-    expect(normalizeDraft({ regionCode: 'CL', attachPhotos: 'yes' }, 'CL').attachPhotos).toBe(false);
+  it('defaults ON (photos reach the client PDF) and only an explicit choice can switch them off', () => {
+    expect(newDraft('CL').attachPhotos).toBe(true);
+    expect(newDraft('CL').photosChoice).toBe(false);
+    // drafts saved before the choice existed stored `false` as a mere default: photos are on again
+    expect(normalizeDraft({ regionCode: 'CL', attachPhotos: false }, 'CL').attachPhotos).toBe(true);
+    expect(normalizeDraft({ regionCode: 'CL' }, 'CL').attachPhotos).toBe(true);
+    // once the user touched the switch, it is taken literally
+    expect(normalizeDraft({ regionCode: 'CL', attachPhotos: false, photosChoice: true }, 'CL').attachPhotos).toBe(false);
+    expect(normalizeDraft({ regionCode: 'CL', attachPhotos: true, photosChoice: true }, 'CL').attachPhotos).toBe(true);
+    expect(normalizeDraft({ regionCode: 'CL', attachPhotos: 'no', photosChoice: true }, 'CL').attachPhotos).toBe(true); // junk is not a "no"
+    expect(normalizeDraft({ regionCode: 'CL', photosChoice: 'yes' }, 'CL').photosChoice).toBe(false);
   });
 });
 

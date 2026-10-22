@@ -1,7 +1,7 @@
 // Report PDF pipeline used by the summary screen. Everything here is a PURE function of its inputs: the
 // document `kind` ('client' | 'tech') is fixed by the caller when the user taps and is the only thing
 // that decides which model and renderer run, so switching tabs while a PDF is being generated can never
-// mix the two reports. Sharing goes through the native Web Share API with the real file (no custom menu).
+// mix the two reports. Sharing goes through the native Web Share API (the real file when the browser allows it; no custom menu).
 
 import { buildClientModel, buildTechModel } from './reports.js';
 import { pdfFileName, pdfMoneyFormatter, rasterizeLogo, renderClientPdf, renderTechPdf } from './pdf.js';
@@ -59,17 +59,35 @@ export function canShareFile(file, nav = typeof navigator === 'undefined' ? null
 }
 
 /**
- * Open the native share sheet with the PDF.
- * @returns 'shared' | 'cancelled' | 'unsupported' - on 'unsupported' the caller falls back to a download.
+ * Open the NATIVE share sheet (navigator.share) whenever the browser has it.
+ *  1. the browser can share files  -> the PDF itself is attached ('shared')
+ *  2. it has share() but refuses files (some desktop / older mobile browsers) -> the same native sheet is
+ *     opened with the title and a short text instead of silently downloading ('shared-text'); the PDF is
+ *     then still available through "Descargar PDF"
+ *  3. no navigator.share at all (or the gesture expired) -> 'unsupported': the caller downloads the file.
+ * Closing the sheet is not an error ('cancelled').
+ * @returns 'shared' | 'shared-text' | 'cancelled' | 'unsupported'
  */
-export async function sharePdfFile(file, { title }, nav = typeof navigator === 'undefined' ? null : navigator) {
-  if (!canShareFile(file, nav)) return 'unsupported';
+export async function sharePdfFile(file, { title, text = '' }, nav = typeof navigator === 'undefined' ? null : navigator) {
+  if (!nav || typeof nav.share !== 'function') return 'unsupported';
+  const textPayload = () => ({ title, ...(text ? { text } : {}) });
+  const run = async (payload, ok) => {
+    await nav.share(payload);
+    return ok;
+  };
   try {
-    await nav.share({ files: [file], title });
-    return 'shared';
+    if (canShareFile(file, nav)) {
+      try {
+        return await run({ files: [file], title }, 'shared');
+      } catch (err) {
+        // files refused at the last moment: fall through to the text-only native sheet
+        if (err?.name !== 'NotSupportedError' && err?.name !== 'TypeError') throw err;
+      }
+    }
+    return await run(textPayload(), 'shared-text');
   } catch (err) {
     if (err?.name === 'AbortError') return 'cancelled'; // the user closed the sheet: not an error
-    if (err?.name === 'NotAllowedError' || err?.name === 'NotSupportedError') return 'unsupported'; // gesture expired / files refused
+    if (err?.name === 'NotAllowedError' || err?.name === 'NotSupportedError' || err?.name === 'TypeError') return 'unsupported'; // gesture expired / nothing shareable
     throw err;
   }
 }

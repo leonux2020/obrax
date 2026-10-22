@@ -306,7 +306,9 @@ export default function App() {
               setDraft={setDraft}
               photos={photos}
               setPhotos={setPhotos}
-              company={active.company}
+              company={active.company.signature || !company.signature ? active.company : { ...active.company, signature: company.signature }}
+              startDate={active.startDate}
+              endDate={active.endDate}
               onNewProject={() => {
                 closeProject();
                 requestNewProject();
@@ -347,8 +349,9 @@ export default function App() {
               logo={logo}
               regionCode={settings.region}
               pwa={pwa}
+              drive={meta.drive}
+              onDriveChange={(v) => setMeta((m) => ({ ...m, drive: v }))}
               onEditProfile={() => setSheet({ type: 'profile' })}
-              onPro={openPaywall}
               onSignIn={signIn}
               onChangeLang={changeLang}
               onChangeRegion={() => {

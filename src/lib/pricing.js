@@ -22,7 +22,11 @@ function fnv1a(str) {
 const noise = (seed) => (fnv1a(seed) / 4294967295) * 2 - 1;
 
 // 15-minute market window: prices drift slowly and identically for everyone within it
-export const marketBucket = (now = Date.now()) => Math.floor(now / 900_000);
+export const MARKET_WINDOW_MS = 900_000;
+// A broken clock value (NaN, undefined, a string) can never poison the prices: it falls back to the real time.
+export const marketBucket = (now = Date.now()) => Math.floor((Number.isFinite(now) ? now : Date.now()) / MARKET_WINDOW_MS);
+/** Epoch ms at which the NEXT market window starts (when the prices change again). */
+export const nextBucketAt = (now = Date.now()) => (marketBucket(now) + 1) * MARKET_WINDOW_MS;
 
 export function roundMoney(value, region) {
   const f = 10 ** region.digits;

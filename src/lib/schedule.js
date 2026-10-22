@@ -142,3 +142,77 @@ export function buildSchedule(partidas, crew = SCHEDULE.defaultCrew) {
     totals: { hh: r1(hhTotal), activeDays: activeTotal, deadDays: deadTotal, totalDays: activeTotal + deadTotal },
   };
 }
+
+// ---- automatic planning from the project -------------------------------------------------------------------
+// The project carries a start date and an estimated end date. When the crew is in AUTOMATIC mode and the
+// project has an end date, the engine picks the SMALLEST crew whose plan (active days + dead technical time)
+// fits that window; without an end date it keeps the stored crew (default 3). Days are calendar days.
+
+const DAY_MS = 86_400_000;
+const pad2 = (n) => String(n).padStart(2, '0');
+export const toISODay = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+/** Strict YYYY-MM-DD -> local-midnight Date, or null. */
+export function parseISODay(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [y, m, d] = value.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d ? date : null;
+}
+
+const addDays = (date, n) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + n);
+const diffDays = (a, b) => Math.round((b.getTime() - a.getTime()) / DAY_MS);
+
+/**
+ * The project's time window. Start = its start date, or today when it has none; the end is optional.
+ * @returns {{start: Date, end: Date|null, availableDays: number|null}} availableDays counts both ends (>= 1)
+ */
+export function planningWindow(timeline = {}, now = Date.now()) {
+  const today = new Date(now);
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const start = parseISODay(timeline?.startDate) ?? todayStart;
+  const endRaw = parseISODay(timeline?.endDate);
+  const end = endRaw && endRaw >= start ? endRaw : null; // an end before the start is ignored (as the traffic light does)
+  return { start, end, availableDays: end ? Math.max(1, diffDays(start, end) + 1) : null };
+}
+
+/** Smallest crew whose plan fits `availableDays`; if none does, the smallest crew that reaches the best possible duration. */
+export function suggestCrew(partidas, availableDays) {
+  const total = (c) => buildSchedule(partidas, c).totals.totalDays;
+  for (let c = SCHEDULE.minCrew; c <= SCHEDULE.maxCrew; c += 1) {
+    if (total(c) <= availableDays) return { crew: c, fits: true };
+  }
+  const best = total(SCHEDULE.maxCrew);
+  for (let c = SCHEDULE.minCrew; c <= SCHEDULE.maxCrew; c += 1) {
+    if (total(c) <= best) return { crew: c, fits: false };
+  }
+  return { crew: SCHEDULE.maxCrew, fits: false };
+}
+
+/**
+ * Full plan of a project: crew (automatic from the deadline, or manual) + calendar dates + deadline check.
+ * @param partidas computeAll() partidas  @param draft {crew, crewAuto}  @param timeline {startDate, endDate}
+ */
+export function planProject(partidas, draft, timeline, now = Date.now()) {
+  const win = planningWindow(timeline, now);
+  const auto = draft?.crewAuto !== false;
+  const stored = clampCrew(draft?.crew ?? SCHEDULE.defaultCrew);
+  const crew = auto && win.availableDays ? suggestCrew(partidas, win.availableDays).crew : stored;
+  const schedule = buildSchedule(partidas, crew);
+  const days = Math.ceil(schedule.totals.totalDays - 1e-9);
+  const estimatedEnd = addDays(win.start, Math.max(1, days) - 1);
+  const spareDays = win.availableDays ? win.availableDays - days : null;
+  return {
+    ...schedule,
+    plan: {
+      auto,
+      hasDeadline: Boolean(win.end),
+      startDate: toISODay(win.start),
+      estimatedEnd: toISODay(estimatedEnd),
+      deadline: win.end ? toISODay(win.end) : '',
+      availableDays: win.availableDays,
+      spareDays,
+      fits: spareDays === null ? null : spareDays >= 0,
+    },
+  };
+}

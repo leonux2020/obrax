@@ -106,6 +106,18 @@ export function exportSignature(strokes, { makeCanvas = () => document.createEle
   throw new SignatureError('store');
 }
 
+// ---- contractor signature (stored in the company profile) -------------------------------------------------
+/** Validate an untrusted stored ink image {dataUrl, w, h}. Returns a clean object or null. */
+export function normalizeInk(obj) {
+  if (!obj || typeof obj !== 'object') return null;
+  const { dataUrl } = obj;
+  if (typeof dataUrl !== 'string' || dataUrl.length > SIGNATURE_LIMITS.maxChars || !DATA_RE.test(dataUrl)) return null;
+  const w = Math.round(Number(obj.w));
+  const h = Math.round(Number(obj.h));
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w < 1 || h < 1 || w > 2000 || h > 2000) return null;
+  return { dataUrl, w, h };
+}
+
 // ---- the stored value ------------------------------------------------------------------------------------
 const int = (v, min, max) => {
   const n = Math.round(Number(v));

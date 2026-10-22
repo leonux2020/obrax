@@ -1,14 +1,13 @@
 import { useI18n } from '../lib/i18n.jsx';
 import { regionName } from '../lib/regions.js';
 import { googleConfigured } from '../lib/auth.js';
-import { Button } from './ui.jsx';
+import { Button, Switch } from './ui.jsx';
 import GoogleButton from './GoogleButton.jsx';
-import HelmetIcon from './HelmetIcon.jsx';
 import BottomSheet from './BottomSheet.jsx';
 import LangSelect from './LangSelect.jsx';
 
 /** Language, default country for new projects, PWA install and local profile switch. */
-export default function SettingsSheet({ user, company, logo, regionCode, pwa, onEditProfile, onPro, onSignIn, onChangeLang, onChangeRegion, onLogout, onClose }) {
+export default function SettingsSheet({ user, company, logo, regionCode, pwa, drive, onDriveChange, onEditProfile, onSignIn, onChangeLang, onChangeRegion, onLogout, onClose }) {
   const { t, lang, region } = useI18n();
   const shown = regionCode ? { flag: region?.flag, name: region ? regionName(region, lang) : '' } : null;
   return (
@@ -48,19 +47,8 @@ export default function SettingsSheet({ user, company, logo, regionCode, pwa, on
           </div>
         </div>
 
-        {/* Locked feature: opens the PRO benefits screen. */}
-        <button
-          type="button"
-          onClick={() => onPro('drive')}
-          data-testid="settings-drive-pro"
-          className="flex min-h-[56px] w-full items-center justify-between gap-3 rounded-xl border border-white/10 px-4 py-3 text-left hover:border-[#d4af37]/60"
-        >
-          <span className="min-w-0 font-semibold">{t('pro.b.drive')}</span>
-          <span className="flex shrink-0 items-center gap-1.5 rounded-md border border-[#d4af37]/60 px-2 py-0.5 text-[11px] font-extrabold tracking-wider text-[#e8c35f]">
-            <HelmetIcon size={18} />
-            PRO
-          </span>
-        </button>
+        {/* FREE feature: Google Drive backup preference (the cloud copy itself is still to come). */}
+        <Switch checked={drive} onChange={onDriveChange} label={t('setup.drive')} description={t('setup.drive.desc')} data-testid="settings-drive" />
 
         {pwa.canInstall && (
           <Button variant="secondary" className="w-full" onClick={pwa.install}>

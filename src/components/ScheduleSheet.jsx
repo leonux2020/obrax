@@ -1,5 +1,5 @@
 import { useI18n } from '../lib/i18n.jsx';
-import { SCHEDULE, clampCrew } from '../lib/schedule.js';
+import { SCHEDULE, clampCrew, parseISODay } from '../lib/schedule.js';
 import { partidaTitle } from '../lib/reports.js';
 import BottomSheet from './BottomSheet.jsx';
 
@@ -33,12 +33,25 @@ function Bar({ row, total }) {
  * active days and the total shrink or grow live while the dead technical time stays exactly the same.
  */
 export default function ScheduleSheet({ draft, setDraft, result, onClose }) {
-  const { t, num } = useI18n();
+  const { t, num, date } = useI18n();
   const s = result.schedule;
+  const plan = s.plan;
+  const auto = plan.auto && plan.hasDeadline; // the crew follows the project's deadline
   const d = t('sched.d');
   const days = (v) => num(v, 1);
-  const crew = clampCrew(draft.crew ?? SCHEDULE.defaultCrew);
-  const setCrew = (delta) => setDraft((x) => ({ ...x, crew: clampCrew((x.crew ?? SCHEDULE.defaultCrew) + delta) }));
+  const crew = clampCrew(s.crew); // the crew actually planned (automatic or manual)
+  // Touching + / - takes manual control starting from the crew currently shown.
+  const setCrew = (delta) => setDraft((x) => ({ ...x, crew: clampCrew(crew + delta), crewAuto: false }));
+  const backToAuto = () => setDraft((x) => ({ ...x, crewAuto: true }));
+  const day = (iso) => date(parseISODay(iso));
+  const deadlineMsg =
+    plan.fits === null
+      ? null
+      : plan.fits
+        ? { tone: 'ok', text: t('sched.deadline.ok', { days: plan.spareDays }) }
+        : plan.auto
+          ? { tone: 'bad', text: t('sched.deadline.impossible') }
+          : { tone: 'bad', text: t('sched.deadline.over', { days: -plan.spareDays }) };
   const rows = s.rows.filter((r) => r.hh > 0);
 
   return (
@@ -54,6 +67,26 @@ export default function ScheduleSheet({ draft, setDraft, result, onClose }) {
               <Stat label={t('sched.active')} hint={t('sched.active.desc')} value={days(s.totals.activeDays)} unit={d} />
               <Stat label={t('sched.total')} hint={t('sched.perDay', { h: s.hoursPerDay })} value={days(s.totals.totalDays)} unit={d} tone="brand" />
             </div>
+
+            <section className="rounded-2xl border border-white/10 p-3" data-testid="sched-plan">
+              <p className="text-sm font-semibold" data-testid="sched-window">
+                {t('sched.window', { start: day(plan.startDate), end: day(plan.estimatedEnd) })}
+              </p>
+              {deadlineMsg && (
+                <p
+                  data-testid="sched-deadline"
+                  data-fits={plan.fits ? 'true' : 'false'}
+                  className={`mt-1 text-sm font-semibold ${deadlineMsg.tone === 'ok' ? 'text-brand' : 'text-orange-400'}`}
+                >
+                  {deadlineMsg.text}
+                </p>
+              )}
+              {!plan.hasDeadline && (
+                <p className="mt-1 text-xs text-neutral-400" data-testid="sched-noend">
+                  {t('sched.noEnd')}
+                </p>
+              )}
+            </section>
 
             <section aria-labelledby="sched-tl" className="rounded-2xl border border-white/10 p-3">
               <h3 id="sched-tl" className="mb-2 font-bold">
@@ -97,9 +130,21 @@ export default function ScheduleSheet({ draft, setDraft, result, onClose }) {
 
         {/* Thumb zone: crew stepper pinned to the bottom of the sheet while the content scrolls. */}
         <div className="sticky bottom-0 -mx-5 -mb-5 mt-4 border-t border-white/10 bg-black px-5 py-3 [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
-          <p id="crew-label" className="mb-2 text-sm font-semibold text-neutral-300">
-            {t('sched.crew')}
-          </p>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <p id="crew-label" className="text-sm font-semibold text-neutral-300">
+              {auto ? t('sched.auto') : t('sched.crew')}
+            </p>
+            {plan.hasDeadline && !plan.auto && (
+              <button
+                type="button"
+                onClick={backToAuto}
+                data-testid="crew-auto"
+                className="min-h-[36px] shrink-0 rounded-lg border border-[#d4af37]/60 px-3 text-xs font-bold text-[#e8c35f]"
+              >
+                ↺ {t('sched.auto.reset')}
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             <button
               type="button"

@@ -8,7 +8,7 @@
 // and the machine is rented for fewer days.
 
 import { getRegion } from './regions.js';
-import { roundMoney } from './pricing.js';
+import { roundMoney, marketBucket } from './pricing.js';
 
 /** usd = base DAILY rental in USD. `perSet` machines are priced per certified set (2 bays) per day. */
 export const MACHINES = Object.freeze({
@@ -39,11 +39,16 @@ function hash(str) {
   return h >>> 0;
 }
 
-/** Daily rental rate in the region's currency (stable: it does not drift with the market window). */
-export function machineryRate(id, regionCode) {
+/**
+ * Daily rental rate in the region's currency. Like the material prices it follows the 15-minute market
+ * window (a slow +-1.5 % drift on top of a stable per-country spread), so rentals refresh together with them.
+ */
+export function machineryRate(id, regionCode, bucket = marketBucket()) {
   const region = getRegion(regionCode);
-  const spread = 1 + ((hash(`${region.code}|machine|${id}`) / 4294967295) * 2 - 1) * 0.05;
-  const rate = roundMoney(MACHINES[id].usd * region.fx * region.priceFactor * spread, region);
+  const noise = (seed) => (hash(seed) / 4294967295) * 2 - 1;
+  const spread = 1 + noise(`${region.code}|machine|${id}`) * 0.05;
+  const drift = 1 + noise(`${bucket}|${region.code}|machine|${id}`) * 0.015;
+  const rate = roundMoney(MACHINES[id].usd * region.fx * region.priceFactor * spread * drift, region);
   return rate > 0 ? rate : 10 ** -region.digits;
 }
 
@@ -86,12 +91,12 @@ export const DEFAULT_MACHINERY = Object.freeze({ include: true, excluded: [] });
  * `config` = { include: master switch, excluded: machine ids the user turned off }.
  * @returns {{items, total, byPartida, suggested}} total and byPartida count only the INCLUDED items.
  */
-export function planMachinery({ partidas, schedule, regionCode, config = DEFAULT_MACHINERY }) {
+export function planMachinery({ partidas, schedule, regionCode, config = DEFAULT_MACHINERY, bucket = marketBucket() }) {
   const region = getRegion(regionCode);
   const include = config?.include !== false;
   const excluded = new Set(config?.excluded ?? []);
   const items = suggestMachinery(partidas, schedule).map((s) => {
-    const rate = machineryRate(s.id, regionCode);
+    const rate = machineryRate(s.id, regionCode, bucket);
     return { ...s, rate, total: roundMoney(s.qty * s.days * rate, region), included: include && !excluded.has(s.id) };
   });
   const byPartida = partidas.map(() => 0);

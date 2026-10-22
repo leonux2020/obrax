@@ -5,7 +5,7 @@ import { REGIONS, LANGS, getRegion } from './regions.js';
 import { TASKS, TASK_IDS, WASTE_LIMITS, defaultDims, pickOption } from './tasks.js';
 import { MATERIAL_IDS } from './catalog.js';
 import { MAX_PRICE } from './pricing.js';
-import { normalizeSignature } from './signature.js';
+import { normalizeSignature, normalizeInk } from './signature.js';
 import { SCHEDULE } from './schedule.js';
 import { MACHINE_IDS, DEFAULT_MACHINERY } from './machinery.js';
 import {
@@ -72,7 +72,7 @@ export const loadUser = () => normalizeUser(read(KEYS.user));
 export const saveUser = (u) => write(KEYS.user, u);
 
 // ---- company / professional profile (printed on both reports) -------------
-export const EMPTY_COMPANY = Object.freeze({ name: '', taxId: '', phone: '', email: '', city: '', proName: '', proTaxId: '' });
+export const EMPTY_COMPANY = Object.freeze({ name: '', taxId: '', phone: '', email: '', city: '', proName: '', proTaxId: '', signature: null });
 
 export function normalizeCompany(obj) {
   if (!obj || typeof obj !== 'object') return { ...EMPTY_COMPANY };
@@ -84,6 +84,7 @@ export function normalizeCompany(obj) {
     city: sanitizeText(obj.city, 60).trim(),
     proName: sanitizeText(obj.proName, 60).trim(), // the professional who signs: personal name ...
     proTaxId: sanitizeTaxId(obj.proTaxId), // ... and personal ID (RUT / DNI / ...)
+    signature: normalizeInk(obj.signature), // contractor's ink (PNG), printed automatically on the final documents
   };
 }
 export const isCompanyEmpty = (c) => !c || Object.values(c).every((v) => !v);
@@ -120,10 +121,12 @@ export function newDraft(regionCode, mode = 'quick') {
     finance: { labor: FINANCE_LIMITS.labor.default, transport: FINANCE_LIMITS.transport.default, tax: null },
     chainId: 'best',
     overrides: {},
-    attachPhotos: false, // also print the field photos on the client budget (they are always in the technical dossier)
+    attachPhotos: true, // the field photos are printed on the client budget too (always in the technical dossier); the user can opt out
+    photosChoice: false, // true once the user has touched that switch: only then is `attachPhotos` taken literally
     showBreakdown: false, // client PDF also lists the Materials / Labor / Transport totals (never stores or unit prices)
     signature: null, // client signature + data, see lib/signature.js
     crew: SCHEDULE.defaultCrew, // workers on site (planning, see lib/schedule.js)
+    crewAuto: true, // crew derived from the project deadline (when it has one); false = the manual `crew`
     machinery: { ...DEFAULT_MACHINERY, excluded: [] }, // major machinery rental: master switch + machines the user turned off
     regionCode: region ? region.code : null,
   };
@@ -192,6 +195,7 @@ export function normalizeDraft(obj, regionCode) {
   }
 
   const signature = normalizeSignature(obj.signature);
+  const photosChoice = obj.photosChoice === true;
   return {
     mode,
     step: Math.min(4, Math.max(0, Number.isInteger(obj.step) ? obj.step : 0)),
@@ -200,10 +204,13 @@ export function normalizeDraft(obj, regionCode) {
     finance,
     chainId,
     overrides,
-    attachPhotos: obj.attachPhotos === true,
+    // drafts saved before the choice existed carry the old default (false): photos are on unless the user switched them off
+    attachPhotos: photosChoice ? obj.attachPhotos !== false : true,
+    photosChoice,
     showBreakdown: obj.showBreakdown === true,
     signature,
     crew: coerceNumber(obj.crew, { min: SCHEDULE.minCrew, max: SCHEDULE.maxCrew, decimals: 0, fallback: SCHEDULE.defaultCrew }),
+    crewAuto: obj.crewAuto !== false,
     machinery: normalizeMachinery(obj.machinery, signature),
     regionCode,
   };

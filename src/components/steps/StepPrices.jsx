@@ -46,6 +46,9 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh }) 
             {t('prices.title')}
           </h2>
           <p className="text-sm text-neutral-300">{t('prices.updated', { time: time(new Date(now)) })}</p>
+          <p className="text-xs text-neutral-400" data-testid="prices-auto">
+            {t('prices.auto')}
+          </p>
         </div>
         <Button variant="secondary" className="!min-h-[44px]" onClick={refresh}>
           ↻ {t('prices.refresh')}

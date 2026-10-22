@@ -8,7 +8,7 @@
 
 import { TASKS } from './tasks.js';
 import { chainLabel } from './regions.js';
-import { isSignatureCurrent } from './signature.js';
+import { isSignatureCurrent, normalizeInk } from './signature.js';
 
 export const partidaTitle = (p, t) => p.name || t(`task.${p.task}`);
 
@@ -104,6 +104,8 @@ export function buildClientModel({ draft, result, company, region, t, num, date 
       const c = companyInfo(company, region, t);
       return (c.signer ? [c.signer, c.signerLine || c.taxLine] : [c.name, c.taxLine]).filter(Boolean);
     })(),
+    // The contractor's own signature, saved once in the profile: filled in automatically (null when none).
+    contractorSignature: normalizeInk(company?.signature),
     // The client's signature is printed only while it still matches the quote it was given on.
     signature: isSignatureCurrent(draft.signature, q.total)
       ? {

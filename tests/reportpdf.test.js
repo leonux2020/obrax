@@ -163,13 +163,25 @@ describe('native share of the PDF file', () => {
     const ok = vi.fn().mockResolvedValue(undefined);
     expect(await realShare(file, { title: 'Reporte de Obra' }, nav(ok, () => true))).toBe('shared');
     expect(ok).toHaveBeenCalledWith({ files: [file], title: 'Reporte de Obra' });
-    expect(await realShare(file, { title: 't' }, nav(ok, () => false))).toBe('unsupported');
+    // share() exists but refuses files: the NATIVE sheet still opens, with title + text (no forced download)
+    const text = vi.fn().mockResolvedValue(undefined);
+    expect(await realShare(file, { title: 't', text: 'resumen' }, nav(text, () => false))).toBe('shared-text');
+    expect(text).toHaveBeenCalledWith({ title: 't', text: 'resumen' });
+    expect(await realShare(file, { title: 't' }, nav(text, () => false))).toBe('shared-text');
+    expect(text).toHaveBeenLastCalledWith({ title: 't' });
+    // no navigator.share at all: the caller downloads
     expect(await realShare(file, { title: 't' }, null)).toBe('unsupported');
+    expect(await realShare(file, { title: 't' }, {})).toBe('unsupported');
+    // files refused at the last moment (NotSupportedError): falls through to the text-only native sheet
+    const refuse = vi.fn().mockRejectedValueOnce(Object.assign(new Error('x'), { name: 'NotSupportedError' })).mockResolvedValueOnce(undefined);
+    expect(await realShare(file, { title: 't', text: 'r' }, nav(refuse, () => true))).toBe('shared-text');
+    expect(refuse).toHaveBeenNthCalledWith(1, { files: [file], title: 't' });
+    expect(refuse).toHaveBeenNthCalledWith(2, { title: 't', text: 'r' });
     expect(await realShare(file, { title: 't' }, { share: ok })).toBe('shared'); // canShare is optional
     const fail = (name) => vi.fn().mockRejectedValue(Object.assign(new Error(name), { name }));
     expect(await realShare(file, { title: 't' }, nav(fail('AbortError'), () => true))).toBe('cancelled');
     expect(await realShare(file, { title: 't' }, nav(fail('NotAllowedError'), () => true))).toBe('unsupported');
-    await expect(realShare(file, { title: 't' }, nav(fail('TypeError'), () => true))).rejects.toThrow();
+    await expect(realShare(file, { title: 't' }, nav(fail('QuotaExceededError'), () => true))).rejects.toThrow(); // unknown failures still surface
     expect(canShareFile(file, { share: ok })).toBe(true);
     expect(canShareFile(file, {})).toBe(false);
   });

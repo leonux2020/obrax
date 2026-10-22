@@ -278,7 +278,7 @@ describe('persisted photos reach both PDFs', () => {
   const raw = (doc) => Buffer.from(doc.output('arraybuffer')).toString('latin1');
   const images = (s) => (s.match(/\/Subtype \/Image/g) || []).length;
 
-  it('after an IndexedDB round-trip: technical always, client only when toggled', async () => {
+  it('after an IndexedDB round-trip: technical always, client too by default (unless the user opts out)', async () => {
     const factory = new IDBFactory();
     const store = createPhotoStore(idbBackend(factory));
     for (let s = 0; s < 4; s += 1) await store.save(photo(s));
@@ -298,10 +298,12 @@ describe('persisted photos reach both PDFs', () => {
     expect(images(tech)).toBe(4);
 
     const model = buildClientModel(base);
-    const off = raw(await renderClientPdf(model, { money, photos: d.attachPhotos ? photos : [], photosTitle: i.t('photo.pdfClientTitle') }));
-    expect(images(off)).toBe(0);
-    const on = raw(await renderClientPdf(model, { money, photos, photosTitle: i.t('photo.pdfClientTitle') }));
+    // default draft: photos are ON, so the client PDF carries them; an explicit opt-out removes them
+    const pick = (draft) => (draft.attachPhotos ? photos : []);
+    const on = raw(await renderClientPdf(model, { money, photos: pick(d), photosTitle: i.t('photo.pdfClientTitle') }));
     expect(images(on)).toBe(4);
+    const off = raw(await renderClientPdf(model, { money, photos: pick({ ...d, attachPhotos: false, photosChoice: true }), photosTitle: i.t('photo.pdfClientTitle') }));
+    expect(images(off)).toBe(0);
   });
 
   it('empty slots never produce an empty grid', () => {

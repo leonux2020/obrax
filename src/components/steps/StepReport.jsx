@@ -132,7 +132,22 @@ function ClientView({ model, photos, signatureProps }) {
       <div className="mt-10 grid gap-8 sm:grid-cols-2">
         {/* contractor: static, read-only data from the company profile */}
         <div data-testid="contractor-sign">
-          <div className="hidden h-20 sm:block" />
+          {model.contractorSignature ? (
+            // black ink on transparent: inverted on screen (the sig-img class) so it reads on the black background
+            <div className="flex h-20 items-end px-2 pb-1" data-testid="contractor-signature">
+              <img
+                src={model.contractorSignature.dataUrl}
+                alt=""
+                width={model.contractorSignature.w}
+                height={model.contractorSignature.h}
+                draggable={false}
+                className="sig-img max-h-full w-auto max-w-full object-contain"
+                data-testid="contractor-signature-img"
+              />
+            </div>
+          ) : (
+            <div className="hidden h-20 sm:block" />
+          )}
           <div className="border-t border-neutral-500 pt-1 text-sm text-neutral-300">
             {model.signCompany}
             {model.signCompanyData.length > 0 && (
@@ -337,6 +352,7 @@ export default function StepReport({ draft, setDraft, result, pricedAt, photos, 
   const [busy, setBusy] = useState(null); // 'download' | 'share' | null: one PDF job at a time
   const job = useRef(false); // synchronous lock (state alone is stale between two quick taps)
   const [pdfError, setPdfError] = useState(false);
+  const [shareNote, setShareNote] = useState(false); // the native sheet opened without the file attached
 
   const ctx = { draft, result, company, region, t: i18n.t, num: i18n.num, unit: i18n.unit, date: i18n.date };
   const clientModel = useMemo(
@@ -377,11 +393,15 @@ export default function StepReport({ draft, setDraft, result, pricedAt, photos, 
     const inputs = { draft, result, company, i18n, photos: reportPhotos };
     setBusy(action);
     setPdfError(false);
+    setShareNote(false);
     try {
       const { doc, fileName, title } = await createReportPdf(kind, inputs);
       if (action === 'share') {
-        const outcome = await sharePdfFile(pdfToFile(doc, fileName), { title });
-        if (outcome === 'unsupported') savePdf(doc, fileName); // no native sharing of files here: download instead
+        // Client budget: its summary text may travel with the share; the internal dossier shares only its title.
+        const shareText = kind === 'client' ? text() : draft.project.name || '';
+        const outcome = await sharePdfFile(pdfToFile(doc, fileName), { title, text: shareText });
+        if (outcome === 'unsupported') savePdf(doc, fileName); // no navigator.share at all: download instead
+        else if (outcome === 'shared-text') setShareNote(true); // native sheet opened, but without the PDF attached
       } else {
         savePdf(doc, fileName);
       }
@@ -437,7 +457,7 @@ export default function StepReport({ draft, setDraft, result, pricedAt, photos, 
       {photoCount > 0 && (
         <Switch
           checked={!!draft.attachPhotos}
-          onChange={(v) => setDraft((d) => ({ ...d, attachPhotos: v }))}
+          onChange={(v) => setDraft((d) => ({ ...d, attachPhotos: v, photosChoice: true }))}
           label={t('photo.attach')}
           description={t('photo.attach.desc')}
         />
@@ -464,6 +484,11 @@ export default function StepReport({ draft, setDraft, result, pricedAt, photos, 
           {view === 'tech' ? t('pdf.techHint') : t('pdf.clientHint')}
         </p>
       </div>
+      {shareNote && (
+        <p role="status" data-testid="pdf-share-note" className="text-sm text-neutral-300">
+          {t('pdf.shareTextOnly')}
+        </p>
+      )}
       {pdfError && (
         <p role="alert" className="text-sm font-semibold text-red-400">
           {t('pdf.error')}

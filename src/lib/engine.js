@@ -1,6 +1,6 @@
 import { validateDims, runCalculation } from './tasks.js';
 import { resolvePrices, buildQuote, chainTotals, marketBucket, planAll } from './pricing.js';
-import { buildSchedule, SCHEDULE } from './schedule.js';
+import { planProject } from './schedule.js';
 import { planMachinery, DEFAULT_MACHINERY } from './machinery.js';
 
 /**
@@ -11,7 +11,7 @@ import { planMachinery, DEFAULT_MACHINERY } from './machinery.js';
  *  - project mode: any number of partidas; shared materials (e.g. cement bags from a slab and a wall)
  *                  are summed into a single purchase line before rounding to whole sale units.
  */
-export function computeAll(draft, now = Date.now()) {
+export function computeAll(draft, now = Date.now(), { timeline = null } = {}) {
   const partidas = draft.partidas.map((p) => {
     const validation = validateDims(p.task, p.dims);
     return {
@@ -40,9 +40,10 @@ export function computeAll(draft, now = Date.now()) {
     overrides: draft.overrides,
     bucket,
   });
-  // Crew plan (HH vs dead technical time) and the major machinery it implies (rented per day of use).
-  const schedule = buildSchedule(partidas, draft.crew ?? SCHEDULE.defaultCrew);
-  const machinery = planMachinery({ partidas, schedule, regionCode: draft.regionCode, config: draft.machinery ?? DEFAULT_MACHINERY });
+  // Crew plan (HH vs dead technical time, crew derived from the project's deadline unless set by hand) and
+  // the major machinery it implies (rented per day of use, at the same 15-minute market window as materials).
+  const schedule = planProject(partidas, draft, timeline, now);
+  const machinery = planMachinery({ partidas, schedule, regionCode: draft.regionCode, config: draft.machinery ?? DEFAULT_MACHINERY, bucket });
   const quote = buildQuote({ partidas: inputs, plan, prices, finance: draft.finance, regionCode: draft.regionCode, machinery });
   const totals = chainTotals({
     partidas: inputs,

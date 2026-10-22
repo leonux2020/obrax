@@ -5,6 +5,7 @@ import { EMPTY_COMPANY } from '../lib/draft.js';
 import { Button } from './ui.jsx';
 import BottomSheet from './BottomSheet.jsx';
 import ProfileFields from './ProfileFields.jsx';
+import ContractorSignatureSheet from './ContractorSignatureSheet.jsx';
 
 /**
  * Edit company + professional data and the backup switch. It is only reachable from Ajustes: the dashboard,
@@ -19,6 +20,7 @@ export default function ProfileSheet({ company, logo: initialLogo, drive: initia
   const [emailError, setEmailError] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [signing, setSigning] = useState(false); // the signing canvas replaces this sheet (never nested) and returns here
 
   const submit = async (e) => {
     e.preventDefault();
@@ -32,6 +34,19 @@ export default function ProfileSheet({ company, logo: initialLogo, drive: initia
     }
     return undefined;
   };
+
+  if (signing) {
+    return (
+      <ContractorSignatureSheet
+        value={form.signature}
+        onSave={(ink) => {
+          setForm((f) => ({ ...f, signature: ink }));
+          setSigning(false);
+        }}
+        onClose={() => setSigning(false)}
+      />
+    );
+  }
 
   return (
     <BottomSheet title={t('profile.title')} subtitle={t('profile.subtitle')} onClose={onClose}>
@@ -50,6 +65,7 @@ export default function ProfileSheet({ company, logo: initialLogo, drive: initia
           setDrive={setDrive}
           emailError={emailError}
           logoError={saveError}
+          onSign={() => setSigning(true)}
         />
         <p className="text-xs text-neutral-400">{t('company.privacy')}</p>
         <div className="grid grid-cols-2 gap-3">

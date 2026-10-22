@@ -386,10 +386,19 @@ export async function renderClientPdf(model, { money, logo = null, appName = 'Ob
 
   // signature lines (the client's ink sits on top of its line, with name / ID / date underneath)
   const sig = model.signature;
-  w.ensure(sig ? 52 : 38);
-  w.gap(sig ? 28 : 18);
+  w.ensure(sig || model.contractorSignature ? 52 : 38);
+  w.gap(sig || model.contractorSignature ? 28 : 18);
   const half = (CONTENT_W - 16) / 2;
   const clientX = MARGIN + half + 16;
+  const own = model.contractorSignature; // contractor's ink from the profile, auto-filled above their line
+  if (own) {
+    const k = Math.min(half / own.w, 24 / own.h);
+    try {
+      w.doc.addImage(own.dataUrl, 'PNG', MARGIN, w.y - own.h * k - 0.5, own.w * k, own.h * k);
+    } catch {
+      /* an undecodable signature must never break the document */
+    }
+  }
   if (sig) {
     const k = Math.min(half / sig.w, 24 / sig.h);
     try {

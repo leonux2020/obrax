@@ -198,20 +198,20 @@ describe('PRO paywall opens when a locked function is used', () => {
     expect(host.querySelectorAll('ul[aria-label] > li')).toHaveLength(FREE_PROJECT_LIMIT);
   });
 
-  it('the Drive backup row in Ajustes is locked: it opens the PRO screen with that benefit highlighted', async () => {
+  it('Google Drive backup is a FREE switch in Ajustes: it never opens the PRO screen', async () => {
     seed();
     await mountApp();
     await click(tab('Ajustes'));
-    const row = q('settings-drive-pro');
-    expect(row.textContent).toContain('Respaldo automático en Google Drive');
-    expect(row.textContent).toContain('PRO');
-    expect(row.querySelector('svg[data-testid="helmet-icon"]')).not.toBeNull();
-    await click(row);
-    expect(document.querySelector('[role="dialog"] [data-testid="settings-drive-pro"]')).toBeNull(); // Ajustes closed
-    expect(q('pro-reason').textContent).toContain('Google Drive');
-    expect(q('pro-paywall').querySelector('[data-active="true"]').textContent).toContain('Respaldo automático');
-    await click(document.querySelector('[data-sheet-close]'));
+    const sw = q('settings-drive');
+    expect(sw.getAttribute('role')).toBe('switch');
+    expect(sw.textContent).toContain('Respaldo en Google Drive (Gratis)');
+    expect(sw.textContent).not.toContain('PRO');
+    expect(sw.getAttribute('aria-checked')).toBe('true');
+    await click(sw);
+    expect(sw.getAttribute('aria-checked')).toBe('false');
     expect(q('pro-paywall')).toBeNull();
+    expect(JSON.parse(localStorage.getItem('cp.profile.v1')).drive).toBe(false); // the preference is saved
+    expect(q('settings-drive-pro')).toBeNull();
   });
 
   it('"Descubre PRO" still opens it without a reason; the helmet icon and clean design are kept', async () => {
@@ -247,7 +247,8 @@ describe('frontend only: no Gemini key in the client', () => {
   });
 
   it('new strings exist in six languages with matching placeholders', () => {
-    const keys = ['login.google.loading', 'login.google.offline', 'login.google.note', 'settings.account.google', 'settings.account.link', 'pro.locked.projects', 'pro.locked.drive', 'pro.locked.ai'];
+    const keys = ['login.google.loading', 'login.google.offline', 'login.google.note', 'settings.account.google', 'settings.account.link', 'pro.locked.projects', 'pro.locked.ai'];
+    for (const l of LANGS) expect(DICT[l]['pro.locked.drive'], l).toBeUndefined();
     for (const l of LANGS) for (const k of keys) expect(DICT[l][k], `${l}:${k}`).toBeTruthy();
     for (const l of LANGS) expect(DICT[l]['pro.locked.projects'], l).toContain('{n}');
   });

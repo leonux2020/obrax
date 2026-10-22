@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useMarketClock } from '../lib/marketClock.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { computeAll } from '../lib/engine.js';
 import { pricingTime } from '../lib/signature.js';
@@ -15,14 +16,15 @@ const STEPS = {
   project: ['project', 'partidas', 'prices', 'finance', 'report'],
 };
 
-export default function Wizard({ projectId, draft, setDraft, photos, setPhotos, company, onNewProject, onExit }) {
+export default function Wizard({ projectId, draft, setDraft, photos, setPhotos, company, startDate = '', endDate = '', onNewProject, onExit }) {
   const { t } = useI18n();
-  const [now, setNow] = useState(() => Date.now());
+  const { now, refresh } = useMarketClock(); // moves by itself every 15 minutes: prices and rentals re-price on their own
   const [showErrors, setShowErrors] = useState(false);
 
   // A signed quote keeps the prices it was signed at (see pricingTime); otherwise live market prices.
   const priceTime = pricingTime(draft, now);
-  const result = useMemo(() => computeAll(draft, priceTime), [draft, priceTime]);
+  // The project's dates drive the automatic crew / calendar plan (see lib/schedule.js).
+  const result = useMemo(() => computeAll(draft, priceTime, { timeline: { startDate, endDate } }), [draft, priceTime, startDate, endDate]);
 
   const steps = STEPS[draft.mode] ?? STEPS.quick;
   const step = draft.step;
@@ -89,7 +91,7 @@ export default function Wizard({ projectId, draft, setDraft, photos, setPhotos, 
         <StepPartidas draft={draft} setDraft={setDraft} result={result} showErrors={showErrors} />
       )}
       {step === 2 && (
-        <StepPrices draft={draft} setDraft={setDraft} result={result} now={priceTime} onRefresh={() => setNow(Date.now())} />
+        <StepPrices draft={draft} setDraft={setDraft} result={result} now={priceTime} onRefresh={refresh} />
       )}
       {step === 3 && <StepFinance draft={draft} setDraft={setDraft} result={result} />}
       {step === 4 && (
