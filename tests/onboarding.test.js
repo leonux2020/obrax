@@ -193,7 +193,7 @@ describe('PRO button and benefits screen', () => {
     expect(pro.className).not.toMatch(/\bbg-/);
   });
 
-  it('the hard hat is a 3/4 gold-gradient site-manager helmet: low thin crest, projecting curved visor, top-left light', async () => {
+  it('the hard hat is a 3/4 gold-gradient site-manager helmet: front-only short visor, smooth flank, low thin crest, top-left light', async () => {
     await setup();
     const svg = q('pro-scan').querySelector('svg[data-testid="helmet-icon"]');
     expect(Number(svg.getAttribute('width'))).toBeGreaterThanOrEqual(24); // w-6 or larger, the protagonist of the button
@@ -225,10 +225,20 @@ describe('PRO button and benefits screen', () => {
     expect(Math.max(...ys('crest')) - crestTop).toBeLessThanOrEqual(5.5);
     // the crest never reaches the dome's flanks: it stays within the upper part of the shell
     expect(Math.max(...ys('crest'))).toBeLessThan(shellTop + 6);
-    // the visor projects past the shell on both sides and is lower than the dome's top
-    const shellW = Math.max(...xs('shell')) - Math.min(...xs('shell'));
-    const visorW = Math.max(...xs('visor')) - Math.min(...xs('visor'));
-    expect(visorW).toBeGreaterThan(shellW + 3);
+    // modern cap-style hat: ONE short visor, only at the front (left in this 3/4 view) - no brim around the shell
+    const shellMin = Math.min(...xs('shell'));
+    const shellMax = Math.max(...xs('shell'));
+    const shellW = shellMax - shellMin;
+    const visorMin = Math.min(...xs('visor'));
+    const visorMax = Math.max(...xs('visor'));
+    expect(visorMin).toBeLessThan(shellMin); // it projects forward past the dome
+    expect(shellMin - visorMin).toBeLessThanOrEqual(4.5); // ...but it is short
+    expect(visorMax).toBeLessThan(shellMin + shellW * 0.5); // never reaches the rear half: no side/back wing
+    expect(svg.querySelectorAll('[data-part="visor"]')).toHaveLength(1);
+    expect(Math.max(...ys('visor'))).toBeLessThanOrEqual(Math.max(...ys('shell')) + 3); // does not hang far below the dome
+    // the left flank is smooth: nothing is drawn over the shell besides the crest and the highlight
+    const drawn = [...svg.querySelectorAll('g[data-part="tilt"] > path')].map((el) => el.getAttribute('data-part') || (el.getAttribute('fill')?.startsWith('url') ? 'shade' : 'line'));
+    expect(drawn).toEqual(['visor', 'shell', 'shade', 'crest', 'shine']);
     // light from the front/upper-left: the body gradient runs top-left -> bottom-right, lightest stop first
     const g = grads.find((x) => svg.querySelector('[data-part="shell"]').getAttribute('fill').includes(x.id));
     expect(Number(g.getAttribute('x2'))).toBeGreaterThan(Number(g.getAttribute('x1')));
