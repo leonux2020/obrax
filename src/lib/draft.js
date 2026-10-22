@@ -6,6 +6,8 @@ import { TASKS, TASK_IDS, WASTE_LIMITS, defaultDims, pickOption } from './tasks.
 import { MATERIAL_IDS } from './catalog.js';
 import { MAX_PRICE } from './pricing.js';
 import { normalizeSignature } from './signature.js';
+import { SCHEDULE } from './schedule.js';
+import { MACHINE_IDS, DEFAULT_MACHINERY } from './machinery.js';
 import {
   coerceNumber,
   sanitizeText,
@@ -107,6 +109,8 @@ export function newDraft(regionCode, mode = 'quick') {
     attachPhotos: false, // also print the field photos on the client budget (they are always in the technical dossier)
     showBreakdown: false, // client PDF also lists the Materials / Labor / Transport totals (never stores or unit prices)
     signature: null, // client signature + data, see lib/signature.js
+    crew: SCHEDULE.defaultCrew, // workers on site (planning, see lib/schedule.js)
+    machinery: { ...DEFAULT_MACHINERY, excluded: [] }, // major machinery rental: master switch + machines the user turned off
     regionCode: region ? region.code : null,
   };
 }
@@ -128,6 +132,16 @@ export function normalizePartida(obj, usedIds = new Set()) {
   usedIds.add(id);
   const waste = coerceNumber(obj.waste, { min: WASTE_LIMITS.min, max: WASTE_LIMITS.max, decimals: 0, fallback: null });
   return { id, name: sanitizeText(obj.name, 60).trim(), task, dims, waste: waste === null ? def.defaultWaste : waste };
+}
+
+/**
+ * Machinery choices. A draft saved BEFORE machinery existed has none: unsigned ones get the suggestion
+ * switched on, but a SIGNED quote keeps it off so its signed total is not altered behind the client's back.
+ */
+function normalizeMachinery(obj, signature) {
+  if (!obj || typeof obj !== 'object') return { include: !signature, excluded: [] };
+  const excluded = Array.isArray(obj.excluded) ? [...new Set(obj.excluded.filter((id) => MACHINE_IDS.includes(id)))] : [];
+  return { include: obj.include !== false, excluded };
 }
 
 export function normalizeDraft(obj, regionCode) {
@@ -163,6 +177,7 @@ export function normalizeDraft(obj, regionCode) {
     }
   }
 
+  const signature = normalizeSignature(obj.signature);
   return {
     mode,
     step: Math.min(4, Math.max(0, Number.isInteger(obj.step) ? obj.step : 0)),
@@ -173,7 +188,9 @@ export function normalizeDraft(obj, regionCode) {
     overrides,
     attachPhotos: obj.attachPhotos === true,
     showBreakdown: obj.showBreakdown === true,
-    signature: normalizeSignature(obj.signature),
+    signature,
+    crew: coerceNumber(obj.crew, { min: SCHEDULE.minCrew, max: SCHEDULE.maxCrew, decimals: 0, fallback: SCHEDULE.defaultCrew }),
+    machinery: normalizeMachinery(obj.machinery, signature),
     regionCode,
   };
 }

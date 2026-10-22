@@ -7,6 +7,7 @@ import { sanitizeText } from '../../lib/sanitize.js';
 import { Badge, Button, TextField } from '../ui.jsx';
 import TaskPicker, { TaskIcon } from '../TaskPicker.jsx';
 import DimsForm from '../DimsForm.jsx';
+import HseButton from '../HseSheet.jsx';
 
 /** Project mode: list, add, edit and delete partidas. Shared materials are consolidated downstream. */
 export default function StepPartidas({ draft, setDraft, result, showErrors }) {
@@ -54,7 +55,7 @@ export default function StepPartidas({ draft, setDraft, result, showErrors }) {
           const main = c.calc?.metrics?.[0];
           return (
             <li key={p.id} className={`card ${open ? 'border-brand' : ''}`}>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black text-brand">
                   <TaskIcon id={p.task} size={30} />
                 </span>
@@ -75,6 +76,7 @@ export default function StepPartidas({ draft, setDraft, result, showErrors }) {
                     )}
                   </p>
                 </div>
+                <HseButton task={p.task} />
                 <Button
                   variant={open ? 'primary' : 'secondary'}
                   className="!min-h-[44px] !px-3 text-sm"

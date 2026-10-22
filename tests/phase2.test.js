@@ -223,7 +223,8 @@ describe('client report model and PDF', () => {
   it('breakdown on: materials + labor + transport add up to the net subtotal and reveal no stores or unit prices', () => {
     const { base, result, i } = setup({ showBreakdown: true });
     const m = buildClientModel(base);
-    expect(m.breakdown.rows.map((r) => r.label)).toEqual([i.t('bd.materials'), i.t('bd.labor'), i.t('bd.transport')]);
+    // a 6x4 m slab (2.4 m3 of concrete) also gets the suggested concrete mixer rental
+    expect(m.breakdown.rows.map((r) => r.label)).toEqual([i.t('bd.materials'), i.t('bd.labor'), i.t('bd.transport'), i.t('bd.machinery')]);
     expect(m.breakdown.rows.reduce((s, r) => s + r.amount, 0)).toBe(result.quote.subtotal);
     const json = JSON.stringify(m);
     for (const chain of ['Sodimac', 'Easy', 'Construmart']) expect(json).not.toContain(chain);
@@ -235,7 +236,7 @@ describe('client report model and PDF', () => {
     const d = { ...base.draft, finance: { ...base.draft.finance, transport: 0 } };
     const r2 = computeAll(d, 1_700_000_000_000);
     const m = buildClientModel({ ...base, draft: d, result: r2 });
-    expect(m.breakdown.rows).toHaveLength(2);
+    expect(m.breakdown.rows).toHaveLength(3); // materials, labor, machinery
     expect(m.breakdown.rows.reduce((s, r) => s + r.amount, 0)).toBe(r2.quote.subtotal);
     expect(result.quote.transport).toBeGreaterThan(0);
   });
@@ -263,7 +264,7 @@ describe('client report model and PDF', () => {
     const full = setup({ showBreakdown: true, signature });
     const on = raw(await renderClientPdf(buildClientModel(full.base), { money: full.money }));
     expect(images(on)).toBeGreaterThan(0); // the PNG (jsPDF adds a 2nd object for its alpha mask)
-    for (const key of ['bd.title', 'bd.materials', 'bd.labor', 'bd.transport']) expect(on).toContain(pdfSafe(full.i.t(key)));
+    for (const key of ['bd.title', 'bd.materials', 'bd.labor', 'bd.transport', 'bd.machinery']) expect(on).toContain(pdfSafe(full.i.t(key)));
     expect(on).toContain('Ana Ruiz');
     expect(on).toContain('11.111.111-1');
   });

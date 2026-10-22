@@ -14,7 +14,7 @@ export default function BottomSheet({ title, subtitle, onClose, children }) {
 
   useEffect(() => {
     const previous = document.activeElement;
-    ref.current?.querySelector('input, select, button:not([data-sheet-close])')?.focus();
+    ref.current?.querySelector('input, select, button:not([data-sheet-close])')?.focus({ preventScroll: true });
     const onKey = (e) => {
       if (e.key === 'Escape') {
         e.preventDefault();

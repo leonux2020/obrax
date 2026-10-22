@@ -261,10 +261,51 @@ function TechView({ model, photos, onEditCompany }) {
         </>
       )}
 
+      {model.planning && model.planning.totals.hh > 0 && (
+        <section data-testid="tech-planning">
+          <h3 className="mb-1 mt-6 text-lg font-bold text-brand">{t('sched.title')}</h3>
+          <p className="mb-1 text-sm text-neutral-300">
+            {t('sched.summary', { days: num(model.planning.totals.totalDays, 1), hh: num(model.planning.totals.hh, 1), n: model.planning.crew })}
+          </p>
+          <ul>
+            {model.planning.rows.filter((r) => r.hh > 0).map((r) => (
+              <li key={r.n} className="border-b border-neutral-800 py-2">
+                <span className="flex justify-between gap-3">
+                  <span>{r.title}</span>
+                  <b className="tabular-nums">{num(r.activeDays + r.deadDays, 1)} {t('sched.d')}</b>
+                </span>
+                <span className="block text-sm text-neutral-400">
+                  {num(r.hh, 1)} HH · {t('sched.col.active')}: {num(r.activeDays, 1)}
+                  {r.deadDays > 0 && ` · ${t('sched.col.dead')}: ${num(r.deadDays, 1)} (${r.deadNote})`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {model.machinery.some((m) => m.included) && (
+        <section data-testid="tech-machinery">
+          <h3 className="mb-1 mt-6 text-lg font-bold text-brand">{t('mach.title')}</h3>
+          <ul>
+            {model.machinery.filter((m) => m.included).map((m) => (
+              <li key={`${m.name}-${m.partida}`} className="flex justify-between gap-3 border-b border-neutral-800 py-2">
+                <span>
+                  {m.name} <span className="text-sm text-neutral-400">· {m.partida} · {t('mach.line', { qty: num(m.qty, 0), days: num(m.days, 0), rate: money(m.rate) })}</span>
+                </span>
+                <b className="tabular-nums">{money(m.total)}</b>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-neutral-400">{t('mach.nohand')}</p>
+        </section>
+      )}
+
       <h3 className="mb-1 mt-6 text-lg font-bold text-brand">{t('pdf.costs')}</h3>
       <Row label={t('fin.materials')} value={money(model.costs.materials)} muted />
       <Row label={`${t('fin.laborLine')} (${model.costs.laborPct}%)`} value={money(model.costs.labor)} muted />
       <Row label={`${t('fin.transportLine')} (${model.costs.transportPct}%)`} value={money(model.costs.transport)} muted />
+      {model.costs.machinery > 0 && <Row label={t('mach.total')} value={money(model.costs.machinery)} muted />}
       <Row label={t('com.subtotalNet')} value={money(model.costs.subtotal)} muted />
       <Row
         label={t('fin.taxLine', { name: model.costs.taxName, rate: num(model.costs.taxRate * 100) })}

@@ -507,6 +507,50 @@ export async function renderTechPdf(model, { t, money, num = (n) => String(n), l
     w.paragraph(t('tech.leftover.tip'), { size: 8, color: C.muted });
   }
 
+  // crew planning: man-hours vs technical dead time
+  if (model.planning && model.planning.totals.hh > 0) {
+    const pl = model.planning;
+    w.section(t('sched.title'));
+    w.paragraph(t('sched.summary', { days: num(pl.totals.totalDays, 1), hh: num(pl.totals.hh, 1), n: pl.crew }), { size: 8.5 });
+    w.table(
+      [
+        { label: t('com.chapters'), width: CONTENT_W - 94 },
+        { label: t('sched.col.hh'), width: 20, align: 'right' },
+        { label: t('sched.col.active'), width: 26, align: 'right' },
+        { label: t('sched.col.dead'), width: 26, align: 'right' },
+        { label: t('tech.col.total'), width: 22, align: 'right' },
+      ],
+      pl.rows
+        .filter((r) => r.hh > 0)
+        .map((r) => [
+          { text: r.title, sub: r.deadNote || undefined },
+          num(r.hh, 1),
+          num(r.activeDays, 1),
+          num(r.deadDays, 1),
+          `${num(r.activeDays + r.deadDays, 1)} ${t('sched.d')}`,
+        ]),
+      { size: 8, footerRow: [t('sched.total'), num(pl.totals.hh, 1), num(pl.totals.activeDays, 1), num(pl.totals.deadDays, 1), `${num(pl.totals.totalDays, 1)} ${t('sched.d')}`] }
+    );
+    w.paragraph(`${t('sched.note')} ${t('sched.perDay', { h: pl.hoursPerDay })}`, { size: 7.5, color: C.muted });
+  }
+
+  // major machinery rental (indirect cost)
+  const rented = model.machinery.filter((m) => m.included);
+  if (rented.length > 0) {
+    w.section(t('mach.title'));
+    w.table(
+      [
+        { label: t('mach.col.machine'), width: CONTENT_W - 88 },
+        { label: t('mach.col.days'), width: 16, align: 'right' },
+        { label: t('mach.col.rate'), width: 34, align: 'right' },
+        { label: t('tech.col.total'), width: 38, align: 'right' },
+      ],
+      rented.map((m) => [{ text: m.name, sub: `${m.partida} · ${num(m.qty, 0)}` }, num(m.days, 0), money(m.rate), money(m.total)]),
+      { size: 8.5, footerRow: [t('mach.total'), '', '', money(model.costs.machinery)] }
+    );
+    w.paragraph(t('mach.nohand'), { size: 7.5, color: C.muted });
+  }
+
   // internal cost structure
   w.section(t('pdf.costs'));
   const c = model.costs;
@@ -519,6 +563,7 @@ export async function renderTechPdf(model, { t, money, num = (n) => String(n), l
       [t('fin.materials'), money(c.materials)],
       [`${t('fin.laborLine')} (${c.laborPct}%)`, money(c.labor)],
       [`${t('fin.transportLine')} (${c.transportPct}%)`, money(c.transport)],
+      ...(c.machinery > 0 ? [[t('mach.total'), money(c.machinery)]] : []),
       [t('com.subtotalNet'), money(c.subtotal)],
       [t('com.taxLine', { name: c.taxName, rate: num(c.taxRate * 100) }), money(c.tax)],
     ],

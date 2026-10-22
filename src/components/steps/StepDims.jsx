@@ -1,5 +1,6 @@
 import { useI18n } from '../../lib/i18n.jsx';
 import DimsForm from '../DimsForm.jsx';
+import HseButton from '../HseSheet.jsx';
 
 /** Quick mode: measurements of the single partida + live geometric preview. */
 export default function StepDims({ draft, setDraft, result, showErrors }) {
@@ -12,11 +13,14 @@ export default function StepDims({ draft, setDraft, result, showErrors }) {
 
   return (
     <section aria-labelledby="dims-title" className="space-y-5">
-      <div>
-        <h2 id="dims-title" className="text-2xl font-bold">
-          {t('dims.title')} · {t(`task.${partida.task}`)}
-        </h2>
-        <p className="text-neutral-300">{t('dims.hint')}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 id="dims-title" className="text-2xl font-bold">
+            {t('dims.title')} · {t(`task.${partida.task}`)}
+          </h2>
+          <p className="text-neutral-300">{t('dims.hint')}</p>
+        </div>
+        <HseButton task={partida.task} />
       </div>
 
       <div className="card">

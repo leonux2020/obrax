@@ -204,7 +204,7 @@ function toPartidas({ partidas, lines, finance }) {
  * Build the full quote: consolidated purchase lines (whole sale units), labor/transport,
  * official VAT breakdown and the amount allocated to every partida (chapter).
  */
-export function buildQuote({ partidas, lines, plan, prices, finance, regionCode }) {
+export function buildQuote({ partidas, lines, plan, prices, finance, regionCode, machinery = null }) {
   const region = getRegion(regionCode);
   const parts = toPartidas({ partidas, lines, finance });
   const planned = plan || planAll(parts);
@@ -237,7 +237,9 @@ export function buildQuote({ partidas, lines, plan, prices, finance, regionCode 
   const leftoverValue = roundMoney(items.reduce((s, i) => s + i.leftoverValue, 0), region);
   const labor = roundMoney((materials * finance.labor) / 100, region);
   const transport = roundMoney((materials * finance.transport) / 100, region);
-  const subtotal = roundMoney(materials + labor + transport, region);
+  // Major machinery rental is an indirect cost added on top (see machinery.js): { total, byPartida }.
+  const machineryTotal = machinery ? roundMoney(machinery.total, region) : 0;
+  const subtotal = roundMoney(materials + labor + transport + machineryTotal, region);
   const taxRate = taxRateFor(region, finance);
   const tax = roundMoney(subtotal * taxRate, region);
   const total = roundMoney(subtotal + tax, region);
@@ -256,7 +258,8 @@ export function buildQuote({ partidas, lines, plan, prices, finance, regionCode 
     });
   };
   const matAlloc = allocate(materials);
-  const netAlloc = allocate(subtotal);
+  // Machinery belongs to the partida that needs it; everything else is shared by material weight.
+  const netAlloc = allocate(roundMoney(subtotal - machineryTotal, region)).map((v, k) => roundMoney(v + (machinery?.byPartida?.[k] ?? 0), region));
   const partidaTotals = parts.map((_, k) => ({ index: k, materials: matAlloc[k], amount: netAlloc[k] }));
 
   return {
@@ -265,6 +268,7 @@ export function buildQuote({ partidas, lines, plan, prices, finance, regionCode 
     leftoverValue,
     labor,
     transport,
+    machinery: machineryTotal,
     subtotal,
     tax,
     total,

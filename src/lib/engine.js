@@ -1,5 +1,7 @@
 import { validateDims, runCalculation } from './tasks.js';
 import { resolvePrices, buildQuote, chainTotals, marketBucket, planAll } from './pricing.js';
+import { buildSchedule, SCHEDULE } from './schedule.js';
+import { planMachinery, DEFAULT_MACHINERY } from './machinery.js';
 
 /**
  * Single entry point used by the UI: draft -> validation per partida, takeoff, ONE consolidated
@@ -38,7 +40,10 @@ export function computeAll(draft, now = Date.now()) {
     overrides: draft.overrides,
     bucket,
   });
-  const quote = buildQuote({ partidas: inputs, plan, prices, finance: draft.finance, regionCode: draft.regionCode });
+  // Crew plan (HH vs dead technical time) and the major machinery it implies (rented per day of use).
+  const schedule = buildSchedule(partidas, draft.crew ?? SCHEDULE.defaultCrew);
+  const machinery = planMachinery({ partidas, schedule, regionCode: draft.regionCode, config: draft.machinery ?? DEFAULT_MACHINERY });
+  const quote = buildQuote({ partidas: inputs, plan, prices, finance: draft.finance, regionCode: draft.regionCode, machinery });
   const totals = chainTotals({
     partidas: inputs,
     regionCode: draft.regionCode,
@@ -52,6 +57,8 @@ export function computeAll(draft, now = Date.now()) {
     validation: partidas[0].validation,
     prices,
     quote,
+    schedule,
+    machinery,
     chainTotals: totals,
   };
 }

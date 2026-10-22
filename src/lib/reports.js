@@ -76,7 +76,7 @@ export function buildClientModel({ draft, result, company, region, t, num, date 
     totalLabel: t('com.total'),
     total: q.total,
     validity: t('com.valid'),
-    // Opt-in aggregate breakdown: three totals that add up to the net subtotal. Never stores / unit prices.
+    // Opt-in aggregate breakdown: totals that add up to the net subtotal. Never stores / unit prices.
     breakdown: draft.showBreakdown
       ? {
           title: t('bd.title'),
@@ -84,6 +84,7 @@ export function buildClientModel({ draft, result, company, region, t, num, date 
             { label: t('bd.materials'), amount: q.materials },
             { label: t('bd.labor'), amount: q.labor },
             ...(q.transport > 0 ? [{ label: t('bd.transport'), amount: q.transport }] : []),
+            ...(q.machinery > 0 ? [{ label: t('bd.machinery'), amount: q.machinery }] : []),
           ],
         }
       : null,
@@ -199,14 +200,44 @@ export function buildTechModel({ draft, result, company, region, t, num, unit, m
       laborPct: draft.finance.labor,
       transport: q.transport,
       transportPct: draft.finance.transport,
+      machinery: q.machinery ?? 0,
       subtotal: q.subtotal,
       taxName: region.taxName,
       taxRate: q.taxRate,
       tax: q.tax,
       total: q.total,
     },
+    planning: buildPlanningModel({ result, t }),
+    machinery: (result.machinery?.items ?? []).map((m) => ({
+      name: t(`mach.${m.id}`),
+      partida: partidaTitle(result.partidas[m.partida], t),
+      qty: m.qty,
+      days: m.days,
+      rate: m.rate,
+      total: m.total,
+      included: m.included,
+    })),
     notes: tasksUsed.map((id) => t(`note.${id}`)),
     disclaimer: t('prices.disclaimer'),
     footer: t('report.generatedBy'),
+  };
+}
+
+/** Crew plan for the technical dossier: HH, dead technical time and the site duration, per partida. */
+export function buildPlanningModel({ result, t }) {
+  const s = result.schedule;
+  if (!s) return null;
+  return {
+    crew: s.crew,
+    hoursPerDay: s.hoursPerDay,
+    rows: s.rows.map((r) => ({
+      n: r.index + 1,
+      title: t('com.chapter', { n: r.index + 1, title: partidaTitle(result.partidas[r.index], t) }),
+      hh: r.hh,
+      activeDays: r.activeDays,
+      deadDays: r.deadDays,
+      deadNote: r.dead.map((d) => `${t(`sched.dead.${d.key}`)} ${d.days} ${t('sched.d')}`).join(' · '),
+    })),
+    totals: s.totals,
   };
 }
