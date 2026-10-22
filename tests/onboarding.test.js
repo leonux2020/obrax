@@ -193,7 +193,7 @@ describe('PRO button and benefits screen', () => {
     expect(pro.className).not.toMatch(/\bbg-/);
   });
 
-  it('the hard hat is big, gold-gradient and has the crest and the curved visor', async () => {
+  it('the hard hat is a 3/4 gold-gradient site-manager helmet: low thin crest, projecting curved visor, top-left light', async () => {
     await setup();
     const svg = q('pro-scan').querySelector('svg[data-testid="helmet-icon"]');
     expect(Number(svg.getAttribute('width'))).toBeGreaterThanOrEqual(24); // w-6 or larger, the protagonist of the button
@@ -212,8 +212,33 @@ describe('PRO button and benefits screen', () => {
       expect(el.getAttribute('fill')).toMatch(/^url\(#/);
     }
     expect(svg.querySelector('[data-part="shine"]')).not.toBeNull();
-    // the visor is wider than the shell (it projects past it) and sits below it
-    expect(svg.querySelector('[data-part="visor"]').getAttribute('d')).toMatch(/^M2 /);
+    // 3/4 view: the whole hat is tilted on the diagonal
+    expect(svg.querySelector('[data-part="tilt"]').getAttribute('transform')).toMatch(/^rotate\(-?\d+/);
+    // geometry helpers (shell and crest use absolute commands only)
+    const ys = (part) => (svg.querySelector(`[data-part="${part}"]`).getAttribute('d').match(/-?\d*\.?\d+/g) || []).map(Number).filter((_, i) => i % 2 === 1);
+    const xs = (part) => (svg.querySelector(`[data-part="${part}"]`).getAttribute('d').match(/-?\d*\.?\d+/g) || []).map(Number).filter((_, i) => i % 2 === 0);
+    // crest: low and thin - it protrudes at most ~1.5 units above the dome apex and is a thin band (<= 5.5 tall in total)
+    const crestTop = Math.min(...ys('crest'));
+    const shellTop = Math.min(...ys('shell'));
+    expect(shellTop - crestTop).toBeGreaterThan(0.3);
+    expect(shellTop - crestTop).toBeLessThanOrEqual(1.5);
+    expect(Math.max(...ys('crest')) - crestTop).toBeLessThanOrEqual(5.5);
+    // the crest never reaches the dome's flanks: it stays within the upper part of the shell
+    expect(Math.max(...ys('crest'))).toBeLessThan(shellTop + 6);
+    // the visor projects past the shell on both sides and is lower than the dome's top
+    const shellW = Math.max(...xs('shell')) - Math.min(...xs('shell'));
+    const visorW = Math.max(...xs('visor')) - Math.min(...xs('visor'));
+    expect(visorW).toBeGreaterThan(shellW + 3);
+    // light from the front/upper-left: the body gradient runs top-left -> bottom-right, lightest stop first
+    const g = grads.find((x) => svg.querySelector('[data-part="shell"]').getAttribute('fill').includes(x.id));
+    expect(Number(g.getAttribute('x2'))).toBeGreaterThan(Number(g.getAttribute('x1')));
+    expect(Number(g.getAttribute('y2'))).toBeGreaterThan(Number(g.getAttribute('y1')));
+    const lum = (hex) => { const n = parseInt(hex.slice(1), 16); return ((n >> 16) & 255) + ((n >> 8) & 255); };
+    const stopColors = [...g.querySelectorAll('stop')].map((st) => st.getAttribute('stop-color'));
+    expect(lum(stopColors[0])).toBeGreaterThan(lum(stopColors[stopColors.length - 1]));
+    // no drop shadows / filters: volume comes from gradients alone, on the bare OLED background
+    expect(svg.querySelector('filter')).toBeNull();
+    expect(read('components/HelmetIcon.jsx')).not.toMatch(/<filter|drop-shadow|feGaussianBlur/);
   });
 
   it('two helmets on screen never share gradient ids', async () => {
