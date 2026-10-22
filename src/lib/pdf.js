@@ -406,6 +406,14 @@ export async function renderClientPdf(model, { money, logo = null, appName = 'Ob
   w.color(C.muted);
   w.text(model.signCompany, MARGIN, w.y + 4.5, { maxWidth: half });
   w.text(model.signClient, clientX, w.y + 4.5, { maxWidth: half });
+  // contractor data, read from the company profile: name and tax ID under their line
+  (model.signCompanyData ?? []).forEach((line, i) => {
+    w.font(i === 0 ? 'bold' : 'normal', 8);
+    w.color(i === 0 ? C.text : C.muted);
+    w.text(line, MARGIN, w.y + 9 + i * 4, { maxWidth: half });
+  });
+  w.font('normal', 8.5);
+  w.color(C.muted);
   if (sig) {
     let sy = w.y + 9;
     const extra = [
@@ -593,7 +601,11 @@ export function rasterizeLogo(svgDataUri, size = 160) {
         const canvas = document.createElement('canvas');
         canvas.width = size;
         canvas.height = size;
-        canvas.getContext('2d').drawImage(img, 0, 0, size, size);
+        // contain-fit: a wide company logo must not be squashed into the square
+        const k = Math.min(size / (img.naturalWidth || size), size / (img.naturalHeight || size));
+        const w = Math.max(1, Math.round((img.naturalWidth || size) * k));
+        const h = Math.max(1, Math.round((img.naturalHeight || size) * k));
+        canvas.getContext('2d').drawImage(img, Math.round((size - w) / 2), Math.round((size - h) / 2), w, h);
         resolve(canvas.toDataURL('image/png'));
       } catch {
         resolve(null);

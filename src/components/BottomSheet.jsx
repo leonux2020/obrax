@@ -7,7 +7,7 @@ const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([di
  * Bottom sheet (one-hand ergonomics): anchored to the bottom of the screen, pure #000 with an ultra
  * thin border. Focus is trapped inside, Escape / backdrop close it and focus returns to the opener.
  */
-export default function BottomSheet({ title, subtitle, onClose, children }) {
+export default function BottomSheet({ title, subtitle, onClose, fullscreen = false, children }) {
   const { t } = useI18n();
   const titleId = useId();
   const ref = useRef(null);
@@ -49,7 +49,9 @@ export default function BottomSheet({ title, subtitle, onClose, children }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-b-0 border-white/10 bg-black p-5 [padding-bottom:max(1.25rem,env(safe-area-inset-bottom))]"
+        className={`relative w-full overflow-y-auto border border-white/10 bg-black p-5 [padding-bottom:max(1.25rem,env(safe-area-inset-bottom))] ${
+          fullscreen ? 'h-[100dvh] max-w-none border-0 sm:mx-auto sm:max-w-3xl sm:border' : 'max-h-[92vh] max-w-lg rounded-t-3xl border-b-0'
+        }`}
       >
         <div className="mb-1 flex items-start justify-between gap-3">
           <h2 id={titleId} className="text-2xl font-bold">

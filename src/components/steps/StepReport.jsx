@@ -32,41 +32,49 @@ function PhotoGrid({ title, photos }) {
   );
 }
 
-function CompanyBlock({ company, onEditCompany }) {
+/**
+ * Contractor data (logo, company name, tax ID, contact). STRICTLY READ-ONLY: it is injected from the
+ * company profile snapshot of the project (set in Onboarding / Company) and has no buttons or handlers here.
+ */
+function CompanyBlock({ company }) {
   const { t } = useI18n();
   if (company.empty) {
     return (
-      <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dashed border-neutral-700 px-4 py-3">
-        <p className="text-sm text-neutral-300">{t('company.empty')}</p>
-        <Button variant="secondary" className="!min-h-[44px] text-sm" onClick={onEditCompany}>
-          {t('company.configure')}
-        </Button>
-      </div>
+      <p className="no-print mb-4 rounded-xl border border-white/10 px-4 py-3 text-sm text-white/40" data-testid="company-block-empty">
+        {t('company.empty')}
+      </p>
     );
   }
   return (
-    <div className="mb-4 rounded-xl border border-neutral-800 px-4 py-3" data-testid="company-block">
-      {company.name && <p className="break-words text-lg font-extrabold">{company.name}</p>}
-      {company.details.length > 0 && (
-        <p className="break-words text-sm text-neutral-300">
-          {company.details.map((d, i) => (
-            <span key={d}>
-              {i > 0 && <span aria-hidden="true"> · </span>}
-              {d}
-            </span>
-          ))}
-        </p>
+    <div className="mb-4 flex items-center gap-3 rounded-xl border border-white/10 px-4 py-3" data-testid="company-block">
+      {company.logo && (
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-white p-1">
+          <img src={company.logo} alt="" className="max-h-full max-w-full object-contain" decoding="async" data-testid="company-logo" />
+        </span>
       )}
+      <div className="min-w-0">
+        {company.name && <p className="break-words text-lg font-extrabold">{company.name}</p>}
+        {company.details.length > 0 && (
+          <p className="break-words text-sm text-neutral-300">
+            {company.details.map((d, i) => (
+              <span key={d}>
+                {i > 0 && <span aria-hidden="true"> · </span>}
+                {d}
+              </span>
+            ))}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
 
-function Heading({ model, onEditCompany }) {
+function Heading({ model }) {
   return (
     <>
-      <CompanyBlock company={model.company} onEditCompany={onEditCompany} />
+      <CompanyBlock company={model.company} />
       <header className="mb-5 flex items-start gap-4 border-b border-neutral-700 pb-4">
-        <Logo size={56} className="shrink-0" />
+        {!model.company.logo && <Logo size={56} className="shrink-0" />}
         <div className="min-w-0 flex-1">
           <h2 className="text-xl font-extrabold leading-tight sm:text-2xl">{model.heading}</h2>
           <p className="break-words text-lg font-semibold text-brand">{model.project}</p>
@@ -87,11 +95,11 @@ function Row({ label, value, strong, muted }) {
 }
 
 /** What the CLIENT receives: chapters, net subtotal, official tax, total. No stores, unit prices or leftovers. */
-function ClientView({ model, photos, onEditCompany }) {
+function ClientView({ model, photos, signatureProps }) {
   const { t, money } = useI18n();
   return (
     <article className="report-sheet card" aria-label={model.heading}>
-      <Heading model={model} onEditCompany={onEditCompany} />
+      <Heading model={model} />
       {model.client && (
         <p className="mb-4">
           <span className="text-neutral-300">{model.clientLabel}: </span>
@@ -129,38 +137,35 @@ function ClientView({ model, photos, onEditCompany }) {
       <p className="mt-4 text-sm text-neutral-300">{model.validity}</p>
       <PhotoGrid title={t('photo.pdfClientTitle')} photos={photos} />
       <div className="mt-10 grid gap-8 sm:grid-cols-2">
-        <div>
-          {model.signature && <div className="hidden h-16 sm:block" />}
-          <div className="border-t border-neutral-500 pt-1 text-sm text-neutral-300">{model.signCompany}</div>
-        </div>
-        <div>
-          {model.signature && (
-            <div className="flex h-16 items-end pb-1" data-testid="client-signature">
-              <img src={model.signature.dataUrl} alt="" className="sig-img max-h-16 w-auto max-w-full object-contain" />
-            </div>
-          )}
+        {/* contractor: static, read-only data from the company profile */}
+        <div data-testid="contractor-sign">
+          <div className="hidden h-20 sm:block" />
           <div className="border-t border-neutral-500 pt-1 text-sm text-neutral-300">
-            {model.signClient}
-            {model.signature && (
+            {model.signCompany}
+            {model.signCompanyData.length > 0 && (
               <span className="mt-1 block text-xs">
-                {model.signature.name && <b className="block text-white">{model.signature.name}</b>}
-                {model.signature.idLine && <span className="block">{model.signature.idLine}</span>}
-                {model.signature.date && <span className="block">{model.signature.date}</span>}
+                {model.signCompanyData.map((line, i) => (
+                  <span key={line} className={`block ${i === 0 ? 'font-bold text-white' : ''}`}>
+                    {line}
+                  </span>
+                ))}
               </span>
             )}
           </div>
         </div>
+        {/* client: the box above the line is the (double tap) trigger of the signing canvas */}
+        <SignatureField model={model} {...signatureProps} />
       </div>
     </article>
   );
 }
 
 /** Contractor / foreman dossier. Internal: contains stores, unit prices, leftovers and cost structure. */
-function TechView({ model, photos, onEditCompany }) {
+function TechView({ model, photos }) {
   const { t, money, num } = useI18n();
   return (
     <article className="report-sheet card" aria-label={model.heading}>
-      <Heading model={model} onEditCompany={onEditCompany} />
+      <Heading model={model} />
       <p className="mb-4 text-sm text-neutral-300">
         {model.modeLabel} · {t('tech.chain')}: <b className="text-white">{model.chainLabel}</b>
         {model.client && (
@@ -331,7 +336,7 @@ function TechView({ model, photos, onEditCompany }) {
   );
 }
 
-export default function StepReport({ draft, setDraft, result, pricedAt, photos, company, onEditCompany, onNewProject }) {
+export default function StepReport({ draft, setDraft, result, pricedAt, photos, company, onNewProject }) {
   const i18n = useI18n();
   const { t, region, locale, num } = i18n;
   const [view, setView] = useState('client');
@@ -381,7 +386,7 @@ export default function StepReport({ draft, setDraft, result, pricedAt, photos, 
     setPdfError(false);
     try {
       // pdf.js loads the jsPDF engine on demand, so it never weighs on the first paint.
-      const logo = await rasterizeLogo(ICON_DATA_URI);
+      const logo = (clientModel.company.logo && (await rasterizeLogo(clientModel.company.logo))) || (await rasterizeLogo(ICON_DATA_URI));
       const money = pdfMoneyFormatter(region, locale);
       const appName = t('app.name');
       const base = { money, logo, appName };
@@ -430,17 +435,19 @@ export default function StepReport({ draft, setDraft, result, pricedAt, photos, 
       </div>
 
       {view === 'client' ? (
-        <ClientView model={clientModel} photos={draft.attachPhotos ? reportPhotos : []} onEditCompany={onEditCompany} />
+        <ClientView
+          model={clientModel}
+          photos={draft.attachPhotos ? reportPhotos : []}
+          signatureProps={{
+            signature: draft.signature,
+            total: result.quote.total,
+            pricedAt,
+            onChange: (signature) => setDraft((d) => ({ ...d, signature })),
+          }}
+        />
       ) : (
-        <TechView model={techModel} photos={reportPhotos} onEditCompany={onEditCompany} />
+        <TechView model={techModel} photos={reportPhotos} />
       )}
-
-      <SignatureField
-        signature={draft.signature}
-        total={result.quote.total}
-        pricedAt={pricedAt}
-        onChange={(signature) => setDraft((d) => ({ ...d, signature }))}
-      />
 
       {photoCount > 0 && (
         <Switch

@@ -15,7 +15,7 @@ const STEPS = {
   project: ['project', 'partidas', 'prices', 'finance', 'report'],
 };
 
-export default function Wizard({ projectId, draft, setDraft, photos, setPhotos, company, onEditCompany, onNewProject, onExit }) {
+export default function Wizard({ projectId, draft, setDraft, photos, setPhotos, company, onNewProject, onExit }) {
   const { t } = useI18n();
   const [now, setNow] = useState(() => Date.now());
   const [showErrors, setShowErrors] = useState(false);
@@ -100,7 +100,6 @@ export default function Wizard({ projectId, draft, setDraft, photos, setPhotos, 
           pricedAt={priceTime}
           photos={photos}
           company={company}
-          onEditCompany={onEditCompany}
           onNewProject={onNewProject}
         />
       )}

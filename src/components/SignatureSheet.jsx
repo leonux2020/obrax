@@ -11,7 +11,7 @@ import SignaturePad from './SignaturePad.jsx';
  * On accept the ink is exported as a small transparent PNG (base64) and handed back together with the
  * client data and the quote total it vouches for.
  */
-export default function SignatureSheet({ signature, total, pricedAt, onSave, onClose }) {
+export default function SignatureSheet({ signature, total, pricedAt, onSave, onRemove = null, onClose }) {
   const { t } = useI18n();
   const pad = useRef(null);
   const [name, setName] = useState(signature?.name || '');
@@ -31,9 +31,9 @@ export default function SignatureSheet({ signature, total, pricedAt, onSave, onC
   };
 
   return (
-    <BottomSheet title={t('sign.title')} subtitle={t('sign.sheet.subtitle')} onClose={onClose}>
+    <BottomSheet fullscreen title={t('sign.title')} subtitle={t('sign.sheet.subtitle')} onClose={onClose}>
       <form onSubmit={accept} className="space-y-4">
-        <SignaturePad ref={pad} label={t('sign.pad')} placeholder={t('sign.pad.ph')} onInkChange={() => setError('')} />
+        <SignaturePad ref={pad} label={t('sign.pad')} placeholder={t('sign.pad.ph')} onInkChange={() => setError('')} className="!h-[40dvh] sm:!h-[44dvh]" />
         <div className="flex justify-end">
           <Button variant="ghost" className="!min-h-[44px] text-sm" onClick={() => pad.current?.clear()} data-testid="signature-clear">
             {t('sign.clear')}
@@ -57,6 +57,11 @@ export default function SignatureSheet({ signature, total, pricedAt, onSave, onC
             {t('sign.accept')}
           </Button>
         </div>
+        {onRemove && (
+          <Button variant="ghost" className="w-full !min-h-[44px] text-sm" onClick={onRemove} data-testid="signature-remove">
+            {t('sign.remove')}
+          </Button>
+        )}
       </form>
     </BottomSheet>
   );

@@ -28,7 +28,14 @@ export function companyInfo(company, region, t) {
   if (c.phone) lines.push(`${t('company.phone')}: ${c.phone}`);
   if (c.email) lines.push(`${t('company.email')}: ${c.email}`);
   if (c.city) lines.push(c.city);
-  return { name: c.name || '', details: lines, empty: !c.name && lines.length === 0 };
+  // Read-only data of the contractor, always taken from the company profile snapshot of the project.
+  return {
+    name: c.name || '',
+    details: lines,
+    taxLine: c.taxId ? `${t(`company.taxId.${region.code}`)}: ${c.taxId}` : '',
+    logo: typeof c.logo === 'string' ? c.logo : '',
+    empty: !c.name && lines.length === 0 && !c.logo,
+  };
 }
 
 const AREA_METRIC = { slab: 'area', roof: 'roofArea' };
@@ -90,6 +97,7 @@ export function buildClientModel({ draft, result, company, region, t, num, date 
       : null,
     signClient: t('com.sign'),
     signCompany: t('com.signCompany'),
+    signCompanyData: [companyInfo(company, region, t).name, companyInfo(company, region, t).taxLine].filter(Boolean),
     // The client's signature is printed only while it still matches the quote it was given on.
     signature: isSignatureCurrent(draft.signature, q.total)
       ? {

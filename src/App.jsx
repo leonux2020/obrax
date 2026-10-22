@@ -253,7 +253,6 @@ export default function App() {
               photos={photos}
               setPhotos={setPhotos}
               company={active.company}
-              onEditCompany={() => setSheet({ type: 'company' })}
               onNewProject={() => {
                 closeProject();
                 setSheet({ type: 'new' });
