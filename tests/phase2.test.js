@@ -315,7 +315,7 @@ describe('UI structure (OLED + one-hand ergonomics)', () => {
     const rep = read('components/steps/StepReport.jsx');
     const sig = rep.indexOf('<SignatureField');
     const toggle = rep.indexOf("t('bd.toggle')");
-    const pdf = rep.indexOf("download('client')");
+    const pdf = rep.indexOf("runPdf('download')");
     expect(sig).toBeGreaterThan(0);
     expect(toggle).toBeGreaterThan(sig);
     expect(pdf).toBeGreaterThan(toggle);

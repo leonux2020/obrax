@@ -4,6 +4,8 @@
 
 export const P3 = {
   es: {
+    'pdf.download': 'Descargar PDF',
+    'report.shareTitle': 'Reporte de Obra',
     'hse.open': 'Seguridad y salud (HSE)',
     'hse.title': 'Seguridad y salud (HSE)',
     'hse.sub': 'Guía rápida para: {task}',
@@ -114,6 +116,8 @@ export const P3 = {
   },
 
   en: {
+    'pdf.download': 'Download PDF',
+    'report.shareTitle': 'Site Report',
     'hse.open': 'Health & safety (HSE)',
     'hse.title': 'Health & safety (HSE)',
     'hse.sub': 'Quick guide for: {task}',
@@ -224,6 +228,8 @@ export const P3 = {
   },
 
   pt: {
+    'pdf.download': 'Baixar PDF',
+    'report.shareTitle': 'Relatório de Obra',
     'hse.open': 'Saúde e segurança (HSE)',
     'hse.title': 'Saúde e segurança (HSE)',
     'hse.sub': 'Guia rápido para: {task}',
@@ -334,6 +340,8 @@ export const P3 = {
   },
 
   fr: {
+    'pdf.download': 'Télécharger le PDF',
+    'report.shareTitle': 'Rapport de chantier',
     'hse.open': 'Santé et sécurité (HSE)',
     'hse.title': 'Santé et sécurité (HSE)',
     'hse.sub': 'Guide rapide pour : {task}',
@@ -444,6 +452,8 @@ export const P3 = {
   },
 
   it: {
+    'pdf.download': 'Scarica PDF',
+    'report.shareTitle': 'Rapporto di cantiere',
     'hse.open': 'Salute e sicurezza (HSE)',
     'hse.title': 'Salute e sicurezza (HSE)',
     'hse.sub': 'Guida rapida per: {task}',
@@ -554,6 +564,8 @@ export const P3 = {
   },
 
   de: {
+    'pdf.download': 'PDF herunterladen',
+    'report.shareTitle': 'Baustellenbericht',
     'hse.open': 'Gesundheit und Sicherheit (HSE)',
     'hse.title': 'Gesundheit und Sicherheit (HSE)',
     'hse.sub': 'Kurzleitfaden für: {task}',

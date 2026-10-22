@@ -1,15 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { buildClientModel, buildTechModel, clientSummaryText } from '../../lib/reports.js';
-import {
-  pdfFileName,
-  pdfMoneyFormatter,
-  rasterizeLogo,
-  renderClientPdf,
-  renderTechPdf,
-  savePdf,
-} from '../../lib/pdf.js';
-import { ICON_DATA_URI } from '../../brand/icon.js';
+import { savePdf } from '../../lib/pdf.js';
+import { createReportPdf, kindForView, pdfToFile, sharePdfFile, warmPdfEngine } from '../../lib/reportPdf.js';
 import { photosForReport, countPhotos } from '../../lib/photos.js';
 import { Button, Logo, Switch } from '../ui.jsx';
 import SignatureField from '../SignatureField.jsx';
@@ -338,10 +331,11 @@ function TechView({ model, photos }) {
 
 export default function StepReport({ draft, setDraft, result, pricedAt, photos, company, onNewProject }) {
   const i18n = useI18n();
-  const { t, region, locale, num } = i18n;
+  const { t, region } = i18n;
   const [view, setView] = useState('client');
   const [copied, setCopied] = useState(false);
-  const [busy, setBusy] = useState(null); // 'client' | 'tech' | null
+  const [busy, setBusy] = useState(null); // 'download' | 'share' | null: one PDF job at a time
+  const job = useRef(false); // synchronous lock (state alone is stale between two quick taps)
   const [pdfError, setPdfError] = useState(false);
 
   const ctx = { draft, result, company, region, t: i18n.t, num: i18n.num, unit: i18n.unit, date: i18n.date };
@@ -358,6 +352,9 @@ export default function StepReport({ draft, setDraft, result, pricedAt, photos, 
 
   const reportPhotos = useMemo(() => photosForReport(photos, i18n.t), [photos, i18n.t]);
   const photoCount = countPhotos(photos);
+  useEffect(() => {
+    warmPdfEngine();
+  }, []);
 
   if (!result.valid) return null;
 
@@ -371,39 +368,27 @@ export default function StepReport({ draft, setDraft, result, pricedAt, photos, 
       /* clipboard unavailable */
     }
   };
-  const share = async () => {
-    try {
-      if (navigator.share) await navigator.share({ title: t('app.name'), text: text() });
-      else await copy();
-    } catch {
-      /* user cancelled */
-    }
-  };
-
-  const download = async (kind) => {
-    if (busy) return;
-    setBusy(kind);
+  // ONE contextual action: the document is the tab that is open at the moment of the tap. The kind and
+  // every input are frozen before the first await, so changing tab while generating cannot mix reports.
+  const runPdf = async (action) => {
+    if (job.current) return;
+    job.current = true;
+    const kind = kindForView(view);
+    const inputs = { draft, result, company, i18n, photos: reportPhotos };
+    setBusy(action);
     setPdfError(false);
     try {
-      // pdf.js loads the jsPDF engine on demand, so it never weighs on the first paint.
-      const logo = (clientModel.company.logo && (await rasterizeLogo(clientModel.company.logo))) || (await rasterizeLogo(ICON_DATA_URI));
-      const money = pdfMoneyFormatter(region, locale);
-      const appName = t('app.name');
-      const base = { money, logo, appName };
-      let doc;
-      if (kind === 'client') {
-        doc = await renderClientPdf(buildClientModel(ctx), {
-          ...base,
-          photos: draft.attachPhotos ? reportPhotos : [],
-          photosTitle: t('photo.pdfClientTitle'),
-        });
+      const { doc, fileName, title } = await createReportPdf(kind, inputs);
+      if (action === 'share') {
+        const outcome = await sharePdfFile(pdfToFile(doc, fileName), { title });
+        if (outcome === 'unsupported') savePdf(doc, fileName); // no native sharing of files here: download instead
       } else {
-        doc = await renderTechPdf(buildTechModel({ ...ctx, money }), { ...base, t, num, photos: reportPhotos });
+        savePdf(doc, fileName);
       }
-      savePdf(doc, pdfFileName(kind === 'client' ? t('pdf.file.client') : t('pdf.file.tech'), draft.project.name));
     } catch {
       setPdfError(true);
     } finally {
+      job.current = false;
       setBusy(null);
     }
   };
@@ -426,7 +411,7 @@ export default function StepReport({ draft, setDraft, result, pricedAt, photos, 
             aria-selected={view === v}
             onClick={() => setView(v)}
             className={`min-h-[52px] rounded-xl border-2 font-bold transition ${
-              view === v ? 'border-brand bg-brand text-black' : 'border-neutral-700 hover:border-neutral-500'
+              view === v ? 'border-brand bg-brand text-black' : 'border-white/10 hover:border-white/30'
             }`}
           >
             {t(key)}
@@ -466,19 +451,18 @@ export default function StepReport({ draft, setDraft, result, pricedAt, photos, 
         data-testid="breakdown-toggle"
       />
 
-      <div className="no-print grid gap-3 sm:grid-cols-2">
-        <div>
-          <Button className="w-full" disabled={!!busy} onClick={() => download('client')}>
-            {busy === 'client' ? t('pdf.generating') : `⬇ ${t('pdf.client')}`}
+      <div className="no-print space-y-2" data-testid="pdf-actions">
+        <div className="grid grid-cols-[1fr_auto] gap-3">
+          <Button className="w-full" disabled={!!busy} onClick={() => runPdf('download')} data-testid="pdf-download">
+            {busy === 'download' ? t('pdf.generating') : `⬇ ${t('pdf.download')}`}
           </Button>
-          <p className="mt-1 text-xs text-neutral-400">{t('pdf.clientHint')}</p>
-        </div>
-        <div>
-          <Button variant="secondary" className="w-full" disabled={!!busy} onClick={() => download('tech')}>
-            {busy === 'tech' ? t('pdf.generating') : `⬇ ${t('pdf.tech')}`}
+          <Button variant="ghost" className="min-w-[132px]" disabled={!!busy} onClick={() => runPdf('share')} data-testid="pdf-share">
+            {busy === 'share' ? t('pdf.generating') : t('report.share')}
           </Button>
-          <p className="mt-1 text-xs text-neutral-400">{t('pdf.techHint')}</p>
         </div>
+        <p className="text-xs text-neutral-400" data-testid="pdf-hint">
+          {view === 'tech' ? t('pdf.techHint') : t('pdf.clientHint')}
+        </p>
       </div>
       {pdfError && (
         <p role="alert" className="text-sm font-semibold text-red-400">
@@ -486,12 +470,9 @@ export default function StepReport({ draft, setDraft, result, pricedAt, photos, 
         </p>
       )}
 
-      <div className="no-print grid gap-2 sm:grid-cols-3">
+      <div className="no-print grid grid-cols-2 gap-2">
         <Button variant="ghost" onClick={() => window.print()}>
           {t('report.print')}
-        </Button>
-        <Button variant="ghost" onClick={share}>
-          {t('report.share')}
         </Button>
         <Button variant="ghost" onClick={copy}>
           {copied ? `✓ ${t('report.copied')}` : t('report.copy')}

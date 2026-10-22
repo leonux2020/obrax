@@ -173,8 +173,8 @@ describe('contractor data is read-only and comes from the company profile', () =
   });
 
   it('the PDF uses the company logo first and the brand icon only as a fallback', () => {
-    const src = read('components/steps/StepReport.jsx');
-    expect(src).toMatch(/clientModel\.company\.logo[\s\S]{0,120}rasterizeLogo\(ICON_DATA_URI\)/);
+    const src = read('lib/reportPdf.js');
+    expect(src).toMatch(/rasterizeLogo\(company\.logo\)[\s\S]{0,160}rasterizeLogo\(ICON_DATA_URI\)/);
     expect(typeof StepReportModule).toBe('function');
   });
 });
