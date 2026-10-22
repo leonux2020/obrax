@@ -175,23 +175,83 @@ describe('after onboarding, the profile lives only in Ajustes', () => {
   });
 });
 
-describe('PRO hook on the dashboard', () => {
-  it('a subtle gold-outlined button shows the "coming soon" toast', async () => {
+describe('PRO button and benefits screen', () => {
+  const setup = async () => {
     localStorage.setItem('cp.settings.v1', JSON.stringify({ region: 'CL', lang: 'es' }));
     localStorage.setItem('cp.user.v1', JSON.stringify({ provider: 'local', name: 'Ana' }));
     localStorage.setItem('cp.profile.v1', JSON.stringify({ onboarded: true, drive: true }));
     await mountApp();
+  };
+
+  it('"Descubre PRO": gold outline, helmet icon, no crown, no fill', async () => {
+    await setup();
     const pro = q('pro-scan');
-    expect(pro.textContent).toContain('Escanear Boleta con IA');
-    expect(pro.textContent).toContain('👑');
-    expect(pro.textContent).toContain('PRO');
+    expect(pro.textContent.trim()).toBe('Descubre PRO');
+    expect(pro.textContent).not.toContain('👑');
+    expect(pro.querySelector('svg[data-testid="helmet-icon"]')).not.toBeNull();
     expect(pro.className).toMatch(/border-\[#d4af37\]/);
     expect(pro.className).not.toMatch(/\bbg-/);
+  });
+
+  it('tapping it opens the benefits screen (no toast) with 3 benefits, 2 plans and an inactive Subscribe', async () => {
+    await setup();
+    expect(q('pro-paywall')).toBeNull();
+    await click(q('pro-scan'));
+    const wall = q('pro-paywall');
+    expect(wall).not.toBeNull();
     expect(q('toast')).toBeNull();
-    await click(pro);
-    expect(q('toast').textContent).toBe('Función de Inteligencia Artificial disponible próximamente');
-    await click(q('toast')); // tap to dismiss
-    expect(q('toast')).toBeNull();
+    const dialog = document.querySelector('[role="dialog"]');
+    expect(dialog.className).toContain('bg-black');
+    const items = [...q('pro-benefits').querySelectorAll('li p:first-child')].map((p) => p.textContent);
+    expect(items).toEqual(['Respaldo automático en Google Drive', 'Lectura de facturas con IA', 'Sin límites de proyectos']);
+    expect(q('pro-plan-monthly').textContent).toContain('Mensual');
+    expect(q('pro-plan-yearly').textContent).toContain('Anual');
+    expect(q('pro-plan-yearly').getAttribute('aria-checked')).toBe('true');
+    await click(q('pro-plan-monthly'));
+    expect(q('pro-plan-monthly').getAttribute('aria-checked')).toBe('true');
+    expect(q('pro-plan-yearly').getAttribute('aria-checked')).toBe('false');
+    const sub = q('pro-subscribe');
+    expect(sub.textContent).toBe('Suscribirse');
+    expect(sub.disabled).toBe(true);
+    await click(sub); // inert
+    expect(q('pro-paywall')).not.toBeNull();
+    expect(q('pro-note').textContent).toContain('ningún cobro');
+  });
+
+  it('there is always a way out: Volver, the × button and Escape', async () => {
+    await setup();
+    await click(q('pro-scan'));
+    expect(q('pro-back').textContent).toBe('Volver');
+    await click(q('pro-back'));
+    expect(q('pro-paywall')).toBeNull();
+    expect(q('dash-empty')).not.toBeNull();
+
+    await click(q('pro-scan'));
+    await click(document.querySelector('[data-sheet-close]'));
+    expect(q('pro-paywall')).toBeNull();
+
+    await click(q('pro-scan'));
+    await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
+    expect(q('pro-paywall')).toBeNull();
+  });
+
+  it('the temporary toast is gone', () => {
+    expect(fs.existsSync(path.join(process.cwd(), 'src/components/Toast.jsx'))).toBe(false);
+    expect(read('components/Dashboard.jsx')).not.toMatch(/Toast|setToast/);
+    for (const l of LANGS) expect(DICT[l]['pro.soon']).toBeUndefined();
+  });
+
+  it('pure black, thin borders, no grey fills', () => {
+    for (const f of ['ProPaywall', 'HelmetIcon']) expect(read(`components/${f}.jsx`), f).not.toMatch(/bg-(neutral|gray|zinc|slate|stone)-\d/);
+    expect(read('components/ProPaywall.jsx')).toContain('border-white/10');
+    expect(read('components/ProPaywall.jsx')).toContain('bg-black');
+  });
+
+  it('paywall strings exist in six languages with the agreed Spanish wording', () => {
+    const keys = ['pro.cta', 'pro.title', 'pro.subtitle', 'pro.benefits', 'pro.b.drive', 'pro.b.ai', 'pro.b.projects', 'pro.plan.monthly', 'pro.plan.yearly', 'pro.price.monthly', 'pro.price.yearly', 'pro.subscribe', 'pro.back', 'pro.note'];
+    for (const l of LANGS) for (const k of keys) expect(DICT[l][k], `${l}:${k}`).toBeTruthy();
+    expect(DICT.es['pro.cta']).toBe('Descubre PRO');
+    expect(DICT.es['pro.back']).toBe('Volver');
   });
 });
 
@@ -219,20 +279,17 @@ describe('data model and copy', () => {
   });
 
   it('all new strings exist in six languages and the Spanish wording is the agreed one', () => {
-    for (const l of LANGS) for (const k of ['setup.cta', 'setup.save', 'setup.drive', 'setup.pro.name', 'pro.scan', 'pro.soon', 'settings.profile.edit']) expect(DICT[l][k], `${l}:${k}`).toBeTruthy();
+    for (const l of LANGS) for (const k of ['setup.cta', 'setup.save', 'setup.drive', 'setup.pro.name', 'settings.profile.edit']) expect(DICT[l][k], `${l}:${k}`).toBeTruthy();
     expect(DICT.es['setup.cta']).toBe('Configurar mi Empresa');
     expect(DICT.es['setup.drive']).toBe('Respaldo en Google Drive (Gratis)');
     expect(DICT.es['setup.save']).toBe('Guardar y Entrar');
-    expect(DICT.es['pro.scan']).toBe('Escanear Boleta con IA');
-    expect(DICT.es['pro.soon']).toBe('Función de Inteligencia Artificial disponible próximamente');
   });
 
   it('OLED: the new screens use pure black, thin borders and no grey fills', () => {
-    for (const f of ['SplashScreen', 'ProfileSetup', 'ProfileFields', 'ProfileSheet', 'Toast']) {
+    for (const f of ['SplashScreen', 'ProfileSetup', 'ProfileFields', 'ProfileSheet']) {
       const text = read(`components/${f}.jsx`);
       expect(text, f).not.toMatch(/bg-(neutral|gray|zinc|slate|stone)-\d/);
     }
     expect(read('components/ProfileSetup.jsx')).toContain('border-white/10');
-    expect(read('components/Toast.jsx')).toContain('border-white/10');
   });
 });

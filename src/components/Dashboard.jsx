@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { sortProjects, trafficLight } from '../lib/projects.js';
 import { Button } from './ui.jsx';
-import Toast from './Toast.jsx';
+import HelmetIcon from './HelmetIcon.jsx';
+import ProPaywall from './ProPaywall.jsx';
 import ProjectCard from './ProjectCard.jsx';
 
 /** Re-render once a minute (and when the tab becomes visible) so the traffic lights never go stale. */
@@ -24,8 +25,7 @@ function useNow(intervalMs = 60_000) {
 /** Main view: one card per client job, most urgent first. Bottom padding leaves room for the BottomNav. */
 export default function Dashboard({ projects, companyMissing, onNew, onOpen, onEdit, onSettings }) {
   const { t } = useI18n();
-  const [toast, setToast] = useState('');
-  const clearToast = useCallback(() => setToast(''), []);
+  const [paywall, setPaywall] = useState(false);
   const now = useNow();
   const sorted = useMemo(() => sortProjects(projects, now), [projects, now]);
   const counts = useMemo(() => {
@@ -46,18 +46,17 @@ export default function Dashboard({ projects, companyMissing, onNew, onOpen, onE
         </p>
       )}
 
-      {/* PRO hook (freemium): a discreet gold-outlined button; the feature itself is not built yet. */}
+      {/* PRO hook (freemium): a discreet gold-outlined button on pure black that opens the benefits screen. */}
       <button
         type="button"
-        onClick={() => setToast(t('pro.soon'))}
+        onClick={() => setPaywall(true)}
         data-testid="pro-scan"
         className="mb-4 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-[#d4af37]/60 px-4 text-sm font-bold text-[#e8c35f] transition hover:border-[#d4af37] active:scale-[0.99]"
       >
-        <span>{t('pro.scan')}</span>
-        <span aria-hidden="true">👑</span>
-        <span className="rounded-md border border-[#d4af37]/60 px-1.5 text-[11px] font-extrabold tracking-wider">PRO</span>
+        <HelmetIcon size={20} />
+        <span>{t('pro.cta')}</span>
       </button>
-      <Toast message={toast} onDone={clearToast} />
+      {paywall && <ProPaywall onClose={() => setPaywall(false)} />}
 
       {companyMissing && (
         <section className="mb-4 rounded-2xl border border-white/10 bg-black p-4" data-testid="company-hint">
