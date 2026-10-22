@@ -1,11 +1,14 @@
 import { useI18n } from '../lib/i18n.jsx';
 import { regionName } from '../lib/regions.js';
+import { googleConfigured } from '../lib/auth.js';
 import { Button } from './ui.jsx';
+import GoogleButton from './GoogleButton.jsx';
+import HelmetIcon from './HelmetIcon.jsx';
 import BottomSheet from './BottomSheet.jsx';
 import LangSelect from './LangSelect.jsx';
 
 /** Language, default country for new projects, PWA install and local profile switch. */
-export default function SettingsSheet({ user, company, logo, regionCode, pwa, onEditProfile, onChangeLang, onChangeRegion, onLogout, onClose }) {
+export default function SettingsSheet({ user, company, logo, regionCode, pwa, onEditProfile, onPro, onSignIn, onChangeLang, onChangeRegion, onLogout, onClose }) {
   const { t, lang, region } = useI18n();
   const shown = regionCode ? { flag: region?.flag, name: region ? regionName(region, lang) : '' } : null;
   return (
@@ -45,6 +48,20 @@ export default function SettingsSheet({ user, company, logo, regionCode, pwa, on
           </div>
         </div>
 
+        {/* Locked feature: opens the PRO benefits screen. */}
+        <button
+          type="button"
+          onClick={() => onPro('drive')}
+          data-testid="settings-drive-pro"
+          className="flex min-h-[56px] w-full items-center justify-between gap-3 rounded-xl border border-white/10 px-4 py-3 text-left hover:border-[#d4af37]/60"
+        >
+          <span className="min-w-0 font-semibold">{t('pro.b.drive')}</span>
+          <span className="flex shrink-0 items-center gap-1.5 rounded-md border border-[#d4af37]/60 px-2 py-0.5 text-[11px] font-extrabold tracking-wider text-[#e8c35f]">
+            <HelmetIcon size={18} />
+            PRO
+          </span>
+        </button>
+
         {pwa.canInstall && (
           <Button variant="secondary" className="w-full" onClick={pwa.install}>
             {t('pwa.install')}
@@ -52,13 +69,22 @@ export default function SettingsSheet({ user, company, logo, regionCode, pwa, on
         )}
 
         <div>
-          <p className="label">{t('settings.account')}</p>
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 px-4 py-3">
-            <span className="min-w-0 truncate font-semibold">{user.name}</span>
+          <p className="label">{t(user.provider === 'google' ? 'settings.account.google' : 'settings.account')}</p>
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 px-4 py-3" data-testid="settings-account">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-semibold">{user.name}</span>
+              {user.email && <span className="block truncate text-sm text-neutral-400">{user.email}</span>}
+            </span>
             <button type="button" onClick={onLogout} className="min-h-[44px] shrink-0 rounded-lg border border-white/10 px-3 text-sm font-bold hover:border-red-500">
               {t('login.switch')}
             </button>
           </div>
+          {user.provider !== 'google' && googleConfigured && (
+            <div className="mt-3 rounded-xl border border-white/10 p-3" data-testid="settings-google-link">
+              <p className="mb-2 text-center text-sm text-neutral-300">{t('settings.account.link')}</p>
+              <GoogleButton onUser={onSignIn} />
+            </div>
+          )}
         </div>
       </div>
     </BottomSheet>

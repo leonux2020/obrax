@@ -1,54 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
-import { GOOGLE_CLIENT_ID, googleConfigured, loadGsi, userFromCredential, localUser } from '../lib/auth.js';
+import { googleConfigured, localUser } from '../lib/auth.js';
 import { sanitizeText } from '../lib/sanitize.js';
 import { Button, Logo, TextField } from './ui.jsx';
+import GoogleButton from './GoogleButton.jsx';
 
 /**
- * Entry screen. The default path is a LOCAL PROFILE (name optional, nothing leaves the device), so the
- * app never depends on an OAuth client being configured. Google sign-in is offered only when
- * VITE_GOOGLE_CLIENT_ID is set.
+ * Main access screen. Google sign-in (VITE_GOOGLE_CLIENT_ID) comes first when it is configured; the LOCAL
+ * PROFILE (name optional, nothing leaves the device) is always available below it, so the app never
+ * depends on an OAuth client or on being online. Any successful sign-in calls `onLogin(user)`.
  */
 export default function Login({ onLogin }) {
   const { t } = useI18n();
-  const btnRef = useRef(null);
   const [name, setName] = useState('');
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (!googleConfigured) return undefined;
-    let cancelled = false;
-    loadGsi()
-      .then((google) => {
-        if (cancelled || !btnRef.current) return;
-        google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: (resp) => {
-            try {
-              onLogin(userFromCredential(resp.credential));
-            } catch {
-              setError(t('login.failed'));
-            }
-          },
-          auto_select: false,
-          cancel_on_tap_outside: true,
-        });
-        google.accounts.id.renderButton(btnRef.current, {
-          theme: 'filled_black',
-          size: 'large',
-          shape: 'pill',
-          text: 'continue_with',
-          width: 280,
-        });
-      })
-      .catch(() => {
-        /* offline / blocked: the local profile below keeps working, so stay silent */
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const enter = (e) => {
     e.preventDefault();
@@ -61,7 +25,14 @@ export default function Login({ onLogin }) {
       <h1 className="text-3xl font-extrabold">{t('app.name')}</h1>
       <p className="mt-1 text-neutral-300">{t('app.tagline')}</p>
 
-      <form onSubmit={enter} className="card mt-7 text-left">
+      {googleConfigured && (
+        <section className="mt-7 rounded-2xl border border-white/10 bg-black p-4" data-testid="login-google-card">
+          <GoogleButton onUser={onLogin} />
+          <p className="mt-3 text-center text-xs text-neutral-400">{t('login.google.note')}</p>
+        </section>
+      )}
+
+      <form onSubmit={enter} className={`card text-left ${googleConfigured ? 'mt-4' : 'mt-7'}`} data-testid="login-local">
         <h2 className="text-xl font-bold">{t('login.local.title')}</h2>
         <p className="mb-4 mt-1 text-sm text-neutral-300">{t('login.local.subtitle')}</p>
         <TextField
@@ -77,18 +48,6 @@ export default function Login({ onLogin }) {
           {t('login.local.enter')}
         </Button>
         <p className="mt-2 text-xs text-neutral-400">{t('login.local.note')}</p>
-
-        {googleConfigured && (
-          <>
-            <p className="my-4 text-center text-sm text-neutral-400">— {t('login.or')} —</p>
-            <div ref={btnRef} className="flex min-h-[44px] justify-center" />
-          </>
-        )}
-        {error && (
-          <p role="alert" className="mt-3 text-sm font-semibold text-red-400">
-            {error}
-          </p>
-        )}
       </form>
     </main>
   );

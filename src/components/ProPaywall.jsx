@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
+import { FREE_PROJECT_LIMIT } from '../lib/pro.js';
 import { Button } from './ui.jsx';
 import BottomSheet from './BottomSheet.jsx';
 import HelmetIcon from './HelmetIcon.jsx';
@@ -18,8 +19,10 @@ const PLANS = [
 /**
  * PRO benefits screen (freemium): a full-height pure-black sheet with the three benefits, two example
  * plans and a "Subscribe" button that is intentionally inactive. "Volver" and "×" always leave it.
+ * `feature` ('projects' | 'drive' | 'ai') says which locked function opened it: a short reason is shown and
+ * the matching benefit is highlighted. 'promo' (the dashboard button) shows neither.
  */
-export default function ProPaywall({ onClose }) {
+export default function ProPaywall({ feature = 'promo', onClose }) {
   const { t } = useI18n();
   const [plan, setPlan] = useState('yearly');
 
@@ -31,10 +34,20 @@ export default function ProPaywall({ onClose }) {
           <span className="rounded-md border border-[#d4af37]/60 px-1.5 text-[11px] font-extrabold tracking-wider">PRO</span>
         </div>
 
+        {feature !== 'promo' && (
+          <p role="status" data-testid="pro-reason" className="mb-4 rounded-xl border border-[#d4af37]/60 px-4 py-3 text-sm font-semibold text-[#e8c35f]">
+            {t(`pro.locked.${feature}`, { n: FREE_PROJECT_LIMIT })}
+          </p>
+        )}
+
         <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-neutral-400">{t('pro.benefits')}</h3>
         <ul className="mb-6 divide-y divide-white/10 rounded-2xl border border-white/10" data-testid="pro-benefits">
           {BENEFITS.map((b) => (
-            <li key={b.id} className="flex items-start gap-3 p-4">
+            <li
+              key={b.id}
+              data-active={feature === b.id ? 'true' : undefined}
+              className={`flex items-start gap-3 p-4 ${feature === b.id ? 'shadow-[inset_3px_0_0_#d4af37]' : ''}`}
+            >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#e8c35f" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-0.5 shrink-0">
                 <path d={b.icon} />
               </svg>

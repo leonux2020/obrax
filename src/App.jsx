@@ -25,6 +25,7 @@ import {
   saveProfileMeta,
 } from './lib/draft.js';
 import { localUser } from './lib/auth.js';
+import { isPro, projectLimitReached } from './lib/pro.js';
 import { usePWA } from './pwa/usePWA.js';
 import RegionSelect from './components/RegionSelect.jsx';
 import Login from './components/Login.jsx';
@@ -37,6 +38,7 @@ import SettingsSheet from './components/SettingsSheet.jsx';
 import ProfileSheet from './components/ProfileSheet.jsx';
 import SplashScreen from './components/SplashScreen.jsx';
 import ProfileSetup from './components/ProfileSetup.jsx';
+import ProPaywall from './components/ProPaywall.jsx';
 
 // Loads the saved projects and performs the one-off migration of the pre-dashboard single draft.
 // It is shared (one in-flight promise) so React StrictMode's double effect — or a quick remount —
@@ -91,6 +93,7 @@ export default function App() {
   const [stage, setStage] = useState(() => (!settings.region && !user && isCompanyEmpty(company) && !meta.onboarded ? 'splash' : 'app'));
   const [sheet, setSheet] = useState(null); // { type: 'new' | 'edit' | 'settings' | 'profile', id? } (profile is reached from Ajustes)
   const [pickingRegion, setPickingRegion] = useState(false);
+  const [paywall, setPaywall] = useState(null); // null | 'promo' | 'projects' | 'drive' | 'ai': which locked feature opened the PRO screen
   const [photos, setPhotos] = useState(emptySlots);
 
   const region = getRegion(settings.region);
@@ -236,9 +239,35 @@ export default function App() {
   );
 
   const changeLang = useCallback((lang) => LANGS.includes(lang) && setSettings((s) => ({ ...s, lang })), []);
+  // Successful sign-in (Google or local profile): the user is stored (effect above), and we land on the
+  // main view: no splash, no open sheet, no pending region picker.
+  const signIn = useCallback((u) => {
+    setUser(u);
+    setSheet(null);
+    setPickingRegion(false);
+    setStage('app');
+    window.scrollTo({ top: 0 });
+  }, []);
+
+  // Freemium gate for new projects: past the free limit the PRO screen opens instead of the form.
+  const requestNewProject = useCallback(() => {
+    if (projectLimitReached(projects?.length ?? 0, isPro())) {
+      setSheet(null);
+      setPaywall('projects');
+      return;
+    }
+    setSheet({ type: 'new' });
+  }, [projects]);
+
+  const openPaywall = useCallback((feature = 'promo') => {
+    setSheet(null);
+    setPaywall(feature);
+  }, []);
+
   const logout = useCallback(() => {
     closeProject();
     setSheet(null);
+    setPaywall(null);
     setUser(null);
   }, [closeProject]);
 
@@ -264,7 +293,7 @@ export default function App() {
           onCancel={region ? () => setPickingRegion(false) : undefined}
         />
       ) : !user ? (
-        <Login onLogin={setUser} />
+        <Login onLogin={signIn} />
       ) : (
         <>
           <Header subtitle={active ? projectTitle(active) || user.name : user.name} pwa={pwa} />
@@ -280,7 +309,7 @@ export default function App() {
               company={active.company}
               onNewProject={() => {
                 closeProject();
-                setSheet({ type: 'new' });
+                requestNewProject();
               }}
               onExit={closeProject}
             />
@@ -289,16 +318,17 @@ export default function App() {
               <Dashboard
                 projects={projects}
                 companyMissing={companyMissing}
-                onNew={() => setSheet({ type: 'new' })}
+                onNew={requestNewProject}
                 onOpen={openProject}
                 onEdit={(id) => setSheet({ type: 'edit', id })}
                 onSettings={() => setSheet({ type: 'settings' })}
+                onPro={() => openPaywall('promo')}
               />
               <BottomNav
                 active={navActive}
                 onProjects={() => setSheet(null)}
                 onSettings={() => setSheet({ type: 'settings' })}
-                onNew={() => setSheet({ type: 'new' })}
+                onNew={requestNewProject}
               />
             </>
           )}
@@ -318,6 +348,8 @@ export default function App() {
               regionCode={settings.region}
               pwa={pwa}
               onEditProfile={() => setSheet({ type: 'profile' })}
+              onPro={openPaywall}
+              onSignIn={signIn}
               onChangeLang={changeLang}
               onChangeRegion={() => {
                 setSheet(null);
@@ -327,6 +359,7 @@ export default function App() {
               onClose={() => setSheet(null)}
             />
           )}
+          {paywall && <ProPaywall feature={paywall} onClose={() => setPaywall(null)} />}
         </>
       )}
     </I18nProvider>
