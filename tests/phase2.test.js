@@ -280,15 +280,16 @@ describe('client report model and PDF', () => {
 });
 
 describe('Phase 2 strings in six languages', () => {
-  const KEYS = ['welcome.title', 'welcome.drive', 'welcome.skip', 'sign.title', 'sign.name', 'sign.id', 'sign.accept', 'bd.toggle', 'bd.title', 'bd.materials', 'bd.labor'];
+  const KEYS = ['setup.title', 'setup.drive', 'setup.save', 'sign.title', 'sign.name', 'sign.id', 'sign.accept', 'bd.toggle', 'bd.title', 'bd.materials', 'bd.labor'];
 
   it('exist in every language', () => {
     for (const l of LANGS) for (const k of KEYS) expect(DICT[l][k], `${l}:${k}`).toBeTruthy();
   });
 
   it('Spanish uses the agreed wording and the universal "ID:" label', () => {
-    expect(DICT.es['welcome.drive']).toBe('Proteger mis datos con Google Drive (Recomendado)');
-    expect(DICT.es['welcome.skip']).toBe('Omitir por ahora');
+    expect(DICT.es['setup.drive']).toBe('Respaldo en Google Drive (Gratis)');
+    expect(DICT.es['setup.save']).toBe('Guardar y Entrar');
+    expect(DICT.es['setup.cta']).toBe('Configurar mi Empresa');
     expect(DICT.es['sign.name']).toBe('Nombre del Cliente');
     expect(DICT.es['bd.toggle']).toBe('Mostrar desglose de Materiales y Mano de Obra en el PDF');
     for (const l of LANGS) expect(DICT[l]['sign.id']).toBe('ID:');
@@ -321,14 +322,14 @@ describe('UI structure (OLED + one-hand ergonomics)', () => {
     expect(pdf).toBeGreaterThan(toggle);
   });
 
-  it('welcome screen: highlighted primary + discreet text button, actions fixed to the bottom', () => {
-    const w = read('components/WelcomeOnboarding.jsx');
+  it('setup screen: actions fixed to the bottom, Drive switch and professional data present', () => {
+    const w = read('components/ProfileSetup.jsx');
     expect(w).toMatch(/fixed inset-x-0 bottom-0/);
-    expect(w).toContain("variant=\"secondary\"");
-    expect(w).toContain("t('welcome.drive')");
-    expect(w).toContain("t('welcome.skip')");
-    expect(w.indexOf("t('welcome.drive')")).toBeLessThan(w.indexOf("t('welcome.skip')"));
-    expect(read('App.jsx')).toContain('WelcomeOnboarding');
+    expect(w).toContain("t('setup.save')");
+    const f = read('components/ProfileFields.jsx');
+    for (const k of ["t('setup.drive')", "t('setup.pro.name')", "t('setup.company')", 'LogoField']) expect(f).toContain(k);
+    expect(read('App.jsx')).toContain('ProfileSetup');
+    expect(read('App.jsx')).toContain('SplashScreen');
   });
 
   it('switch is a real role="switch" with an ultra-thin border', () => {

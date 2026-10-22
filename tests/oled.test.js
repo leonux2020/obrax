@@ -55,7 +55,7 @@ describe('one-hand ergonomics', () => {
     const sheet = read('components/BottomSheet.jsx');
     expect(sheet).toMatch(/items-end/);
     expect(sheet).toMatch(/rounded-t-3xl/);
-    for (const f of ['ProjectSheet', 'SettingsSheet', 'CompanyProfile']) expect(read(`components/${f}.jsx`)).toContain('BottomSheet');
+    for (const f of ['ProjectSheet', 'SettingsSheet', 'ProfileSheet']) expect(read(`components/${f}.jsx`)).toContain('BottomSheet');
   });
 
   it('touch targets are at least 44 px', () => {

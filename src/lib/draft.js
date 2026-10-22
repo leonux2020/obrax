@@ -18,7 +18,7 @@ import {
   oneOf,
 } from './sanitize.js';
 
-const KEYS = { settings: 'cp.settings.v1', user: 'cp.user.v1', draft: 'cp.draft.v2', company: 'cp.company.v1' };
+const KEYS = { settings: 'cp.settings.v1', user: 'cp.user.v1', draft: 'cp.draft.v2', company: 'cp.company.v1', profile: 'cp.profile.v1' };
 
 export const FINANCE_LIMITS = Object.freeze({
   labor: { min: 0, max: 150, step: 1, default: 35 },
@@ -72,7 +72,7 @@ export const loadUser = () => normalizeUser(read(KEYS.user));
 export const saveUser = (u) => write(KEYS.user, u);
 
 // ---- company / professional profile (printed on both reports) -------------
-export const EMPTY_COMPANY = Object.freeze({ name: '', taxId: '', phone: '', email: '', city: '' });
+export const EMPTY_COMPANY = Object.freeze({ name: '', taxId: '', phone: '', email: '', city: '', proName: '', proTaxId: '' });
 
 export function normalizeCompany(obj) {
   if (!obj || typeof obj !== 'object') return { ...EMPTY_COMPANY };
@@ -82,11 +82,25 @@ export function normalizeCompany(obj) {
     phone: sanitizePhone(obj.phone).trim(),
     email: sanitizeEmail(obj.email),
     city: sanitizeText(obj.city, 60).trim(),
+    proName: sanitizeText(obj.proName, 60).trim(), // the professional who signs: personal name ...
+    proTaxId: sanitizeTaxId(obj.proTaxId), // ... and personal ID (RUT / DNI / ...)
   };
 }
 export const isCompanyEmpty = (c) => !c || Object.values(c).every((v) => !v);
 export const loadCompany = () => normalizeCompany(read(KEYS.company));
 export const saveCompany = (c) => write(KEYS.company, isCompanyEmpty(c) ? null : normalizeCompany(c));
+
+// ---- onboarding / backup preferences ----------------------------------------
+// `onboarded` is the flag that retires the splash screen for good; `drive` is the user's choice for the
+// (upcoming) Google Drive backup. Both live next to the company profile, never inside a project.
+export const DEFAULT_PROFILE_META = Object.freeze({ onboarded: false, drive: true });
+export function normalizeProfileMeta(obj) {
+  if (!obj || typeof obj !== 'object') return { ...DEFAULT_PROFILE_META };
+  return { onboarded: obj.onboarded === true, drive: obj.drive !== false };
+}
+export const loadProfileMeta = () => normalizeProfileMeta(read(KEYS.profile));
+export const saveProfileMeta = (m) => write(KEYS.profile, normalizeProfileMeta(m));
+export const hasStoredProfileMeta = () => read(KEYS.profile) !== null;
 
 // ---- draft (project in progress) -------------------------------------------
 const ID_RE = /^[a-z0-9]{1,16}$/;

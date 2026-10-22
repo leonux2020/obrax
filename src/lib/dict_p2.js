@@ -1,15 +1,8 @@
-// Phase 2 strings: welcome onboarding, client signature and the PDF breakdown toggle, in the six
+// Phase 2 strings: client signature and the PDF breakdown toggle, in the six
 // supported languages. Merged into DICT by dict.js; the parity test keeps keys and {placeholders} equal.
 
 export const P2 = {
   es: {
-    'welcome.title': 'Bienvenido a Obrax',
-    'welcome.subtitle': 'Configura tu empresa una sola vez: aparecerá en cada presupuesto que emitas.',
-    'welcome.required': 'Escribe el nombre de tu empresa o sube un logotipo para continuar.',
-    'welcome.drive': 'Proteger mis datos con Google Drive (Recomendado)',
-    'welcome.drive.hint': 'La copia de seguridad en la nube llegará pronto. Por ahora tus datos se guardan solo en este dispositivo.',
-    'welcome.skip': 'Omitir por ahora',
-    'welcome.err.store': 'No se pudieron guardar los datos en este dispositivo.',
     'sign.title': 'Firma del Cliente',
     'sign.hint': 'Doble toque para firmar',
     'sign.sheet.subtitle': 'Entrega el dispositivo al cliente: puede firmar con el dedo o con un lápiz.',
@@ -34,13 +27,6 @@ export const P2 = {
     'bd.transport': 'Transporte y logística',
   },
   en: {
-    'welcome.title': 'Welcome to Obrax',
-    'welcome.subtitle': 'Set up your company once: it is printed on every quote you issue.',
-    'welcome.required': 'Add your company name or a logo to continue.',
-    'welcome.drive': 'Protect my data with Google Drive (Recommended)',
-    'welcome.drive.hint': 'Cloud backup is coming soon. For now your data is saved on this device only.',
-    'welcome.skip': 'Skip for now',
-    'welcome.err.store': 'Your data could not be saved on this device.',
     'sign.title': 'Client Signature',
     'sign.hint': 'Double-tap to sign',
     'sign.sheet.subtitle': 'Hand the device to the client: they can sign with a finger or a stylus.',
@@ -65,13 +51,6 @@ export const P2 = {
     'bd.transport': 'Transport & logistics',
   },
   pt: {
-    'welcome.title': 'Bem-vindo ao Obrax',
-    'welcome.subtitle': 'Configure sua empresa uma única vez: ela aparece em cada orçamento que você emitir.',
-    'welcome.required': 'Informe o nome da empresa ou envie um logotipo para continuar.',
-    'welcome.drive': 'Proteger meus dados com o Google Drive (Recomendado)',
-    'welcome.drive.hint': 'O backup na nuvem chegará em breve. Por enquanto seus dados ficam salvos só neste dispositivo.',
-    'welcome.skip': 'Pular por agora',
-    'welcome.err.store': 'Não foi possível salvar os dados neste dispositivo.',
     'sign.title': 'Assinatura do Cliente',
     'sign.hint': 'Toque duplo para assinar',
     'sign.sheet.subtitle': 'Entregue o aparelho ao cliente: ele pode assinar com o dedo ou uma caneta.',
@@ -96,13 +75,6 @@ export const P2 = {
     'bd.transport': 'Transporte e logística',
   },
   fr: {
-    'welcome.title': 'Bienvenue sur Obrax',
-    'welcome.subtitle': 'Configurez votre entreprise une seule fois : elle figure sur chaque devis que vous émettez.',
-    'welcome.required': 'Indiquez le nom de votre entreprise ou ajoutez un logo pour continuer.',
-    'welcome.drive': 'Protéger mes données avec Google Drive (Recommandé)',
-    'welcome.drive.hint': "La sauvegarde dans le cloud arrive bientôt. Pour l'instant, vos données restent sur cet appareil.",
-    'welcome.skip': "Passer pour l'instant",
-    'welcome.err.store': "Impossible d'enregistrer les données sur cet appareil.",
     'sign.title': 'Signature du Client',
     'sign.hint': 'Double appui pour signer',
     'sign.sheet.subtitle': "Passez l'appareil au client : il peut signer du doigt ou au stylet.",
@@ -127,13 +99,6 @@ export const P2 = {
     'bd.transport': 'Transport et logistique',
   },
   it: {
-    'welcome.title': 'Benvenuto in Obrax',
-    'welcome.subtitle': 'Configura la tua azienda una sola volta: comparirà su ogni preventivo che emetti.',
-    'welcome.required': "Inserisci il nome dell'azienda o carica un logo per continuare.",
-    'welcome.drive': 'Proteggi i miei dati con Google Drive (Consigliato)',
-    'welcome.drive.hint': 'Il backup nel cloud arriverà presto. Per ora i dati restano solo su questo dispositivo.',
-    'welcome.skip': 'Salta per ora',
-    'welcome.err.store': 'Impossibile salvare i dati su questo dispositivo.',
     'sign.title': 'Firma del Cliente',
     'sign.hint': 'Doppio tocco per firmare',
     'sign.sheet.subtitle': 'Passa il dispositivo al cliente: può firmare con il dito o con una penna.',
@@ -158,13 +123,6 @@ export const P2 = {
     'bd.transport': 'Trasporto e logistica',
   },
   de: {
-    'welcome.title': 'Willkommen bei Obrax',
-    'welcome.subtitle': 'Richten Sie Ihr Unternehmen einmalig ein: Es erscheint auf jedem Angebot, das Sie erstellen.',
-    'welcome.required': 'Geben Sie den Firmennamen ein oder laden Sie ein Logo hoch, um fortzufahren.',
-    'welcome.drive': 'Meine Daten mit Google Drive schützen (Empfohlen)',
-    'welcome.drive.hint': 'Die Cloud-Sicherung folgt bald. Vorerst bleiben Ihre Daten nur auf diesem Gerät.',
-    'welcome.skip': 'Vorerst überspringen',
-    'welcome.err.store': 'Die Daten konnten auf diesem Gerät nicht gespeichert werden.',
     'sign.title': 'Kundenunterschrift',
     'sign.hint': 'Doppeltippen zum Unterschreiben',
     'sign.sheet.subtitle': 'Reichen Sie das Gerät an den Kunden: Er kann mit Finger oder Stift unterschreiben.',

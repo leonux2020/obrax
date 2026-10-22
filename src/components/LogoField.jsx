@@ -5,7 +5,7 @@ import { PhotoError } from '../lib/photos.js';
 import { Button } from './ui.jsx';
 
 /**
- * Light logo picker shared by the company profile and the welcome screen. The chosen image is compressed
+ * Light logo picker shared by the first-run setup and the profile sheet in Ajustes. The chosen image is compressed
  * on the device (max 256 px, transparency kept) and handed back as a base64 data URL.
  */
 export default function LogoField({ value, onChange, onBusy, externalError = '' }) {

@@ -34,7 +34,9 @@ export function companyInfo(company, region, t) {
     details: lines,
     taxLine: c.taxId ? `${t(`company.taxId.${region.code}`)}: ${c.taxId}` : '',
     logo: typeof c.logo === 'string' ? c.logo : '',
-    empty: !c.name && lines.length === 0 && !c.logo,
+    signer: c.proName || '', // the professional who signs (own key names: the confidentiality test greps the model for store names)
+    signerLine: c.proTaxId ? `${t(`company.taxId.${region.code}`)}: ${c.proTaxId}` : '',
+    empty: !c.name && lines.length === 0 && !c.logo && !c.proName,
   };
 }
 
@@ -97,7 +99,11 @@ export function buildClientModel({ draft, result, company, region, t, num, date 
       : null,
     signClient: t('com.sign'),
     signCompany: t('com.signCompany'),
-    signCompanyData: [companyInfo(company, region, t).name, companyInfo(company, region, t).taxLine].filter(Boolean),
+    // who signs for the contractor: the professional if one is on the profile, else the company
+    signCompanyData: (() => {
+      const c = companyInfo(company, region, t);
+      return (c.signer ? [c.signer, c.signerLine || c.taxLine] : [c.name, c.taxLine]).filter(Boolean);
+    })(),
     // The client's signature is printed only while it still matches the quote it was given on.
     signature: isSignatureCurrent(draft.signature, q.total)
       ? {
