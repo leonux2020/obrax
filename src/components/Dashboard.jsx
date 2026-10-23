@@ -3,6 +3,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { sortProjects, trafficLight } from '../lib/projects.js';
 import { Button } from './ui.jsx';
 import HelmetIcon from './HelmetIcon.jsx';
+import { usePro } from '../lib/usePro.js';
 import ProjectCard from './ProjectCard.jsx';
 
 /** Re-render once a minute (and when the tab becomes visible) so the traffic lights never go stale. */
@@ -23,6 +24,7 @@ function useNow(intervalMs = 60_000) {
 
 /** Main view: one card per client job, most urgent first. Bottom padding leaves room for the BottomNav. */
 export default function Dashboard({ projects, companyMissing, onNew, onOpen, onEdit, onSettings, onPro }) {
+  const pro = usePro();
   const { t } = useI18n();
   const now = useNow();
   const sorted = useMemo(() => sortProjects(projects, now), [projects, now]);
@@ -45,6 +47,12 @@ export default function Dashboard({ projects, companyMissing, onNew, onOpen, onE
       )}
 
       {/* PRO hook (freemium): a discreet gold-outlined button on pure black that opens the benefits screen. */}
+      {pro ? (
+        <p role="status" data-testid="pro-active" className="mb-4 flex min-h-[56px] w-full items-center justify-center gap-3 rounded-xl border border-[#d4af37] px-4 text-base font-bold text-[#e8c35f]">
+          <HelmetIcon size={28} />
+          <span>{t('pro.active')}</span>
+        </p>
+      ) : (
       <button
         type="button"
         onClick={onPro}
@@ -54,6 +62,7 @@ export default function Dashboard({ projects, companyMissing, onNew, onOpen, onE
         <HelmetIcon size={28} />
         <span>{t('pro.cta')}</span>
       </button>
+      )}
 
       {companyMissing && (
         <section className="mb-4 rounded-2xl border border-white/10 bg-black p-4" data-testid="company-hint">

@@ -2,6 +2,8 @@
 
 export const P6 = {
   es: {
+    'pro.active': "PRO activo",
+    'pro.devDeactivate': "Desactivar PRO de prueba",
     'inv.cta': "Leer factura con IA",
     'inv.cta.hint': "Sube o toma una foto de tu factura de materiales: sus precios reales reemplazan los simulados.",
     'inv.title': "Leer factura",
@@ -36,6 +38,8 @@ export const P6 = {
     'pro.devActivate': "Activar PRO de prueba (solo desarrollo)",
   },
   en: {
+    'pro.active': "PRO active",
+    'pro.devDeactivate': "Disable test PRO",
     'inv.cta': "Read invoice with AI",
     'inv.cta.hint': "Upload or take a photo of your materials invoice: its real prices replace the simulated ones.",
     'inv.title': "Read invoice",
@@ -70,6 +74,8 @@ export const P6 = {
     'pro.devActivate': "Enable test PRO (development only)",
   },
   pt: {
+    'pro.active': "PRO ativo",
+    'pro.devDeactivate': "Desativar PRO de teste",
     'inv.cta': "Ler nota fiscal com IA",
     'inv.cta.hint': "Envie ou tire uma foto da sua nota de materiais: os preços reais substituem os simulados.",
     'inv.title': "Ler nota fiscal",
@@ -104,6 +110,8 @@ export const P6 = {
     'pro.devActivate': "Ativar PRO de teste (só desenvolvimento)",
   },
   fr: {
+    'pro.active': "PRO actif",
+    'pro.devDeactivate': "Désactiver le PRO de test",
     'inv.cta': "Lire une facture avec l'IA",
     'inv.cta.hint': "Importez ou prenez en photo votre facture de matériaux : ses prix réels remplacent les prix simulés.",
     'inv.title': "Lire une facture",
@@ -138,6 +146,8 @@ export const P6 = {
     'pro.devActivate': "Activer le PRO de test (développement uniquement)",
   },
   it: {
+    'pro.active': "PRO attivo",
+    'pro.devDeactivate': "Disattiva PRO di prova",
     'inv.cta': "Leggi fattura con l'IA",
     'inv.cta.hint': "Carica o scatta una foto della fattura dei materiali: i prezzi reali sostituiscono quelli simulati.",
     'inv.title': "Leggi fattura",
@@ -172,6 +182,8 @@ export const P6 = {
     'pro.devActivate': "Attiva PRO di prova (solo sviluppo)",
   },
   de: {
+    'pro.active': "PRO aktiv",
+    'pro.devDeactivate': "Test-PRO deaktivieren",
     'inv.cta': "Rechnung mit KI lesen",
     'inv.cta.hint': "Laden Sie ein Foto Ihrer Materialrechnung hoch oder machen Sie eins: Die echten Preise ersetzen die simulierten.",
     'inv.title': "Rechnung lesen",

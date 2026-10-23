@@ -14,14 +14,14 @@ export default function StepStart({ draft, setDraft, photos, setPhotos, projectI
     setDraft((d) => {
       if (d.mode === mode) return d;
       const partidas = mode === 'quick' ? (d.partidas.length ? d.partidas.slice(0, 1) : [newPartida('slab')]) : d.partidas;
-      return { ...d, mode, partidas, overrides: {} };
+      return { ...d, mode, partidas };
     });
 
   const pickTask = (task) =>
     setDraft((d) => {
       const cur = d.partidas[0] ?? newPartida(task);
       const next = { ...cur, task, dims: defaultDims(task, cur.dims), waste: TASKS[task].defaultWaste };
-      return { ...d, partidas: [next], overrides: {} };
+      return { ...d, partidas: [next] };
     });
 
   const setProject = (key) => (v) => setDraft((d) => ({ ...d, project: { ...d.project, [key]: v } }));

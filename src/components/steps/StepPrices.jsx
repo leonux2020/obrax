@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { MAX_PRICE, taxRateFor } from '../../lib/pricing.js';
-import { isPro } from '../../lib/pro.js';
+import { usePro } from '../../lib/usePro.js';
 import { createRateLimiter, humanVerified } from '../../lib/shield.js';
 import { chainLabel } from '../../lib/regions.js';
 import { Badge, Button, NumberField } from '../ui.jsx';
@@ -13,8 +13,19 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
   const humanLimiter = useRef(createRateLimiter(8, 60_000));
   const botLimiter = useRef(createRateLimiter(2, 60_000));
   const [limited, setLimited] = useState(false);
+  const pro = usePro();
   const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [wantsInvoice, setWantsInvoice] = useState(false); // tapped while locked: open the reader as soon as PRO is on
   const [applied, setApplied] = useState(0); // prices loaded from the last invoice
+
+  // The paywall's test switch (or, later, a real purchase) flips PRO while this screen is open: continue where the
+  // user left off, with no second tap.
+  useEffect(() => {
+    if (pro && wantsInvoice) {
+      setWantsInvoice(false);
+      setInvoiceOpen(true);
+    }
+  }, [pro, wantsInvoice]);
 
   if (!result.valid) return null;
 
@@ -38,7 +49,13 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
   };
 
   // PRO: AI invoice reading. Locked users get the paywall (with the reason) instead of the flow.
-  const openInvoice = () => (isPro() ? setInvoiceOpen(true) : onPro?.('ai'));
+  const openInvoice = () => {
+    if (pro) setInvoiceOpen(true);
+    else {
+      setWantsInvoice(true);
+      onPro?.('ai');
+    }
+  };
   const applyInvoice = (overrides) => {
     const n = Object.keys(overrides).length;
     if (n > 0) setDraft((d) => ({ ...d, overrides: { ...d.overrides, ...overrides } }));
@@ -73,7 +90,7 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
             <path d="M4 7V5a1 1 0 0 1 1-1h2M20 7V5a1 1 0 0 0-1-1h-2M4 17v2a1 1 0 0 0 1 1h2M20 17v2a1 1 0 0 1-1 1h-2M8 12h8" />
           </svg>
           {t('inv.cta')}
-          {!isPro() && <span className="rounded-md border border-[#d4af37]/60 px-1.5 text-[11px] font-extrabold tracking-wider">PRO</span>}
+          {!pro && <span className="rounded-md border border-[#d4af37]/60 px-1.5 text-[11px] font-extrabold tracking-wider">PRO</span>}
         </Button>
         <p className="mt-2 text-xs text-neutral-300">{t('inv.cta.hint')}</p>
         {applied > 0 && (

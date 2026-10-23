@@ -42,6 +42,12 @@ function Harness({ onPro }) {
   return h(I18nProvider, { lang: 'es', regionCode: 'CL' }, h(StepPrices, { draft, setDraft, result, now: NOW, onRefresh: () => {}, onPro }));
 }
 
+// A stand-in for App: owns the paywall state exactly like App does (onPro -> paywall, onClose -> closed).
+function MiniApp() {
+  const [paywall, setPaywall] = useState(null);
+  return h(React.Fragment, null, h(Harness, { onPro: setPaywall }), paywall ? h(I18nProvider, { lang: 'es', regionCode: 'CL' }, h(ProPaywall, { feature: paywall, onClose: () => setPaywall(null) })) : null);
+}
+
 const ok = (items, extra = {}) => ({ ok: true, status: 200, json: async () => ({ ok: true, isInvoice: true, currency: 'CLP', taxIncluded: false, supplier: 'Ferretería Sur', items, ...extra }) });
 const fail = (status, error) => ({ ok: false, status, json: async () => ({ ok: false, error }) });
 const L = (materialId, unitPriceText, extra = {}) => ({ materialId, description: `${materialId} factura`, quantity: 10, unit: 'u', unitPriceText, priceBasis: 'sale_unit', ...extra });
@@ -220,5 +226,59 @@ describe('invoice -> proxy -> review -> real prices in the quote', () => {
     await mount();
     expect(q('prices-auto')).not.toBeNull();
     expect(document.querySelectorAll('li.card').length).toBeGreaterThan(0);
+  });
+});
+
+describe('"Activar PRO de prueba": immediate, closes the modal, enables the reader (no loop)', () => {
+  const mountMini = async () => {
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    await act(async () => root.render(h(MiniApp)));
+  };
+
+  it('locked tap -> paywall -> one tap on the test switch -> modal gone and the invoice reader is open', async () => {
+    await mountMini();
+    expect(q('invoice-open').textContent).toContain('PRO');
+    await click(q('invoice-open'));
+    expect(q('pro-paywall')).not.toBeNull();
+    expect(q('pro-reason').textContent).toContain('lectura de facturas con IA');
+    await click(q('pro-dev-activate'));
+    expect(isPro()).toBe(true);
+    expect(q('pro-paywall')).toBeNull(); // closed
+    expect(q('invoice-sheet')).not.toBeNull(); // and the function is already enabled: no second tap
+    expect(q('invoice-sheet').dataset.phase).toBe('pick');
+    await click(document.querySelector('[data-sheet-close]'));
+    expect(q('invoice-sheet')).toBeNull();
+    expect(q('invoice-open').textContent).not.toMatch(/PRO$/); // badge gone at once
+    await click(q('invoice-open')); // from now on it never goes back to the paywall
+    expect(q('pro-paywall')).toBeNull();
+    expect(q('invoice-sheet')).not.toBeNull();
+  });
+
+  it('closing the paywall WITHOUT activating leaves the user free and the reader closed', async () => {
+    await mountMini();
+    await click(q('invoice-open'));
+    await click(q('pro-back'));
+    expect(q('pro-paywall')).toBeNull();
+    expect(q('invoice-sheet')).toBeNull();
+    expect(isPro()).toBe(false);
+    expect(q('invoice-open').textContent).toContain('PRO');
+  });
+
+  it('already PRO: the paywall says so and the same switch turns the test PRO off again', async () => {
+    localStorage.setItem(SIM_PRO_KEY, '1');
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    const onClose = vi.fn();
+    await act(async () => root.render(h(I18nProvider, { lang: 'es', regionCode: 'CL' }, h(ProPaywall, { feature: 'promo', onClose }))));
+    expect(q('pro-active-note').textContent).toBe('PRO activo');
+    expect(q('pro-dev-activate')).toBeNull();
+    await click(q('pro-dev-deactivate'));
+    expect(isPro()).toBe(false);
+    expect(localStorage.getItem(SIM_PRO_KEY)).toBeNull();
+    expect(q('pro-dev-activate')).not.toBeNull(); // re-rendered by itself
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

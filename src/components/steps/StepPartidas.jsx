@@ -15,7 +15,9 @@ export default function StepPartidas({ draft, setDraft, result, showErrors }) {
   const [editing, setEditing] = useState(() => draft.partidas.find((_, i) => !result.partidas[i]?.validation.valid)?.id ?? null);
 
   const update = (id, fn) =>
-    setDraft((d) => ({ ...d, overrides: {}, partidas: d.partidas.map((p) => (p.id === id ? fn(p) : p)) }));
+    // Fixed prices (typed by hand or read from an invoice) are NOT cleared by editing a partida: they belong to the
+    // material, not to the dimensions, and the engine ignores the ones the quote does not use.
+    setDraft((d) => ({ ...d, partidas: d.partidas.map((p) => (p.id === id ? fn(p) : p)) }));
 
   const add = () => {
     if (draft.partidas.length >= MAX_PARTIDAS) return;
@@ -26,7 +28,7 @@ export default function StepPartidas({ draft, setDraft, result, showErrors }) {
 
   const remove = (id) => {
     if (!window.confirm(t('part.confirmDelete'))) return;
-    setDraft((d) => ({ ...d, overrides: {}, partidas: d.partidas.filter((p) => p.id !== id) }));
+    setDraft((d) => ({ ...d, partidas: d.partidas.filter((p) => p.id !== id) }));
     if (editing === id) setEditing(null);
   };
 

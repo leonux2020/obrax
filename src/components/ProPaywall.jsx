@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { FREE_PROJECT_LIMIT, setSimulatedPro } from '../lib/pro.js';
+import { usePro } from '../lib/usePro.js';
 import { Button } from './ui.jsx';
 import BottomSheet from './BottomSheet.jsx';
 import HelmetIcon from './HelmetIcon.jsx';
@@ -28,6 +29,7 @@ const PLANS = [
 export default function ProPaywall({ feature = 'promo', onClose }) {
   const { t } = useI18n();
   const [plan, setPlan] = useState('yearly');
+  const pro = usePro();
 
   return (
     <BottomSheet fullscreen title={t('pro.title')} subtitle={t('pro.subtitle')} onClose={onClose}>
@@ -37,7 +39,13 @@ export default function ProPaywall({ feature = 'promo', onClose }) {
           <span className="rounded-md border border-[#d4af37]/60 px-1.5 text-[11px] font-extrabold tracking-wider">PRO</span>
         </div>
 
-        {feature !== 'promo' && (
+        {pro && (
+          <p role="status" data-testid="pro-active-note" className="mb-4 rounded-xl border border-[#d4af37] px-4 py-3 text-sm font-semibold text-[#e8c35f]">
+            {t('pro.active')}
+          </p>
+        )}
+
+        {feature !== 'promo' && !pro && (
           <p role="status" data-testid="pro-reason" className="mb-4 rounded-xl border border-[#d4af37]/60 px-4 py-3 text-sm font-semibold text-[#e8c35f]">
             {t(`pro.locked.${feature}`, { n: FREE_PROJECT_LIMIT })}
           </p>
@@ -112,16 +120,17 @@ export default function ProPaywall({ feature = 'promo', onClose }) {
           </Button>
           {import.meta.env.DEV && (
             // Development only (dead code in production builds): lets the PRO flows be tried on localhost.
+            // Turning PRO on is immediate for the whole app (usePro) and closes this screen.
             <Button
               variant="ghost"
               className="w-full !border-[#d4af37]/60 text-[#e8c35f]"
-              data-testid="pro-dev-activate"
+              data-testid={pro ? 'pro-dev-deactivate' : 'pro-dev-activate'}
               onClick={() => {
-                setSimulatedPro(true);
-                onClose();
+                setSimulatedPro(!pro);
+                if (!pro) onClose();
               }}
             >
-              {t('pro.devActivate')}
+              {t(pro ? 'pro.devDeactivate' : 'pro.devActivate')}
             </Button>
           )}
           <Button variant="ghost" onClick={onClose} data-testid="pro-back" className="w-full">

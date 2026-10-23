@@ -25,7 +25,8 @@ import {
   saveProfileMeta,
 } from './lib/draft.js';
 import { localUser } from './lib/auth.js';
-import { isPro, projectLimitReached } from './lib/pro.js';
+import { projectLimitReached } from './lib/pro.js';
+import { usePro } from './lib/usePro.js';
 import { usePWA } from './pwa/usePWA.js';
 import RegionSelect from './components/RegionSelect.jsx';
 import Login from './components/Login.jsx';
@@ -82,6 +83,7 @@ function bootProjects(region) {
 
 export default function App() {
   const pwa = usePWA();
+  const pro = usePro();
   const [settings, setSettings] = useState(loadSettings);
   const [user, setUser] = useState(loadUser);
   const [company, setCompany] = useState(loadCompany); // global profile (text); the logo lives in IndexedDB
@@ -252,13 +254,13 @@ export default function App() {
 
   // Freemium gate for new projects: past the free limit the PRO screen opens instead of the form.
   const requestNewProject = useCallback(() => {
-    if (projectLimitReached(projects?.length ?? 0, isPro())) {
+    if (projectLimitReached(projects?.length ?? 0, pro)) {
       setSheet(null);
       setPaywall('projects');
       return;
     }
     setSheet({ type: 'new' });
-  }, [projects]);
+  }, [projects, pro]);
 
   const openPaywall = useCallback((feature = 'promo') => {
     setSheet(null);

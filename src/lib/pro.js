@@ -12,6 +12,20 @@ export const PRO_FEATURES = Object.freeze(['projects', 'ai']);
 // flows can be tried on localhost. A real subscription must replace this with a server-verified entitlement.
 export const SIM_PRO_KEY = 'cp.pro.sim.v1';
 
+const listeners = new Set();
+const notify = () => listeners.forEach((fn) => fn());
+
+/** Subscribe to PRO changes (same tab via setSimulatedPro, other tabs via the storage event). Returns the unsubscribe. */
+export function subscribePro(fn) {
+  listeners.add(fn);
+  const onStorage = (e) => (e.key === null || e.key === SIM_PRO_KEY) && fn();
+  if (typeof window !== 'undefined') window.addEventListener('storage', onStorage);
+  return () => {
+    listeners.delete(fn);
+    if (typeof window !== 'undefined') window.removeEventListener('storage', onStorage);
+  };
+}
+
 export function isPro() {
   if (!import.meta.env.DEV) return false;
   try {
@@ -21,15 +35,16 @@ export function isPro() {
   }
 }
 
-/** Development only (no-op in production builds). */
+/** Development only (no-op in production builds). Notifies every subscriber at once: no reload, no second click. */
 export function setSimulatedPro(on) {
   if (!import.meta.env.DEV) return;
   try {
     if (on) localStorage.setItem(SIM_PRO_KEY, '1');
     else localStorage.removeItem(SIM_PRO_KEY);
   } catch {
-    /* storage unavailable */
+    /* storage unavailable: the flag simply does not stick */
   }
+  notify();
 }
 
 /** True when the free plan cannot create another project (existing ones are never touched). */
