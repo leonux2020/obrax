@@ -108,6 +108,17 @@ export function snapshotCompany(company, logo = '') {
 export const isSnapshotEmpty = (c) => !c || (isCompanyEmpty({ ...c, logo: '' }) && !c.logo);
 
 /**
+ * The company printed on a project's documents (preview + PDF): the project's own snapshot of the profile, except
+ * the contractor's SIGNATURE, which always follows the profile (drawn once at onboarding / settings). Otherwise a
+ * project created before the signature was drawn, or before it was redrawn, would keep printing an empty / old one.
+ */
+export function documentCompany(snapshot, profile) {
+  const own = snapshot || {};
+  const sig = profile?.signature || own.signature || null;
+  return sig === own.signature ? own : { ...own, signature: sig };
+}
+
+/**
  * A project created BEFORE the profile existed has an empty snapshot; it adopts the profile the first
  * time one is saved. A populated snapshot is never overwritten (that is what keeps issued quotes intact).
  */

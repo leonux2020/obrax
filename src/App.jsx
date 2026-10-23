@@ -6,7 +6,7 @@ import { logoStore } from './lib/companyStore.js';
 import { hasIndexedDb } from './lib/db.js';
 import { I18nProvider } from './lib/i18n.jsx';
 import { getRegion, LANGS } from './lib/regions.js';
-import { adoptCompany, newProject, projectTitle, toDayString } from './lib/projects.js';
+import { adoptCompany, documentCompany, newProject, projectTitle, toDayString } from './lib/projects.js';
 import { normalizeLocation } from './lib/ledger.js';
 import { computeAll } from './lib/engine.js';
 import { planningTimeline, pricingTime } from './lib/signature.js';
@@ -88,8 +88,7 @@ function bootProjects(region) {
   return bootPromise;
 }
 
-/** The company printed on a project's documents: its own snapshot, plus the profile's signature when the snapshot has none. */
-const projectCompany = (project, company) => (project.company.signature || !company.signature ? project.company : { ...project.company, signature: company.signature });
+const projectCompany = (project, company) => documentCompany(project.company, company);
 
 export default function App({ splash = SPLASH_TIMING }) {
   const pwa = usePWA();

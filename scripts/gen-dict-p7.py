@@ -59,7 +59,6 @@ T = {
  'fin.profit.desc': ['Tu ganancia sobre costos e imprevistos.', 'Your profit over costs and contingencies.', 'Seu lucro sobre custos e imprevistos.', 'Votre marge sur les coûts et imprévus.', 'Il tuo utile su costi e imprevisti.', 'Ihr Gewinn auf Kosten und Unvorhergesehenes.'],
  'fin.contingencyLine': ['Imprevistos', 'Contingencies', 'Imprevistos', 'Imprévus', 'Imprevisti', 'Unvorhergesehenes'],
  'fin.profitLine': ['Utilidad', 'Profit', 'Lucro', 'Marge', 'Utile', 'Gewinn'],
- 'bd.overhead': ['Gastos generales y utilidad', 'Overheads and profit', 'Despesas gerais e lucro', 'Frais généraux et marge', 'Spese generali e utile', 'Gemeinkosten und Gewinn'],
  # project view
  'pv.budget': ['Presupuesto', 'Budget', 'Orçamento', 'Budget', 'Preventivo', 'Budget'],
  'pv.frozen': ['Cotización congelada', 'Quote frozen', 'Orçamento congelado', 'Devis figé', 'Preventivo bloccato', 'Angebot eingefroren'],

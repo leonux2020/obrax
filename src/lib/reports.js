@@ -7,6 +7,7 @@
 //                      breakdown, waste, leftovers inventory and the internal cost structure.
 
 import { TASKS } from './tasks.js';
+import { roundMoney } from './pricing.js';
 import { chainLabel } from './regions.js';
 import { isSignatureCurrent, normalizeInk } from './signature.js';
 
@@ -58,6 +59,27 @@ export function scopeText(p, t, num) {
   });
 }
 
+/**
+ * The client NEVER sees "Imprevistos" or "Utilidad": their money is absorbed (prorated) into the Materials and
+ * Labor lines in proportion to those two lines, so the rows still add up EXACTLY to the net subtotal.
+ * Rounding is done in the region's currency digits; Labor takes the residual so no cent is ever lost.
+ * Transport and machinery keep their real amounts. The technical report keeps the real, transparent split.
+ * @returns {{key: 'materials'|'labor'|'transport'|'machinery', amount: number}[]}
+ */
+export function clientBreakdownRows(q, region) {
+  const base = q.materials + q.labor;
+  const overhead = roundMoney(q.subtotal - q.materials - q.labor - q.transport - q.machinery, region);
+  const matShare = overhead === 0 ? 0 : roundMoney(base > 0 ? (overhead * q.materials) / base : overhead, region);
+  const materials = roundMoney(q.materials + matShare, region);
+  const labor = roundMoney(q.subtotal - q.transport - q.machinery - materials, region);
+  return [
+    { key: 'materials', amount: materials },
+    { key: 'labor', amount: labor },
+    ...(q.transport > 0 ? [{ key: 'transport', amount: q.transport }] : []),
+    ...(q.machinery > 0 ? [{ key: 'machinery', amount: q.machinery }] : []),
+  ];
+}
+
 /** Client-facing budget. */
 export function buildClientModel({ draft, result, company, region, t, num, date }) {
   const q = result.quote;
@@ -89,14 +111,7 @@ export function buildClientModel({ draft, result, company, region, t, num, date 
     breakdown: draft.showBreakdown
       ? {
           title: t('bd.title'),
-          rows: [
-            { label: t('bd.materials'), amount: q.materials },
-            { label: t('bd.labor'), amount: q.labor },
-            ...(q.transport > 0 ? [{ label: t('bd.transport'), amount: q.transport }] : []),
-            ...(q.machinery > 0 ? [{ label: t('bd.machinery'), amount: q.machinery }] : []),
-            // contingency + profit travel together as one line so the rows still add up to the net subtotal
-            ...(q.contingency + q.profit > 0 ? [{ label: t('bd.overhead'), amount: q.contingency + q.profit }] : []),
-          ],
+          rows: clientBreakdownRows(q, region).map((r) => ({ label: t(`bd.${r.key}`), amount: r.amount })),
         }
       : null,
     signClient: t('com.sign'),

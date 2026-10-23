@@ -325,7 +325,7 @@ describe('contractor signature saved in the profile', () => {
     const rep = read('components/steps/StepReport.jsx');
     expect(rep).toContain('data-testid="contractor-signature-img"');
     expect(rep).toContain('sig-img'); // inverted on the black screen, printed black on paper
-    expect(read('App.jsx')).toMatch(/signature: company\.signature/); // older projects still print the profile's signature
+    expect(read('App.jsx')).toMatch(/documentCompany\(project\.company, company\)/); // the profile's signature is authoritative for every project
   });
 
   // fake canvas: happy-dom has no 2D context
