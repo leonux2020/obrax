@@ -4,13 +4,15 @@
 // renders: otherwise the page boots on an address it does not understand and the user is left on a blank screen.
 //
 //   startDriveRedirect()   -> remembers a random `state` and sends the browser to Google's consent page
-//   consumeOAuthCallback() -> (called in main.jsx, before React) validates `state`, DISCARDS the token (only the
-//                             fact "consent granted" is kept), cleans the address bar and stores a small result
+//   consumeOAuthCallback() -> (called in main.jsx, before React) validates `state`, moves the token to the
+//                             session-only token store (the result record only says "consent granted"), cleans the address bar and stores a small result
 //   peekOAuthResult() / clearOAuthResult() -> the app reads that result once it is mounted
 //
-// Nothing here stores the access token: the app only records that the user agreed.
+// The access token is NEVER left in the address bar or in the stored result: it goes to driveToken.js, which keeps it for
+// this browser session only (memory + sessionStorage) so the silent Drive backup can use it.
 
 import { DRIVE_SCOPE, GOOGLE_CLIENT_ID, requestDriveAccess } from './auth.js';
+import { setDriveToken } from './driveToken.js';
 
 export const OAUTH_KEYS = Object.freeze({ state: 'cp.oauth.state', result: 'cp.oauth.result', setup: 'cp.setup.draft' });
 const STATE_TTL_MS = 10 * 60 * 1000;
@@ -81,7 +83,8 @@ export function consumeOAuthCallback({ loc = typeof location === 'undefined' ? n
   storage?.removeItem?.(OAUTH_KEYS.state);
   const stateOk = Boolean(saved?.state) && saved.state === params.get('state') && now - (saved.at || 0) < STATE_TTL_MS;
   const result = !stateOk ? { kind: 'drive', granted: false, error: 'state' } : hasToken && !params.has('error') ? { kind: 'drive', granted: true } : { kind: 'drive', granted: false, error: 'denied' };
-  // the token itself is dropped here on purpose: only the outcome is kept
+  // the result record keeps only the outcome; the token goes to its own session-only store
+  if (result.granted) setDriveToken(params.get('access_token'), Number(params.get('expires_in')), { storage, now });
   try {
     storage?.setItem(OAUTH_KEYS.result, JSON.stringify(result));
   } catch {

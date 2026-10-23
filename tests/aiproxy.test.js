@@ -353,7 +353,10 @@ describe('GEMINI_API_KEY stays on the server', () => {
     expect(example).not.toMatch(/VITE_GEMINI/i);
     expect(example).toMatch(/GEMINI_API_KEY=\s*$/m); // placeholder only, no real value
     expect(fs.readFileSync(path.join(root, '.gitignore'), 'utf8')).toMatch(/^\.env\.local$/m);
-    expect(Object.values(CSP_DIRECTIVES).flat().join(' ')).not.toMatch(/googleapis|generativelanguage/); // the browser never talks to Google AI
+    const sources = Object.values(CSP_DIRECTIVES).flat();
+    expect(sources.join(' ')).not.toMatch(/generativelanguage/); // the browser never talks to Google AI
+    // the only googleapis.com sources are the Drive v3 REST paths used by the backup (no wildcard, no other API)
+    expect(sources.filter((x) => x.includes('googleapis.com')).sort()).toEqual(['https://www.googleapis.com/drive/', 'https://www.googleapis.com/upload/drive/']);
     expect(CSP_DIRECTIVES['connect-src']).toContain("'self'"); // ...only to our own /api route
   });
 

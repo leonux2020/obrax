@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { regionName } from '../lib/regions.js';
 import { EMPTY_COMPANY } from '../lib/draft.js';
@@ -14,7 +14,7 @@ import SignaturePad from './SignaturePad.jsx';
  *   request (Google's own OAuth consent: this app never has a field for a password) + "Continuar".
  * Later edits do NOT happen here: they live in Ajustes (see ProfileSheet).
  */
-export default function ProfileSetup({ onSave, onChangeRegion = null, requestDrive = connectDrive, returned = null }) {
+export default function ProfileSetup({ onSave, onChangeRegion = null, requestDrive = connectDrive, onDriveConnected = null, returned = null }) {
   const { t, region, lang } = useI18n();
   // `returned`: the answer Google sent back after a full-page redirect ({granted} | {error}); the typed form is restored
   const [form, setForm] = useState(() => ({ ...EMPTY_COMPANY, ...(returned ? takeSetupDraft() : null) }));
@@ -26,6 +26,18 @@ export default function ProfileSetup({ onSave, onChangeRegion = null, requestDri
   const [inked, setInked] = useState(false);
   const pad = useRef(null);
 
+  // Back from Google's consent page (redirect flow): look for an existing backup, same as after the pop-up.
+  const searched = useRef(false);
+  useEffect(() => {
+    if (!returned?.granted || searched.current || !onDriveConnected) return;
+    searched.current = true;
+    setDriveState('searching');
+    Promise.resolve(onDriveConnected())
+      .catch(() => null)
+      .finally(() => setDriveState('ok'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const connectDrive = async () => {
     if (driveState === 'asking') return;
     setDriveState('asking');
@@ -34,6 +46,9 @@ export default function ProfileSetup({ onSave, onChangeRegion = null, requestDri
       await requestDrive();
       takeSetupDraft(); // no redirect happened: the saved copy is not needed
       setDrive(true);
+      setDriveState('searching');
+      // an existing backup of this Google account is restored on the spot (the app then leaves this screen)
+      await Promise.resolve(onDriveConnected?.()).catch(() => null);
       setDriveState('ok');
     } catch (err) {
       if (err?.code === 'redirect') return; // the page is going to Google: keep "waiting"
@@ -134,11 +149,11 @@ export default function ProfileSetup({ onSave, onChangeRegion = null, requestDri
               variant={driveState === 'ok' ? 'ghost' : 'secondary'}
               className="w-full"
               onClick={connectDrive}
-              disabled={driveState === 'asking'}
+              disabled={driveState === 'asking' || driveState === 'searching'}
               data-testid="setup-drive"
               aria-pressed={driveState === 'ok'}
             >
-              {driveState === 'ok' ? `✓ ${t('setup.drive.ok')}` : driveState === 'asking' ? t('setup.drive.asking') : t('setup.drive.connect')}
+              {driveState === 'ok' ? `✓ ${t('setup.drive.ok')}` : driveState === 'asking' ? t('setup.drive.asking') : driveState === 'searching' ? t('setup.drive.searching') : t('setup.drive.connect')}
             </Button>
             {['not_configured', 'offline', 'denied'].includes(driveState) && (
               <p role="status" data-testid="setup-drive-note" data-code={driveState} className="text-sm text-neutral-300">

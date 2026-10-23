@@ -6,6 +6,7 @@
 // in-memory state can write anything back.
 
 import { DB_NAME } from './db.js';
+import { clearDriveToken } from './driveToken.js';
 
 const attempt = async (fn) => {
   try {
@@ -51,6 +52,7 @@ export async function wipeLocalData({
   google = typeof window === 'undefined' ? null : window.google,
 } = {}) {
   const storage = await attempt(() => {
+    clearDriveToken({ storage: session }); // the in-memory copy of the Drive token too
     local?.clear();
     session?.clear();
   });

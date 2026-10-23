@@ -189,8 +189,9 @@ describe('Google login on the main access screen (VITE_GOOGLE_CLIENT_ID)', () =>
     expect(q('settings-account').textContent).toContain('ana@example.com');
   });
 
-  it('Ajustes has a red "Cerrar sesión" button; confirming erases the device and goes back to the start', async () => {
+  it('Ajustes has a red "Cerrar sesión" button; without a cloud backup, confirming erases the device and goes back to the start', async () => {
     seed();
+    localStorage.setItem('cp.profile.v1', JSON.stringify({ onboarded: true, drive: false })); // Drive backup off
     sessionStorage.setItem('cp.oauth.result', 'token-ish');
     localStorage.setItem('cp.pro.sim.v1', '1');
     localStorage.setItem('cp.draft.v2', '{"x":1}');
@@ -203,7 +204,7 @@ describe('Google login on the main access screen (VITE_GOOGLE_CLIENT_ID)', () =>
     expect(q('logout-warning')).toBeNull();
     await click(btn); // first tap only asks: it cannot be undone
     expect(out).not.toHaveBeenCalled();
-    expect(q('logout-warning')).not.toBeNull();
+    expect(q('logout-warning').textContent).toContain('No se puede deshacer');
     expect(localStorage.getItem('cp.user.v1')).not.toBeNull();
     await click(q('logout-cancel')); // cancelling keeps everything
     expect(q('logout-button')).not.toBeNull();
@@ -215,6 +216,19 @@ describe('Google login on the main access screen (VITE_GOOGLE_CLIENT_ID)', () =>
     expect(out).toHaveBeenCalledTimes(1);
     expect(localStorage.length).toBe(0); // user, settings, company, profile, draft, PRO simulation: all gone
     expect(sessionStorage.length).toBe(0); // OAuth state / result too
+  });
+
+  it('with the Drive backup on and no way to reach Drive, Cerrar sesión erases NOTHING (see driveapp-backup.test.js for the full cycle)', async () => {
+    seed(); // Drive backup is on by default and the fake Google has no token client
+    const out = vi.fn();
+    await mountApp({ onSignedOut: out });
+    await click(tab('Ajustes'));
+    await click(q('logout-button'));
+    await click(q('logout-confirm'));
+    await flush(80);
+    expect(out).not.toHaveBeenCalled();
+    expect(localStorage.getItem('cp.company.v1')).not.toBeNull();
+    expect(q('logout-force')).not.toBeNull();
   });
 });
 

@@ -29,7 +29,11 @@ import {
   loadProfileMeta,
   saveProfileMeta,
 } from './lib/draft.js';
-import { localUser } from './lib/auth.js';
+import { ensureDriveToken, googleConfigured, localUser } from './lib/auth.js';
+import { clearDriveToken, getDriveToken, isDriveLinked } from './lib/driveToken.js';
+import { createDriveClient } from './lib/drive.js';
+import { createDriveSync } from './lib/driveSync.js';
+import { collectBackup, isDeviceEmpty, parseBackup, restoreBackup } from './lib/backup.js';
 import { projectLimitReached } from './lib/pro.js';
 import { usePro } from './lib/usePro.js';
 import { usePWA } from './pwa/usePWA.js';
@@ -48,6 +52,7 @@ import { clearOAuthResult, peekOAuthResult } from './lib/oauthCallback.js';
 import SplashScreen, { SPLASH_TIMING } from './components/SplashScreen.jsx';
 import ProfileSetup from './components/ProfileSetup.jsx';
 import ProPaywall from './components/ProPaywall.jsx';
+import RestoreScreen from './components/RestoreScreen.jsx';
 
 // Loads the saved projects and performs the one-off migration of the pre-dashboard single draft.
 // It is shared (one in-flight promise) so React StrictMode's double effect — or a quick remount —
@@ -126,12 +131,52 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   const activeRef = useRef(null);
   const wipingRef = useRef(false); // true while signing out: nothing may be written back to the (erased) device
   activeRef.current = active;
+  const [restoring, setRestoring] = useState(false); // reading the Drive backup before the Dashboard is shown
+  const latest = useRef(null); // the CURRENT state, read by the backup engine and the restore
+  latest.current = { settings, company, meta, logo, projects };
+  const backupOn = googleConfigured && meta.drive;
+  const backupOnRef = useRef(false);
+  backupOnRef.current = backupOn && !wipingRef.current;
+
+  // ---- Google Drive backup (silent) ---------------------------------------------------------------------------
+  const driveClient = useMemo(() => createDriveClient({ getToken: async () => getDriveToken(), onAuthRejected: () => clearDriveToken() }), []);
+  const sync = useMemo(
+    () =>
+      createDriveSync({
+        client: driveClient,
+        collect: () => collectBackup({ ...latest.current, projects: latest.current.projects || [], loadPhotos: (id) => photoStoreFor(id).load().catch(() => []) }),
+        // in the background Google is only asked (silently) when this device has been connected before
+        ensureToken: ({ interactive }) => (interactive || isDriveLinked() ? ensureDriveToken({ interactive }) : Promise.resolve(getDriveToken())),
+        isEnabled: () => backupOnRef.current,
+      }),
+    [driveClient]
+  );
+  const [backup, setBackup] = useState(() => sync.getState());
+  useEffect(() => sync.subscribe(setBackup), [sync]);
 
   useEffect(() => saveSettings(settings), [settings]);
   useEffect(() => saveUser(user), [user]);
   useEffect(() => saveCompany(company), [company]);
   useEffect(() => saveProfileMeta(meta), [meta]);
   useEffect(() => clearOAuthResult(), []); // the answer is consumed once
+  // Every change of projects / profile / settings / backup preference queues a silent Drive backup.
+  const syncReady = useRef(false);
+  useEffect(() => {
+    if (projects === null) return;
+    if (!syncReady.current) {
+      syncReady.current = true; // the first load is not a change; just resume anything left pending
+      sync.resume();
+      return;
+    }
+    if (!wipingRef.current) sync.markDirty();
+  }, [projects, company, settings, meta, logo, sync]);
+  const changePhotos = useCallback(
+    (next) => {
+      setPhotos(next);
+      if (!wipingRef.current) sync.markDirty();
+    },
+    [sync]
+  );
   useEffect(() => {
     document.documentElement.lang = settings.lang;
   }, [settings.lang]);
@@ -296,16 +341,6 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   );
 
   const changeLang = useCallback((lang) => LANGS.includes(lang) && setSettings((s) => ({ ...s, lang })), []);
-  // Successful sign-in (Google or local profile): the user is stored (effect above), and we land on the
-  // main view: no splash, no open sheet, no pending region picker.
-  const signIn = useCallback((u) => {
-    setUser(u);
-    setSheet(null);
-    setPickingRegion(false);
-    setStage('app');
-    window.scrollTo({ top: 0 });
-  }, []);
-
   // Freemium gate for new projects: past the free limit the PRO screen opens instead of the form.
   const requestNewProject = useCallback(() => {
     if (projectLimitReached(projects?.length ?? 0, pro)) {
@@ -321,14 +356,83 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     setPaywall(feature);
   }, []);
 
-  // Sign out = deep clean (storage, IndexedDB, Google session) and a full reload onto the opening screen, so no
-  // in-memory state can write anything back. A new installation-like start: splash -> setup -> dashboard.
-  const logout = useCallback(async () => {
-    if (wipingRef.current) return;
-    wipingRef.current = true;
-    await wipeLocalData();
-    onSignedOut();
-  }, [onSignedOut]);
+  // Sign out = deep clean (storage, IndexedDB, Google session) and a full reload onto the opening screen. With the
+  // Drive backup on, the CURRENT state is first uploaded and the sign-out only goes on once Drive has it: if it
+  // cannot be confirmed nothing is erased and the caller is told why ({ ok: false, reason }). `force` = the user
+  // explicitly chose to leave without the backup.
+  const logout = useCallback(
+    async ({ force = false } = {}) => {
+      if (wipingRef.current) return { ok: true };
+      if (backupOnRef.current && !force) {
+        const r = await sync.flush({ force: true, interactive: true });
+        if (!r.ok) return r;
+      }
+      wipingRef.current = true;
+      sync.cancel();
+      await wipeLocalData();
+      onSignedOut();
+      return { ok: true };
+    },
+    [sync, onSignedOut]
+  );
+
+  // ---- restore from Drive --------------------------------------------------------------------------------------
+  // Reads the newest backup of the CUBRAX folder and merges it into the device (projects: newest wins; profile and
+  // settings only fill an empty device), writes IndexedDB and then updates the screen state.
+  const restoreFromDrive = useCallback(
+    async ({ interactive = false } = {}) => {
+      const token = await ensureDriveToken({ interactive });
+      if (!token) return { ok: false, reason: 'auth' };
+      try {
+        const found = await driveClient.latestBackup(parseBackup);
+        if (!found) return { ok: true, restored: false };
+        const local = latest.current;
+        const merged = await restoreBackup({ ...local, projects: local.projects || [] }, found.value, { projectStore, photoStoreFor, logoStore });
+        setProjects(merged.projects);
+        if (merged.profileRestored) {
+          setCompany(merged.company);
+          setLogo(merged.logo);
+          setSettings(merged.settings);
+          setMeta(merged.meta);
+        } else setMeta((m) => (m.drive ? m : { ...m, drive: true }));
+        return { ok: true, restored: true, profile: merged.profileRestored, company: merged.company, projects: merged.wonProjects.length };
+      } catch (err) {
+        return { ok: false, reason: err?.code || 'error' };
+      }
+    },
+    [driveClient]
+  );
+  // First-run setup connected Drive: if this Google account already has a backup, it is restored and the user lands
+  // on the Dashboard with everything back (nothing to type).
+  const onDriveConnected = useCallback(async () => {
+    if (!isDeviceEmpty(latest.current)) return { ok: true, restored: false };
+    const r = await restoreFromDrive();
+    if (r.ok && r.restored && r.profile) {
+      setUser((u) => u || localUser(r.company.proName || r.company.name));
+      setStage('app');
+      setSheet(null);
+    }
+    return r;
+  }, [restoreFromDrive]);
+  // Successful sign-in (Google or local profile): the user is stored (effect above), and we land on the
+  // main view: no splash, no open sheet, no pending region picker.
+  const signIn = useCallback(
+    (u) => {
+      setUser(u);
+      setSheet(null);
+      setPickingRegion(false);
+      setStage('app');
+      window.scrollTo({ top: 0 });
+      // Google on a new device / after signing out: look for the backup in Drive BEFORE the Dashboard is shown.
+      if (u.provider === 'google' && googleConfigured && isDeviceEmpty(latest.current)) {
+        setRestoring(true);
+        restoreFromDrive({ interactive: true })
+          .catch(() => null)
+          .finally(() => setRestoring(false));
+      }
+    },
+    [restoreFromDrive]
+  );
 
   const returning = meta.onboarded || !isCompanyEmpty(company);
   // "Iniciar": a returning user goes straight on; a new one gets the single setup screen, with the country,
@@ -346,7 +450,9 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
 
   return (
     <I18nProvider lang={settings.lang} regionCode={active ? active.draft.regionCode : settings.region}>
-      {stage === 'splash' ? (
+      {restoring ? (
+        <RestoreScreen />
+      ) : stage === 'splash' ? (
         <SplashScreen onStart={start} auto={Boolean(user) || returning || Boolean(oauth)} timing={splash} />
       ) : stage === 'setup' ? (
         !region || pickingRegion ? (
@@ -357,7 +463,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
             onCancel={region ? () => setPickingRegion(false) : () => setStage('splash')}
           />
         ) : (
-          <ProfileSetup onSave={finishSetup} onChangeRegion={() => setPickingRegion(true)} returned={oauth} />
+          <ProfileSetup onSave={finishSetup} onChangeRegion={() => setPickingRegion(true)} returned={oauth} onDriveConnected={onDriveConnected} />
         )
       ) : !region || pickingRegion ? (
         <RegionSelect
@@ -380,7 +486,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
                 draft={active.draft}
                 setDraft={setDraft}
                 photos={photos}
-                setPhotos={setPhotos}
+                setPhotos={changePhotos}
                 company={projectCompany(active, company)}
                 startDate={active.startDate}
                 endDate={active.endDate}
@@ -398,7 +504,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
                 setProject={setProject}
                 setDraft={setDraft}
                 photos={photos}
-                setPhotos={setPhotos}
+                setPhotos={changePhotos}
                 company={projectCompany(active, company)}
                 onBack={closeProject}
                 onEdit={() => setSheet({ type: 'edit', id: active.id })}
@@ -451,6 +557,13 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
                 setSheet(null);
                 setPickingRegion(true);
               }}
+              backup={{ configured: googleConfigured, enabled: backupOn, state: backup }}
+              onBackupNow={async () => {
+                const r = await sync.flush({ force: true, interactive: true });
+                if (r.ok) setMeta((m) => (m.drive ? m : { ...m, drive: true }));
+                return r;
+              }}
+              onRestore={() => restoreFromDrive({ interactive: true })}
               onLogout={logout}
               onClose={() => setSheet(null)}
             />

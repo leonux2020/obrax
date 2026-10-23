@@ -5,6 +5,7 @@
 // (signature, aud, iss, exp) before you trust it for anything beyond showing the user's name.
 
 import { sanitizeText, sanitizeEmail, sanitizeAvatarUrl } from './sanitize.js';
+import { getDriveToken, setDriveToken } from './driveToken.js';
 
 export const GOOGLE_CLIENT_ID = String(import.meta.env?.VITE_GOOGLE_CLIENT_ID || '').trim();
 export const googleConfigured = /^[\w-]+\.apps\.googleusercontent\.com$/.test(GOOGLE_CLIENT_ID);
@@ -74,9 +75,9 @@ const driveError = (code) => Object.assign(new Error(`drive:${code}`), { code })
 /**
  * Ask Google (consent pop-up of Google Identity Services) for access to the app's own Drive folder.
  * Resolves { granted: true } only when Google confirms the scope; rejects with an Error whose `code` is
- * 'not_configured' | 'offline' | 'denied' | 'popup' (the pop-up could not open). The access token itself is not kept: this step records the consent.
+ * 'not_configured' | 'offline' | 'denied' | 'popup' (the pop-up could not open). The access token is kept for this browser session only (driveToken.js), never persisted: it is what the silent backup uses.
  */
-export async function requestDriveAccess({ clientId = GOOGLE_CLIENT_ID, enabled = googleConfigured, load = loadGsi } = {}) {
+export async function requestDriveAccess({ clientId = GOOGLE_CLIENT_ID, enabled = googleConfigured, load = loadGsi, prompt = '' } = {}) {
   if (!enabled) throw driveError('not_configured');
   let google;
   try {
@@ -92,12 +93,30 @@ export async function requestDriveAccess({ clientId = GOOGLE_CLIENT_ID, enabled 
       scope: DRIVE_SCOPE,
       callback: (resp) => {
         const ok = resp?.access_token && !resp.error && (typeof oauth.hasGrantedAllScopes !== 'function' || oauth.hasGrantedAllScopes(resp, DRIVE_SCOPE));
-        if (ok) resolve({ granted: true });
-        else reject(driveError('denied'));
+        if (ok) {
+          setDriveToken(resp.access_token, resp.expires_in); // kept for this session only: it is what the silent backup uses
+          resolve({ granted: true });
+        } else reject(driveError('denied'));
       },
       // the pop-up could not open (blocked, in-app browser): the caller falls back to a full-page redirect
       error_callback: (e) => reject(driveError(e?.type === 'popup_failed_to_open' ? 'popup' : 'denied')),
     });
-    client.requestAccessToken({ prompt: '' });
+    client.requestAccessToken({ prompt });
   });
+}
+
+/**
+ * A valid Drive token for the silent backup / restore. Uses the one already held; otherwise asks Google:
+ * `interactive: false` never shows a screen (works only while Google still remembers the consent, else resolves
+ * null), `interactive: true` may open the consent pop-up (call it from a tap). Never throws.
+ */
+export async function ensureDriveToken({ interactive = false, request = requestDriveAccess } = {}) {
+  const held = getDriveToken();
+  if (held) return held;
+  try {
+    await request({ prompt: interactive ? '' : 'none' });
+  } catch {
+    return null;
+  }
+  return getDriveToken();
 }

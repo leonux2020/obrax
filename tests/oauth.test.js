@@ -7,6 +7,7 @@ import { createRoot } from 'react-dom/client';
 import App from '../src/App.jsx';
 import { OAUTH_KEYS, consumeOAuthCallback, startDriveRedirect, connectDrive, peekOAuthResult, clearOAuthResult, saveSetupDraft, takeSetupDraft } from '../src/lib/oauthCallback.js';
 import { DRIVE_SCOPE } from '../src/lib/auth.js';
+import { getDriveToken, clearDriveToken } from '../src/lib/driveToken.js';
 import { loadProfileMeta } from '../src/lib/draft.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -49,13 +50,16 @@ describe('consumeOAuthCallback', () => {
     expect(hist.replaceState).not.toHaveBeenCalled();
   });
 
-  it('a valid token answer: outcome kept, token dropped, address cleaned, state used once', () => {
+  it('a valid token answer: outcome kept, token only in the session token store, address cleaned, state used once', () => {
     const { storage, hist, state } = setup();
     const res = consumeOAuthCallback({ loc: loc(`#access_token=SECRET-TOKEN&token_type=Bearer&expires_in=3599&state=${state}&scope=x`), hist, storage, now: 2000 });
     expect(res).toEqual({ kind: 'drive', granted: true });
     expect(hist.replaceState).toHaveBeenCalledWith(null, '', '/');
     expect(storage.getItem(OAUTH_KEYS.state)).toBeNull();
-    expect(JSON.stringify([...storage.m])).not.toContain('SECRET-TOKEN');
+    expect(storage.getItem(OAUTH_KEYS.result)).not.toContain('SECRET-TOKEN'); // the stored outcome never carries it
+    expect(JSON.stringify([...storage.m].filter(([k]) => k !== 'cp.drive.token.v1'))).not.toContain('SECRET-TOKEN');
+    expect(getDriveToken({ storage, now: 2000 })).toBe('SECRET-TOKEN'); // session-only, for the silent backup
+    clearDriveToken({ storage });
     expect(peekOAuthResult(storage)).toEqual({ kind: 'drive', granted: true, error: '' });
     clearOAuthResult(storage);
     expect(peekOAuthResult(storage)).toBeNull();

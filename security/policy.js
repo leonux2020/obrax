@@ -9,7 +9,8 @@ export const CSP_DIRECTIVES = {
   'style-src': ["'self'", 'https://accounts.google.com/gsi/style'],
   'img-src': ["'self'", 'data:', 'blob:', 'https://*.googleusercontent.com'],
   'font-src': ["'self'"],
-  'connect-src': ["'self'", 'https://accounts.google.com/gsi/'],
+  // Drive backup: ONLY the Drive v3 REST paths (metadata + upload); the browser still never talks to Google AI.
+  'connect-src': ["'self'", 'https://accounts.google.com/gsi/', 'https://www.googleapis.com/drive/', 'https://www.googleapis.com/upload/drive/'],
   'frame-src': ['https://accounts.google.com/gsi/'],
   'manifest-src': ["'self'"],
   'worker-src': ["'self'"],
