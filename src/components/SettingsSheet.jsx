@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { regionName } from '../lib/regions.js';
 import { googleConfigured } from '../lib/auth.js';
@@ -9,6 +10,8 @@ import LangSelect from './LangSelect.jsx';
 /** Language, default country for new projects, PWA install and local profile switch. */
 export default function SettingsSheet({ user, company, logo, regionCode, pwa, drive, onDriveChange, onEditProfile, onSignIn, onChangeLang, onChangeRegion, onLogout, onClose }) {
   const { t, lang, region } = useI18n();
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
   const shown = regionCode ? { flag: region?.flag, name: region ? regionName(region, lang) : '' } : null;
   return (
     <BottomSheet title={t('settings.title')} onClose={onClose}>
@@ -63,15 +66,49 @@ export default function SettingsSheet({ user, company, logo, regionCode, pwa, dr
               <span className="block truncate font-semibold">{user.name}</span>
               {user.email && <span className="block truncate text-sm text-neutral-400">{user.email}</span>}
             </span>
-            <button type="button" onClick={onLogout} className="min-h-[44px] shrink-0 rounded-lg border border-white/10 px-3 text-sm font-bold hover:border-red-500">
-              {t('login.switch')}
-            </button>
           </div>
           {user.provider !== 'google' && googleConfigured && (
             <div className="mt-3 rounded-xl border border-white/10 p-3" data-testid="settings-google-link">
               <p className="mb-2 text-center text-sm text-neutral-300">{t('settings.account.link')}</p>
               <GoogleButton onUser={onSignIn} />
             </div>
+          )}
+        </div>
+
+        {/* Sign out = deep clean of this device (see lib/session.js); it asks once because it cannot be undone. */}
+        <div className="border-t border-white/10 pt-5">
+          {confirming && (
+            <p className="mb-3 rounded-xl border border-red-500/40 px-4 py-3 text-sm text-red-300" role="alert" data-testid="logout-warning">
+              {t('settings.logout.warn')}
+            </p>
+          )}
+          {confirming ? (
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="ghost" onClick={() => setConfirming(false)} disabled={busy} data-testid="logout-cancel">
+                {t('common.cancel')}
+              </Button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setBusy(true);
+                  onLogout();
+                }}
+                data-testid="logout-confirm"
+                className="min-h-[52px] rounded-xl bg-red-600 px-3 text-sm font-bold text-white transition hover:bg-red-500 active:scale-[0.98] disabled:opacity-60"
+              >
+                {busy ? t('settings.logout.working') : t('settings.logout.confirm')}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirming(true)}
+              data-testid="logout-button"
+              className="min-h-[52px] w-full rounded-xl bg-red-600 text-base font-bold text-white transition hover:bg-red-500 active:scale-[0.98]"
+            >
+              {t('settings.logout')}
+            </button>
           )}
         </div>
       </div>

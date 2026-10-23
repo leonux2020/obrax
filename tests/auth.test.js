@@ -42,12 +42,12 @@ beforeAll(async () => {
   App = (await import('../src/App.jsx')).default; // imported AFTER the stub: auth.js reads the env at load time
 });
 
-const mountApp = async () => {
+const mountApp = async (props = {}) => {
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
   await act(async () => {
-    root.render(React.createElement(App, { splash: { hold: 0, fade: 0 } }));
+    root.render(React.createElement(App, { splash: { hold: 0, fade: 0 }, ...props }));
     await new Promise((r) => setTimeout(r, 40));
   });
 };
@@ -176,7 +176,7 @@ describe('Google login on the main access screen (VITE_GOOGLE_CLIENT_ID)', () =>
     }
   });
 
-  it('a local user can link a Google account from Ajustes; logging out returns to the access screen', async () => {
+  it('a local user can link a Google account from Ajustes', async () => {
     seed();
     await mountApp();
     await click(tab('Ajustes'));
@@ -187,9 +187,34 @@ describe('Google login on the main access screen (VITE_GOOGLE_CLIENT_ID)', () =>
     await click(tab('Ajustes'));
     expect(q('settings-google-link')).toBeNull();
     expect(q('settings-account').textContent).toContain('ana@example.com');
-    await click([...q('settings-account').querySelectorAll('button')].find((b) => b.textContent.trim()));
-    expect(q('splash')).toBeNull(); // signed out: straight to the access screen, no re-registration
-    expect(q('login-google-card')).not.toBeNull();
+  });
+
+  it('Ajustes has a red "Cerrar sesión" button; confirming erases the device and goes back to the start', async () => {
+    seed();
+    sessionStorage.setItem('cp.oauth.result', 'token-ish');
+    localStorage.setItem('cp.pro.sim.v1', '1');
+    localStorage.setItem('cp.draft.v2', '{"x":1}');
+    const out = vi.fn();
+    await mountApp({ onSignedOut: out });
+    await click(tab('Ajustes'));
+    const btn = q('logout-button');
+    expect(btn.textContent.trim()).toBe('Cerrar sesión');
+    expect(btn.className).toMatch(/bg-red-/);
+    expect(q('logout-warning')).toBeNull();
+    await click(btn); // first tap only asks: it cannot be undone
+    expect(out).not.toHaveBeenCalled();
+    expect(q('logout-warning')).not.toBeNull();
+    expect(localStorage.getItem('cp.user.v1')).not.toBeNull();
+    await click(q('logout-cancel')); // cancelling keeps everything
+    expect(q('logout-button')).not.toBeNull();
+    expect(localStorage.getItem('cp.user.v1')).not.toBeNull();
+
+    await click(q('logout-button'));
+    await click(q('logout-confirm'));
+    await flush(80);
+    expect(out).toHaveBeenCalledTimes(1);
+    expect(localStorage.length).toBe(0); // user, settings, company, profile, draft, PRO simulation: all gone
+    expect(sessionStorage.length).toBe(0); // OAuth state / result too
   });
 });
 

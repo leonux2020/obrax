@@ -6,6 +6,7 @@ import { logoStore } from './lib/companyStore.js';
 import { hasIndexedDb } from './lib/db.js';
 import { I18nProvider } from './lib/i18n.jsx';
 import { getRegion, LANGS } from './lib/regions.js';
+import { wipeLocalData } from './lib/session.js';
 import { adoptCompany, documentCompany, newProject, projectTitle, toDayString } from './lib/projects.js';
 import { normalizeLocation } from './lib/ledger.js';
 import { computeAll } from './lib/engine.js';
@@ -88,9 +89,12 @@ function bootProjects(region) {
   return bootPromise;
 }
 
+/** Back to the opening screen with a clean page load (the app lives at the site root). */
+const goToStart = () => window.location.replace(import.meta.env?.BASE_URL || '/');
+
 const projectCompany = (project, company) => documentCompany(project.company, company);
 
-export default function App({ splash = SPLASH_TIMING }) {
+export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart }) {
   const pwa = usePWA();
   const pro = usePro();
   const [settings, setSettings] = useState(loadSettings);
@@ -120,6 +124,7 @@ export default function App({ splash = SPLASH_TIMING }) {
   const region = getRegion(settings.region);
   const active = useMemo(() => projects?.find((p) => p.id === activeId) ?? null, [projects, activeId]);
   const activeRef = useRef(null);
+  const wipingRef = useRef(false); // true while signing out: nothing may be written back to the (erased) device
   activeRef.current = active;
 
   useEffect(() => saveSettings(settings), [settings]);
@@ -148,11 +153,11 @@ export default function App({ splash = SPLASH_TIMING }) {
   // ---- persistence of the open project (debounced) + flush when the page is hidden --------------------
   useEffect(() => {
     if (!active) return undefined;
-    const id = setTimeout(() => projectStore.save(active).catch(() => {}), 250);
+    const id = setTimeout(() => !wipingRef.current && projectStore.save(active).catch(() => {}), 250);
     return () => clearTimeout(id);
   }, [active]);
   useEffect(() => {
-    const flush = () => activeRef.current && projectStore.save(activeRef.current).catch(() => {});
+    const flush = () => activeRef.current && !wipingRef.current && projectStore.save(activeRef.current).catch(() => {});
     window.addEventListener('pagehide', flush);
     return () => window.removeEventListener('pagehide', flush);
   }, []);
@@ -316,13 +321,14 @@ export default function App({ splash = SPLASH_TIMING }) {
     setPaywall(feature);
   }, []);
 
-  const logout = useCallback(() => {
-    closeProject();
-    setSheet(null);
-    setPaywall(null);
-    setUser(null);
-    setStage('app'); // signed out: the sign-in screen (the opening screen is only for opening the app)
-  }, [closeProject]);
+  // Sign out = deep clean (storage, IndexedDB, Google session) and a full reload onto the opening screen, so no
+  // in-memory state can write anything back. A new installation-like start: splash -> setup -> dashboard.
+  const logout = useCallback(async () => {
+    if (wipingRef.current) return;
+    wipingRef.current = true;
+    await wipeLocalData();
+    onSignedOut();
+  }, [onSignedOut]);
 
   const returning = meta.onboarded || !isCompanyEmpty(company);
   // "Iniciar": a returning user goes straight on; a new one gets the single setup screen, with the country,
