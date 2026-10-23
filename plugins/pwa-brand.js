@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { buildIconSvg, buildManifest, PNG_ICONS, BRAND } from '../src/brand/icon.js';
+import { buildIconSvg, buildLockupSvg, buildManifest, PNG_ICONS, LOGO_FILE, BRAND } from '../src/brand/icon.js';
 import { CSP_META, buildHeadersFile } from '../security/policy.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -65,6 +65,10 @@ export default function pwaBrand() {
               res.setHeader('Content-Type', 'image/svg+xml');
               return res.end(buildIconSvg());
             }
+            if (url === `/${LOGO_FILE}`) {
+              res.setHeader('Content-Type', 'image/png');
+              return res.end(await renderPng(buildLockupSvg(), 1024));
+            }
             const def = PNG_ICONS.find((p) => `/${p.file}` === url);
             if (def) {
               res.setHeader('Content-Type', 'image/png');
@@ -119,6 +123,7 @@ export default function pwaBrand() {
         for (const def of PNG_ICONS) {
           fs.writeFileSync(path.join(outDir, def.file), await getPng(def));
         }
+        fs.writeFileSync(path.join(outDir, LOGO_FILE), await renderPng(buildLockupSvg(), 1024));
         fs.writeFileSync(path.join(outDir, '_headers'), buildHeadersFile());
 
         // Precache list + content-hash version => atomic, offline-safe updates.

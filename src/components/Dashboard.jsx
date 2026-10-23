@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { isClosed, projectLevel, sortProjects } from '../lib/projects.js';
 import { usePro } from '../lib/usePro.js';
-import { Logo } from './ui.jsx';
+import { Logo, Wordmark } from './ui.jsx';
 import HelmetIcon from './HelmetIcon.jsx';
 import { LEVEL_COLOR } from './levelStyle.js';
 import ProjectCard from './ProjectCard.jsx';
@@ -60,8 +60,11 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro }
   return (
     <main className="mx-auto w-full max-w-3xl px-3 pb-44 pt-3 sm:px-4">
       <header className="mb-3 flex items-center gap-3">
-        <Logo size={34} />
-        <h1 className="min-w-0 flex-1 truncate text-2xl font-extrabold tracking-tight">{t('nav.projects')}</h1>
+        <Logo size={54} />
+        <div className="min-w-0 flex-1">
+          <Wordmark height={11} className="mb-1 opacity-90" />
+          <h1 className="truncate text-2xl font-extrabold tracking-tight">{t('nav.projects')}</h1>
+        </div>
         {/* PRO: always a real button that opens the plans screen (also when PRO is already active). Gold hard hat on top. */}
         <button
           type="button"

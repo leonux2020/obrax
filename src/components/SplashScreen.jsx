@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
-import { Button, Logo } from './ui.jsx';
+import { Button, Logo, Wordmark } from './ui.jsx';
 import InstallButton from './InstallButton.jsx';
 
 /** How long the opening screen is held and how long its fade-out lasts (ms). */
 export const SPLASH_TIMING = Object.freeze({ hold: 1500, fade: 450 });
 
 /**
- * Opening screen: ONLY the logo, the name CUBRAX right under it and "Un producto Japadigital". It is ALWAYS shown when the app opens.
+ * Opening screen: ONLY the hard-hat logo, the CUBRAX lettering (green X) right under it and "Un producto Japadigital". It is ALWAYS shown when the app opens.
  *  - `auto` (the user already has a profile or a session): it holds for `hold` ms, fades out and calls `onStart`,
  *    so the Dashboard (or the sign-in screen) appears by itself.
  *  - otherwise (first run): the one "Iniciar" button (bottom third, thumb reach) starts the setup.
@@ -43,9 +43,10 @@ export default function SplashScreen({ onStart, auto = false, timing = SPLASH_TI
       data-testid="splash"
       data-leaving={leaving ? 'true' : undefined}
     >
-      <Logo size={132} />
-      <h1 data-testid="splash-name" className="mt-6 w-full text-center text-3xl font-semibold uppercase tracking-[0.35em] text-white [padding-left:0.35em]">
-        {t('app.name')}
+      <Logo size={248} />
+      <h1 data-testid="splash-name" className="mt-8 flex w-full justify-center text-center">
+        <span className="sr-only">{t('app.name')}</span>
+        <Wordmark height={40} />
       </h1>
 
       <div className="fixed inset-x-0 bottom-0 z-40 px-6 [padding-bottom:max(1.5rem,env(safe-area-inset-bottom))]">

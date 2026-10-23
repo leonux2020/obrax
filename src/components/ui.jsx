@@ -1,17 +1,29 @@
 import { useEffect, useId, useState } from 'react';
-import { ICON_DATA_URI } from '../brand/icon.js';
+import { LETTER_PATHS, MARK_DATA_URI, MARK_RATIO, WORD, WORD_BOX, BRAND } from '../brand/icon.js';
 import { sanitizeNumericText, parseDecimal } from '../lib/sanitize.js';
 
+/** The CUBRAX hard hat (3/4 view, vector, transparent): `size` is its width in px. */
 export function Logo({ size = 40, className = '' }) {
   return (
     <img
-      src={ICON_DATA_URI}
+      src={MARK_DATA_URI}
       width={size}
-      height={size}
+      height={Math.round(size * MARK_RATIO)}
       alt=""
       draggable="false"
-      className={`select-none rounded-xl ${className}`}
+      className={`select-none ${className}`}
     />
+  );
+}
+
+/** The CUBRAX lettering (technological monoline, green X). Decorative: put the accessible name next to it. */
+export function Wordmark({ height = 28, className = '' }) {
+  return (
+    <svg viewBox={`0 0 ${WORD_BOX.w} ${WORD_BOX.h}`} height={height} width={Math.round((height * WORD_BOX.w) / WORD_BOX.h)} aria-hidden="true" focusable="false" className={className} data-testid="wordmark">
+      {[...WORD].map((c, i) => (
+        <path key={c} d={LETTER_PATHS[c]} transform={`translate(${i * 72 + 2} 0)`} fill="none" stroke={c === 'X' ? BRAND.green : '#ffffff'} strokeWidth="12" strokeLinejoin="miter" strokeLinecap="square" />
+      ))}
+    </svg>
   );
 }
 
