@@ -43,7 +43,7 @@ import BottomNav from './components/BottomNav.jsx';
 import ProjectSheet from './components/ProjectSheet.jsx';
 import SettingsSheet from './components/SettingsSheet.jsx';
 import ProfileSheet from './components/ProfileSheet.jsx';
-import SplashScreen from './components/SplashScreen.jsx';
+import SplashScreen, { SPLASH_TIMING } from './components/SplashScreen.jsx';
 import ProfileSetup from './components/ProfileSetup.jsx';
 import ProPaywall from './components/ProPaywall.jsx';
 
@@ -90,7 +90,7 @@ function bootProjects(region) {
 /** The company printed on a project's documents: its own snapshot, plus the profile's signature when the snapshot has none. */
 const projectCompany = (project, company) => (project.company.signature || !company.signature ? project.company : { ...project.company, signature: company.signature });
 
-export default function App() {
+export default function App({ splash = SPLASH_TIMING }) {
   const pwa = usePWA();
   const pro = usePro();
   const [settings, setSettings] = useState(loadSettings);
@@ -103,7 +103,7 @@ export default function App() {
   // The welcome screen ('splash') is ALWAYS the first view of a new or signed-out user (nobody authenticated);
   // a stored user goes straight to the app. 'setup' is the registration (first run), 'app' shows Login when
   // there is no user.
-  const [stage, setStage] = useState(() => (user ? 'app' : 'splash'));
+  const [stage, setStage] = useState('splash'); // the opening screen is ALWAYS the first thing shown
   const [sheet, setSheet] = useState(null); // { type: 'new' | 'edit' | 'settings' | 'profile', id? } (profile is reached from Ajustes)
   const [tab, setTab] = useState('projects'); // bottom navigation: 'projects' | 'accounting' (Ajustes is a sheet)
   const [dashTab, setDashTab] = useState('active'); // dashboard tabs: 'active' | 'history'
@@ -315,14 +315,14 @@ export default function App() {
     setSheet(null);
     setPaywall(null);
     setUser(null);
-    setStage('splash'); // signed out: back to the welcome screen
+    setStage('app'); // signed out: the sign-in screen (the opening screen is only for opening the app)
   }, [closeProject]);
 
   const returning = meta.onboarded || !isCompanyEmpty(company);
   // "Iniciar": a returning user goes straight on; a new one gets the single setup screen, with the country,
   // currency and language already taken from the device (nothing to answer).
   const start = () => {
-    if (returning) return setStage('app');
+    if (user || returning) return setStage('app');
     if (!settings.region) {
       const code = detectRegionCode();
       if (code) setSettings({ region: code, lang: detectLang(getRegion(code).lang) });
@@ -335,7 +335,7 @@ export default function App() {
   return (
     <I18nProvider lang={settings.lang} regionCode={active ? active.draft.regionCode : settings.region}>
       {stage === 'splash' ? (
-        <SplashScreen onStart={start} />
+        <SplashScreen onStart={start} auto={Boolean(user) || returning} timing={splash} />
       ) : stage === 'setup' ? (
         !region || pickingRegion ? (
           <RegionSelect

@@ -106,12 +106,13 @@ describe('ledger: cash control, labour pool and rental alerts', () => {
 describe('projects: dashboard level, closed jobs and the new fields', () => {
   const at = (start, end) => newProject({ regionCode: 'CL', startDate: start, endDate: end, now: NOW });
 
-  it('projectLevel: future (blue), red with the late days, orange, green and undated', () => {
+  it('projectLevel: future (blue), red with the late days, orange, green and undated (on time)', () => {
     expect(projectLevel(at('2026-10-30', '2026-11-30'), NOW)).toMatchObject({ level: 'future', daysUntilStart: 8, daysLate: 0 });
     expect(projectLevel(at('2026-10-01', '2026-10-17'), NOW)).toMatchObject({ level: 'red', daysLate: 5 });
     expect(projectLevel(at('2026-10-01', '2026-10-24'), NOW).level).toBe('orange');
     expect(projectLevel(at('2026-10-01', '2026-12-31'), NOW).level).toBe('green');
-    expect(projectLevel(at('', ''), NOW).level).toBe('none');
+    expect(projectLevel(at('2026-10-01', ''), NOW)).toMatchObject({ level: 'green', daysLate: 0 }); // no end date: never late
+    expect(projectLevel(at('', ''), NOW).level).toBe('green');
   });
 
   it('closedAt marks the Historial; the ledger fields survive a save/load round trip and junk is cleaned', () => {

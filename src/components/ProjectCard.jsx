@@ -43,8 +43,8 @@ export default function ProjectCard({ project, now, onOpen }) {
         data-testid="project-card"
         data-level={level}
         aria-label={[title, client, detail].filter(Boolean).join(', ')}
-        style={{ borderBottomColor: LEVEL_COLOR[level] }}
-        className="block w-full rounded-2xl border border-b-[6px] border-white/10 bg-black p-4 text-left transition active:bg-white/[0.04]"
+        style={{ borderColor: LEVEL_COLOR[level] }}
+        className="block w-full rounded-2xl border-2 border-b-[8px] bg-black p-4 text-left transition active:bg-white/[0.04]"
       >
         <span className="flex items-start gap-3">
           <span className="min-w-0 flex-1">

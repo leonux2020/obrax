@@ -47,15 +47,14 @@ const mountApp = async () => {
   document.body.appendChild(host);
   root = createRoot(host);
   await act(async () => {
-    root.render(React.createElement(App));
+    root.render(React.createElement(App, { splash: { hold: 0, fade: 0 } }));
     await new Promise((r) => setTimeout(r, 40));
   });
 };
-// A signed-out user always lands on the welcome screen first; its button leads to the access screen.
+// A signed-out returning user goes from the opening screen straight to the access screen (the test timing skips the 1.5 s wait).
 const toAccess = async () => {
-  expect(q('splash')).not.toBeNull();
-  expect(q('login-google-card')).toBeNull();
-  await click(q('splash-start'));
+  expect(q('splash')).toBeNull();
+  expect(q('login-google-card')).not.toBeNull();
 };
 const q = (id) => document.querySelector(`[data-testid="${id}"]`);
 const flush = (ms = 30) => act(async () => { await new Promise((r) => setTimeout(r, ms)); });
@@ -135,16 +134,18 @@ describe('Google login on the main access screen (VITE_GOOGLE_CLIENT_ID)', () =>
     expect(localStorage.getItem('cp.user.v1')).toBeNull();
   });
 
-  it('the welcome screen is the first view for a signed-out user even with saved projects, and a stored user skips it', async () => {
+  it('a signed-out user reaches the access screen (no dashboard, no app header) and a stored user skips it', async () => {
     seed({ user: null });
     await mountApp();
-    expect(q('splash')).not.toBeNull();
-    expect(host.querySelector('header')).toBeNull();
+    expect(q('splash')).toBeNull();
+    expect(q('login-google-card')).not.toBeNull();
+    expect(q('dash-empty')).toBeNull();
     act(() => root.unmount());
     host.remove();
     seed();
     await mountApp();
-    expect(q('splash')).toBeNull();
+    expect(q('login-google-card')).toBeNull();
+    expect(q('dash-empty')).not.toBeNull();
   });
 
   it('the local profile still works next to Google', async () => {
@@ -187,9 +188,7 @@ describe('Google login on the main access screen (VITE_GOOGLE_CLIENT_ID)', () =>
     expect(q('settings-google-link')).toBeNull();
     expect(q('settings-account').textContent).toContain('ana@example.com');
     await click([...q('settings-account').querySelectorAll('button')].find((b) => b.textContent.trim()));
-    expect(q('splash')).not.toBeNull(); // signed out: the welcome screen comes first again
-    expect(q('splash-start').textContent).toBe('Iniciar'); // a returning user does not re-register: it goes to the access screen
-    await click(q('splash-start'));
+    expect(q('splash')).toBeNull(); // signed out: straight to the access screen, no re-registration
     expect(q('login-google-card')).not.toBeNull();
   });
 });

@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMarketClock } from '../lib/marketClock.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { computeAll } from '../lib/engine.js';
 import { pricingTime, planningTimeline, freezeQuote } from '../lib/signature.js';
 import { FINANCE_LIMITS } from '../lib/draft.js';
-import { LEDGER_LIMITS, cashSummary, dayOf, laborPool, newEntryId, rentalsDue, RENTAL_CATEGORIES } from '../lib/ledger.js';
-import { isClosed, projectClient, projectLevel, projectTitle } from '../lib/projects.js';
+import { LEDGER_LIMITS, cashSummary, dayOf, laborPool, locationLabel, newEntryId, rentalsDue, RENTAL_CATEGORIES } from '../lib/ledger.js';
+import { isClosed, parseDay, projectClient, projectLevel, projectTitle, toDayString } from '../lib/projects.js';
 import { buildRenditionFile } from '../lib/rendition.js';
 import { photosForReport } from '../lib/photos.js';
 import { createReportPdf, pdfToFile, warmPdfEngine } from '../lib/reportPdf.js';
@@ -14,7 +14,7 @@ import { sanitizeText } from '../lib/sanitize.js';
 import { usePro } from '../lib/usePro.js';
 import { Button, NumberField, TextField } from './ui.jsx';
 import { LEVEL_COLOR, levelDetail } from './levelStyle.js';
-import PercentRail from './PercentRail.jsx';
+import PercentSlider from './PercentSlider.jsx';
 import CashSheet from './CashSheet.jsx';
 import ReceiptSheet from './ReceiptSheet.jsx';
 import SnapGrid from './SnapGrid.jsx';
@@ -25,12 +25,6 @@ const Icon = ({ children, size = 24 }) => (
     {children}
   </svg>
 );
-
-const PRESETS = {
-  labor: [0, 10, 15, 20, 25, 30, 35, 40, 50, 60, 80, 100],
-  contingency: [0, 3, 5, 7, 10, 15, 20, 25],
-  profit: [0, 5, 10, 15, 20, 25, 30, 40, 50],
-};
 
 function Section({ id, title, children }) {
   return (
@@ -45,16 +39,22 @@ function Section({ id, title, children }) {
 
 /** Hidden accordion: cash advanced to workers, discounted from the labour pool that stays visible above it. */
 function Advances({ advances, onChange, pool }) {
-  const { t, money, region } = useI18n();
+  const { t, money, region, locale } = useI18n();
   const [open, setOpen] = useState(false);
   const [worker, setWorker] = useState('');
   const [amount, setAmount] = useState(null);
+  const [date, setDate] = useState(() => toDayString(new Date())); // today, editable
+  const stamp = (ms) => (ms ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(ms)) : '');
   const add = (e) => {
     e.preventDefault();
     if (!worker.trim() || !(amount > 0) || advances.length >= LEDGER_LIMITS.advances) return;
-    onChange([{ id: newEntryId(), worker: worker.trim(), amount, at: Date.now() }, ...advances]);
+    const day = parseDay(date);
+    // the chosen day at local noon (so it never slips to another day with the time zone); today keeps the real time
+    const at = day ? (date === toDayString(new Date()) ? Date.now() : new Date(day.getFullYear(), day.getMonth(), day.getDate(), 12).getTime()) : Date.now();
+    onChange([{ id: newEntryId(), worker: worker.trim(), amount, at }, ...advances]);
     setWorker('');
     setAmount(null);
+    setDate(toDayString(new Date()));
   };
   return (
     <div>
@@ -77,6 +77,12 @@ function Advances({ advances, onChange, pool }) {
           <form onSubmit={add} className="space-y-3">
             <TextField label={t('adv.worker')} value={worker} onChange={setWorker} sanitize={(v) => sanitizeText(v, 60)} placeholder={t('adv.workerPh')} />
             <NumberField label={t('adv.amount')} value={amount} onChange={setAmount} decimals={region.digits} placeholder="0" />
+            <div>
+              <label htmlFor="adv-date" className="label">
+                {t('adv.date')}
+              </label>
+              <input id="adv-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="field-input [color-scheme:dark]" data-testid="advance-date" />
+            </div>
             <Button type="submit" className="w-full" disabled={!worker.trim() || !(amount > 0)} data-testid="advance-add">
               {t('adv.add')}
             </Button>
@@ -85,7 +91,10 @@ function Advances({ advances, onChange, pool }) {
             <ul className="divide-y divide-white/10" data-testid="advance-list">
               {advances.map((a) => (
                 <li key={a.id} className="flex min-h-[52px] items-center gap-3 py-1.5">
-                  <span className="min-w-0 flex-1 truncate font-semibold">{a.worker}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold">{a.worker}</span>
+                    <span className="block text-xs text-neutral-400">{stamp(a.at)}</span>
+                  </span>
                   <span className="font-bold tabular-nums">{money(a.amount)}</span>
                   <button
                     type="button"
@@ -109,6 +118,8 @@ function Advances({ advances, onChange, pool }) {
 function Logbook({ entries, onChange }) {
   const { t, lang, locale } = useI18n();
   const [text, setText] = useState('');
+  const [hint, setHint] = useState(false);
+  const field = useRef(null);
   const save = () => {
     const clean = sanitizeText(text, LEDGER_LIMITS.logChars).trim();
     if (!clean) return;
@@ -136,21 +147,46 @@ function Logbook({ entries, onChange }) {
           ))}
         </ul>
       )}
-      <textarea
-        value={text}
-        onChange={(e) => setText(sanitizeText(e.target.value, LEDGER_LIMITS.logChars))}
-        rows={3}
-        lang={lang}
-        inputMode="text"
-        autoCapitalize="sentences"
-        autoCorrect="on"
-        spellCheck
-        enterKeyHint="done"
-        placeholder={t('log.placeholder')}
-        aria-label={t('log.title')}
-        data-testid="log-input"
-        className="field-input min-h-[96px] resize-y"
-      />
+      <div className="relative">
+        <textarea
+          ref={field}
+          value={text}
+          onChange={(e) => setText(sanitizeText(e.target.value, LEDGER_LIMITS.logChars))}
+          rows={3}
+          lang={lang}
+          inputMode="text"
+          autoCapitalize="sentences"
+          autoCorrect="on"
+          spellCheck
+          enterKeyHint="done"
+          placeholder={t('log.placeholder')}
+          aria-label={t('log.title')}
+          data-testid="log-input"
+          className="field-input min-h-[96px] resize-y pr-14"
+        />
+        {/* visual invitation to dictate: the keyboard's own microphone does the listening (no audio is handled here) */}
+        <button
+          type="button"
+          onClick={() => {
+            field.current?.focus();
+            setHint(true);
+          }}
+          aria-label={t('log.dictate')}
+          data-testid="log-mic"
+          className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 text-brand transition hover:border-brand active:scale-95"
+        >
+          <Icon size={22}>
+            <rect x="9" y="3" width="6" height="11" rx="3" />
+            <path d="M5 11a7 7 0 0 0 14 0" />
+            <path d="M12 18v3" />
+          </Icon>
+        </button>
+      </div>
+      {hint && (
+        <p role="status" data-testid="log-mic-hint" className="text-xs text-neutral-300">
+          {t('log.dictateHint')}
+        </p>
+      )}
       {text.trim() && (
         <Button className="w-full" onClick={save} data-testid="log-save">
           {t('log.save')}
@@ -259,6 +295,22 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
           <p className="truncate text-sm text-neutral-300">
             <span aria-hidden="true">{region.flag}</span> {client || t('proj.noClient')}
           </p>
+          {project.location && (
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${project.location.lat},${project.location.lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="pv-location"
+              aria-label={`${t('pv.map')}: ${locationLabel(project.location)}`}
+              className="mt-0.5 flex min-h-[28px] max-w-full items-center gap-1 text-sm text-neutral-300 underline decoration-white/30 underline-offset-2 hover:text-white"
+            >
+              <Icon size={14}>
+                <path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" />
+                <circle cx="12" cy="10" r="2.5" />
+              </Icon>
+              <span className="truncate">{locationLabel(project.location)}</span>
+            </a>
+          )}
         </div>
         <button type="button" onClick={onEdit} aria-label={t('proj.edit')} data-testid="pv-edit" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/10 hover:border-brand">
           <Icon>
@@ -271,8 +323,8 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
         <span
           data-testid="pv-status"
           data-level={level}
-          className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-sm font-bold"
-          style={{ color: level === 'none' || level === 'closed' ? '#a3a3a3' : LEVEL_COLOR[level] }}
+          className="inline-flex max-w-full items-center gap-2 rounded-full border-2 px-3 py-1.5 text-sm font-extrabold"
+          style={{ color: LEVEL_COLOR[level], borderColor: LEVEL_COLOR[level] }}
         >
           <span aria-hidden="true" className="h-3 w-3 shrink-0 rounded-full" style={{ background: LEVEL_COLOR[level] }} />
           <span className="truncate">{detail || t(`light.${info.level}`)}</span>
@@ -312,26 +364,29 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
             </span>
           </span>
         </button>
+
+        {/* the calculation (measures, partidas, prices, schedule) lives in the editor: a quiet row inside the budget card */}
+        <button
+          type="button"
+          onClick={onEditor}
+          data-testid="editor-open"
+          data-pending={result.valid ? undefined : 'true'}
+          className={`mt-4 flex min-h-[44px] w-full items-center gap-2 border-t border-white/10 pt-3 text-left text-sm font-semibold transition hover:text-white ${result.valid ? 'text-neutral-300' : 'text-brand'}`}
+        >
+          <Icon size={18}>
+            <path d="M3 17L17 3l4 4L7 21H3z" />
+            <path d="M13 7l4 4M9 11l2 2M6 14l2 2" />
+          </Icon>
+          <span className="flex-1">{result.valid ? t('pv.calc', { n: draft.partidas.length }) : t('pv.calc.define')}</span>
+          <span aria-hidden="true" className="text-lg text-neutral-500">
+            ›
+          </span>
+        </button>
       </section>
 
-      {/* the calculation (measures, partidas, prices, schedule) lives in the editor */}
-      <button
-        type="button"
-        onClick={onEditor}
-        data-testid="editor-open"
-        className={`mt-3 flex min-h-[56px] w-full items-center gap-3 rounded-2xl px-4 text-left font-bold transition active:scale-[0.99] ${
-          result.valid ? 'border border-white/10 hover:border-brand' : 'bg-brand text-black'
-        }`}
-      >
-        <span className="flex-1">{result.valid ? t('pv.calc', { n: draft.partidas.length }) : t('pv.calc.define')}</span>
-        <span aria-hidden="true" className="text-xl">
-          ›
-        </span>
-      </button>
-
-      {/* 3. horizontal selectors */}
+      {/* 3. selectors: one slider each (Mano de Obra, Imprevistos, Utilidad) */}
       <section aria-label={t('pv.selectors')} className="card mt-4 space-y-4" data-testid="selectors">
-        <PercentRail label={t('fin.labor')} testId="rail-labor" value={draft.finance.labor} presets={PRESETS.labor} min={FINANCE_LIMITS.labor.min} max={FINANCE_LIMITS.labor.max} onChange={setFinance('labor')} />
+        <PercentSlider label={t('fin.labor')} testId="slider-labor" value={draft.finance.labor} min={FINANCE_LIMITS.labor.min} max={FINANCE_LIMITS.labor.max} onChange={setFinance('labor')} />
         {result.valid && (
           <p data-testid="labor-pool" data-available={pool.available} className="text-sm text-neutral-300">
             {t('adv.pool')}: <b className="tabular-nums text-white">{money(pool.available)}</b>
@@ -339,8 +394,8 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
           </p>
         )}
         <Advances advances={project.advances} onChange={setList('advances')} pool={pool} />
-        <PercentRail label={t('fin.contingency')} testId="rail-contingency" value={draft.finance.contingency} presets={PRESETS.contingency} min={FINANCE_LIMITS.contingency.min} max={FINANCE_LIMITS.contingency.max} onChange={setFinance('contingency')} />
-        <PercentRail label={t('fin.profit')} testId="rail-profit" value={draft.finance.profit} presets={PRESETS.profit} min={FINANCE_LIMITS.profit.min} max={FINANCE_LIMITS.profit.max} onChange={setFinance('profit')} />
+        <PercentSlider label={t('fin.contingency')} testId="slider-contingency" value={draft.finance.contingency} min={FINANCE_LIMITS.contingency.min} max={FINANCE_LIMITS.contingency.max} onChange={setFinance('contingency')} />
+        <PercentSlider label={t('fin.profit')} testId="slider-profit" value={draft.finance.profit} min={FINANCE_LIMITS.profit.min} max={FINANCE_LIMITS.profit.max} onChange={setFinance('profit')} />
       </section>
 
       {/* 4. AI receipt scan */}

@@ -24,7 +24,7 @@ async function mount() {
   document.body.appendChild(host);
   root = createRoot(host);
   await act(async () => {
-    root.render(React.createElement(App));
+    root.render(React.createElement(App, { splash: { hold: 0, fade: 0 } }));
     await new Promise((r) => setTimeout(r, 40));
   });
 }

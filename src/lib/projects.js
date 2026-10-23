@@ -62,7 +62,7 @@ export function trafficLight(startDate, endDate, now = Date.now(), rules = LIGHT
 }
 
 /**
- * The five states shown on the dashboard. `future` (blue) = the job has not started yet; the other levels are the
+ * The four states shown on the dashboard (an undated, already started job counts as on time). `future` (blue) = the job has not started yet; the other levels are the
  * time traffic light. `daysLate` is the critical figure printed on a red card.
  */
 export function projectLevel(project, now = Date.now()) {
@@ -70,7 +70,9 @@ export function projectLevel(project, now = Date.now()) {
   const start = parseDay(project.startDate);
   const today = startOfDay(now);
   if (start && start > today) return { level: 'future', daysLate: 0, daysUntilStart: dayDiff(today, start), light };
-  return { level: light.level, daysLate: light.level === 'red' ? Math.abs(light.daysLeft) : 0, daysUntilStart: 0, light };
+  // A job that has begun but has no end date can never be late: it is "on time" (green), not an inert grey.
+  const level = light.level === 'none' ? 'green' : light.level;
+  return { level, daysLate: level === 'red' ? Math.abs(light.daysLeft) : 0, daysUntilStart: 0, light };
 }
 
 /** A finished job (marked in the edit sheet) lives in the dashboard's "Historial" tab. */

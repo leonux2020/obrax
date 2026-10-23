@@ -80,21 +80,24 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro }
 
       {active.length > 0 && (
         <ul className="mb-3 grid grid-cols-4 gap-1.5" data-testid="dash-pills" aria-label={t('light.label')}>
-          {PILLS.map(([level, key]) => (
-            <li
-              key={level}
-              data-testid={`pill-${level}`}
-              data-count={counts[level]}
-              aria-label={`${t(key)}: ${counts[level]}`}
-              className={`flex flex-col items-center rounded-xl border border-white/10 px-1 py-1.5 ${counts[level] ? '' : 'opacity-40'}`}
-            >
-              <span className="flex items-center gap-1.5 text-lg font-extrabold tabular-nums leading-none">
-                <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ background: LEVEL_COLOR[level] }} />
-                {counts[level]}
-              </span>
-              <span className="mt-1 max-w-full truncate text-[10px] font-semibold text-neutral-300">{t(key)}</span>
-            </li>
-          ))}
+          {PILLS.map(([level, key]) => {
+            const on = counts[level] > 0;
+            const color = LEVEL_COLOR[level];
+            return (
+              <li
+                key={level}
+                data-testid={`pill-${level}`}
+                data-count={counts[level]}
+                aria-label={`${t(key)}: ${counts[level]}`}
+                // opaque, saturated and always fully visible: filled when there is something, outlined when empty
+                style={on ? { background: color, borderColor: color, color: '#000' } : { borderColor: color, color }}
+                className="flex flex-col items-center rounded-xl border-2 px-1 py-2"
+              >
+                <span className="text-2xl font-black tabular-nums leading-none">{counts[level]}</span>
+                <span className="mt-1 max-w-full truncate text-[11px] font-extrabold">{t(key)}</span>
+              </li>
+            );
+          })}
         </ul>
       )}
 

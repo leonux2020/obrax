@@ -80,6 +80,7 @@ T = {
  'adv.worker': ['Trabajador', 'Worker', 'Trabalhador', 'Ouvrier', 'Operaio', 'Mitarbeiter'],
  'adv.workerPh': ['Nombre del trabajador', "Worker's name", 'Nome do trabalhador', "Nom de l'ouvrier", "Nome dell'operaio", 'Name des Mitarbeiters'],
  'adv.amount': ['Monto adelantado', 'Amount advanced', 'Valor adiantado', 'Montant avancé', 'Importo anticipato', 'Vorschussbetrag'],
+ 'adv.date': ['Fecha', 'Date', 'Data', 'Date', 'Data', 'Datum'],
  'adv.add': ['Agregar adelanto', 'Add advance', 'Adicionar adiantamento', "Ajouter l'avance", "Aggiungi l'anticipo", 'Vorschuss hinzufügen'],
  'adv.pool': ['Mano de obra disponible', 'Labour available', 'Mão de obra disponível', "Main-d'œuvre disponible", 'Manodopera disponibile', 'Verfügbare Arbeitskosten'],
  'scan.cta': ['Escanear Boleta con IA', 'Scan Receipt with AI', 'Escanear Recibo com IA', 'Scanner un reçu avec l’IA', 'Scansiona la ricevuta con IA', 'Beleg mit KI scannen'],
@@ -102,6 +103,9 @@ T = {
  'snap.title': ['Fotos de la obra', 'Site photos', 'Fotos da obra', 'Photos du chantier', 'Foto del cantiere', 'Baustellenfotos'],
  'log.title': ['Bitácora', 'Site log', 'Diário de obra', 'Journal de chantier', 'Diario di cantiere', 'Bautagebuch'],
  'log.placeholder': ['Escribe o dicta con el micrófono del teclado…', "Type or dictate with your keyboard's microphone…", 'Escreva ou dite com o microfone do teclado…', 'Écrivez ou dictez avec le micro du clavier…', 'Scrivi o detta con il microfono della tastiera…', 'Schreiben oder diktieren Sie mit dem Mikrofon der Tastatur…'],
+ 'log.dictate': ['Dictar por voz', 'Dictate by voice', 'Ditar por voz', 'Dicter à la voix', 'Detta a voce', 'Per Sprache diktieren'],
+ 'log.dictateHint': ['Toca el micrófono de tu teclado para dictar la nota.', "Tap your keyboard's microphone key to dictate the note.", 'Toque na tecla do microfone do teclado para ditar a nota.', 'Touchez la touche micro du clavier pour dicter la note.', 'Tocca il tasto microfono della tastiera per dettare la nota.', 'Tippen Sie auf die Mikrofontaste der Tastatur, um die Notiz zu diktieren.'],
+ 'pv.map': ['Ver en el mapa', 'View on map', 'Ver no mapa', 'Voir sur la carte', 'Vedi sulla mappa', 'Auf der Karte ansehen'],
  'log.save': ['Guardar nota', 'Save note', 'Salvar nota', 'Enregistrer la note', 'Salva nota', 'Notiz speichern'],
  # export
  'xl.export': ['Exportar Rendición', 'Export Statement', 'Exportar Prestação de Contas', 'Exporter la reddition', 'Esporta Rendiconto', 'Abrechnung exportieren'],

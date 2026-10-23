@@ -83,6 +83,23 @@ describe('Dashboard: counters instead of sentences, tabs, full-width clickable c
     expect(host.textContent).not.toMatch(/proyectos? activos?|tienes \d/i);
   });
 
+  it('colours are opaque and vivid: filled pills when there is something, outlined (never dimmed) when empty; undated started jobs count as on time', async () => {
+    const list = [mk('Atrasada', -30, -4), mk('Sin fecha fin', -3, 0)];
+    list[1].endDate = '';
+    await render(React.createElement(Dashboard, { projects: list, tab: 'active', onTab: () => {}, onNew: () => {}, onOpen: () => {}, onPro: () => {} }));
+    expect(q('pill-red').getAttribute('data-count')).toBe('1');
+    expect(q('pill-green').getAttribute('data-count')).toBe('1'); // real dates: no end date = cannot be late
+    expect(q('pill-red').style.background).not.toBe('');
+    expect(q('pill-red').style.color).toMatch(/^(#000|rgb\(0, 0, 0\))$/);
+    expect(q('pill-orange').style.background).toBe(''); // empty: outlined...
+    expect(q('pill-orange').style.borderColor).not.toBe('');
+    for (const l of ['red', 'orange', 'green', 'future']) expect(q(`pill-${l}`).className).not.toMatch(/opacity/);
+    const cards = qa('project-card');
+    expect(cards.map((c) => c.getAttribute('data-level')).sort()).toEqual(['green', 'red']);
+    for (const c of cards) expect(c.style.borderColor).toMatch(/^(#|rgb)/);
+    expect(Object.values(LEVEL_COLOR).slice(0, 4)).toEqual(['#ff2b2b', '#ff9500', '#00d95f', '#2d8cff']);
+  });
+
   it('tabs switch Activos / Historial; closed jobs only live in the history', async () => {
     await render(React.createElement(Harness, { onOpen: () => {}, onNew: () => {} }));
     expect(qa('project-card')).toHaveLength(5);
@@ -102,14 +119,15 @@ describe('Dashboard: counters instead of sentences, tabs, full-width clickable c
     for (const c of cards) {
       expect(c.tagName).toBe('BUTTON');
       expect(c.className).toContain('w-full');
-      expect(c.className).toContain('border-b-[6px]');
+      expect(c.className).toContain('border-b-[8px]');
+      expect(c.className).toContain('border-2');
       expect(c.querySelectorAll('button')).toHaveLength(0); // no Abrir / Editar inside
       expect(c.querySelector('[data-testid="card-flag"]').textContent).toBe('🇨🇱');
     }
     const late = cards.find((c) => c.getAttribute('data-level') === 'red');
-    expect(late.style.borderBottomColor).not.toBe('');
+    expect(late.style.borderColor).not.toBe('');
     expect(late.querySelector('[data-testid="card-detail"]').textContent).toContain('4');
-    expect(LEVEL_COLOR.red).toBe('#ef4444');
+    expect(LEVEL_COLOR.red).toBe('#ff2b2b');
     expect(cards.find((c) => c.getAttribute('data-level') === 'future')).toBeTruthy();
     await click(late);
     expect(opened).toHaveLength(1);
@@ -214,19 +232,40 @@ describe('Project interior', () => {
     const inputs = q('advances-panel').querySelectorAll('input');
     await type(inputs[0], 'Juan Pérez');
     await type(inputs[1], '20000');
+    expect(q('advance-date').value).toBe(toDayString(new Date())); // pre-filled with today
+    await type(q('advance-date'), '2026-09-15'); // ...and editable
     await click(q('advance-add'));
     expect(q('advance-list').textContent).toContain('Juan Pérez');
+    expect(q('advance-list').textContent).toMatch(/15/); // the chosen date is shown
+    expect(q('advance-date').value).toBe(toDayString(new Date())); // the form resets to today
     expect(Number(q('labor-pool').getAttribute('data-available'))).toBe(pool0 - 20000);
   });
 
-  it('Imprevistos and Utilidad rails change the budget total', async () => {
+  const slide = (el, value) =>
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, String(value));
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+  it('Mano de Obra / Imprevistos / Utilidad are single continuous sliders (no button grids); the number sits next to the title', async () => {
     await render(React.createElement(Harness, { initial: sized(mk('Casa', -2, 30)) }));
+    const sel = q('selectors');
+    expect(sel.querySelectorAll('button[role="radio"]')).toHaveLength(0);
+    const ranges = [...sel.querySelectorAll('input[type="range"]')];
+    expect(ranges).toHaveLength(3);
+    for (const r of ranges) expect(r.getAttribute('step')).toBe('1');
+    expect(q('slider-labor-value').textContent).toBe('35%');
+    expect(q('slider-labor-value').previousElementSibling.tagName).toBe('LABEL'); // number right beside the title
     const total0 = q('budget-total').textContent;
-    await click(q('rail-contingency-10'));
+    await slide(q('slider-contingency-input'), 10);
+    expect(q('slider-contingency-value').textContent).toBe('10%');
     const total1 = q('budget-total').textContent;
     expect(total1).not.toBe(total0);
-    await click(q('rail-profit-20'));
+    await slide(q('slider-profit-input'), 20);
+    expect(q('slider-profit-value').textContent).toBe('20%');
     expect(q('budget-total').textContent).not.toBe(total1);
+    await slide(q('slider-labor-input'), 80);
+    expect(q('slider-labor-value').textContent).toBe('80%');
   });
 
   it('"Escanear Boleta con IA" is PRO: a free user is sent to the paywall, not to the camera', async () => {
@@ -284,11 +323,31 @@ describe('Project interior', () => {
     expect(q('expense-list').querySelectorAll('[data-testid="hourglass"]')).toHaveLength(0);
   });
 
+  it('the project location is shown inside the project as a map link, and only the pencil (edit sheet) changes it', async () => {
+    const withLoc = { ...sized(mk('Casa', -2, 30)), location: { lat: -33.4489, lng: -70.6693, label: '' } };
+    await render(React.createElement(Harness, { initial: withLoc }));
+    const link = q('pv-location');
+    expect(link.tagName).toBe('A');
+    expect(link.getAttribute('href')).toContain('-33.4489,-70.6693');
+    expect(link.getAttribute('rel')).toContain('noopener');
+    expect(link.textContent).toContain('-33.4489');
+    expect(q('project-locate')).toBeNull(); // no location editing inside the view itself
+    act(() => root.unmount());
+    root = createRoot(host);
+    await render(React.createElement(Harness, { initial: sized(mk('Sin ubicación', -2, 30)) }));
+    expect(q('pv-location')).toBeNull();
+  });
+
   it('Bitácora: a plain text field (keyboard dictation) saves dated entries', async () => {
     await render(React.createElement(Harness, { initial: sized(mk('Casa', -2, 30)) }));
     const field = q('log-input');
     expect(field.tagName).toBe('TEXTAREA');
     expect(q('log-save')).toBeNull();
+    expect(q('log-mic')).not.toBeNull(); // visual microphone that invites to dictate
+    expect(q('log-mic').getAttribute('aria-label')).toBe('Dictar por voz');
+    await click(q('log-mic'));
+    expect(document.activeElement).toBe(field);
+    expect(q('log-mic-hint')).not.toBeNull();
     await type(field, 'Se vació la losa del primer piso');
     await click(q('log-save'));
     expect(q('log-list').textContent).toContain('Se vació la losa');
@@ -298,7 +357,9 @@ describe('Project interior', () => {
   it('a project without measures is not an error: the editor row invites to define them and PDF is disabled', async () => {
     await render(React.createElement(Harness, { initial: mk('Vacía', 0, 10) }));
     expect(q('pdf-generate').disabled).toBe(true);
-    expect(q('editor-open').className).toContain('bg-brand');
+    expect(q('editor-open').getAttribute('data-pending')).toBe('true');
+    expect(q('editor-open').className).not.toContain('bg-brand'); // no giant green block
+    expect(q('editor-open').closest('section')).toBe(q('budget-total').closest('section')); // quiet row inside the budget card
   });
 });
 
