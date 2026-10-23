@@ -6,7 +6,7 @@ import { planningTimeline, pricingTime } from './signature.js';
 
 /** Total with tax, or null while the project has no valid measures yet. */
 export function projectTotal(project, now = Date.now()) {
-  const r = computeAll(project.draft, pricingTime(project.draft, now), { timeline: planningTimeline(project.draft, project) });
+  const r = computeAll(project.draft, pricingTime(project.draft, now), { timeline: planningTimeline(project.draft, project), chains: false });
   return r.valid ? r.quote.total : null;
 }
 

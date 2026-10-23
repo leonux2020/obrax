@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { Button, Logo } from './ui.jsx';
+import InstallButton from './InstallButton.jsx';
 
 /** How long the opening screen is held and how long its fade-out lasts (ms). */
 export const SPLASH_TIMING = Object.freeze({ hold: 1500, fade: 450 });
@@ -12,7 +13,7 @@ export const SPLASH_TIMING = Object.freeze({ hold: 1500, fade: 450 });
  *  - otherwise (first run): the one "Iniciar" button (bottom third, thumb reach) starts the setup.
  * `timing` {hold:0, fade:0} skips the wait (tests).
  */
-export default function SplashScreen({ onStart, auto = false, timing = SPLASH_TIMING }) {
+export default function SplashScreen({ onStart, auto = false, timing = SPLASH_TIMING, pwa = null }) {
   const { t } = useI18n();
   const [leaving, setLeaving] = useState(false);
 
@@ -54,6 +55,7 @@ export default function SplashScreen({ onStart, auto = false, timing = SPLASH_TI
               {t('splash.start')}
             </Button>
           )}
+          <InstallButton pwa={pwa} className={auto ? '' : 'mt-3'} />
           <p className="mt-5 text-center text-xs text-neutral-500" data-testid="splash-credit">
             {t('splash.credit')}
           </p>

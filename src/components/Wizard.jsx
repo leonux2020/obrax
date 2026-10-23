@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMarketClock } from '../lib/marketClock.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { computeAll } from '../lib/engine.js';
 import { pricingTime, planningTimeline, freezeSignature } from '../lib/signature.js';
+import { usePriceBook, usePriceFeed } from '../lib/usePrices.js';
 import { Button } from './ui.jsx';
 import StepStart from './steps/StepStart.jsx';
 import StepDims from './steps/StepDims.jsx';
@@ -20,12 +21,15 @@ export default function Wizard({ projectId, draft, setDraft: setProjectDraft, ph
   const { t } = useI18n();
   const { now, refresh } = useMarketClock(); // moves by itself every 15 minutes: prices and rentals re-price on their own
   const [showErrors, setShowErrors] = useState(false);
+  usePriceFeed(draft.regionCode);
+  const book = usePriceBook(draft.regionCode); // live market prices (price service); null = built-in reference prices
+  const bookRef = useRef(null); // the book of the quote on screen: a new signature locks exactly these prices
 
   // Every edit flows through here: a signature applied now is stamped with the project's current dates, which
   // freezes the crew / rental plan of that document (see planningTimeline).
   const setDraft = useCallback(
     (update) =>
-      setProjectDraft((d) => freezeSignature(d, typeof update === 'function' ? update(d) : update, { startDate, endDate })),
+      setProjectDraft((d) => freezeSignature(d, typeof update === 'function' ? update(d) : update, { startDate, endDate }, bookRef.current)),
     [setProjectDraft, startDate, endDate]
   );
 
@@ -34,10 +38,11 @@ export default function Wizard({ projectId, draft, setDraft: setProjectDraft, ph
   // The project's dates drive the automatic crew / calendar plan (see lib/schedule.js).
   const timeline = planningTimeline(draft, { startDate, endDate });
   const result = useMemo(
-    () => computeAll(draft, priceTime, { timeline }),
+    () => computeAll(draft, priceTime, { timeline, book }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [draft, priceTime, timeline.startDate, timeline.endDate]
+    [draft, priceTime, timeline.startDate, timeline.endDate, book]
   );
+  bookRef.current = result.book ?? null;
 
   const steps = STEPS[draft.mode] ?? STEPS.quick;
   const step = draft.step;

@@ -2,7 +2,7 @@
 // Data life cycle, device A: changes are backed up to Drive, and "Cerrar sesión" only erases once Drive has the last change.
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { createFakeDrive } from './helpers/fakeDrive.js';
-import { CLIENT, q, flush, click, typeInto, installFakeGoogle, createHost } from './helpers/appHarness.js';
+import { CLIENT, backToDashboard, q, flush, click, typeInto, installFakeGoogle, createHost } from './helpers/appHarness.js';
 import { parseBackup } from '../src/lib/backup.js';
 import { clearDriveToken } from '../src/lib/driveToken.js';
 
@@ -33,7 +33,7 @@ const createProject = async (name) => {
   typeInto(document.querySelector('[role="dialog"] input'), name);
   await click(q('project-save'));
   await flush(60);
-  await click(q('pv-back'));
+  await backToDashboard();
 };
 
 beforeEach(() => {

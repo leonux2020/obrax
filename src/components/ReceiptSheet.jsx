@@ -4,7 +4,7 @@ import { InvoiceError } from '../lib/invoice.js';
 import { EXPENSE_CATEGORIES, RENTAL_CATEGORIES } from '../lib/ledger.js';
 import { PhotoError, compressInvoiceImage } from '../lib/photos.js';
 import { expensesFromRows, requestReceipt } from '../lib/receipt.js';
-import { Button, NumberField } from './ui.jsx';
+import { Button, DateInput, NumberField } from './ui.jsx';
 import BottomSheet from './BottomSheet.jsx';
 import Hourglass from './Hourglass.jsx';
 
@@ -144,7 +144,7 @@ export default function ReceiptSheet({ onSave, onClose, prepareImage = compressI
                           <label className="label" htmlFor={`ret-${r.key}`}>
                             {t('rental.returnOn')}
                           </label>
-                          <input id={`ret-${r.key}`} type="date" value={r.returnDate} onChange={(e) => patch(r.key, { returnDate: e.target.value })} className="field-input [color-scheme:dark]" data-testid={`receipt-return-${r.key}`} />
+                          <DateInput id={`ret-${r.key}`} value={r.returnDate} onChange={(e) => patch(r.key, { returnDate: e.target.value })} data-testid={`receipt-return-${r.key}`} />
                         </div>
                       )}
                     </div>

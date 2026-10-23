@@ -107,6 +107,33 @@ export function NumberField({
   );
 }
 
+/** Open the native calendar (Chromium / Safari 16+); a browser without showPicker, or a refused call, just keeps the normal field. */
+export function openDatePicker(input) {
+  try {
+    input?.showPicker?.();
+  } catch {
+    /* NotAllowedError (no user gesture) / SecurityError: the field stays usable by keyboard */
+  }
+}
+
+/**
+ * Every <input type="date"> of the app: the browser's small calendar icon is hidden by CSS (see .date-input in
+ * index.css) and the WHOLE field opens the calendar on tap / click.
+ */
+export function DateInput({ className = '', onClick, ...props }) {
+  return (
+    <input
+      type="date"
+      {...props}
+      onClick={(e) => {
+        openDatePicker(e.currentTarget);
+        onClick?.(e);
+      }}
+      className={`field-input date-input cursor-pointer [color-scheme:dark] ${className}`}
+    />
+  );
+}
+
 export function TextField({ label, value, onChange, placeholder, maxLength = 80, optional, sanitize }) {
   const id = useId();
   return (

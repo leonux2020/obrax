@@ -1,19 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { MAX_PRICE, taxRateFor } from '../../lib/pricing.js';
-import { usePro } from '../../lib/usePro.js';
+import { useAiAccess } from '../../lib/usePro.js';
+import { usePriceStatus } from '../../lib/usePrices.js';
+import { refreshPrices } from '../../lib/priceFeed.js';
 import { createRateLimiter, humanVerified } from '../../lib/shield.js';
 import { chainLabel } from '../../lib/regions.js';
 import { Badge, Button, NumberField } from '../ui.jsx';
 import InvoiceSheet from '../InvoiceSheet.jsx';
 
 export default function StepPrices({ draft, setDraft, result, now, onRefresh, onPro }) {
-  const { t, region, money, num, unit, time } = useI18n();
+  const { t, region, money, num, unit, time, locale } = useI18n();
   // Genuine user input => 8 refreshes/min; scripted (untrusted-event) sessions => 2/min.
   const humanLimiter = useRef(createRateLimiter(8, 60_000));
   const botLimiter = useRef(createRateLimiter(2, 60_000));
   const [limited, setLimited] = useState(false);
-  const pro = usePro();
+  const feed = usePriceStatus(draft.regionCode);
+  const pro = useAiAccess(); // 'pro' | 'dev' (localhost bypass) | null
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [wantsInvoice, setWantsInvoice] = useState(false); // tapped while locked: open the reader as soon as PRO is on
   const [applied, setApplied] = useState(0); // prices loaded from the last invoice
@@ -45,6 +48,7 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
     if (allowed) {
       setLimited(false);
       onRefresh();
+      refreshPrices(draft.regionCode, { force: true }); // ask the price service again (falls back to the last saved values)
     } else setLimited(true);
   };
 
@@ -79,6 +83,13 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
           <p className="text-xs text-neutral-400" data-testid="prices-auto">
             {t('prices.auto')}
           </p>
+          <p role="status" className={`text-xs ${feed.state === 'cached' ? 'text-[#e8c35f]' : 'text-neutral-400'}`} data-testid="prices-feed" data-state={feed.state}>
+            {feed.state === 'loading'
+              ? t('prices.live.updating')
+              : feed.state === 'fresh' || feed.state === 'cached'
+                ? t(feed.state === 'fresh' ? 'prices.live.fresh' : 'prices.live.cached', { date: new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(feed.at)) })
+                : t('prices.live.sim')}
+          </p>
         </div>
         <Button variant="secondary" className="!min-h-[44px]" onClick={refresh}>
           ↻ {t('prices.refresh')}
@@ -91,6 +102,7 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
           </svg>
           {t('inv.cta')}
           {!pro && <span className="rounded-md border border-[#d4af37]/60 px-1.5 text-[11px] font-extrabold tracking-wider">PRO</span>}
+          {pro === 'dev' && <span data-testid="ai-dev-badge" className="rounded-md border border-white/30 px-1.5 text-[11px] font-extrabold tracking-wider text-neutral-300">DEV</span>}
         </Button>
         <p className="mt-2 text-xs text-neutral-300">{t('inv.cta.hint')}</p>
         {applied > 0 && (

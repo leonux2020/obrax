@@ -37,6 +37,15 @@ PWA (React + Vite + Tailwind) para cubicación y presupuestos de obra. Tema OLED
 - Límite honesto: nada en el navegador es 100 % inmune a copia. La lógica que deba ser realmente secreta debe vivir en un servidor.
 - Para producción con Google: verifica el ID token **en el servidor** (firma, `aud`, `iss`, `exp`).
 
+## Estabilidad y flujos críticos (reparaciones)
+
+- **Instalar App**: `src/pwa/installPrompt.js` captura `beforeinstallprompt` al arrancar (se importa en `main.jsx`) y el botón `InstallButton` aparece en la pantalla inicial y en Ajustes mientras la app no esté instalada. Sin evento nativo (iOS Safari, Firefox) muestra cómo instalarla a mano.
+- **Fechas**: todos los `type="date"` usan `DateInput` (`ui.jsx`): sin icono del navegador (CSS) y todo el campo abre el calendario con `showPicker()`.
+- **Proyecto nuevo**: abre el editor en la elección del tipo de obra (Partida simple) o en la lista de partidas (Trabajo completo); el módulo financiero llega al salir del editor.
+- **Motor de precios**: `priceFeed.js` pide materiales y arriendos al proxy (`kind:'prices'`, solo viaja el código de país; es una estimación de IA validada contra una banda de cordura). Si falla, o falta un producto, se usa el último valor guardado en IndexedDB (`prices`, DB v3); sin datos, la simulación local. Una cotización firmada o congelada conserva su propio libro de precios.
+- **Bitácora de voz**: `speech.js` (Web Speech API). El texto aparece en vivo y la nota se guarda sola al terminar. En Chrome el audio lo procesa el servicio de voz del navegador; la app solo recibe texto.
+- **Escáner IA en local**: con `npm run dev` en `localhost`/`127.0.0.1` el escáner y la lectura de facturas se desbloquean sin simular PRO (insignia DEV). Nunca en producción ni en los tests.
+
 ## Marca y PWA
 
 El icono (casco + plano + cinta métrica) está en `src/brand/icon.js` y es la única fuente del logo, favicon, `manifest.json`, iconos PNG 192/512, maskable y apple-touch-icon. El plugin `plugins/pwa-brand.js` los genera en cada build, junto con un Service Worker versionado por hash de contenido.

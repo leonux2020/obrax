@@ -47,6 +47,23 @@ export function setSimulatedPro(on) {
   notify();
 }
 
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+
+/**
+ * Development-only bypass of the PRO paywall for the AI features (receipt scanner + invoice reading), so they can be
+ * tried without simulating a subscription. It needs ALL of: the Vite dev server (`MODE === 'development'`, which also
+ * means `DEV`) and a loopback host. Production builds, preview
+ * servers on another host and the test runner (MODE 'test') never get it; `import.meta.env.DEV` is a build-time
+ * constant, so the branch is dead code in production bundles. It unlocks the client gate only: the server proxy keeps
+ * its own origin check and rate limit.
+ */
+export function devAiBypass({ dev = import.meta.env.DEV, mode = import.meta.env.MODE, host = typeof location === 'undefined' ? '' : location.hostname } = {}) {
+  return Boolean(dev) && mode === 'development' && LOCAL_HOSTS.has(String(host).toLowerCase());
+}
+
+/** Who may use the AI features right now: 'pro' (subscription), 'dev' (local bypass) or null (paywall). */
+export const aiAccess = () => (isPro() ? 'pro' : devAiBypass() ? 'dev' : null);
+
 /** True when the free plan cannot create another project (existing ones are never touched). */
 export const projectLimitReached = (count, pro = isPro()) => !pro && Number(count) >= FREE_PROJECT_LIMIT;
 

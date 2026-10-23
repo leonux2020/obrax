@@ -4,7 +4,7 @@ import { currentPosition } from '../lib/geo.js';
 import { locationLabel, normalizeLocation } from '../lib/ledger.js';
 import { isClosed, parseDay, toDayString } from '../lib/projects.js';
 import { sanitizeText } from '../lib/sanitize.js';
-import { Button, Switch, TextField } from './ui.jsx';
+import { Button, DateInput, Switch, TextField } from './ui.jsx';
 import BottomSheet from './BottomSheet.jsx';
 
 function DateField({ label, value, onChange, invalid }) {
@@ -14,7 +14,7 @@ function DateField({ label, value, onChange, invalid }) {
       <label htmlFor={id} className="label">
         {label}
       </label>
-      <input id={id} type="date" value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={invalid || undefined} className="field-input [color-scheme:dark]" />
+      <DateInput id={id} value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={invalid || undefined} />
     </div>
   );
 }

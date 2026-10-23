@@ -416,7 +416,7 @@ describe('Project interior', () => {
     delete navigator.clipboard;
   });
 
-  it('Bitácora: a plain text field (keyboard dictation) saves dated entries', async () => {
+  it('Bitácora: typing still works (and without Web Speech the mic says so, keyboard dictation remains)', async () => {
     await render(React.createElement(Harness, { initial: sized(mk('Casa', -2, 30)) }));
     const field = q('log-input');
     expect(field.tagName).toBe('TEXTAREA');
@@ -425,7 +425,7 @@ describe('Project interior', () => {
     expect(q('log-mic').getAttribute('aria-label')).toBe('Dictar por voz');
     await click(q('log-mic'));
     expect(document.activeElement).toBe(field);
-    expect(q('log-mic-hint')).not.toBeNull();
+    expect(q('log-mic-hint').textContent).toContain('no admite dictado');
     await type(field, 'Se vació la losa del primer piso');
     await click(q('log-save'));
     expect(q('log-list').textContent).toContain('Se vació la losa');

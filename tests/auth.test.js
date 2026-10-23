@@ -7,6 +7,7 @@ import { createRoot } from 'react-dom/client';
 import { DICT } from '../src/lib/dict.js';
 import { LANGS } from '../src/lib/regions.js';
 import { FREE_PROJECT_LIMIT, isPro, projectLimitReached } from '../src/lib/pro.js';
+import { backToDashboard } from './helpers/appHarness.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -239,7 +240,7 @@ describe('PRO paywall opens when a locked function is used', () => {
     typeInto(document.querySelector('[role="dialog"] input'), name);
     await click(q('project-save'));
     await flush(60);
-    await click(q('pv-back'));
+    await backToDashboard();
   };
 
   it(`the free plan allows ${FREE_PROJECT_LIMIT} projects; the next "Nuevo" opens the PRO screen instead of the form`, async () => {

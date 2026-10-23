@@ -185,7 +185,7 @@ describe('Cronograma y cuadrillas: automatic from the project', () => {
   it('the wizard and the dashboard card pass the project dates to the engine', () => {
     const w = read('components/Wizard.jsx');
     expect(w).toMatch(/planningTimeline\(draft, \{ startDate, endDate \}\)/);
-    expect(w).toMatch(/computeAll\(draft, priceTime, \{ timeline \}\)/);
+    expect(w).toMatch(/computeAll\(draft, priceTime, \{ timeline, book \}\)/);
     expect(read('App.jsx')).toMatch(/startDate=\{active\.startDate\}/);
     expect(read('components/ProjectCard.jsx')).toMatch(/planningTimeline\(project\.draft, project\)/);
   });
@@ -272,7 +272,7 @@ describe('prices and rentals refresh continuously', () => {
 
   it('the dashboard card re-prices on every market window and day change', () => {
     const card = read('components/ProjectCard.jsx');
-    expect(card).toMatch(/\[project\.draft, project\.startDate, project\.endDate, lang, bucket, day\]/);
+    expect(card).toMatch(/\[project\.draft, project\.startDate, project\.endDate, lang, bucket, day, book\]/);
   });
 });
 

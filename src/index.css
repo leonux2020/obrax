@@ -42,6 +42,13 @@
   .field-input {
     @apply w-full min-h-[52px] rounded-xl border-2 border-neutral-700 bg-black px-4 text-lg font-medium text-white placeholder:text-neutral-500 focus:border-brand focus:outline-none;
   }
+  /* Date fields: no browser calendar icon; the whole field opens the calendar (DateInput in ui.jsx). */
+  .date-input::-webkit-calendar-picker-indicator {
+    display: none;
+  }
+  .date-input::-webkit-date-and-time-value {
+    text-align: left;
+  }
   .field-input[aria-invalid='true'] {
     @apply border-red-500;
   }

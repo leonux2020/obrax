@@ -5,8 +5,8 @@
 //    mention it (a test enforces that, and scans the production build for the key's value).
 //  - The key travels in the `x-goog-api-key` header (never in the URL, so it cannot end up in access logs),
 //    is never logged and never appears in a response; upstream error bodies are NOT forwarded either.
-//  - The browser can only send one image (jpeg/png/webp, <= 4 MB of JSON) and receives a validated, bounded
-//    extraction: it cannot choose the model, the prompt or any other Gemini parameter.
+//  - The browser can only send one image (jpeg/png/webp, <= 4 MB of JSON) - or a region code for the price list -
+//    and receives a validated, bounded extraction: it cannot choose the model, the prompt or any other Gemini parameter.
 //  - Abuse limits: same-origin only, POST + JSON only, per-IP and global rate limits, upstream timeout.
 //
 // The handler is a pure function of (request, injected fetch/clock) so it runs identically inside the Vite dev
@@ -17,6 +17,9 @@ import { DICT } from '../src/lib/dict.js';
 import { normalizeExtraction } from '../src/lib/invoice.js';
 import { normalizeReceipt } from '../src/lib/receipt.js';
 import { EXPENSE_CATEGORIES } from '../src/lib/ledger.js';
+import { MACHINE_IDS } from '../src/lib/machines.js';
+import { getRegion } from '../src/lib/regions.js';
+import { normalizeBook } from '../src/lib/priceBook.js';
 
 export const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const RETRYABLE = new Set([404, 408, 500, 502, 503, 504]);
@@ -91,7 +94,48 @@ export const RESPONSE_SCHEMA = Object.freeze({
 
 // ---- second fixed prompt: "Escanear Boleta" (expense receipts + rented tools) ---------------------------------
 // The browser can only pick WHICH of the two server-side prompts runs ({kind:'receipt'}); it can never send text.
-export const KINDS = Object.freeze(['invoice', 'receipt']);
+export const KINDS = Object.freeze(['invoice', 'receipt', 'prices']);
+
+// ---- third fixed prompt: "prices" (no image) --------------------------------------------------------------------
+// The browser only sends a REGION CODE; the product list, the units and the prompt are all server-side. The answer is
+// an ESTIMATE of typical retail prices by the model (it has no live shop feed): it is validated against a sanity band
+// around the built-in reference and the client keeps the last known value for anything missing or rejected.
+export function buildPricesPrompt(regionCode) {
+  const region = getRegion(regionCode);
+  const catalog = Object.entries(CATALOG)
+    .map(([id, m]) => `- ${id}: ${DICT.es[`mat.${id}`] ?? id} | price of ONE sale unit (${m.sale}, = ${m.size} ${m.base})`)
+    .join('\n');
+  const machines = MACHINE_IDS.map((id) => `- ${id}: ${id === 'mixer' ? 'concrete mixer (trompo hormigonero)' : id === 'compactor' ? 'plate compactor' : 'certified scaffold, ONE set of two bays'} | rental price per DAY`).join('\n');
+  return [
+    `You estimate the CURRENT typical retail prices of construction materials and the daily rental of site machinery in ${region.name.en} (${region.code}).`,
+    `Currency: ${region.currency}. Prices include the usual consumer taxes, as shown on a shop shelf of a large national hardware chain.`,
+    'Return ONLY JSON that follows the response schema: one entry per id below, with a plain number (no symbols, no thousands separators).',
+    'If you do not know a product, leave it out: never invent ids and never return zero.',
+    '',
+    'MATERIALS:',
+    catalog,
+    '',
+    'MACHINE RENTALS:',
+    machines,
+  ].join('\n');
+}
+
+export const PRICES_SCHEMA = Object.freeze({
+  type: 'OBJECT',
+  properties: {
+    materials: { type: 'ARRAY', items: { type: 'OBJECT', properties: { id: S(), price: N() }, required: ['id', 'price'] } },
+    rent: { type: 'ARRAY', items: { type: 'OBJECT', properties: { id: S(), price: N() }, required: ['id', 'price'] } },
+  },
+  required: ['materials', 'rent'],
+});
+
+export function buildPricesRequest({ regionCode, model = DEFAULT_MODEL }) {
+  return {
+    systemInstruction: { parts: [{ text: buildPricesPrompt(regionCode) }] },
+    contents: [{ role: 'user', parts: [{ text: 'Return the price list.' }] }],
+    generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: PRICES_SCHEMA, maxOutputTokens: 4096, ...thinkingFor(model) },
+  };
+}
 
 export function buildReceiptPrompt({ currency = '', today = '' } = {}) {
   const cur = /^[A-Za-z]{3}$/.test(currency) ? currency.toUpperCase() : 'the local currency';
@@ -267,20 +311,22 @@ export function createInvoiceHandler({
     } catch {
       return fail(400, 'bad_image');
     }
-    const m = typeof body?.image === 'string' ? IMAGE_RE.exec(body.image) : null;
-    if (!m || !m[2].startsWith(MAGIC[m[1]]) || m[2].length < 100) return fail(400, 'bad_image');
+    // `kind` only selects one of the fixed server-side prompts (anything unknown is an invoice)
+    const kind = body?.kind === 'receipt' ? 'receipt' : body?.kind === 'prices' ? 'prices' : 'invoice';
+    const priceRegion = kind === 'prices' && typeof body.region === 'string' ? getRegion(body.region) : null;
+    if (kind === 'prices' && !priceRegion) return fail(400, 'bad_region');
+    const m = kind === 'prices' ? null : typeof body?.image === 'string' ? IMAGE_RE.exec(body.image) : null;
+    if (kind !== 'prices' && (!m || !m[2].startsWith(MAGIC[m[1]]) || m[2].length < 100)) return fail(400, 'bad_image');
 
     const ip = String(req.ip || 'unknown');
     if (!perIp(ip) || !global('all')) return fail(429, 'rate_limited');
 
     // Google retires and overloads models: try the configured one, then the lighter alias. Only transient or
     // "model gone" failures move on; the error body of a failed attempt is never forwarded.
-    // `kind` only selects one of the fixed server-side prompts (anything unknown is an invoice)
-    const kind = body.kind === 'receipt' ? 'receipt' : 'invoice';
     const nowDate = new Date(clock());
     const pad = (n) => String(n).padStart(2, '0');
     const today = `${nowDate.getFullYear()}-${pad(nowDate.getMonth() + 1)}-${pad(nowDate.getDate())}`;
-    const reqBody = { mime: m[1], data: m[2], currency: typeof body.currency === 'string' ? body.currency : '', kind, today };
+    const reqBody = { mime: m?.[1], data: m?.[2], currency: typeof body.currency === 'string' ? body.currency : '', kind, today };
     let payload = null;
     let last = fail(502, 'upstream');
     for (const mdl of models) {
@@ -291,7 +337,7 @@ export function createInvoiceHandler({
         upstream = await fetchImpl(`${GEMINI_BASE}/${encodeURIComponent(mdl)}:generateContent`, {
           method: 'POST',
           headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
-          body: JSON.stringify(buildGeminiRequest({ ...reqBody, model: mdl })),
+          body: JSON.stringify(kind === 'prices' ? buildPricesRequest({ regionCode: priceRegion.code, model: mdl }) : buildGeminiRequest({ ...reqBody, model: mdl })),
           signal: ctl.signal,
         });
       } catch (err) {
@@ -326,6 +372,11 @@ export function createInvoiceHandler({
     if (payload?.promptFeedback?.blockReason) return fail(422, 'unreadable');
     const parsed = parseModelJson(payload);
     if (!parsed) return fail(502, 'unreadable');
+    if (kind === 'prices') {
+      const book = normalizeBook({ ...parsed, region: priceRegion.code, at: clock() }, priceRegion.code);
+      if (!book) return fail(422, 'unreadable');
+      return json(200, { ok: true, book });
+    }
     if (kind === 'receipt') {
       const receipt = normalizeReceipt(parsed);
       if (!receipt.isReceipt) return fail(422, 'not_invoice');

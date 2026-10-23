@@ -390,7 +390,7 @@ describe('proxy: "Escanear Boleta" ({kind:"receipt"}) is a second FIXED prompt b
   const clock = () => new Date(2026, 9, 22, 12, 0, 0).getTime();
 
   it('only picks one of two server prompts; any unknown kind is an invoice, and the browser cannot send text', async () => {
-    expect(KINDS).toEqual(['invoice', 'receipt']);
+    expect(KINDS).toEqual(['invoice', 'receipt', 'prices']); // prices: region code only, no image
     const f = okFetch(receipt());
     const res = await make({ fetchImpl: f, clock })(receiptRequest());
     expect(res.status).toBe(200);

@@ -6,6 +6,7 @@
 
 import { CATALOG } from './catalog.js';
 import { getRegion } from './regions.js';
+import { liveMaterial } from './priceBook.js';
 
 export const MAX_PRICE = 1_000_000_000;
 
@@ -33,8 +34,14 @@ export function roundMoney(value, region) {
   return Math.round(value * f) / f;
 }
 
-export function referencePrice(materialId, region, chain, bucket = marketBucket()) {
+export function referencePrice(materialId, region, chain, bucket = marketBucket(), book = null) {
   const mat = CATALOG[materialId];
+  const live = liveMaterial(book, region.code, materialId);
+  if (live > 0) {
+    // a live market price replaces the simulated base AND its drift; the chain positioning and spread still apply
+    const price = roundMoney(live * chain.factor * (1 + noise(`${region.code}|${chain.id}|${materialId}`) * 0.06), region);
+    return price > 0 ? price : 10 ** -region.digits;
+  }
   const base = mat.usd * region.fx * region.priceFactor * chain.factor;
   const spread = 1 + noise(`${region.code}|${chain.id}|${materialId}`) * 0.06;
   const drift = 1 + noise(`${bucket}|${region.code}|${materialId}`) * 0.015;
@@ -47,7 +54,7 @@ export function referencePrice(materialId, region, chain, bucket = marketBucket(
  * chainId === 'best' => cheapest chain for every item.
  * @returns {Record<string,{price:number, ref:number, source:'ref'|'manual', chainId:string}>}
  */
-export function resolvePrices({ ids, regionCode, chainId, overrides = {}, bucket = marketBucket() }) {
+export function resolvePrices({ ids, regionCode, chainId, overrides = {}, bucket = marketBucket(), book = null }) {
   const region = getRegion(regionCode);
   const out = {};
   for (const id of ids) {
@@ -55,7 +62,7 @@ export function resolvePrices({ ids, regionCode, chainId, overrides = {}, bucket
     let ref;
     if (chainId === 'best' || !region.chains.some((c) => c.id === chainId)) {
       for (const c of region.chains) {
-        const p = referencePrice(id, region, c, bucket);
+        const p = referencePrice(id, region, c, bucket, book);
         if (ref === undefined || p < ref) {
           ref = p;
           chain = c;
@@ -63,7 +70,7 @@ export function resolvePrices({ ids, regionCode, chainId, overrides = {}, bucket
       }
     } else {
       chain = region.chains.find((c) => c.id === chainId);
-      ref = referencePrice(id, region, chain, bucket);
+      ref = referencePrice(id, region, chain, bucket, book);
     }
     const manual = overrides[id];
     const hasManual = typeof manual === 'number' && manual > 0 && manual <= MAX_PRICE;
@@ -289,13 +296,13 @@ export function buildQuote({ partidas, lines, plan, prices, finance, regionCode,
 }
 
 /** Estimated materials total for each chain (for the comparison chips). */
-export function chainTotals({ partidas, lines, regionCode, wastePct = 0, overrides, bucket = marketBucket() }) {
+export function chainTotals({ partidas, lines, regionCode, wastePct = 0, overrides, bucket = marketBucket(), book = null }) {
   const region = getRegion(regionCode);
   const parts = partidas || [{ lines, waste: wastePct }];
   const plan = planAll(parts);
   const ids = plan.map((p) => p.id);
   const totalFor = (chainId) => {
-    const prices = resolvePrices({ ids, regionCode, chainId, overrides, bucket });
+    const prices = resolvePrices({ ids, regionCode, chainId, overrides, bucket, book });
     return buildQuote({
       partidas: parts,
       plan,

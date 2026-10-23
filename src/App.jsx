@@ -36,6 +36,7 @@ import { createDriveSync } from './lib/driveSync.js';
 import { collectBackup, isDeviceEmpty, parseBackup, restoreBackup } from './lib/backup.js';
 import { projectLimitReached } from './lib/pro.js';
 import { usePro } from './lib/usePro.js';
+import { usePriceFeed } from './lib/usePrices.js';
 import { usePWA } from './pwa/usePWA.js';
 import RegionSelect from './components/RegionSelect.jsx';
 import Login from './components/Login.jsx';
@@ -127,6 +128,8 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   const [photos, setPhotos] = useState(emptySlots);
 
   const region = getRegion(settings.region);
+  // live material / rental prices for the regions in use (the user's country + every project's); only inside the app
+  usePriceFeed(stage === 'app' ? [settings.region, ...(projects ?? []).map((p) => p.draft.regionCode)] : []);
   const active = useMemo(() => projects?.find((p) => p.id === activeId) ?? null, [projects, activeId]);
   const activeRef = useRef(null);
   const wipingRef = useRef(false); // true while signing out: nothing may be written back to the (erased) device
@@ -201,10 +204,17 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     const id = setTimeout(() => !wipingRef.current && projectStore.save(active).catch(() => {}), 250);
     return () => clearTimeout(id);
   }, [active]);
+  // `pagehide` alone is not reliable on mobile / installed PWAs (the OS often freezes or kills the page without it):
+  // `visibilitychange -> hidden` is the last event that is guaranteed to run, so the open project is also flushed there.
   useEffect(() => {
     const flush = () => activeRef.current && !wipingRef.current && projectStore.save(activeRef.current).catch(() => {});
+    const onVisibility = () => document.visibilityState === 'hidden' && flush();
     window.addEventListener('pagehide', flush);
-    return () => window.removeEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
   // ---- project actions -------------------------------------------------------------------------------------
@@ -260,19 +270,24 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   const openEditor = () => {
     const p = activeRef.current;
     if (!p) return;
-    const valid = computeAll(p.draft, pricingTime(p.draft, Date.now()), { timeline: planningTimeline(p.draft, p) }).valid;
+    const valid = computeAll(p.draft, pricingTime(p.draft, Date.now()), { timeline: planningTimeline(p.draft, p), chains: false }).valid;
     setDraft((d) => ({ ...d, step: valid || d.mode === 'project' ? 1 : 0 }));
     setEditor(true);
     window.scrollTo({ top: 0 });
   };
 
+  // A NEW project goes straight to choosing the kind of work and typing the measures: "Partida simple" opens the task
+  // picker (Radier, Pintura, Tabiquería...), "Proyecto completo" opens the list of partidas. The financial module
+  // (ProjectView) only comes after that, when the user leaves the editor.
   const createProject = (fields) => {
     // The company profile is COPIED into the new project: later profile changes never rewrite it.
-    const project = newProject({ regionCode: settings.region, company, logo, ...fields });
+    const created = newProject({ regionCode: settings.region, company, logo, ...fields });
+    const project = { ...created, draft: { ...created.draft, step: created.draft.mode === 'project' ? 1 : 0 } };
     commit(project);
     setSheet(null);
     setTab('projects');
     openProject(project.id);
+    setEditor(true);
   };
 
   const editProject = (project, fields) => {
@@ -453,7 +468,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
       {restoring ? (
         <RestoreScreen />
       ) : stage === 'splash' ? (
-        <SplashScreen onStart={start} auto={Boolean(user) || returning || Boolean(oauth)} timing={splash} />
+        <SplashScreen onStart={start} auto={Boolean(user) || returning || Boolean(oauth)} timing={splash} pwa={pwa} />
       ) : stage === 'setup' ? (
         !region || pickingRegion ? (
           <RegionSelect

@@ -4,6 +4,7 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from '../src/App.jsx';
 import { FREE_PROJECT_LIMIT, SIM_PRO_KEY, isPro } from '../src/lib/pro.js';
+import { backToDashboard } from './helpers/appHarness.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -68,7 +69,7 @@ describe('PRO test switch inside the real App', () => {
       typeInto(document.querySelector('[role="dialog"] input'), name);
       await click(q('project-save'));
       await flush(60);
-      await click(q('pv-back'));
+      await backToDashboard();
       return true;
     };
     for (let i = 1; i <= FREE_PROJECT_LIMIT; i += 1) expect(await create(`Obra ${i}`)).toBe(true);

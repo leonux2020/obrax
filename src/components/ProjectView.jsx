@@ -11,8 +11,10 @@ import { photosForReport } from '../lib/photos.js';
 import { createReportPdf, pdfToFile, warmPdfEngine } from '../lib/reportPdf.js';
 import { shareOrDownload } from '../lib/shareFile.js';
 import { sanitizeText } from '../lib/sanitize.js';
-import { usePro } from '../lib/usePro.js';
-import { Button, NumberField, TextField } from './ui.jsx';
+import { createDictation, getSpeechRecognition } from '../lib/speech.js';
+import { useAiAccess } from '../lib/usePro.js';
+import { usePriceBook, usePriceFeed } from '../lib/usePrices.js';
+import { Button, DateInput, NumberField, TextField } from './ui.jsx';
 import { LEVEL_COLOR, levelDetail } from './levelStyle.js';
 import PercentSlider from './PercentSlider.jsx';
 import CashSheet from './CashSheet.jsx';
@@ -81,7 +83,7 @@ function Advances({ advances, onChange, pool }) {
               <label htmlFor="adv-date" className="label">
                 {t('adv.date')}
               </label>
-              <input id="adv-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="field-input [color-scheme:dark]" data-testid="advance-date" />
+              <DateInput id="adv-date" value={date} onChange={(e) => setDate(e.target.value)} data-testid="advance-date" />
             </div>
             <Button type="submit" className="w-full" disabled={!worker.trim() || !(amount > 0)} data-testid="advance-add">
               {t('adv.add')}
@@ -114,18 +116,70 @@ function Advances({ advances, onChange, pool }) {
   );
 }
 
-/** Bitácora: the keyboard's own dictation (mic key) fills this field; nothing else is needed. */
-function Logbook({ entries, onChange }) {
+/**
+ * Bitácora con dictado por voz (Web Speech API): the microphone icon starts/stops the dictation, the words appear in the
+ * text area WHILE you speak and, when the dictation ends, the note is saved by itself into the project (IndexedDB, through
+ * the usual persistence of the open project). Typing and the "Guardar nota" button keep working.
+ */
+export function Logbook({ entries, onChange }) {
   const { t, lang, locale } = useI18n();
   const [text, setText] = useState('');
-  const [hint, setHint] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [note, setNote] = useState(''); // i18n key of the status line
   const field = useRef(null);
-  const save = () => {
-    const clean = sanitizeText(text, LEDGER_LIMITS.logChars).trim();
-    if (!clean) return;
-    onChange([{ id: newEntryId(), at: Date.now(), text: clean }, ...entries].slice(0, LEDGER_LIMITS.logbook));
+  const dictation = useRef(null);
+  // refs so the speech callbacks (created once per session) always see the latest values
+  const textRef = useRef('');
+  const entriesRef = useRef(entries);
+  const changeRef = useRef(onChange);
+  entriesRef.current = entries;
+  changeRef.current = onChange;
+  textRef.current = text;
+
+  const commit = (raw) => {
+    const clean = sanitizeText(raw, LEDGER_LIMITS.logChars).trim();
+    if (!clean) return false;
+    changeRef.current([{ id: newEntryId(), at: Date.now(), text: clean }, ...entriesRef.current].slice(0, LEDGER_LIMITS.logbook));
     setText('');
+    textRef.current = '';
+    return true;
   };
+  const save = () => {
+    setNote('');
+    commit(text);
+  };
+  const supported = Boolean(getSpeechRecognition());
+
+  const toggleMic = () => {
+    if (listening) {
+      dictation.current?.stop();
+      return;
+    }
+    if (!supported) {
+      field.current?.focus();
+      setNote('log.dictateUnsupported');
+      return;
+    }
+    setNote('log.listening');
+    dictation.current = createDictation({
+      lang,
+      locale,
+      getBase: () => textRef.current,
+      onText: (full) => setText(sanitizeText(full, LEDGER_LIMITS.logChars)),
+      onEnd: (full) => {
+        setListening(false);
+        setNote(commit(full) ? 'log.autosaved' : ''); // end of the dictation = saved into the project
+      },
+      onError: (kind) => {
+        setListening(false);
+        setNote(kind === 'denied' ? 'log.dictateDenied' : kind === 'unsupported' ? 'log.dictateUnsupported' : 'log.dictateError');
+      },
+    });
+    if (dictation.current.start()) setListening(true);
+  };
+  // leaving the screen while dictating: close the session (its onEnd still saves what was said)
+  useEffect(() => () => dictation.current?.stop(), []);
+
   const stamp = (ms) => (ms ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(ms)) : '');
   return (
     <div className="space-y-3">
@@ -164,30 +218,36 @@ function Logbook({ entries, onChange }) {
           data-testid="log-input"
           className="field-input min-h-[96px] resize-y pr-14"
         />
-        {/* visual invitation to dictate: the keyboard's own microphone does the listening (no audio is handled here) */}
         <button
           type="button"
-          onClick={() => {
-            field.current?.focus();
-            setHint(true);
-          }}
-          aria-label={t('log.dictate')}
+          onClick={toggleMic}
+          aria-label={listening ? t('log.dictate.stop') : t('log.dictate')}
+          aria-pressed={listening}
           data-testid="log-mic"
-          className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 text-brand transition hover:border-brand active:scale-95"
+          data-listening={listening ? 'true' : 'false'}
+          className={`absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full border text-brand transition active:scale-95 ${
+            listening ? 'animate-pulse border-red-500 bg-red-500/15 text-red-400' : 'border-white/15 hover:border-brand'
+          }`}
         >
-          <Icon size={22}>
-            <rect x="9" y="3" width="6" height="11" rx="3" />
-            <path d="M5 11a7 7 0 0 0 14 0" />
-            <path d="M12 18v3" />
-          </Icon>
+          {listening ? (
+            <Icon size={20}>
+              <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />
+            </Icon>
+          ) : (
+            <Icon size={22}>
+              <rect x="9" y="3" width="6" height="11" rx="3" />
+              <path d="M5 11a7 7 0 0 0 14 0" />
+              <path d="M12 18v3" />
+            </Icon>
+          )}
         </button>
       </div>
-      {hint && (
+      {note && (
         <p role="status" data-testid="log-mic-hint" className="text-xs text-neutral-300">
-          {t('log.dictateHint')}
+          {t(note)}
         </p>
       )}
-      {text.trim() && (
+      {text.trim() && !listening && (
         <Button className="w-full" onClick={save} data-testid="log-save">
           {t('log.save')}
         </Button>
@@ -272,7 +332,7 @@ function LocationBlock({ location }) {
 export default function ProjectView({ project, setProject, setDraft, photos, setPhotos, company, onBack, onEdit, onEditor, onPro, prepareReceipt, fetchImpl }) {
   const i18n = useI18n();
   const { t, money, num, unit, region, locale } = i18n;
-  const pro = usePro();
+  const pro = useAiAccess(); // 'pro' | 'dev' (localhost bypass) | null
   const { now } = useMarketClock();
   const draft = project.draft;
   const [cashOpen, setCashOpen] = useState(false);
@@ -287,10 +347,12 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
 
   const priceTime = pricingTime(draft, now);
   const timeline = planningTimeline(draft, project);
+  usePriceFeed(draft.regionCode);
+  const book = usePriceBook(draft.regionCode);
   const result = useMemo(
-    () => computeAll(draft, priceTime, { timeline }),
+    () => computeAll(draft, priceTime, { timeline, book }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [draft, priceTime, timeline.startDate, timeline.endDate]
+    [draft, priceTime, timeline.startDate, timeline.endDate, book]
   );
   const total = result.valid ? result.quote.total : 0;
   const cash = cashSummary(total, project.payments);
@@ -316,7 +378,7 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
       // "Generar PDF" FREEZES the quote: from now on the document and the project keep these prices and dates
       // (a client signature already does the same, so it is left alone). The contractor's signature from the
       // company profile is printed by the report itself.
-      const frozen = draft.frozen || draft.signature ? draft : freezeQuote(draft, { pricedAt: priceTime, total, live: project });
+      const frozen = draft.frozen || draft.signature ? draft : freezeQuote(draft, { pricedAt: priceTime, total, live: project, book: result.book });
       if (frozen !== draft) setDraft(() => frozen);
       const { doc, fileName, title: shareTitle } = await createReportPdf('client', { draft: frozen, result, company, i18n, photos: photosForReport(photos, t) });
       const outcome = await shareOrDownload(pdfToFile(doc, fileName), { title: shareTitle });
@@ -465,6 +527,7 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
         </Icon>
         <span>{t('scan.cta')}</span>
         {!pro && <span className="rounded border border-[#d4af37]/60 px-1.5 text-[10px] tracking-widest">PRO</span>}
+        {pro === 'dev' && <span data-testid="ai-dev-badge" className="rounded border border-white/30 px-1.5 text-[10px] tracking-widest text-neutral-300">DEV</span>}
       </button>
 
       {/* 5. supplies: what the quote needs + what the receipts say was bought / rented */}

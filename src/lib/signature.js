@@ -3,6 +3,10 @@
 // from storage. Pure functions only: the canvas factory is injected so everything runs in Node tests.
 
 import { sanitizeText, sanitizeTaxId } from './sanitize.js';
+import { normalizeBook } from './priceBook.js';
+
+/** A price book stored inside a frozen / signed quote (it carries its own region). */
+const lockedBook = (b) => (b && typeof b === 'object' ? normalizeBook(b, b.region) : null);
 
 export const SIGNATURE_LIMITS = Object.freeze({
   maxWidth: 480, // exported PNG, px
@@ -136,6 +140,7 @@ export function normalizeSignature(obj) {
   const total = Number(obj.total);
   const pricedAt = Number(obj.pricedAt);
   const timeline = normalizeTimeline(obj.timeline);
+  const book = lockedBook(obj.book);
   return {
     dataUrl,
     w,
@@ -146,6 +151,7 @@ export function normalizeSignature(obj) {
     total: Number.isFinite(total) && total >= 0 ? total : 0,
     pricedAt: Number.isFinite(pricedAt) && pricedAt > 0 ? pricedAt : 0,
     ...(timeline ? { timeline } : {}),
+    ...(book ? { book } : {}),
   };
 }
 
@@ -185,7 +191,7 @@ export function planningTimeline(draft, live = {}) {
 }
 
 /**
- * The frozen quote ("Generar PDF"): { at, pricedAt, total, timeline }. While it exists the market clock and the
+ * The frozen quote ("Generar PDF"): { at, pricedAt, total, timeline, book? }. While it exists the market clock and the
  * project dates are ignored by the quote (same guarantee a client signature gives, but without the client).
  */
 export function normalizeFrozen(obj) {
@@ -199,23 +205,25 @@ export function normalizeFrozen(obj) {
     pricedAt,
     total: Number.isFinite(total) && total >= 0 ? total : 0,
     timeline: normalizeTimeline(obj.timeline) ?? { startDate: '', endDate: '' },
+    ...(lockedBook(obj.book) ? { book: lockedBook(obj.book) } : {}),
   };
 }
 
 /** Freeze the quote now: prices at `pricedAt`, project dates as they are. A signed quote is already frozen by its signature. */
-export function freezeQuote(draft, { pricedAt, total = 0, live = {}, now = Date.now() }) {
+export function freezeQuote(draft, { pricedAt, total = 0, live = {}, now = Date.now(), book = null }) {
   if (draft.frozen) return draft;
-  return { ...draft, frozen: normalizeFrozen({ at: now, pricedAt, total, timeline: normalizeTimeline(live) }) };
+  return { ...draft, frozen: normalizeFrozen({ at: now, pricedAt, total, timeline: normalizeTimeline(live), book }) };
 }
 
 /**
  * Stamp a freshly applied signature with the dates (and thereby the plan) it vouches for. Only a signature
  * that is NEW in `next` (different from the one in `prev`) is stamped: older ones keep what they have.
  */
-export function freezeSignature(prev, next, live = {}) {
+export function freezeSignature(prev, next, live = {}, book = null) {
   const sig = next?.signature;
   if (!sig || sig.timeline || sig === prev?.signature) return next;
-  return { ...next, signature: { ...sig, timeline: normalizeTimeline(live) } };
+  const locked = lockedBook(book);
+  return { ...next, signature: { ...sig, timeline: normalizeTimeline(live), ...(locked ? { book: locked } : {}) } };
 }
 
 /** A signature only vouches for the quote it was given on: if the total changed afterwards it is stale. */

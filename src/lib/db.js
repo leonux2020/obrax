@@ -5,13 +5,16 @@
 //   project_photos  keyPath `key` = "<projectId>:<slot>"   photos scoped per project
 //   projects        keyPath `id`                           one record per client job
 //   company         keyPath `key`                          company logo (base64)
+// v3 adds:
+//   prices          keyPath `region`                       last known price book of each region (priceStore.js)
 
 export const DB_NAME = 'obrax';
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 export const STORE_LEGACY_PHOTOS = 'photos';
 export const STORE_PHOTOS = 'project_photos';
 export const STORE_PROJECTS = 'projects';
 export const STORE_COMPANY = 'company';
+export const STORE_PRICES = 'prices';
 
 export function openDb(factory) {
   return new Promise((resolve, reject) => {
@@ -22,6 +25,7 @@ export function openDb(factory) {
       if (!has(STORE_PHOTOS)) db.createObjectStore(STORE_PHOTOS, { keyPath: 'key' });
       if (!has(STORE_PROJECTS)) db.createObjectStore(STORE_PROJECTS, { keyPath: 'id' });
       if (!has(STORE_COMPANY)) db.createObjectStore(STORE_COMPANY, { keyPath: 'key' });
+      if (!has(STORE_PRICES)) db.createObjectStore(STORE_PRICES, { keyPath: 'region' });
     };
     req.onsuccess = () => {
       const db = req.result;

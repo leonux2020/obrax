@@ -5,6 +5,7 @@ import { getRegion } from '../lib/regions.js';
 import { buildRenditionFile, projectBalance } from '../lib/rendition.js';
 import { projectClient, projectTitle } from '../lib/projects.js';
 import { projectTotals } from '../lib/projectTotals.js';
+import { usePriceVersion } from '../lib/usePrices.js';
 import { shareOrDownload } from '../lib/shareFile.js';
 import { Button, Logo } from './ui.jsx';
 
@@ -19,7 +20,8 @@ export default function GlobalAccounting({ projects }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
 
-  const totals = useMemo(() => projectTotals(projects, now), [projects, now]);
+  const priceVersion = usePriceVersion(); // live prices landing re-total the projects
+  const totals = useMemo(() => projectTotals(projects, now), [projects, now, priceVersion]);
   const rows = useMemo(() => projects.map((p) => ({ project: p, balance: projectBalance(p, totals.get(p.id)), fmt: makeI18n(lang, p.draft.regionCode).money })), [projects, totals, lang]);
   const all = projects.length > 0 && selected.length === projects.length;
   const toggle = (id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));

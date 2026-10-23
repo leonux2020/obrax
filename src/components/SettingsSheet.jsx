@@ -6,6 +6,7 @@ import { Button, Switch } from './ui.jsx';
 import GoogleButton from './GoogleButton.jsx';
 import BottomSheet from './BottomSheet.jsx';
 import LangSelect from './LangSelect.jsx';
+import InstallButton from './InstallButton.jsx';
 
 /** Language, default country for new projects, PWA install and local profile switch. */
 export default function SettingsSheet({ user, company, logo, regionCode, pwa, drive, onDriveChange, onEditProfile, onSignIn, onChangeLang, onChangeRegion, onLogout, onClose, backup = null, onBackupNow = null, onRestore = null }) {
@@ -124,11 +125,7 @@ export default function SettingsSheet({ user, company, logo, regionCode, pwa, dr
           </div>
         )}
 
-        {pwa.canInstall && (
-          <Button variant="secondary" className="w-full" onClick={pwa.install}>
-            {t('pwa.install')}
-          </Button>
-        )}
+        <InstallButton pwa={pwa} />
 
         <div>
           <p className="label">{t(user.provider === 'google' ? 'settings.account.google' : 'settings.account')}</p>

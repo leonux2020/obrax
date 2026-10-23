@@ -9,14 +9,10 @@
 
 import { getRegion } from './regions.js';
 import { roundMoney, marketBucket } from './pricing.js';
+import { MACHINES, MACHINE_IDS } from './machines.js';
+import { liveRent } from './priceBook.js';
 
-/** usd = base DAILY rental in USD. `perSet` machines are priced per certified set (2 bays) per day. */
-export const MACHINES = Object.freeze({
-  mixer: { id: 'mixer', usd: 30 }, // trompo hormigonero
-  compactor: { id: 'compactor', usd: 45 }, // placa compactadora
-  scaffold: { id: 'scaffold', usd: 12, perSet: true }, // andamio certificado
-});
-export const MACHINE_IDS = Object.freeze(Object.keys(MACHINES));
+export { MACHINES, MACHINE_IDS };
 
 /** Thresholds of the suggestion rules (documented so they are easy to review and tune). */
 export const MACHINE_RULES = Object.freeze({
@@ -43,11 +39,13 @@ function hash(str) {
  * Daily rental rate in the region's currency. Like the material prices it follows the 15-minute market
  * window (a slow +-1.5 % drift on top of a stable per-country spread), so rentals refresh together with them.
  */
-export function machineryRate(id, regionCode, bucket = marketBucket()) {
+export function machineryRate(id, regionCode, bucket = marketBucket(), book = null) {
   const region = getRegion(regionCode);
   const noise = (seed) => (hash(seed) / 4294967295) * 2 - 1;
   const spread = 1 + noise(`${region.code}|machine|${id}`) * 0.05;
   const drift = 1 + noise(`${bucket}|${region.code}|machine|${id}`) * 0.015;
+  const live = liveRent(book, region.code, id);
+  if (live > 0) return roundMoney(live * spread, region); // a live market rate replaces the simulated base (and its drift)
   const rate = roundMoney(MACHINES[id].usd * region.fx * region.priceFactor * spread * drift, region);
   return rate > 0 ? rate : 10 ** -region.digits;
 }
@@ -91,12 +89,12 @@ export const DEFAULT_MACHINERY = Object.freeze({ include: true, excluded: [] });
  * `config` = { include: master switch, excluded: machine ids the user turned off }.
  * @returns {{items, total, byPartida, suggested}} total and byPartida count only the INCLUDED items.
  */
-export function planMachinery({ partidas, schedule, regionCode, config = DEFAULT_MACHINERY, bucket = marketBucket() }) {
+export function planMachinery({ partidas, schedule, regionCode, config = DEFAULT_MACHINERY, bucket = marketBucket(), book = null }) {
   const region = getRegion(regionCode);
   const include = config?.include !== false;
   const excluded = new Set(config?.excluded ?? []);
   const items = suggestMachinery(partidas, schedule).map((s) => {
-    const rate = machineryRate(s.id, regionCode, bucket);
+    const rate = machineryRate(s.id, regionCode, bucket, book);
     return { ...s, rate, total: roundMoney(s.qty * s.days * rate, region), included: include && !excluded.has(s.id) };
   });
   const byPartida = partidas.map(() => 0);

@@ -15,6 +15,15 @@ export const typeInto = (input, value) =>
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 
+// A NEW project opens in the editor (task + measures). Leave it (wizard back -> project view -> back) to the list.
+export async function backToDashboard() {
+  for (let i = 0; i < 8; i += 1) {
+    if (q('pv-back')) return click(q('pv-back'));
+    if (q('wizard-back')) await click(q('wizard-back'));
+    else return;
+  }
+}
+
 export function installFakeGoogle(drive, behavior = {}) {
   const requests = [];
   window.google = {

@@ -1,22 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { getInstallState, promptInstall, startInstallCapture, subscribeInstall } from './installPrompt.js';
 
 /** Service worker registration + install prompt + update flow + online status. */
 export function usePWA() {
-  const [installEvent, setInstallEvent] = useState(null);
   const [waiting, setWaiting] = useState(null);
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
   const refreshing = useRef(false);
 
   useEffect(() => {
-    const onBeforeInstall = (e) => {
-      e.preventDefault();
-      setInstallEvent(e);
-    };
-    const onInstalled = () => setInstallEvent(null);
+    startInstallCapture(); // idempotent: main.jsx already did it before the first render
     const up = () => setOnline(true);
     const down = () => setOnline(false);
-    window.addEventListener('beforeinstallprompt', onBeforeInstall);
-    window.addEventListener('appinstalled', onInstalled);
     window.addEventListener('online', up);
     window.addEventListener('offline', down);
 
@@ -45,23 +39,16 @@ export function usePWA() {
     }
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstall);
-      window.removeEventListener('appinstalled', onInstalled);
       window.removeEventListener('online', up);
       window.removeEventListener('offline', down);
       if (onControllerChange) navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
     };
   }, []);
 
-  const install = useCallback(async () => {
-    if (!installEvent) return;
-    installEvent.prompt();
-    try {
-      await installEvent.userChoice;
-    } finally {
-      setInstallEvent(null);
-    }
-  }, [installEvent]);
+  // the captured install event lives in installPrompt.js (it fires once, early); this only reads it
+  const installSnapshot = useSyncExternalStore(subscribeInstall, () => JSON.stringify(getInstallState()), () => '{}');
+  const { canPrompt, installed } = JSON.parse(installSnapshot || '{}');
+  const install = useCallback(() => promptInstall(), []);
 
   const applyUpdate = useCallback(() => {
     if (!waiting) return;
@@ -69,5 +56,5 @@ export function usePWA() {
     waiting.postMessage({ type: 'SKIP_WAITING' });
   }, [waiting]);
 
-  return { canInstall: Boolean(installEvent), install, updateReady: Boolean(waiting), applyUpdate, online };
+  return { canInstall: Boolean(canPrompt), installed: Boolean(installed), install, updateReady: Boolean(waiting), applyUpdate, online };
 }

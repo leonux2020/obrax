@@ -59,10 +59,12 @@ describe('first run: splash -> setup -> dashboard', () => {
     await mountApp();
     expect(q('splash')).not.toBeNull();
     expect(host.querySelector('img')).not.toBeNull();
-    const buttons = host.querySelectorAll('button');
+    // "Iniciar" + the "Instalar App" button (hidden once installed), both in the bottom third (thumb zone)
+    const buttons = [...host.querySelectorAll('button')].filter((b) => b.dataset.testid !== 'install-app');
     expect(buttons).toHaveLength(1);
     expect(buttons[0].textContent).toBe('Iniciar');
-    expect(buttons[0].closest('.fixed').className).toContain('bottom-0'); // bottom third, thumb zone
+    expect(buttons[0].closest('.fixed').className).toContain('bottom-0');
+    expect(q('install-app').closest('.fixed').className).toContain('bottom-0');
     expect(q('splash-credit').textContent).toBe('Un producto Japadigital');
     const name = host.querySelector('h1');
     expect(name.textContent).toBe('CUBRAX'); // the name sits centred right under the logo
