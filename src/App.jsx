@@ -319,6 +319,7 @@ export default function App() {
                 closeProject();
                 requestNewProject();
               }}
+              onPro={openPaywall}
               onExit={closeProject}
             />
           ) : (

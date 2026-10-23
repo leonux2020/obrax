@@ -267,7 +267,7 @@ describe('frontend only: no Gemini key in the client', () => {
   it('no source file reads GEMINI_API_KEY and the only env var used by the client is VITE_GOOGLE_CLIENT_ID', () => {
     const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]));
     const files = walk(path.join(process.cwd(), 'src')).filter((f) => /\.(js|jsx)$/.test(f));
-    for (const f of files) expect(fs.readFileSync(f, 'utf8'), f).not.toMatch(/GEMINI/i);
+    for (const f of files) expect(fs.readFileSync(f, 'utf8'), f).not.toMatch(/GEMINI_|x-goog-api-key|generativelanguage/i) // the product name may appear in UI copy; the key, its env name and Google's endpoint may not;
     const envUses = files.flatMap((f) => [...fs.readFileSync(f, 'utf8').matchAll(/import\.meta\.env\??\.(\w+)/g)].map((m) => m[1]));
     expect(new Set(envUses.filter((n) => n.startsWith('VITE_')))).toEqual(new Set(['VITE_GOOGLE_CLIENT_ID']));
   });

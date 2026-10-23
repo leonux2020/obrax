@@ -1,16 +1,20 @@
 import { useRef, useState } from 'react';
 import { useI18n } from '../../lib/i18n.jsx';
-import { MAX_PRICE } from '../../lib/pricing.js';
+import { MAX_PRICE, taxRateFor } from '../../lib/pricing.js';
+import { isPro } from '../../lib/pro.js';
 import { createRateLimiter, humanVerified } from '../../lib/shield.js';
 import { chainLabel } from '../../lib/regions.js';
 import { Badge, Button, NumberField } from '../ui.jsx';
+import InvoiceSheet from '../InvoiceSheet.jsx';
 
-export default function StepPrices({ draft, setDraft, result, now, onRefresh }) {
+export default function StepPrices({ draft, setDraft, result, now, onRefresh, onPro }) {
   const { t, region, money, num, unit, time } = useI18n();
   // Genuine user input => 8 refreshes/min; scripted (untrusted-event) sessions => 2/min.
   const humanLimiter = useRef(createRateLimiter(8, 60_000));
   const botLimiter = useRef(createRateLimiter(2, 60_000));
   const [limited, setLimited] = useState(false);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [applied, setApplied] = useState(0); // prices loaded from the last invoice
 
   if (!result.valid) return null;
 
@@ -31,6 +35,15 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh }) 
       setLimited(false);
       onRefresh();
     } else setLimited(true);
+  };
+
+  // PRO: AI invoice reading. Locked users get the paywall (with the reason) instead of the flow.
+  const openInvoice = () => (isPro() ? setInvoiceOpen(true) : onPro?.('ai'));
+  const applyInvoice = (overrides) => {
+    const n = Object.keys(overrides).length;
+    if (n > 0) setDraft((d) => ({ ...d, overrides: { ...d.overrides, ...overrides } }));
+    setApplied(n);
+    setInvoiceOpen(false);
   };
 
   const chips = [
@@ -54,6 +67,24 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh }) 
           ↻ {t('prices.refresh')}
         </Button>
       </div>
+      <div className="rounded-2xl border border-[#d4af37]/60 p-3" data-testid="invoice-card">
+        <Button variant="ghost" className="w-full !min-h-[56px] !border-[#d4af37]/60 text-[#e8c35f]" onClick={openInvoice} data-testid="invoice-open">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 7V5a1 1 0 0 1 1-1h2M20 7V5a1 1 0 0 0-1-1h-2M4 17v2a1 1 0 0 0 1 1h2M20 17v2a1 1 0 0 1-1 1h-2M8 12h8" />
+          </svg>
+          {t('inv.cta')}
+          {!isPro() && <span className="rounded-md border border-[#d4af37]/60 px-1.5 text-[11px] font-extrabold tracking-wider">PRO</span>}
+        </Button>
+        <p className="mt-2 text-xs text-neutral-300">{t('inv.cta.hint')}</p>
+        {applied > 0 && (
+          <p role="status" data-testid="invoice-applied" className="mt-2 text-sm font-semibold text-brand">
+            {t('inv.applied', { n: applied })}
+          </p>
+        )}
+      </div>
+      {invoiceOpen && (
+        <InvoiceSheet quoteItems={result.quote.items} taxRate={taxRateFor(region, draft.finance)} onApply={applyInvoice} onClose={() => setInvoiceOpen(false)} />
+      )}
       {draft.partidas.length > 1 && <p className="text-sm text-brand">{t('part.consolidated')}</p>}
       {limited && (
         <p role="alert" className="text-sm font-semibold text-red-400">

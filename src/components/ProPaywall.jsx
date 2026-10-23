@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
-import { FREE_PROJECT_LIMIT } from '../lib/pro.js';
+import { FREE_PROJECT_LIMIT, setSimulatedPro } from '../lib/pro.js';
 import { Button } from './ui.jsx';
 import BottomSheet from './BottomSheet.jsx';
 import HelmetIcon from './HelmetIcon.jsx';
@@ -110,6 +110,20 @@ export default function ProPaywall({ feature = 'promo', onClose }) {
           <Button disabled aria-disabled="true" data-testid="pro-subscribe" className="w-full">
             {t('pro.subscribe')}
           </Button>
+          {import.meta.env.DEV && (
+            // Development only (dead code in production builds): lets the PRO flows be tried on localhost.
+            <Button
+              variant="ghost"
+              className="w-full !border-[#d4af37]/60 text-[#e8c35f]"
+              data-testid="pro-dev-activate"
+              onClick={() => {
+                setSimulatedPro(true);
+                onClose();
+              }}
+            >
+              {t('pro.devActivate')}
+            </Button>
+          )}
           <Button variant="ghost" onClick={onClose} data-testid="pro-back" className="w-full">
             {t('pro.back')}
           </Button>

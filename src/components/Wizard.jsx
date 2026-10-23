@@ -16,7 +16,7 @@ const STEPS = {
   project: ['project', 'partidas', 'prices', 'finance', 'report'],
 };
 
-export default function Wizard({ projectId, draft, setDraft: setProjectDraft, photos, setPhotos, company, startDate = '', endDate = '', onNewProject, onExit }) {
+export default function Wizard({ projectId, draft, setDraft: setProjectDraft, photos, setPhotos, company, startDate = '', endDate = '', onNewProject, onPro, onExit }) {
   const { t } = useI18n();
   const { now, refresh } = useMarketClock(); // moves by itself every 15 minutes: prices and rentals re-price on their own
   const [showErrors, setShowErrors] = useState(false);
@@ -104,7 +104,7 @@ export default function Wizard({ projectId, draft, setDraft: setProjectDraft, ph
         <StepPartidas draft={draft} setDraft={setDraft} result={result} showErrors={showErrors} />
       )}
       {step === 2 && (
-        <StepPrices draft={draft} setDraft={setDraft} result={result} now={priceTime} onRefresh={refresh} />
+        <StepPrices draft={draft} setDraft={setDraft} result={result} now={priceTime} onRefresh={refresh} onPro={onPro} />
       )}
       {step === 3 && <StepFinance draft={draft} setDraft={setDraft} result={result} />}
       {step === 4 && (

@@ -2,6 +2,8 @@
 // Pure helpers (limits, validation, normalisation) are separated from the browser-only
 // compression pipeline so the rules are unit-testable in Node.
 
+import { INVOICE_LIMITS } from './invoice.js';
+
 export const MAX_PHOTOS = 4;
 export const PHOTO_SLOTS = Object.freeze(['panoramic', 'existing', 'details', 'logistics']);
 
@@ -279,4 +281,33 @@ export function shouldUseLiveCamera(nav = globalThis.navigator, matchMedia = glo
     /* ignore */
   }
   return true;
+}
+
+/**
+ * Invoice photo for AI reading. Receipts are text, so this keeps far more detail than the evidence photos
+ * (longest side 1600 px, up to ~900 KB) while staying small enough for one request to the proxy.
+ * @returns {{dataUrl: string, width: number, height: number}}
+ */
+export async function compressInvoiceImage(file, env = {}) {
+  if (!file || typeof file.type !== 'string' || !file.type.startsWith('image/')) throw new PhotoError('type');
+  if (file.size > PHOTO_LIMITS.maxInputBytes) throw new PhotoError('size');
+  const img = await (env.decode || decode)(file);
+  try {
+    let { width: tw, height: th } = fitSize(img.width, img.height, INVOICE_LIMITS.maxSide);
+    if (!tw) throw new PhotoError('decode');
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const canvas = downscale(img.source, img.width, img.height, tw, th, env.makeCanvas);
+      const { dataUrl } = encodeJpeg(canvas, { targetBytes: INVOICE_LIMITS.targetBytes });
+      releaseCanvas(canvas);
+      if (dataUrlBytes(dataUrl) <= INVOICE_LIMITS.targetBytes * 1.2 || attempt === 5) {
+        if (!/^data:image\/jpeg;base64,/.test(dataUrl)) throw new PhotoError('decode');
+        return { dataUrl, width: tw, height: th };
+      }
+      tw = Math.max(1, Math.round(tw * 0.85));
+      th = Math.max(1, Math.round(th * 0.85));
+    }
+    throw new PhotoError('decode');
+  } finally {
+    img.close?.();
+  }
 }
