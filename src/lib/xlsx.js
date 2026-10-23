@@ -119,7 +119,7 @@ export function buildXlsx(sheets, { digits = 2 } = {}) {
 }
 
 /** Safe file name stem: letters / digits / dash / underscore only. */
-export const fileStem = (text, fallback = 'obrax') =>
+export const fileStem = (text, fallback = 'cubrax') =>
   String(text || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')

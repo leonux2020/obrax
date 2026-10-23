@@ -19,6 +19,8 @@ function DateField({ label, value, onChange, invalid }) {
   );
 }
 
+const SectionTitle = ({ children }) => <h3 className="pt-2 text-xs font-bold uppercase tracking-wider text-neutral-400">{children}</h3>;
+
 const ModeIcon = ({ mode }) => (
   <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {mode === 'quick' ? (
@@ -88,8 +90,9 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
   };
 
   return (
-    <BottomSheet title={t(editing ? 'proj.edit.title' : 'proj.new.title')} onClose={onClose}>
-      <form onSubmit={submit} className="mt-3 space-y-4">
+    <BottomSheet fullscreen={editing} title={t(editing ? 'proj.edit.title' : 'proj.new.title')} onClose={onClose}>
+      <form onSubmit={submit} className={`mt-3 space-y-4 ${editing ? 'mx-auto max-w-lg pb-6' : ''}`} data-testid={editing ? 'edit-form' : 'new-form'}>
+        {editing && <SectionTitle>{t('edit.sectionBasics')}</SectionTitle>}
         <TextField label={t('project.name')} placeholder={t('project.namePh')} value={form.name} sanitize={(v) => sanitizeText(v, 60)} onChange={set('name')} />
         <TextField label={t('project.client')} placeholder={t('project.clientPh')} value={form.client} sanitize={(v) => sanitizeText(v, 60)} onChange={set('client')} />
 
@@ -120,6 +123,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
           </div>
         )}
 
+        {editing && <SectionTitle>{t('edit.sectionDates')}</SectionTitle>}
         <div className="grid grid-cols-2 gap-3">
           <DateField label={t('proj.start')} value={form.startDate} onChange={set('startDate')} />
           <DateField label={t('proj.end')} value={form.endDate} onChange={set('endDate')} invalid={badRange} />
@@ -131,6 +135,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
         )}
 
         <div>
+          {editing && <SectionTitle>{t('loc.title')}</SectionTitle>}
           <div className="flex items-center gap-2">
             <Button variant="ghost" className="flex-1 !min-h-[52px]" onClick={useHere} disabled={geo === 'asking'} data-testid="project-locate">
               <span aria-hidden="true">📍</span> {geo === 'asking' ? t('newp.locating') : form.location ? t('newp.located') : t('newp.locate')}
@@ -148,7 +153,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
             )}
           </div>
           {form.location && (
-            <p className="mt-1.5 text-xs text-neutral-400" data-testid="project-location">
+            <p className="mt-1.5 break-words text-sm text-neutral-300" data-testid="project-location">
               {locationLabel(form.location)}
             </p>
           )}
@@ -161,6 +166,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
 
         {editing && (
           <>
+            <SectionTitle>{t('edit.sectionState')}</SectionTitle>
             <Switch checked={form.closed} onChange={set('closed')} label={t('proj.closeSwitch')} description={t('proj.closeSwitch.desc')} data-testid="project-closed" />
             {project.draft.frozen && (
               <Switch checked={form.unfreeze} onChange={set('unfreeze')} label={t('proj.unfreeze')} description={t('proj.unfreeze.desc')} data-testid="project-unfreeze" />

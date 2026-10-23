@@ -1,6 +1,6 @@
 // FR dictionary (generated from reviewed translation; keys mirror the ES dictionary).
 export const FR = {
-  "app.name": "Obrax",
+  "app.name": "CUBRAX",
   "app.tagline": "Métrés et devis de chantier",
   "common.next": "Suivant",
   "common.back": "Retour",
@@ -149,7 +149,7 @@ export const FR = {
   "report.copied": "Copié",
   "report.newProject": "Nouveau projet",
   "report.confirmNew": "Supprimer ce projet et en commencer un nouveau ?",
-  "report.generatedBy": "Généré avec Obrax",
+  "report.generatedBy": "Généré avec CUBRAX",
   "tech.heading": "Rapport technique de chantier",
   "tech.task": "Travail",
   "tech.measures": "Mesures saisies",

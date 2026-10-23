@@ -2,7 +2,7 @@
   "name": "obrax",
   "private": true,
   "version": "1.0.0",
-  "description": "Obrax - PWA de cubicación y presupuestos para profesionales de la construcción",
+  "description": "CUBRAX - PWA de cubicación y presupuestos para profesionales de la construcción",
   "type": "module",
   "engines": {
     "node": ">=18.17"

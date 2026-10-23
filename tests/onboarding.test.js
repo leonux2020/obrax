@@ -64,7 +64,10 @@ describe('first run: splash -> setup -> dashboard', () => {
     expect(buttons[0].textContent).toBe('Iniciar');
     expect(buttons[0].closest('.fixed').className).toContain('bottom-0'); // bottom third, thumb zone
     expect(q('splash-credit').textContent).toBe('Un producto Japadigital');
-    expect(host.querySelector('h1').className).toContain('sr-only'); // the name is only for screen readers: the screen shows the logo
+    const name = host.querySelector('h1');
+    expect(name.textContent).toBe('CUBRAX'); // the name sits centred right under the logo
+    expect(name.className).toContain('text-center');
+    expect(host.querySelector('img').compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(host.querySelectorAll('p')).toHaveLength(1); // no tagline, no extra text
     expect(host.querySelector('header')).toBeNull(); // no app chrome around the splash
   });

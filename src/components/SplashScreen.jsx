@@ -6,7 +6,7 @@ import { Button, Logo } from './ui.jsx';
 export const SPLASH_TIMING = Object.freeze({ hold: 1500, fade: 450 });
 
 /**
- * Opening screen: ONLY the logo and "Un producto Japadigital". It is ALWAYS shown when the app opens.
+ * Opening screen: ONLY the logo, the name CUBRAX right under it and "Un producto Japadigital". It is ALWAYS shown when the app opens.
  *  - `auto` (the user already has a profile or a session): it holds for `hold` ms, fades out and calls `onStart`,
  *    so the Dashboard (or the sign-in screen) appears by itself.
  *  - otherwise (first run): the one "Iniciar" button (bottom third, thumb reach) starts the setup.
@@ -43,7 +43,9 @@ export default function SplashScreen({ onStart, auto = false, timing = SPLASH_TI
       data-leaving={leaving ? 'true' : undefined}
     >
       <Logo size={132} />
-      <h1 className="sr-only">{t('app.name')}</h1>
+      <h1 data-testid="splash-name" className="mt-6 w-full text-center text-3xl font-semibold uppercase tracking-[0.35em] text-white [padding-left:0.35em]">
+        {t('app.name')}
+      </h1>
 
       <div className="fixed inset-x-0 bottom-0 z-40 px-6 [padding-bottom:max(1.5rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto w-full max-w-md">

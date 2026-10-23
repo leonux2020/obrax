@@ -319,13 +319,13 @@ class Writer {
 async function newDoc(title, author) {
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: typeof document !== 'undefined' }); // readable (uncompressed) in Node so tests can assert on the text
-  doc.setProperties({ title: pdfSafe(title), author: pdfSafe(author || ''), creator: 'Obrax' });
+  doc.setProperties({ title: pdfSafe(title), author: pdfSafe(author || ''), creator: 'CUBRAX' });
   return doc;
 }
 
 // ---- CLIENT budget ---------------------------------------------------------------------------------
 /** @param model buildClientModel() result @param ctx {money, logo, appName} */
-export async function renderClientPdf(model, { money, logo = null, appName = 'Obrax', photos = [], photosTitle = '' }) {
+export async function renderClientPdf(model, { money, logo = null, appName = 'CUBRAX', photos = [], photosTitle = '' }) {
   const doc = await newDoc(`${model.heading} - ${model.project}`, model.company.name);
   const w = new Writer(doc, appName);
   w.header(model, { logo, title: model.heading.toUpperCase() });
@@ -445,7 +445,7 @@ export async function renderClientPdf(model, { money, logo = null, appName = 'Ob
 
 // ---- TECHNICAL dossier ------------------------------------------------------------------------------------
 /** @param model buildTechModel() result @param ctx {t, money, logo, appName} */
-export async function renderTechPdf(model, { t, money, num = (n) => String(n), logo = null, appName = 'Obrax', photos = [] }) {
+export async function renderTechPdf(model, { t, money, num = (n) => String(n), logo = null, appName = 'CUBRAX', photos = [] }) {
   const doc = await newDoc(`${model.heading} - ${model.project}`, model.company.name);
   const w = new Writer(doc, appName);
   w.header(model, { logo, title: model.heading.toUpperCase() });

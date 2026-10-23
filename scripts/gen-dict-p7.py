@@ -4,7 +4,7 @@ L = ['es', 'en', 'pt', 'fr', 'it', 'de']
 T = {
  # splash + setup
  'splash.start': ['Iniciar', 'Start', 'Iniciar', 'Démarrer', 'Inizia', 'Starten'],
- 'splash.credit': ['Un producto Japadigital', 'A Japadigital product', 'Um produto Japadigital', 'Un produit Japadigital', 'Un prodotto Japadigital', 'Ein Produkt von Japadigital'],
+ 'splash.credit': ['Un producto Japadigital'] * 6,  # brand line: identical in every language
  'setup.sign': ['Firma digital', 'Digital signature', 'Assinatura digital', 'Signature numérique', 'Firma digitale', 'Digitale Unterschrift'],
  'setup.driveTitle': ['Copia de seguridad', 'Backup', 'Backup', 'Sauvegarde', 'Backup', 'Datensicherung'],
  'setup.drive.connect': ['Conectar Google Drive', 'Connect Google Drive', 'Conectar o Google Drive', 'Connecter Google Drive', 'Collega Google Drive', 'Google Drive verbinden'],
@@ -105,6 +105,15 @@ T = {
  'log.placeholder': ['Escribe o dicta con el micrófono del teclado…', "Type or dictate with your keyboard's microphone…", 'Escreva ou dite com o microfone do teclado…', 'Écrivez ou dictez avec le micro du clavier…', 'Scrivi o detta con il microfono della tastiera…', 'Schreiben oder diktieren Sie mit dem Mikrofon der Tastatur…'],
  'log.dictate': ['Dictar por voz', 'Dictate by voice', 'Ditar por voz', 'Dicter à la voix', 'Detta a voce', 'Per Sprache diktieren'],
  'log.dictateHint': ['Toca el micrófono de tu teclado para dictar la nota.', "Tap your keyboard's microphone key to dictate the note.", 'Toque na tecla do microfone do teclado para ditar a nota.', 'Touchez la touche micro du clavier pour dicter la note.', 'Tocca il tasto microfono della tastiera per dettare la nota.', 'Tippen Sie auf die Mikrofontaste der Tastatur, um die Notiz zu diktieren.'],
+ 'loc.title': ['Ubicación', 'Location', 'Localização', 'Emplacement', 'Posizione', 'Standort'],
+ 'loc.open': ['Abrir en Maps', 'Open in Maps', 'Abrir no Maps', 'Ouvrir dans Maps', 'Apri in Maps', 'In Maps öffnen'],
+ 'loc.share': ['Compartir', 'Share', 'Compartilhar', 'Partager', 'Condividi', 'Teilen'],
+ 'loc.none': ['Sin ubicación. Agrégala con el lápiz.', 'No location yet. Add it with the pencil.', 'Sem localização. Adicione com o lápis.', "Pas d'emplacement. Ajoutez-le avec le crayon.", 'Nessuna posizione. Aggiungila con la matita.', 'Noch kein Standort. Fügen Sie ihn mit dem Stift hinzu.'],
+ 'loc.copied': ['Enlace copiado al portapapeles.', 'Link copied to the clipboard.', 'Link copiado para a área de transferência.', 'Lien copié dans le presse-papiers.', 'Link copiato negli appunti.', 'Link in die Zwischenablage kopiert.'],
+ 'edit.sectionBasics': ['Datos de la obra', 'Job details', 'Dados da obra', 'Données du chantier', 'Dati del cantiere', 'Baustellendaten'],
+ 'edit.sectionDates': ['Fechas', 'Dates', 'Datas', 'Dates', 'Date', 'Termine'],
+ 'edit.sectionState': ['Estado de la obra', 'Job status', 'Estado da obra', 'État du chantier', 'Stato del cantiere', 'Baustellenstatus'],
+ 'oauth.drive.done': ['Google Drive conectado correctamente.', 'Google Drive connected successfully.', 'Google Drive conectado com sucesso.', 'Google Drive connecté avec succès.', 'Google Drive collegato correttamente.', 'Google Drive erfolgreich verbunden.'],
  'pv.map': ['Ver en el mapa', 'View on map', 'Ver no mapa', 'Voir sur la carte', 'Vedi sulla mappa', 'Auf der Karte ansehen'],
  'log.save': ['Guardar nota', 'Save note', 'Salvar nota', 'Enregistrer la note', 'Salva nota', 'Notiz speichern'],
  # export

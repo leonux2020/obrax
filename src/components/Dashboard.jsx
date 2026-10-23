@@ -3,6 +3,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { isClosed, projectLevel, sortProjects } from '../lib/projects.js';
 import { usePro } from '../lib/usePro.js';
 import { Logo } from './ui.jsx';
+import HelmetIcon from './HelmetIcon.jsx';
 import { LEVEL_COLOR } from './levelStyle.js';
 import ProjectCard from './ProjectCard.jsx';
 
@@ -61,40 +62,35 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro }
       <header className="mb-3 flex items-center gap-3">
         <Logo size={34} />
         <h1 className="min-w-0 flex-1 truncate text-2xl font-extrabold tracking-tight">{t('nav.projects')}</h1>
-        {pro ? (
-          <span role="status" data-testid="pro-active" aria-label={t('pro.active')} className="rounded-md border border-[#d4af37]/60 px-2 py-0.5 text-[11px] font-extrabold tracking-widest text-[#e8c35f]">
-            PRO
-          </span>
-        ) : (
-          <button
-            type="button"
-            onClick={onPro}
-            data-testid="pro-scan"
-            aria-label={t('pro.cta')}
-            className="min-h-[32px] rounded-md border border-white/15 px-2 text-[11px] font-extrabold tracking-widest text-white/50 transition hover:border-[#d4af37] hover:text-[#e8c35f]"
-          >
-            PRO
-          </button>
-        )}
+        {/* PRO: always a real button that opens the plans screen (also when PRO is already active). Gold hard hat on top. */}
+        <button
+          type="button"
+          onClick={() => onPro()}
+          data-testid={pro ? 'pro-active' : 'pro-scan'}
+          data-pro={pro ? 'true' : undefined}
+          aria-label={pro ? t('pro.active') : t('pro.cta')}
+          className={`flex min-h-[52px] min-w-[52px] flex-col items-center justify-center gap-0.5 rounded-xl border px-2 py-1 transition-shadow duration-200 hover:shadow-[0_0_14px_rgba(212,175,55,0.5)] focus-visible:shadow-[0_0_14px_rgba(212,175,55,0.5)] active:shadow-[0_0_18px_rgba(232,195,95,0.6)] ${
+            pro ? 'border-[#d4af37]/60 text-[#e8c35f]' : 'border-white/15 text-white/60 hover:border-[#d4af37]/70 hover:text-[#e8c35f]'
+          }`}
+        >
+          <HelmetIcon size={28} />
+          <span className="text-[11px] font-extrabold leading-none tracking-widest">PRO</span>
+        </button>
       </header>
 
       {active.length > 0 && (
-        <ul className="mb-3 grid grid-cols-4 gap-1.5" data-testid="dash-pills" aria-label={t('light.label')}>
+        <ul className="mb-3 flex items-center justify-around" data-testid="dash-pills" aria-label={t('light.label')}>
           {PILLS.map(([level, key]) => {
-            const on = counts[level] > 0;
             const color = LEVEL_COLOR[level];
             return (
-              <li
-                key={level}
-                data-testid={`pill-${level}`}
-                data-count={counts[level]}
-                aria-label={`${t(key)}: ${counts[level]}`}
-                // opaque, saturated and always fully visible: filled when there is something, outlined when empty
-                style={on ? { background: color, borderColor: color, color: '#000' } : { borderColor: color, color }}
-                className="flex flex-col items-center rounded-xl border-2 px-1 py-2"
-              >
-                <span className="text-2xl font-black tabular-nums leading-none">{counts[level]}</span>
-                <span className="mt-1 max-w-full truncate text-[11px] font-extrabold">{t(key)}</span>
+              <li key={level} data-testid={`pill-${level}`} data-count={counts[level]} aria-label={`${t(key)}: ${counts[level]}`} title={t(key)} className="relative block h-[54px] w-[60px]">
+                {/* warning-sign triangle: transparent / OLED black inside, solid 2 px border in the state colour, number in the middle */}
+                <svg viewBox="0 0 60 54" className="absolute inset-0 h-full w-full" aria-hidden="true" focusable="false">
+                  <polygon points="30,3 57,51 3,51" fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" data-testid={`tri-${level}`} />
+                </svg>
+                <span aria-hidden="true" className="absolute inset-x-0 top-[25px] text-center text-xl font-black leading-none tabular-nums" style={{ color }}>
+                  {counts[level]}
+                </span>
               </li>
             );
           })}

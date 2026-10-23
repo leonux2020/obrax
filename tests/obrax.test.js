@@ -38,28 +38,28 @@ const variant = (k) => {
 };
 const photo = (slot, extra = {}) => ({ slot, dataUrl: variant(slot), width: 1200, height: 800, at: 1, ...extra });
 
-describe('Obrax branding', () => {
+describe('CUBRAX branding', () => {
   it('uses the new name everywhere it is defined', () => {
-    expect(BRAND.name).toBe('Obrax');
-    expect(BRAND.shortName).toBe('Obrax');
+    expect(BRAND.name).toBe('CUBRAX');
+    expect(BRAND.shortName).toBe('CUBRAX');
     const m = buildManifest();
-    expect(m.name).toBe('Obrax');
-    expect(m.short_name).toBe('Obrax');
+    expect(m.name).toBe('CUBRAX');
+    expect(m.short_name).toBe('CUBRAX');
     expect(m.id).toBe('com.obrax.app');
     expect(m.icons.length).toBeGreaterThanOrEqual(4);
-    expect(DICT.es['app.name']).toBe('Obrax');
-    expect(DICT.en['app.name']).toBe('Obrax');
+    expect(DICT.es['app.name']).toBe('CUBRAX');
+    expect(DICT.en['app.name']).toBe('CUBRAX');
   });
   it('index.html carries the requested title and brand meta', () => {
     const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-    expect(html).toContain('<title>Obrax - Cubicación &amp; Presupuestos de Obra</title>');
-    expect(html).toContain('content="Obrax"');
-    expect(BRAND.title).toBe('Obrax - Cubicación & Presupuestos de Obra');
+    expect(html).toContain('<title>CUBRAX - Cubicación &amp; Presupuestos de Obra</title>');
+    expect(html).toContain('content="CUBRAX"');
+    expect(BRAND.title).toBe('CUBRAX - Cubicación & Presupuestos de Obra');
   });
   it('keeps the embedded construction logo (helmet, blueprint grid, measuring tape)', () => {
     const svg = buildIconSvg();
     expect(svg).toContain('<svg');
-    expect(svg).toContain('aria-label="Obrax"');
+    expect(svg).toContain('aria-label="CUBRAX"');
   });
   it('no source file still uses the old brand', () => {
     const files = ['index.html', 'package.json', 'public/robots.txt', 'src/lib/dict.js', 'src/lib/pdf.js', 'src/brand/icon.js'];

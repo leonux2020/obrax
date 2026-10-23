@@ -43,6 +43,7 @@ import BottomNav from './components/BottomNav.jsx';
 import ProjectSheet from './components/ProjectSheet.jsx';
 import SettingsSheet from './components/SettingsSheet.jsx';
 import ProfileSheet from './components/ProfileSheet.jsx';
+import { clearOAuthResult, peekOAuthResult } from './lib/oauthCallback.js';
 import SplashScreen, { SPLASH_TIMING } from './components/SplashScreen.jsx';
 import ProfileSetup from './components/ProfileSetup.jsx';
 import ProPaywall from './components/ProPaywall.jsx';
@@ -99,7 +100,12 @@ export default function App({ splash = SPLASH_TIMING }) {
   const [logo, setLogo] = useState('');
   const [projects, setProjects] = useState(null); // null while loading from IndexedDB
   const [activeId, setActiveId] = useState(null); // null = dashboard
-  const [meta, setMeta] = useState(loadProfileMeta); // { onboarded, drive }
+  // Google's answer after a full-page redirect (Drive consent), already validated and stripped of its token in main.jsx.
+  const [oauth] = useState(peekOAuthResult);
+  const [meta, setMeta] = useState(() => {
+    const m = loadProfileMeta(); // { onboarded, drive }
+    return oauth?.granted && m.onboarded ? { ...m, drive: true } : m;
+  });
   // The welcome screen ('splash') is ALWAYS the first view of a new or signed-out user (nobody authenticated);
   // a stored user goes straight to the app. 'setup' is the registration (first run), 'app' shows Login when
   // there is no user.
@@ -121,6 +127,7 @@ export default function App({ splash = SPLASH_TIMING }) {
   useEffect(() => saveUser(user), [user]);
   useEffect(() => saveCompany(company), [company]);
   useEffect(() => saveProfileMeta(meta), [meta]);
+  useEffect(() => clearOAuthResult(), []); // the answer is consumed once
   useEffect(() => {
     document.documentElement.lang = settings.lang;
   }, [settings.lang]);
@@ -335,7 +342,7 @@ export default function App({ splash = SPLASH_TIMING }) {
   return (
     <I18nProvider lang={settings.lang} regionCode={active ? active.draft.regionCode : settings.region}>
       {stage === 'splash' ? (
-        <SplashScreen onStart={start} auto={Boolean(user) || returning} timing={splash} />
+        <SplashScreen onStart={start} auto={Boolean(user) || returning || Boolean(oauth)} timing={splash} />
       ) : stage === 'setup' ? (
         !region || pickingRegion ? (
           <RegionSelect
@@ -345,7 +352,7 @@ export default function App({ splash = SPLASH_TIMING }) {
             onCancel={region ? () => setPickingRegion(false) : () => setStage('splash')}
           />
         ) : (
-          <ProfileSetup onSave={finishSetup} onChangeRegion={() => setPickingRegion(true)} />
+          <ProfileSetup onSave={finishSetup} onChangeRegion={() => setPickingRegion(true)} returned={oauth} />
         )
       ) : !region || pickingRegion ? (
         <RegionSelect

@@ -83,21 +83,50 @@ describe('Dashboard: counters instead of sentences, tabs, full-width clickable c
     expect(host.textContent).not.toMatch(/proyectos? activos?|tienes \d/i);
   });
 
-  it('colours are opaque and vivid: filled pills when there is something, outlined (never dimmed) when empty; undated started jobs count as on time', async () => {
+  it('indicators are small warning triangles: transparent inside, solid 2px border in the state colour, the number in the middle; undated started jobs count as on time', async () => {
     const list = [mk('Atrasada', -30, -4), mk('Sin fecha fin', -3, 0)];
     list[1].endDate = '';
     await render(React.createElement(Dashboard, { projects: list, tab: 'active', onTab: () => {}, onNew: () => {}, onOpen: () => {}, onPro: () => {} }));
     expect(q('pill-red').getAttribute('data-count')).toBe('1');
     expect(q('pill-green').getAttribute('data-count')).toBe('1'); // real dates: no end date = cannot be late
-    expect(q('pill-red').style.background).not.toBe('');
-    expect(q('pill-red').style.color).toMatch(/^(#000|rgb\(0, 0, 0\))$/);
-    expect(q('pill-orange').style.background).toBe(''); // empty: outlined...
-    expect(q('pill-orange').style.borderColor).not.toBe('');
-    for (const l of ['red', 'orange', 'green', 'future']) expect(q(`pill-${l}`).className).not.toMatch(/opacity/);
+    expect(host.querySelectorAll('[data-testid="dash-pills"] svg polygon')).toHaveLength(4);
+    const colors = { red: '#ff2b2b', orange: '#ff9500', green: '#00d95f', future: '#2d8cff' };
+    for (const [level, color] of Object.entries(colors)) {
+      const tri = q(`tri-${level}`);
+      expect(tri.getAttribute('stroke')).toBe(color);
+      expect(tri.getAttribute('stroke-width')).toBe('2');
+      expect(tri.getAttribute('fill')).toBe('none'); // OLED black / transparent inside
+      const li = q(`pill-${level}`);
+      expect(li.className).not.toMatch(/opacity|bg-/);
+      expect(li.className).toContain('h-[54px]'); // small, not a giant rectangle
+      expect(li.textContent).toBe(String(li.getAttribute('data-count'))); // the number, centred in the triangle
+    }
     const cards = qa('project-card');
     expect(cards.map((c) => c.getAttribute('data-level')).sort()).toEqual(['green', 'red']);
     for (const c of cards) expect(c.style.borderColor).toMatch(/^(#|rgb)/);
-    expect(Object.values(LEVEL_COLOR).slice(0, 4)).toEqual(['#ff2b2b', '#ff9500', '#00d95f', '#2d8cff']);
+    expect(Object.values(LEVEL_COLOR).slice(0, 4)).toEqual(Object.values(colors));
+  });
+
+  it('PRO button: gold hard hat right above the label, subtle gold glow on hover / touch, always opens the plans screen', async () => {
+    const onPro = vi.fn();
+    await render(React.createElement(Dashboard, { projects: [], tab: 'active', onTab: () => {}, onNew: () => {}, onOpen: () => {}, onPro }));
+    const btn = q('pro-scan');
+    expect(btn.tagName).toBe('BUTTON');
+    expect(btn.className).toContain('flex-col');
+    const [hat, label] = [btn.firstElementChild, btn.lastElementChild];
+    expect(hat.getAttribute('data-testid')).toBe('helmet-icon'); // above...
+    expect(label.textContent).toBe('PRO'); // ...the text
+    expect(btn.className).toMatch(/hover:shadow-\[0_0_\d+px_rgba\(212,175,55/);
+    expect(btn.className).toMatch(/active:shadow-/);
+    await click(btn);
+    expect(onPro).toHaveBeenCalledTimes(1);
+    act(() => root.unmount());
+    root = createRoot(host);
+    localStorage.setItem('cp.pro.sim.v1', '1'); // already PRO: still a button that opens the plans
+    await render(React.createElement(Dashboard, { projects: [], tab: 'active', onTab: () => {}, onNew: () => {}, onOpen: () => {}, onPro }));
+    expect(q('pro-active').tagName).toBe('BUTTON');
+    await click(q('pro-active'));
+    expect(onPro).toHaveBeenCalledTimes(2);
   });
 
   it('tabs switch Activos / Historial; closed jobs only live in the history', async () => {
@@ -187,6 +216,25 @@ describe('New project sheet: agile form, no money', () => {
   });
 });
 
+describe('Edit modal (the pencil)', () => {
+  it('opens a clean full-height modal with name, client, dates and location in labelled sections', async () => {
+    const saved = [];
+    const p = { ...sized(mk('Casa', -2, 30)), location: { lat: -33.4489, lng: -70.6693, label: '' } };
+    await render(React.createElement(ProjectSheet, { project: p, onSave: (v) => saved.push(v), onDelete: () => {}, onClose: () => {}, locate: async () => ({ lat: 10, lng: 20 }) }));
+    const dialog = document.querySelector('[role="dialog"]');
+    expect(dialog.className).toContain('h-[100dvh]');
+    const headings = [...dialog.querySelectorAll('h3')].map((h) => h.textContent);
+    expect(headings).toEqual(['Datos de la obra', 'Fechas', 'Ubicación', 'Estado de la obra']);
+    expect(dialog.querySelectorAll('input[type="text"]')).toHaveLength(2); // name + client
+    expect(dialog.querySelectorAll('input[type="date"]')).toHaveLength(2);
+    expect(document.querySelector('[data-testid="project-location"]').textContent).toContain('-33.4489');
+    await click(document.querySelector('[data-testid="project-locate"]'));
+    expect(document.querySelector('[data-testid="project-location"]').textContent).toContain('10.0000');
+    await click(document.querySelector('[data-testid="project-save"]'));
+    expect(saved[0]).toMatchObject({ name: 'Casa', location: { lat: 10, lng: 20 } });
+  });
+});
+
 describe('Project interior', () => {
   const photos = [];
   function Harness({ initial, onEdit = () => {}, onEditor = () => {}, onPro = () => {}, extra = {} }) {
@@ -255,7 +303,15 @@ describe('Project interior', () => {
     expect(ranges).toHaveLength(3);
     for (const r of ranges) expect(r.getAttribute('step')).toBe('1');
     expect(q('slider-labor-value').textContent).toBe('35%');
-    expect(q('slider-labor-value').previousElementSibling.tagName).toBe('LABEL'); // number right beside the title
+    const pillCls = q('slider-labor-value').className;
+    for (const k of ['bg-brand', 'text-black', 'rounded-md']) expect(pillCls).toContain(k); // green pill, black text
+    for (const id of ['labor', 'contingency', 'profit']) {
+      const box = q(`slider-${id}`);
+      const kids = [...box.children];
+      expect(kids[0].contains(q(`slider-${id}-value`))).toBe(true); // the pill row sits above the rail...
+      expect(kids[0].className).toContain('justify-between'); // ...at its right end
+      expect(kids[1].tagName).toBe('INPUT');
+    }
     const total0 = q('budget-total').textContent;
     await slide(q('slider-contingency-input'), 10);
     expect(q('slider-contingency-value').textContent).toBe('10%');
@@ -323,19 +379,41 @@ describe('Project interior', () => {
     expect(q('expense-list').querySelectorAll('[data-testid="hourglass"]')).toHaveLength(0);
   });
 
-  it('the project location is shown inside the project as a map link, and only the pencil (edit sheet) changes it', async () => {
+  it('Ubicación block: the place plus "Abrir en Maps" and "Compartir" (navigator.share); editing happens only from the pencil', async () => {
     const withLoc = { ...sized(mk('Casa', -2, 30)), location: { lat: -33.4489, lng: -70.6693, label: '' } };
+    const shared = [];
+    Object.defineProperty(navigator, 'share', { value: async (d) => shared.push(d), configurable: true });
     await render(React.createElement(Harness, { initial: withLoc }));
-    const link = q('pv-location');
-    expect(link.tagName).toBe('A');
-    expect(link.getAttribute('href')).toContain('-33.4489,-70.6693');
-    expect(link.getAttribute('rel')).toContain('noopener');
-    expect(link.textContent).toContain('-33.4489');
+    expect(q('pv-location-block').textContent).toContain('Ubicación');
+    expect(q('pv-location').textContent).toContain('-33.4489');
+    const open = q('loc-open');
+    expect(open.tagName).toBe('A');
+    expect(open.textContent).toBe('Abrir en Maps');
+    expect(open.getAttribute('href')).toContain('-33.4489,-70.6693');
+    expect(open.getAttribute('target')).toBe('_blank');
+    expect(open.getAttribute('rel')).toContain('noopener');
+    expect(q('loc-share').textContent).toBe('Compartir');
+    await click(q('loc-share'));
+    expect(shared).toHaveLength(1);
+    expect(shared[0].url).toContain('-33.4489,-70.6693');
     expect(q('project-locate')).toBeNull(); // no location editing inside the view itself
+    delete navigator.share;
     act(() => root.unmount());
     root = createRoot(host);
     await render(React.createElement(Harness, { initial: sized(mk('Sin ubicación', -2, 30)) }));
     expect(q('pv-location')).toBeNull();
+    expect(q('loc-open')).toBeNull();
+    expect(q('pv-location-empty').textContent).toContain('lápiz');
+  });
+
+  it('without navigator.share the link is copied to the clipboard', async () => {
+    const copied = [];
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (v) => copied.push(v) }, configurable: true });
+    await render(React.createElement(Harness, { initial: { ...sized(mk('Casa', -2, 30)), location: { lat: 1, lng: 2, label: 'Obra Norte' } } }));
+    await click(q('loc-share'));
+    expect(copied[0]).toContain('1,2');
+    expect(q('loc-note')).not.toBeNull();
+    delete navigator.clipboard;
   });
 
   it('Bitácora: a plain text field (keyboard dictation) saves dated entries', async () => {

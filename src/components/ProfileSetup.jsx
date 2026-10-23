@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { regionName } from '../lib/regions.js';
 import { EMPTY_COMPANY } from '../lib/draft.js';
-import { requestDriveAccess } from '../lib/auth.js';
+import { connectDrive, saveSetupDraft, takeSetupDraft } from '../lib/oauthCallback.js';
 import { SignatureError, exportSignature } from '../lib/signature.js';
 import { Button } from './ui.jsx';
 import ProfileFields from './ProfileFields.jsx';
@@ -14,12 +14,13 @@ import SignaturePad from './SignaturePad.jsx';
  *   request (Google's own OAuth consent: this app never has a field for a password) + "Continuar".
  * Later edits do NOT happen here: they live in Ajustes (see ProfileSheet).
  */
-export default function ProfileSetup({ onSave, onChangeRegion = null, requestDrive = requestDriveAccess }) {
+export default function ProfileSetup({ onSave, onChangeRegion = null, requestDrive = connectDrive, returned = null }) {
   const { t, region, lang } = useI18n();
-  const [form, setForm] = useState({ ...EMPTY_COMPANY });
+  // `returned`: the answer Google sent back after a full-page redirect ({granted} | {error}); the typed form is restored
+  const [form, setForm] = useState(() => ({ ...EMPTY_COMPANY, ...(returned ? takeSetupDraft() : null) }));
   const [logo, setLogo] = useState('');
-  const [drive, setDrive] = useState(false); // true only once Google confirmed the consent
-  const [driveState, setDriveState] = useState('idle'); // idle | asking | ok | not_configured | offline | denied
+  const [drive, setDrive] = useState(Boolean(returned?.granted)); // true only once Google confirmed the consent
+  const [driveState, setDriveState] = useState(returned ? (returned.granted ? 'ok' : 'denied') : 'idle'); // idle | asking | ok | not_configured | offline | denied
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [inked, setInked] = useState(false);
@@ -29,10 +30,13 @@ export default function ProfileSetup({ onSave, onChangeRegion = null, requestDri
     if (driveState === 'asking') return;
     setDriveState('asking');
     try {
+      saveSetupDraft(form); // kept in case the browser has to leave to Google and come back
       await requestDrive();
+      takeSetupDraft(); // no redirect happened: the saved copy is not needed
       setDrive(true);
       setDriveState('ok');
     } catch (err) {
+      if (err?.code === 'redirect') return; // the page is going to Google: keep "waiting"
       setDrive(false);
       setDriveState(['not_configured', 'offline', 'denied'].includes(err?.code) ? err.code : 'denied');
     }

@@ -1,4 +1,4 @@
-/* Obrax service worker. Generated at build: version + precache list are injected below. */
+/* CUBRAX service worker. Generated at build: version + precache list are injected below. */
 const VERSION = '__VERSION__';
 const CACHE = `obrax-${VERSION}`;
 const PRECACHE = __PRECACHE__;

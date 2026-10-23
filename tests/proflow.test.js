@@ -54,7 +54,10 @@ describe('PRO test switch inside the real App', () => {
     expect(q('pro-paywall')).toBeNull();
     expect(q('pro-active').textContent.trim()).toBe('PRO');
     expect(q('pro-active').getAttribute('aria-label')).toBe('PRO activo');
-    expect(q('pro-scan')).toBeNull(); // nothing left that reopens the paywall
+    expect(q('pro-scan')).toBeNull();
+    await click(q('pro-active')); // the PRO button still opens the plans screen
+    expect(q('pro-paywall')).not.toBeNull();
+    expect(q('pro-active-note')).not.toBeNull();
   });
 
   it('PRO lifts the free-project limit at once (no reload): the 4th project opens the form, not the paywall', async () => {

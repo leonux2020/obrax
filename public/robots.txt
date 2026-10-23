@@ -1,4 +1,4 @@
-# Obrax - the pricing/calculation engine is proprietary.
+# CUBRAX - the pricing/calculation engine is proprietary.
 User-agent: *
 Allow: /
 Disallow: /assets/

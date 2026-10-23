@@ -54,7 +54,7 @@ export function userFromCredential(credential, { clientId = GOOGLE_CLIENT_ID, no
   };
 }
 
-export const demoUser = () => ({ provider: 'demo', name: 'Usuario Demo', email: 'demo@obrax.app', picture: '' });
+export const demoUser = () => ({ provider: 'demo', name: 'Usuario Demo', email: 'demo@cubrax.app', picture: '' });
 export const guestUser = () => ({ provider: 'guest', name: 'Invitado', email: '', picture: '' });
 
 /** Local profile: no account, no network. Name is optional and stays on this device. */
@@ -74,7 +74,7 @@ const driveError = (code) => Object.assign(new Error(`drive:${code}`), { code })
 /**
  * Ask Google (consent pop-up of Google Identity Services) for access to the app's own Drive folder.
  * Resolves { granted: true } only when Google confirms the scope; rejects with an Error whose `code` is
- * 'not_configured' | 'offline' | 'denied'. The access token itself is not kept: this step records the consent.
+ * 'not_configured' | 'offline' | 'denied' | 'popup' (the pop-up could not open). The access token itself is not kept: this step records the consent.
  */
 export async function requestDriveAccess({ clientId = GOOGLE_CLIENT_ID, enabled = googleConfigured, load = loadGsi } = {}) {
   if (!enabled) throw driveError('not_configured');
@@ -95,7 +95,8 @@ export async function requestDriveAccess({ clientId = GOOGLE_CLIENT_ID, enabled 
         if (ok) resolve({ granted: true });
         else reject(driveError('denied'));
       },
-      error_callback: () => reject(driveError('denied')),
+      // the pop-up could not open (blocked, in-app browser): the caller falls back to a full-page redirect
+      error_callback: (e) => reject(driveError(e?.type === 'popup_failed_to_open' ? 'popup' : 'denied')),
     });
     client.requestAccessToken({ prompt: '' });
   });

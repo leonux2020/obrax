@@ -15,7 +15,7 @@ export const kindForView = (view) => (view === 'tech' ? 'tech' : 'client');
 /** Warm the jsPDF chunk so generating (and the share user-gesture window) is fast on first use. */
 export const warmPdfEngine = () => import('jspdf').catch(() => null);
 
-/** Company logo as a PNG data URL for the PDF header; the Obrax icon only when there is none / it fails. */
+/** Company logo as a PNG data URL for the PDF header; the CUBRAX icon only when there is none / it fails. */
 async function pdfLogo(company) {
   const own = typeof company?.logo === 'string' && company.logo ? await rasterizeLogo(company.logo) : null;
   return own || rasterizeLogo(ICON_DATA_URI);

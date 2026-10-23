@@ -196,6 +196,74 @@ function Logbook({ entries, onChange }) {
   );
 }
 
+/** Where the job is: the place as text plus two quick actions (open in the maps app / share it). Edited only from the pencil. */
+function LocationBlock({ location }) {
+  const { t } = useI18n();
+  const [note, setNote] = useState('');
+  const label = locationLabel(location);
+  const url = location ? `https://www.google.com/maps/search/?api=1&query=${location.lat},${location.lng}` : '';
+  const share = async () => {
+    setNote('');
+    const data = { title: label, text: label, url };
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+        await navigator.share(data);
+      } else if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        setNote('copied');
+      }
+    } catch (err) {
+      if (err?.name !== 'AbortError') setNote('');
+    }
+  };
+  return (
+    <section aria-labelledby="pv-loc" className="card mt-4" data-testid="pv-location-block">
+      <h2 id="pv-loc" className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+        {t('loc.title')}
+      </h2>
+      {location ? (
+        <>
+          <p data-testid="pv-location" className="mt-1.5 flex items-center gap-2 break-words text-sm text-neutral-200">
+            <Icon size={18}>
+              <path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" />
+              <circle cx="12" cy="10" r="2.5" />
+            </Icon>
+            <span className="min-w-0 flex-1">{label}</span>
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="loc-open"
+              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-brand px-3 text-sm font-bold text-brand transition hover:bg-brand/10 active:scale-[0.98]"
+            >
+              {t('loc.open')}
+            </a>
+            <button
+              type="button"
+              onClick={share}
+              data-testid="loc-share"
+              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-white/15 px-3 text-sm font-bold text-white transition hover:border-white/40 active:scale-[0.98]"
+            >
+              {t('loc.share')}
+            </button>
+          </div>
+          {note === 'copied' && (
+            <p role="status" data-testid="loc-note" className="mt-2 text-xs text-neutral-300">
+              {t('loc.copied')}
+            </p>
+          )}
+        </>
+      ) : (
+        <p data-testid="pv-location-empty" className="mt-1.5 text-sm text-neutral-400">
+          {t('loc.none')}
+        </p>
+      )}
+    </section>
+  );
+}
+
 /**
  * The inside of a project, top to bottom: identity + state + pencil, the money (budget + cash bar), the three
  * horizontal selectors (+ advances), the AI receipt scan, the supplies, Tap-to-Snap, the bitácora, the rendición and,
@@ -295,22 +363,6 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
           <p className="truncate text-sm text-neutral-300">
             <span aria-hidden="true">{region.flag}</span> {client || t('proj.noClient')}
           </p>
-          {project.location && (
-            <a
-              href={`https://www.google.com/maps/search/?api=1&query=${project.location.lat},${project.location.lng}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              data-testid="pv-location"
-              aria-label={`${t('pv.map')}: ${locationLabel(project.location)}`}
-              className="mt-0.5 flex min-h-[28px] max-w-full items-center gap-1 text-sm text-neutral-300 underline decoration-white/30 underline-offset-2 hover:text-white"
-            >
-              <Icon size={14}>
-                <path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" />
-                <circle cx="12" cy="10" r="2.5" />
-              </Icon>
-              <span className="truncate">{locationLabel(project.location)}</span>
-            </a>
-          )}
         </div>
         <button type="button" onClick={onEdit} aria-label={t('proj.edit')} data-testid="pv-edit" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/10 hover:border-brand">
           <Icon>
@@ -331,6 +383,8 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
         </span>
         {due.length > 0 && <Hourglass label={t('rental.dueToday')} />}
       </div>
+
+      <LocationBlock location={project.location} />
 
       {/* 2. money: the budget and the cash control bar */}
       <section aria-labelledby="pv-budget" className="card mt-4">
