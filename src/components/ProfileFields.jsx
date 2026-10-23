@@ -9,7 +9,7 @@ import ContractorSignatureField from './ContractorSignatureField.jsx';
  * company (logo, name, tax ID; contact data when `extended`), professional (name + personal ID) and the
  * Google Drive backup switch. Fully controlled: the parent owns `form`, `logo` and `drive`.
  */
-export default function ProfileFields({ form, setForm, logo, setLogo, onBusy, drive, setDrive, extended = false, emailError = false, logoError = '', onSign = null }) {
+export default function ProfileFields({ form, setForm, logo, setLogo, onBusy, drive, setDrive, extended = false, emailError = false, logoError = '', onSign = null, showDrive = true }) {
   const { t, region } = useI18n();
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }));
   const idLabel = t(`company.taxId.${region.code}`);
@@ -50,8 +50,8 @@ export default function ProfileFields({ form, setForm, logo, setLogo, onBusy, dr
 
       {extended && onSign && <ContractorSignatureField value={form.signature} onOpen={onSign} />}
 
-      <Switch checked={drive} onChange={setDrive} label={t('setup.drive')} description={t('setup.drive.desc')} data-testid="setup-drive" />
-      <p className="text-xs text-neutral-400">{t('company.snapshot')}</p>
+      {showDrive && <Switch checked={drive} onChange={setDrive} label={t('setup.drive')} description={t('setup.drive.desc')} data-testid="setup-drive" />}
+      {showDrive && <p className="text-xs text-neutral-400">{t('company.snapshot')}</p>}
     </div>
   );
 }

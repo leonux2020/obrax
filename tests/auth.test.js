@@ -188,7 +188,7 @@ describe('Google login on the main access screen (VITE_GOOGLE_CLIENT_ID)', () =>
     expect(q('settings-account').textContent).toContain('ana@example.com');
     await click([...q('settings-account').querySelectorAll('button')].find((b) => b.textContent.trim()));
     expect(q('splash')).not.toBeNull(); // signed out: the welcome screen comes first again
-    expect(q('splash-start').textContent).toBe('Acceder'); // a returning user does not re-register
+    expect(q('splash-start').textContent).toBe('Iniciar'); // a returning user does not re-register: it goes to the access screen
     await click(q('splash-start'));
     expect(q('login-google-card')).not.toBeNull();
   });
@@ -196,12 +196,12 @@ describe('Google login on the main access screen (VITE_GOOGLE_CLIENT_ID)', () =>
 
 describe('PRO paywall opens when a locked function is used', () => {
   const createViaNav = async (name) => {
-    await click(tab('Nuevo'));
+    await click(q('fab-new'));
     if (q('pro-paywall')) return;
     typeInto(document.querySelector('[role="dialog"] input'), name);
     await click(q('project-save'));
     await flush(60);
-    await click(q('wizard-back'));
+    await click(q('pv-back'));
   };
 
   it(`the free plan allows ${FREE_PROJECT_LIMIT} projects; the next "Nuevo" opens the PRO screen instead of the form`, async () => {
@@ -210,18 +210,18 @@ describe('PRO paywall opens when a locked function is used', () => {
     for (let i = 1; i <= FREE_PROJECT_LIMIT; i += 1) {
       await createViaNav(`Obra ${i}`);
       expect(q('pro-paywall'), `project ${i}`).toBeNull();
-      expect(host.querySelectorAll('ul[aria-label] > li')).toHaveLength(i);
+      expect(host.querySelectorAll('[data-testid="project-card"]')).toHaveLength(i);
     }
-    await click(tab('Nuevo'));
+    await click(q('fab-new'));
     expect(q('pro-paywall')).not.toBeNull();
     expect(q('project-save')).toBeNull(); // no new-project form
     expect(q('pro-reason').textContent).toContain(`${FREE_PROJECT_LIMIT} proyectos`);
     expect(q('pro-paywall').querySelector('[data-active="true"]').textContent).toContain('Sin límites de proyectos');
-    expect(host.querySelectorAll('ul[aria-label] > li')).toHaveLength(FREE_PROJECT_LIMIT);
+    expect(host.querySelectorAll('[data-testid="project-card"]')).toHaveLength(FREE_PROJECT_LIMIT);
 
     await click(q('pro-back')); // free navigation back
     expect(q('pro-paywall')).toBeNull();
-    expect(host.querySelectorAll('ul[aria-label] > li')).toHaveLength(FREE_PROJECT_LIMIT);
+    expect(host.querySelectorAll('[data-testid="project-card"]')).toHaveLength(FREE_PROJECT_LIMIT);
   });
 
   it('Google Drive backup is a FREE switch in Ajustes: it never opens the PRO screen', async () => {

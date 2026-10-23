@@ -94,6 +94,8 @@ export function buildClientModel({ draft, result, company, region, t, num, date 
             { label: t('bd.labor'), amount: q.labor },
             ...(q.transport > 0 ? [{ label: t('bd.transport'), amount: q.transport }] : []),
             ...(q.machinery > 0 ? [{ label: t('bd.machinery'), amount: q.machinery }] : []),
+            // contingency + profit travel together as one line so the rows still add up to the net subtotal
+            ...(q.contingency + q.profit > 0 ? [{ label: t('bd.overhead'), amount: q.contingency + q.profit }] : []),
           ],
         }
       : null,
@@ -217,6 +219,10 @@ export function buildTechModel({ draft, result, company, region, t, num, unit, m
       transport: q.transport,
       transportPct: draft.finance.transport,
       machinery: q.machinery ?? 0,
+      contingency: q.contingency ?? 0,
+      contingencyPct: draft.finance.contingency ?? 0,
+      profit: q.profit ?? 0,
+      profitPct: draft.finance.profit ?? 0,
       subtotal: q.subtotal,
       taxName: region.taxName,
       taxRate: q.taxRate,

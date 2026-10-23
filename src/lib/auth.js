@@ -64,3 +64,39 @@ export const localUser = (name = '') => ({
   email: '',
   picture: '',
 });
+
+// ---- Google Drive consent (the same native Google OAuth as the sign-in; no password is ever typed here) ----------
+// `drive.file` only gives access to files the app itself creates, never to the rest of the user's Drive.
+export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+
+const driveError = (code) => Object.assign(new Error(`drive:${code}`), { code });
+
+/**
+ * Ask Google (consent pop-up of Google Identity Services) for access to the app's own Drive folder.
+ * Resolves { granted: true } only when Google confirms the scope; rejects with an Error whose `code` is
+ * 'not_configured' | 'offline' | 'denied'. The access token itself is not kept: this step records the consent.
+ */
+export async function requestDriveAccess({ clientId = GOOGLE_CLIENT_ID, enabled = googleConfigured, load = loadGsi } = {}) {
+  if (!enabled) throw driveError('not_configured');
+  let google;
+  try {
+    google = await load();
+  } catch {
+    throw driveError('offline');
+  }
+  const oauth = google?.accounts?.oauth2;
+  if (!oauth?.initTokenClient) throw driveError('offline');
+  return new Promise((resolve, reject) => {
+    const client = oauth.initTokenClient({
+      client_id: clientId,
+      scope: DRIVE_SCOPE,
+      callback: (resp) => {
+        const ok = resp?.access_token && !resp.error && (typeof oauth.hasGrantedAllScopes !== 'function' || oauth.hasGrantedAllScopes(resp, DRIVE_SCOPE));
+        if (ok) resolve({ granted: true });
+        else reject(driveError('denied'));
+      },
+      error_callback: () => reject(driveError('denied')),
+    });
+    client.requestAccessToken({ prompt: '' });
+  });
+}

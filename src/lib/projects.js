@@ -5,6 +5,7 @@ import { getRegion } from './regions.js';
 import { normalizeDraft, normalizeCompany, newDraft, isCompanyEmpty } from './draft.js';
 import { sanitizeText } from './sanitize.js';
 import { normalizeLogo } from './logo.js';
+import { normalizeAdvances, normalizeExpenses, normalizeLocation, normalizeLogbook, normalizePayments } from './ledger.js';
 
 export const MAX_PROJECTS = 200;
 const ID_RE = /^[a-z0-9]{6,24}$/;
@@ -60,6 +61,21 @@ export function trafficLight(startDate, endDate, now = Date.now(), rules = LIGHT
   return { level, daysLeft, fractionLeft };
 }
 
+/**
+ * The five states shown on the dashboard. `future` (blue) = the job has not started yet; the other levels are the
+ * time traffic light. `daysLate` is the critical figure printed on a red card.
+ */
+export function projectLevel(project, now = Date.now()) {
+  const light = trafficLight(project.startDate, project.endDate, now);
+  const start = parseDay(project.startDate);
+  const today = startOfDay(now);
+  if (start && start > today) return { level: 'future', daysLate: 0, daysUntilStart: dayDiff(today, start), light };
+  return { level: light.level, daysLate: light.level === 'red' ? Math.abs(light.daysLeft) : 0, daysUntilStart: 0, light };
+}
+
+/** A finished job (marked in the edit sheet) lives in the dashboard's "Historial" tab. */
+export const isClosed = (project) => Number(project?.closedAt) > 0;
+
 const SEVERITY = { red: 0, orange: 1, green: 2, none: 3 };
 
 /** Dashboard order: most urgent first (red, orange, green, undated), then earliest deadline, then newest. */
@@ -100,7 +116,7 @@ export function adoptCompany(project, company, logo = '') {
 }
 
 // ---- project model --------------------------------------------------------------------------------------
-export function newProject({ regionCode, mode = 'quick', company = null, logo = '', name = '', client = '', startDate = '', endDate = '', now = Date.now() }) {
+export function newProject({ regionCode, mode = 'quick', company = null, logo = '', name = '', client = '', startDate = '', endDate = '', location = null, now = Date.now() }) {
   const draft = newDraft(regionCode, mode);
   draft.project = { name: sanitizeText(name, 60).trim(), client: sanitizeText(client, 60).trim() };
   const start = parseDay(startDate) ? startDate : '';
@@ -112,6 +128,12 @@ export function newProject({ regionCode, mode = 'quick', company = null, logo = 
     startDate: start,
     endDate: end,
     company: snapshotCompany(company, logo),
+    location: normalizeLocation(location),
+    closedAt: 0,
+    payments: [],
+    advances: [],
+    expenses: [],
+    logbook: [],
     draft,
   };
 }
@@ -133,6 +155,12 @@ export function normalizeProject(obj) {
     startDate: start,
     endDate: endOk ? obj.endDate : '',
     company: snapshotCompany(obj.company, obj.company?.logo),
+    location: normalizeLocation(obj.location),
+    closedAt: Number.isFinite(Number(obj.closedAt)) && Number(obj.closedAt) > 0 ? Number(obj.closedAt) : 0,
+    payments: normalizePayments(obj.payments),
+    advances: normalizeAdvances(obj.advances),
+    expenses: normalizeExpenses(obj.expenses),
+    logbook: normalizeLogbook(obj.logbook),
     draft: normalizeDraft(obj.draft, regionCode),
   };
 }

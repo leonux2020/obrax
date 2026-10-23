@@ -180,7 +180,7 @@ describe('draft: crew and machinery persistence', () => {
     expect(d.crew).toBe(SCHEDULE.defaultCrew);
     expect(d.machinery).toEqual({ include: true, excluded: [] });
     expect(d.crewAuto).toBe(true);
-    expect(Object.keys(d).slice(-4)).toEqual(['crew', 'crewAuto', 'machinery', 'regionCode']);
+    expect(Object.keys(d).slice(-5)).toEqual(['crew', 'crewAuto', 'machinery', 'frozen', 'regionCode']);
   });
 
   it('normalizes hostile input', () => {

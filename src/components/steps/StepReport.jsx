@@ -319,6 +319,8 @@ function TechView({ model, photos }) {
       <Row label={`${t('fin.laborLine')} (${model.costs.laborPct}%)`} value={money(model.costs.labor)} muted />
       <Row label={`${t('fin.transportLine')} (${model.costs.transportPct}%)`} value={money(model.costs.transport)} muted />
       {model.costs.machinery > 0 && <Row label={t('mach.total')} value={money(model.costs.machinery)} muted />}
+      {model.costs.contingency > 0 && <Row label={`${t('fin.contingencyLine')} (${model.costs.contingencyPct}%)`} value={money(model.costs.contingency)} muted />}
+      {model.costs.profit > 0 && <Row label={`${t('fin.profitLine')} (${model.costs.profitPct}%)`} value={money(model.costs.profit)} muted />}
       <Row label={t('com.subtotalNet')} value={money(model.costs.subtotal)} muted />
       <Row
         label={t('fin.taxLine', { name: model.costs.taxName, rate: num(model.costs.taxRate * 100) })}

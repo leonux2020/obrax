@@ -5,7 +5,7 @@ import { REGIONS, LANGS, getRegion } from './regions.js';
 import { TASKS, TASK_IDS, WASTE_LIMITS, defaultDims, pickOption } from './tasks.js';
 import { MATERIAL_IDS } from './catalog.js';
 import { MAX_PRICE } from './pricing.js';
-import { normalizeSignature, normalizeInk } from './signature.js';
+import { normalizeSignature, normalizeInk, normalizeFrozen } from './signature.js';
 import { SCHEDULE } from './schedule.js';
 import { MACHINE_IDS, DEFAULT_MACHINERY } from './machinery.js';
 import {
@@ -23,6 +23,8 @@ const KEYS = { settings: 'cp.settings.v1', user: 'cp.user.v1', draft: 'cp.draft.
 export const FINANCE_LIMITS = Object.freeze({
   labor: { min: 0, max: 150, step: 1, default: 35 },
   transport: { min: 0, max: 30, step: 1, default: 5 },
+  contingency: { min: 0, max: 30, step: 1, default: 0 }, // Imprevistos: % over direct costs (0 keeps every older quote identical)
+  profit: { min: 0, max: 100, step: 1, default: 0 }, // Utilidad: % over direct costs + contingency
 });
 export const TAX_LIMITS = Object.freeze({ min: 0, max: 50, decimals: 2 });
 export const MAX_PARTIDAS = 30;
@@ -118,7 +120,7 @@ export function newDraft(regionCode, mode = 'quick') {
     step: 0,
     project: { name: '', client: '' },
     partidas: mode === 'quick' ? [newPartida('slab')] : [],
-    finance: { labor: FINANCE_LIMITS.labor.default, transport: FINANCE_LIMITS.transport.default, tax: null },
+    finance: { labor: FINANCE_LIMITS.labor.default, transport: FINANCE_LIMITS.transport.default, contingency: FINANCE_LIMITS.contingency.default, profit: FINANCE_LIMITS.profit.default, tax: null },
     chainId: 'best',
     overrides: {},
     attachPhotos: true, // the field photos are printed on the client budget too (always in the technical dossier); the user can opt out
@@ -128,6 +130,7 @@ export function newDraft(regionCode, mode = 'quick') {
     crew: SCHEDULE.defaultCrew, // workers on site (planning, see lib/schedule.js)
     crewAuto: true, // crew derived from the project deadline (when it has one); false = the manual `crew`
     machinery: { ...DEFAULT_MACHINERY, excluded: [] }, // major machinery rental: master switch + machines the user turned off
+    frozen: null, // "Generar PDF" freezes the quote: market prices and project dates stop moving (see lib/signature.js)
     regionCode: region ? region.code : null,
   };
 }
@@ -212,6 +215,7 @@ export function normalizeDraft(obj, regionCode) {
     crew: coerceNumber(obj.crew, { min: SCHEDULE.minCrew, max: SCHEDULE.maxCrew, decimals: 0, fallback: SCHEDULE.defaultCrew }),
     crewAuto: obj.crewAuto !== false,
     machinery: normalizeMachinery(obj.machinery, signature),
+    frozen: normalizeFrozen(obj.frozen),
     regionCode,
   };
 }

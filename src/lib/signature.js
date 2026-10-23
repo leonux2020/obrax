@@ -167,7 +167,7 @@ export function buildSignature({ ink, name = '', taxId = '', total = 0, pricedAt
  * client accepted. While a signature exists the quote is therefore priced at the moment it was signed;
  * removing the signature releases the prices again.
  */
-export const pricingTime = (draft, now) => draft?.signature?.pricedAt || now;
+export const pricingTime = (draft, now) => draft?.signature?.pricedAt || draft?.frozen?.pricedAt || now;
 
 /**
  * The project dates the crew / rental plan is computed with. A signed quote is FROZEN: it keeps the dates it
@@ -177,8 +177,35 @@ export const pricingTime = (draft, now) => draft?.signature?.pricedAt || now;
  */
 export function planningTimeline(draft, live = {}) {
   const sig = draft?.signature;
-  if (!sig) return { startDate: live?.startDate || '', endDate: live?.endDate || '' };
+  if (!sig) {
+    if (draft?.frozen) return draft.frozen.timeline; // "Generar PDF" froze it with the dates of that moment
+    return { startDate: live?.startDate || '', endDate: live?.endDate || '' };
+  }
   return sig.timeline ?? { startDate: '', endDate: '' };
+}
+
+/**
+ * The frozen quote ("Generar PDF"): { at, pricedAt, total, timeline }. While it exists the market clock and the
+ * project dates are ignored by the quote (same guarantee a client signature gives, but without the client).
+ */
+export function normalizeFrozen(obj) {
+  if (!obj || typeof obj !== 'object') return null;
+  const at = Number(obj.at);
+  const pricedAt = Number(obj.pricedAt);
+  const total = Number(obj.total);
+  if (!Number.isFinite(pricedAt) || pricedAt <= 0) return null;
+  return {
+    at: Number.isFinite(at) && at > 0 ? at : pricedAt,
+    pricedAt,
+    total: Number.isFinite(total) && total >= 0 ? total : 0,
+    timeline: normalizeTimeline(obj.timeline) ?? { startDate: '', endDate: '' },
+  };
+}
+
+/** Freeze the quote now: prices at `pricedAt`, project dates as they are. A signed quote is already frozen by its signature. */
+export function freezeQuote(draft, { pricedAt, total = 0, live = {}, now = Date.now() }) {
+  if (draft.frozen) return draft;
+  return { ...draft, frozen: normalizeFrozen({ at: now, pricedAt, total, timeline: normalizeTimeline(live) }) };
 }
 
 /**

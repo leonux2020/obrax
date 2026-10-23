@@ -7,6 +7,10 @@ import { hasIndexedDb } from './lib/db.js';
 import { I18nProvider } from './lib/i18n.jsx';
 import { getRegion, LANGS } from './lib/regions.js';
 import { adoptCompany, newProject, projectTitle, toDayString } from './lib/projects.js';
+import { normalizeLocation } from './lib/ledger.js';
+import { computeAll } from './lib/engine.js';
+import { planningTimeline, pricingTime } from './lib/signature.js';
+import { detectLang, detectRegionCode } from './lib/geo.js';
 import { sanitizeText } from './lib/sanitize.js';
 import {
   loadSettings,
@@ -32,6 +36,8 @@ import RegionSelect from './components/RegionSelect.jsx';
 import Login from './components/Login.jsx';
 import Header from './components/Header.jsx';
 import Wizard from './components/Wizard.jsx';
+import ProjectView from './components/ProjectView.jsx';
+import GlobalAccounting from './components/GlobalAccounting.jsx';
 import Dashboard from './components/Dashboard.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import ProjectSheet from './components/ProjectSheet.jsx';
@@ -81,6 +87,9 @@ function bootProjects(region) {
   return bootPromise;
 }
 
+/** The company printed on a project's documents: its own snapshot, plus the profile's signature when the snapshot has none. */
+const projectCompany = (project, company) => (project.company.signature || !company.signature ? project.company : { ...project.company, signature: company.signature });
+
 export default function App() {
   const pwa = usePWA();
   const pro = usePro();
@@ -96,6 +105,9 @@ export default function App() {
   // there is no user.
   const [stage, setStage] = useState(() => (user ? 'app' : 'splash'));
   const [sheet, setSheet] = useState(null); // { type: 'new' | 'edit' | 'settings' | 'profile', id? } (profile is reached from Ajustes)
+  const [tab, setTab] = useState('projects'); // bottom navigation: 'projects' | 'accounting' (Ajustes is a sheet)
+  const [dashTab, setDashTab] = useState('active'); // dashboard tabs: 'active' | 'history'
+  const [editor, setEditor] = useState(false); // the technical editor (measures, prices, schedule) of the open project
   const [pickingRegion, setPickingRegion] = useState(false);
   const [paywall, setPaywall] = useState(null); // null | 'promo' | 'projects' | 'drive' | 'ai': which locked feature opened the PRO screen
   const [photos, setPhotos] = useState(emptySlots);
@@ -147,6 +159,7 @@ export default function App() {
 
   const openProject = useCallback((id) => {
     setActiveId(id);
+    setEditor(false);
     setPhotos(emptySlots());
     photoStoreFor(id)
       .load()
@@ -158,10 +171,11 @@ export default function App() {
   const closeProject = useCallback(() => {
     if (activeRef.current) projectStore.save(activeRef.current).catch(() => {});
     setActiveId(null);
+    setEditor(false);
     setPhotos(emptySlots());
   }, []);
 
-  // The open project's draft: all wizard edits flow through here.
+  // The open project's draft: all wizard / project-view edits flow through here.
   const setDraft = useCallback(
     (update) =>
       setProjects((list) =>
@@ -173,12 +187,35 @@ export default function App() {
       ),
     [activeId]
   );
+  // The open project itself (payments, advances, expenses, logbook...).
+  const setProject = useCallback(
+    (update) =>
+      setProjects((list) =>
+        list.map((p) => {
+          if (p.id !== activeId) return p;
+          const next = typeof update === 'function' ? update(p) : update;
+          return next === p ? p : { ...next, updatedAt: Date.now() };
+        })
+      ),
+    [activeId]
+  );
+
+  // The editor opens where the work is: the task / measures while the quote is incomplete, the measures afterwards.
+  const openEditor = () => {
+    const p = activeRef.current;
+    if (!p) return;
+    const valid = computeAll(p.draft, pricingTime(p.draft, Date.now()), { timeline: planningTimeline(p.draft, p) }).valid;
+    setDraft((d) => ({ ...d, step: valid || d.mode === 'project' ? 1 : 0 }));
+    setEditor(true);
+    window.scrollTo({ top: 0 });
+  };
 
   const createProject = (fields) => {
     // The company profile is COPIED into the new project: later profile changes never rewrite it.
     const project = newProject({ regionCode: settings.region, company, logo, ...fields });
     commit(project);
     setSheet(null);
+    setTab('projects');
     openProject(project.id);
   };
 
@@ -187,8 +224,14 @@ export default function App() {
       ...project,
       startDate: fields.startDate,
       endDate: fields.endDate,
+      location: normalizeLocation(fields.location),
+      closedAt: fields.closed ? project.closedAt || Date.now() : 0, // finished jobs live in the Historial tab
       updatedAt: Date.now(),
-      draft: { ...project.draft, project: { name: sanitizeText(fields.name, 60).trim(), client: sanitizeText(fields.client, 60).trim() } },
+      draft: {
+        ...project.draft,
+        frozen: fields.unfreeze ? null : project.draft.frozen,
+        project: { name: sanitizeText(fields.name, 60).trim(), client: sanitizeText(fields.client, 60).trim() },
+      },
     });
     setSheet(null);
   };
@@ -275,23 +318,34 @@ export default function App() {
     setStage('splash'); // signed out: back to the welcome screen
   }, [closeProject]);
 
-  const companyMissing = isCompanyEmpty(company) && !logo;
+  const returning = meta.onboarded || !isCompanyEmpty(company);
+  // "Iniciar": a returning user goes straight on; a new one gets the single setup screen, with the country,
+  // currency and language already taken from the device (nothing to answer).
+  const start = () => {
+    if (returning) return setStage('app');
+    if (!settings.region) {
+      const code = detectRegionCode();
+      if (code) setSettings({ region: code, lang: detectLang(getRegion(code).lang) });
+    }
+    return setStage('setup');
+  };
   const editing = sheet?.type === 'edit' ? projects?.find((p) => p.id === sheet.id) : null;
-  const navActive = sheet?.type === 'settings' || sheet?.type === 'profile' ? 'settings' : 'projects';
+  const navActive = sheet?.type === 'settings' || sheet?.type === 'profile' ? 'settings' : tab;
 
   return (
     <I18nProvider lang={settings.lang} regionCode={active ? active.draft.regionCode : settings.region}>
       {stage === 'splash' ? (
-        <SplashScreen
-          returning={meta.onboarded || !isCompanyEmpty(company)}
-          onStart={() => setStage(meta.onboarded || !isCompanyEmpty(company) ? 'app' : 'setup')}
-          onLogin={() => setStage('app')}
-        />
+        <SplashScreen onStart={start} />
       ) : stage === 'setup' ? (
-        !region ? (
-          <RegionSelect initial={null} onConfirm={confirmRegion} onChangeLang={changeLang} onCancel={() => setStage('splash')} />
+        !region || pickingRegion ? (
+          <RegionSelect
+            initial={settings.region}
+            onConfirm={confirmRegion}
+            onChangeLang={changeLang}
+            onCancel={region ? () => setPickingRegion(false) : () => setStage('splash')}
+          />
         ) : (
-          <ProfileSetup onSave={finishSetup} onBack={() => setStage('splash')} />
+          <ProfileSetup onSave={finishSetup} onChangeRegion={() => setPickingRegion(true)} />
         )
       ) : !region || pickingRegion ? (
         <RegionSelect
@@ -304,42 +358,60 @@ export default function App() {
         <Login onLogin={signIn} />
       ) : (
         <>
-          <Header subtitle={active ? projectTitle(active) || user.name : user.name} pwa={pwa} />
+          <Header bare={!(active && editor)} subtitle={active ? projectTitle(active) || user.name : user.name} pwa={pwa} />
 
           {projects === null ? null : active ? (
-            <Wizard
-              key={active.id}
-              projectId={active.id}
-              draft={active.draft}
-              setDraft={setDraft}
-              photos={photos}
-              setPhotos={setPhotos}
-              company={active.company.signature || !company.signature ? active.company : { ...active.company, signature: company.signature }}
-              startDate={active.startDate}
-              endDate={active.endDate}
-              onNewProject={() => {
-                closeProject();
-                requestNewProject();
-              }}
-              onPro={openPaywall}
-              onExit={closeProject}
-            />
+            editor ? (
+              <Wizard
+                key={active.id}
+                projectId={active.id}
+                draft={active.draft}
+                setDraft={setDraft}
+                photos={photos}
+                setPhotos={setPhotos}
+                company={projectCompany(active, company)}
+                startDate={active.startDate}
+                endDate={active.endDate}
+                onNewProject={() => {
+                  closeProject();
+                  requestNewProject();
+                }}
+                onPro={openPaywall}
+                onExit={() => setEditor(false)}
+              />
+            ) : (
+              <ProjectView
+                key={active.id}
+                project={active}
+                setProject={setProject}
+                setDraft={setDraft}
+                photos={photos}
+                setPhotos={setPhotos}
+                company={projectCompany(active, company)}
+                onBack={closeProject}
+                onEdit={() => setSheet({ type: 'edit', id: active.id })}
+                onEditor={openEditor}
+                onPro={openPaywall}
+              />
+            )
           ) : (
             <>
-              <Dashboard
-                projects={projects}
-                companyMissing={companyMissing}
-                onNew={requestNewProject}
-                onOpen={openProject}
-                onEdit={(id) => setSheet({ type: 'edit', id })}
-                onSettings={() => setSheet({ type: 'settings' })}
-                onPro={() => openPaywall('promo')}
-              />
+              {tab === 'accounting' ? (
+                <GlobalAccounting projects={projects} />
+              ) : (
+                <Dashboard projects={projects} tab={dashTab} onTab={setDashTab} onNew={requestNewProject} onOpen={openProject} onPro={() => openPaywall('promo')} />
+              )}
               <BottomNav
                 active={navActive}
-                onProjects={() => setSheet(null)}
+                onProjects={() => {
+                  setSheet(null);
+                  setTab('projects');
+                }}
+                onAccounting={() => {
+                  setSheet(null);
+                  setTab('accounting');
+                }}
                 onSettings={() => setSheet({ type: 'settings' })}
-                onNew={requestNewProject}
               />
             </>
           )}

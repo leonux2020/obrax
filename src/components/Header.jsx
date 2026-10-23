@@ -2,7 +2,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { Logo } from './ui.jsx';
 
 /** Slim top bar: brand only (language, country, company and profile live in the bottom navigation). */
-export default function Header({ subtitle, pwa }) {
+export default function Header({ subtitle, pwa, bare = false }) {
   const { t } = useI18n();
   return (
     <>
@@ -19,6 +19,7 @@ export default function Header({ subtitle, pwa }) {
           </button>
         </div>
       )}
+      {!bare && (
       <header className="no-print sticky top-0 z-20 border-b border-white/10 bg-black">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-3 py-2 sm:px-4">
           <Logo size={40} />
@@ -28,6 +29,7 @@ export default function Header({ subtitle, pwa }) {
           </div>
         </div>
       </header>
+      )}
     </>
   );
 }

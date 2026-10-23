@@ -186,10 +186,11 @@ export const ERROR_CODES = Object.freeze(['not_configured', 'rate_limited', 'bad
 const SERVER_CODES = new Set(ERROR_CODES);
 
 /**
- * Send ONE compressed invoice photo to the proxy and return the clean extraction.
+ * POST one compressed photo to OUR proxy and return the parsed JSON body (`ok: true`). Shared by invoice and
+ * receipt reading. `kind` is only a request for one of the server's fixed prompts: the browser can never send its own.
  * @throws {InvoiceError} with a stable `code` the UI translates.
  */
-export async function requestExtraction(dataUrl, { currency = '', lang = '', fetchImpl = globalThis.fetch, signal, endpoint = INVOICE_ENDPOINT } = {}) {
+export async function postImage(dataUrl, { kind = 'invoice', currency = '', lang = '', fetchImpl = globalThis.fetch, signal, endpoint = INVOICE_ENDPOINT } = {}) {
   let res;
   const timeout = new AbortController();
   const timer = setTimeout(() => timeout.abort(), INVOICE_LIMITS.requestTimeoutMs);
@@ -199,7 +200,7 @@ export async function requestExtraction(dataUrl, { currency = '', lang = '', fet
     res = await fetchImpl(endpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ image: dataUrl, currency, lang }),
+      body: JSON.stringify({ image: dataUrl, currency, lang, ...(kind === 'invoice' ? {} : { kind }) }),
       credentials: 'same-origin',
       cache: 'no-store',
       signal: timeout.signal,
@@ -220,6 +221,12 @@ export async function requestExtraction(dataUrl, { currency = '', lang = '', fet
     const code = body && typeof body.error === 'string' && SERVER_CODES.has(body.error) ? body.error : res.status === 404 || res.status === 405 ? 'not_configured' : 'upstream';
     throw new InvoiceError(code);
   }
+  return body;
+}
+
+/** Send ONE compressed invoice photo to the proxy and return the clean extraction. */
+export async function requestExtraction(dataUrl, opts = {}) {
+  const body = await postImage(dataUrl, { ...opts, kind: 'invoice' });
   const extraction = normalizeExtraction(body);
   if (!extraction.isInvoice) throw new InvoiceError('not_invoice');
   if (!extraction.items.length) throw new InvoiceError('unreadable');

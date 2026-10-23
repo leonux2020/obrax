@@ -243,7 +243,11 @@ export function buildQuote({ partidas, lines, plan, prices, finance, regionCode,
   const transport = roundMoney((materials * finance.transport) / 100, region);
   // Major machinery rental is an indirect cost added on top (see machinery.js): { total, byPartida }.
   const machineryTotal = machinery ? roundMoney(machinery.total, region) : 0;
-  const subtotal = roundMoney(materials + labor + transport + machineryTotal, region);
+  // Imprevistos and Utilidad (both 0 unless the user sets them): contingency on the direct costs, profit on top of it
+  const direct = materials + labor + transport + machineryTotal;
+  const contingency = roundMoney((direct * (finance.contingency || 0)) / 100, region);
+  const profit = roundMoney(((direct + contingency) * (finance.profit || 0)) / 100, region);
+  const subtotal = roundMoney(direct + contingency + profit, region);
   const taxRate = taxRateFor(region, finance);
   const tax = roundMoney(subtotal * taxRate, region);
   const total = roundMoney(subtotal + tax, region);
@@ -273,6 +277,8 @@ export function buildQuote({ partidas, lines, plan, prices, finance, regionCode,
     labor,
     transport,
     machinery: machineryTotal,
+    contingency,
+    profit,
     subtotal,
     tax,
     total,

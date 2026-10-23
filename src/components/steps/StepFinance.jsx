@@ -23,7 +23,7 @@ export default function StepFinance({ draft, setDraft, result }) {
         {t('fin.title')}
       </h2>
 
-      {['labor', 'transport'].map((k) => (
+      {['labor', 'transport', 'contingency', 'profit'].map((k) => (
         <Slider
           key={k}
           label={t(`fin.${k}`)}
@@ -99,6 +99,8 @@ export default function StepFinance({ draft, setDraft, result }) {
               [t('fin.laborLine'), result.quote.labor],
               [t('fin.transportLine'), result.quote.transport],
               ...(result.quote.machinery > 0 ? [[t('mach.total'), result.quote.machinery]] : []),
+              ...(result.quote.contingency > 0 ? [[t('fin.contingencyLine'), result.quote.contingency]] : []),
+              ...(result.quote.profit > 0 ? [[t('fin.profitLine'), result.quote.profit]] : []),
             ].map(([label, v]) => (
               <div key={label} className="flex justify-between gap-3">
                 <dt className="text-neutral-300">{label}</dt>

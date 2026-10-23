@@ -581,6 +581,8 @@ export async function renderTechPdf(model, { t, money, num = (n) => String(n), l
       [`${t('fin.laborLine')} (${c.laborPct}%)`, money(c.labor)],
       [`${t('fin.transportLine')} (${c.transportPct}%)`, money(c.transport)],
       ...(c.machinery > 0 ? [[t('mach.total'), money(c.machinery)]] : []),
+      ...(c.contingency > 0 ? [[`${t('fin.contingencyLine')} (${c.contingencyPct}%)`, money(c.contingency)]] : []),
+      ...(c.profit > 0 ? [[`${t('fin.profitLine')} (${c.profitPct}%)`, money(c.profit)]] : []),
       [t('com.subtotalNet'), money(c.subtotal)],
       [t('com.taxLine', { name: c.taxName, rate: num(c.taxRate * 100) }), money(c.tax)],
     ],

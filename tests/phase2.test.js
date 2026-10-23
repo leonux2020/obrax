@@ -325,7 +325,7 @@ describe('UI structure (OLED + one-hand ergonomics)', () => {
   it('setup screen: actions fixed to the bottom, Drive switch and professional data present', () => {
     const w = read('components/ProfileSetup.jsx');
     expect(w).toMatch(/fixed inset-x-0 bottom-0/);
-    expect(w).toContain("t('setup.save')");
+    expect(w).toContain("t('setup.continue')");
     const f = read('components/ProfileFields.jsx');
     for (const k of ["t('setup.drive')", "t('setup.pro.name')", "t('setup.company')", 'LogoField']) expect(f).toContain(k);
     expect(read('App.jsx')).toContain('ProfileSetup');

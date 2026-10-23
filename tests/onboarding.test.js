@@ -55,39 +55,41 @@ afterEach(() => {
 });
 
 describe('first run: splash -> setup -> dashboard', () => {
-  it('a brand-new install shows ONLY the logo, the app name and the bottom buttons', async () => {
+  it('a brand-new install shows ONLY the logo, one "Iniciar" button and "Un producto Japadigital"', async () => {
     await mountApp();
     expect(q('splash')).not.toBeNull();
-    expect(host.querySelector('h1').textContent).toBe('Obrax');
     expect(host.querySelector('img')).not.toBeNull();
     const buttons = host.querySelectorAll('button');
-    expect(buttons).toHaveLength(2); // registration CTA + "Ya tengo cuenta"
-    expect(buttons[0].textContent).toBe('Configurar mi Empresa');
-    expect(buttons[1].textContent).toBe('Ya tengo cuenta');
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0].textContent).toBe('Iniciar');
     expect(buttons[0].closest('.fixed').className).toContain('bottom-0'); // bottom third, thumb zone
+    expect(q('splash-credit').textContent).toBe('Un producto Japadigital');
+    expect(host.querySelector('h1').className).toContain('sr-only'); // the name is only for screen readers: the screen shows the logo
+    expect(host.querySelectorAll('p')).toHaveLength(1); // no tagline, no extra text
     expect(host.querySelector('header')).toBeNull(); // no app chrome around the splash
   });
 
-  it('full flow: country -> company + professional + Drive switch -> "Guardar y Entrar" -> Dashboard, and the splash never returns', async () => {
+  it('full flow: Iniciar -> ONE setup screen (country detected silently, company, signature canvas, Drive request) -> Continuar -> Dashboard', async () => {
+    Object.defineProperty(navigator, 'languages', { value: ['es-CL', 'es'], configurable: true });
     await mountApp();
     await click(q('splash-start'));
-    // no country saved yet: the country picker comes first
-    const combo = host.querySelector('[role="combobox"]');
-    act(() => combo.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-    const chile = [...document.querySelectorAll('[role="option"]')].find((o) => o.textContent.includes('Chile'));
-    await click(chile);
-    await click([...host.querySelectorAll('button')].find((b) => b.textContent === DICT.es['region.continue']));
-
+    // the country was NOT asked: it comes from the device and is shown as a chip
+    expect(host.querySelector('[role="combobox"]')).toBeNull();
     expect(q('setup')).not.toBeNull();
+    expect(q('setup-region').textContent).toContain('Chile');
+    expect(q('setup-currency').textContent).toBe('CLP');
+    expect(JSON.parse(localStorage.getItem('cp.settings.v1'))).toMatchObject({ region: 'CL', lang: 'es' });
+
     const main = q('setup');
-    for (const label of ['Empresa', 'Profesional']) expect([...main.querySelectorAll('h2')].map((h) => h.textContent)).toContain(label);
-    const drive = q('setup-drive');
-    expect(drive.getAttribute('role')).toBe('switch');
-    expect(drive.getAttribute('aria-checked')).toBe('true');
-    expect(drive.textContent).toContain('Respaldo en Google Drive (Gratis)');
-    await click(drive);
-    expect(drive.getAttribute('aria-checked')).toBe('false');
-    expect(q('setup-save').textContent).toBe('Guardar y Entrar');
+    for (const label of ['Empresa', 'Profesional', 'Firma digital']) expect([...main.querySelectorAll('h2')].map((h) => h.textContent)).toContain(label);
+    expect(main.querySelector('[data-testid="signature-canvas"]')).not.toBeNull(); // the canvas lives on this very screen
+    // Google Drive: the request goes through Google's own consent; there is no password field anywhere
+    expect(q('setup-drive').textContent).toBe('Conectar Google Drive');
+    expect(main.querySelector('input[type="password"]')).toBeNull();
+    await click(q('setup-drive')); // no client id in tests: the OAuth flow reports it, nothing breaks
+    expect(q('setup-drive-note').getAttribute('data-code')).toBe('not_configured');
+    expect(q('setup-save').textContent).toBe('Continuar');
+    expect(q('setup-save').closest('.fixed').className).toContain('bottom-0');
 
     // nothing to save yet -> a friendly error, still on setup
     await click(q('setup-save'));
@@ -110,7 +112,7 @@ describe('first run: splash -> setup -> dashboard', () => {
     // persisted
     const company = loadCompany();
     expect(company).toMatchObject({ name: 'Constructora Aurora SpA', taxId: '76.123.456-7', proName: 'Ana Ruiz', proTaxId: '12.345.678-5' });
-    expect(loadProfileMeta()).toEqual({ onboarded: true, drive: false });
+    expect(loadProfileMeta()).toEqual({ onboarded: true, drive: false }); // Drive stays off until Google confirms
     expect(loadUser()).toMatchObject({ provider: 'local', name: 'Ana Ruiz' });
 
     // relaunch: straight to the dashboard
@@ -119,6 +121,41 @@ describe('first run: splash -> setup -> dashboard', () => {
     expect(q('splash')).toBeNull();
     expect(q('setup')).toBeNull();
     expect(q('dash-empty')).not.toBeNull();
+    delete navigator.languages;
+  });
+
+  it('when the device gives no country hint the picker still appears (the only question left)', async () => {
+    Object.defineProperty(navigator, 'languages', { value: ['en'], configurable: true });
+    const original = Intl.DateTimeFormat.prototype.resolvedOptions;
+    Intl.DateTimeFormat.prototype.resolvedOptions = () => ({ timeZone: 'Etc/UTC', locale: 'en' });
+    try {
+      await mountApp();
+      await click(q('splash-start'));
+      expect(host.querySelector('[role="combobox"]')).not.toBeNull();
+      expect(q('setup')).toBeNull();
+    } finally {
+      Intl.DateTimeFormat.prototype.resolvedOptions = original;
+      delete navigator.languages;
+    }
+  });
+
+  it('the Google Drive request records the consent only when Google confirms it (injected OAuth)', async () => {
+    const saved = [];
+    const h = document.createElement('div');
+    document.body.appendChild(h);
+    const r = createRoot(h);
+    await act(async () => {
+      r.render(React.createElement(I18nProvider, { lang: 'es', regionCode: 'CL' }, React.createElement(ProfileSetup, { onSave: async (d) => saved.push(d), requestDrive: async () => ({ granted: true }) })));
+    });
+    const btn = h.querySelector('[data-testid="setup-drive"]');
+    await act(async () => { btn.dispatchEvent(new MouseEvent('click', { bubbles: true })); await new Promise((x) => setTimeout(x, 5)); });
+    expect(btn.textContent).toContain('Google Drive conectado');
+    type(h.querySelector('input[type="text"]'), 'Aurora');
+    await act(async () => { h.querySelector('[data-testid="setup-save"]').dispatchEvent(new MouseEvent('click', { bubbles: true })); await new Promise((x) => setTimeout(x, 20)); });
+    expect(saved).toHaveLength(1);
+    expect(saved[0].drive).toBe(true);
+    act(() => r.unmount());
+    h.remove();
   });
 });
 
@@ -132,11 +169,12 @@ describe('after onboarding, the profile lives only in Ajustes', () => {
   }
   const tab = (name) => [...host.querySelectorAll('nav button')].find((b) => b.textContent.includes(name));
 
-  it('the bottom nav has Proyectos / Ajustes / Nuevo: no "Empresa" shortcut', async () => {
+  it('the bottom nav has Proyectos / Contabilidad Global / Ajustes: no "Empresa" shortcut and no "Nuevo" (that is the FAB)', async () => {
     await onboarded();
     expect(q('splash')).toBeNull();
     const labels = [...host.querySelectorAll('nav button')].map((b) => b.textContent.trim());
-    expect(labels).toEqual(['Proyectos', 'Ajustes', 'Nuevo']);
+    expect(labels).toEqual(['Proyectos', 'Contabilidad Global', 'Ajustes']);
+    expect(q('fab-new')).not.toBeNull();
     expect(read('components/BottomNav.jsx')).not.toContain('onCompany');
   });
 
@@ -164,14 +202,13 @@ describe('after onboarding, the profile lives only in Ajustes', () => {
     expect(read('App.jsx')).toMatch(/onEditProfile=\{\(\) => setSheet\(\{ type: 'profile' \}\)\}/);
   });
 
-  it('a user who has an empty company profile (legacy) goes to Ajustes from the dashboard hint, not to a splash', async () => {
+  it('a user who has an empty company profile (legacy) lands on the dashboard, not on a splash, and reaches Ajustes from the nav', async () => {
     localStorage.setItem('cp.settings.v1', JSON.stringify({ region: 'CL', lang: 'es' }));
     localStorage.setItem('cp.user.v1', JSON.stringify({ provider: 'local', name: 'Ana' }));
     await mountApp();
     expect(q('splash')).toBeNull();
-    const hint = q('company-hint');
-    expect(hint).not.toBeNull();
-    await click(hint.querySelector('button'));
+    expect(q('company-hint')).toBeNull(); // no long hint text any more
+    await click(tab('Ajustes'));
     expect(document.querySelector('[role="dialog"]').textContent).toContain('Idioma');
   });
 });
@@ -184,19 +221,20 @@ describe('PRO button and benefits screen', () => {
     await mountApp();
   };
 
-  it('"Descubre PRO": gold outline, helmet icon, no crown, no fill', async () => {
+  it('the PRO mark is a discreet badge in the header (no big button, no long text)', async () => {
     await setup();
     const pro = q('pro-scan');
-    expect(pro.textContent.trim()).toBe('Descubre PRO');
-    expect(pro.textContent).not.toContain('👑');
-    expect(pro.querySelector('svg[data-testid="helmet-icon"]')).not.toBeNull();
-    expect(pro.className).toMatch(/border-\[#d4af37\]/);
+    expect(pro.textContent.trim()).toBe('PRO');
+    expect(pro.getAttribute('aria-label')).toBe('Descubre PRO');
+    expect(pro.closest('header')).not.toBeNull();
     expect(pro.className).not.toMatch(/\bbg-/);
+    expect(pro.className).not.toMatch(/min-h-\[56px\]/);
   });
 
   it('the hard hat is a 3/4 gold-gradient site-manager helmet: front-only short visor, smooth flank, low thin crest, top-left light', async () => {
     await setup();
-    const svg = q('pro-scan').querySelector('svg[data-testid="helmet-icon"]');
+    await click(q('pro-scan'));
+    const svg = document.querySelector('svg[data-testid="helmet-icon"]');
     expect(Number(svg.getAttribute('width'))).toBeGreaterThanOrEqual(24); // w-6 or larger, the protagonist of the button
     expect(Number(svg.getAttribute('width'))).toBe(Number(svg.getAttribute('height')));
     const grads = [...svg.querySelectorAll('linearGradient')];
@@ -252,11 +290,11 @@ describe('PRO button and benefits screen', () => {
     expect(read('components/HelmetIcon.jsx')).not.toMatch(/<filter|drop-shadow|feGaussianBlur/);
   });
 
-  it('two helmets on screen never share gradient ids', async () => {
+  it('the gradient ids of the hard hat are unique', async () => {
     await setup();
     await click(q('pro-scan'));
     const ids = [...document.querySelectorAll('svg[data-testid="helmet-icon"] linearGradient')].map((g) => g.id);
-    expect(ids.length).toBeGreaterThanOrEqual(6);
+    expect(ids.length).toBeGreaterThanOrEqual(3);
     expect(new Set(ids).size).toBe(ids.length);
   });
 

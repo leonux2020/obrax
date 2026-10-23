@@ -52,28 +52,29 @@ describe('PRO test switch inside the real App', () => {
     expect(isPro()).toBe(true);
     expect(localStorage.getItem(SIM_PRO_KEY)).toBe('1');
     expect(q('pro-paywall')).toBeNull();
-    expect(q('pro-active').textContent).toContain('PRO activo');
+    expect(q('pro-active').textContent.trim()).toBe('PRO');
+    expect(q('pro-active').getAttribute('aria-label')).toBe('PRO activo');
     expect(q('pro-scan')).toBeNull(); // nothing left that reopens the paywall
   });
 
   it('PRO lifts the free-project limit at once (no reload): the 4th project opens the form, not the paywall', async () => {
     await mount();
     const create = async (name) => {
-      await click(tab('Nuevo'));
+      await click(q('fab-new'));
       if (q('pro-paywall')) return false;
       typeInto(document.querySelector('[role="dialog"] input'), name);
       await click(q('project-save'));
       await flush(60);
-      await click(q('wizard-back'));
+      await click(q('pv-back'));
       return true;
     };
     for (let i = 1; i <= FREE_PROJECT_LIMIT; i += 1) expect(await create(`Obra ${i}`)).toBe(true);
-    await click(tab('Nuevo'));
+    await click(q('fab-new'));
     expect(q('pro-paywall')).not.toBeNull(); // free plan: blocked
     await click(q('pro-dev-activate'));
     expect(q('pro-paywall')).toBeNull();
     expect(await create('Obra 4')).toBe(true); // PRO: allowed straight away
-    expect(host.querySelectorAll('ul[aria-label] > li')).toHaveLength(FREE_PROJECT_LIMIT + 1);
+    expect(host.querySelectorAll('[data-testid="project-card"]')).toHaveLength(FREE_PROJECT_LIMIT + 1);
   });
 
   it('a stored PRO flag is honoured on a fresh launch', async () => {

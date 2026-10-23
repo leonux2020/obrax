@@ -60,6 +60,8 @@ describe('one-hand ergonomics', () => {
 
   it('touch targets are at least 44 px', () => {
     expect(read('components/BottomNav.jsx')).toMatch(/min-h-\[56px\]/);
-    expect(read('components/ProjectCard.jsx')).toMatch(/min-h-\[52px\]/);
+    // the whole card is one big button (no tiny Open / Edit buttons) and the FAB is 64 px
+    expect(read('components/ProjectCard.jsx')).toMatch(/block w-full[^"]*p-4/);
+    expect(read('components/Dashboard.jsx')).toMatch(/h-16 w-16/);
   });
 });
