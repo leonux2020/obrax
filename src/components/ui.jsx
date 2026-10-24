@@ -1,18 +1,47 @@
 import { useEffect, useId, useState } from 'react';
-import { LETTER_PATHS, MARK_DATA_URI, MARK_RATIO, WORD, WORD_BOX, WORD_VIEWBOX, BRAND } from '../brand/icon.js';
+import { LETTER_PATHS, MARK_LAYOUT, DIM_ART, RULER_ART, HELMET_FILE, WORD, WORD_BOX, WORD_VIEWBOX, BRAND } from '../brand/icon.js';
 import { sanitizeNumericText, parseDecimal } from '../lib/sanitize.js';
 
 /** The CUBRAX isotype (dimension line + 3/4 hard hat + ruler, vector, transparent): `size` is its HEIGHT in px. */
 export function Logo({ size = 40, className = '' }) {
-  return (
-    <img
-      src={MARK_DATA_URI}
-      width={Math.round(size / MARK_RATIO)}
-      height={size}
-      alt=""
-      draggable="false"
-      className={`select-none ${className}`}
+  // Hybrid isotype, sized by HEIGHT: static SVG dimension line on top, the supplied photoreal hard hat in the middle
+  // (<img>, object-fit: contain, never distorted) and the static SVG ruler below, with transparent air in between.
+  const k = size / MARK_LAYOUT.h;
+  const w = Math.round(MARK_LAYOUT.w * k);
+  const band = (level, art) => (
+    <svg
+      viewBox={`0 ${level.y} ${MARK_LAYOUT.w} ${level.h}`}
+      width={w}
+      height={level.h * k}
+      aria-hidden="true"
+      focusable="false"
+      style={{ display: 'block', flex: 'none' }}
+      dangerouslySetInnerHTML={{ __html: art }}
     />
+  );
+  return (
+    <span
+      className={`inline-flex shrink-0 select-none flex-col items-center ${className}`}
+      style={{ width: w, height: size }}
+      data-testid="logo"
+    >
+      {band(MARK_LAYOUT.dimension, DIM_ART)}
+      <img
+        src={`${import.meta.env.BASE_URL}${HELMET_FILE}`}
+        alt=""
+        draggable="false"
+        data-testid="logo-helmet"
+        style={{
+          display: 'block',
+          flex: 'none',
+          width: w,
+          height: MARK_LAYOUT.helmet.h * k,
+          marginTop: MARK_LAYOUT.gapTop * k,
+          objectFit: 'contain',
+        }}
+      />
+      <span style={{ display: 'block', marginTop: MARK_LAYOUT.gapBottom * k }}>{band(MARK_LAYOUT.ruler, RULER_ART)}</span>
+    </span>
   );
 }
 

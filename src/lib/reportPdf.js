@@ -5,7 +5,7 @@
 
 import { buildClientModel, buildTechModel } from './reports.js';
 import { pdfFileName, pdfMoneyFormatter, rasterizeLogo, renderClientPdf, renderTechPdf } from './pdf.js';
-import { ICON_DATA_URI } from '../brand/icon.js';
+import { PDF_LOGO_URL } from '../brand/icon.js';
 
 export const REPORT_KINDS = Object.freeze(['client', 'tech']);
 
@@ -15,10 +15,27 @@ export const kindForView = (view) => (view === 'tech' ? 'tech' : 'client');
 /** Warm the jsPDF chunk so generating (and the share user-gesture window) is fast on first use. */
 export const warmPdfEngine = () => import('jspdf').catch(() => null);
 
+/** The CUBRAX app icon (same-origin PNG, precached by the service worker) as a PNG data URL; null if unavailable. */
+async function brandLogo() {
+  try {
+    const res = await fetch(PDF_LOGO_URL);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 /** Company logo as a PNG data URL for the PDF header; the CUBRAX icon only when there is none / it fails. */
 async function pdfLogo(company) {
   const own = typeof company?.logo === 'string' && company.logo ? await rasterizeLogo(company.logo) : null;
-  return own || rasterizeLogo(ICON_DATA_URI);
+  return own || brandLogo();
 }
 
 /**

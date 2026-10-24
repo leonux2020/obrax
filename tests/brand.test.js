@@ -1,12 +1,14 @@
 // @vitest-environment happy-dom
-// CUBRAX brand: 3/4 hard hat + technological lettering with a green X + "Un producto Japadigital", on OLED black.
+// CUBRAX brand: supplied photoreal hard hat + static SVG dimension line / ruler, Montserrat SemiBold lettering with a green X.
 import { describe, it, expect, afterEach } from 'vitest';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { I18nProvider } from '../src/lib/i18n.jsx';
 import SplashScreen from '../src/components/SplashScreen.jsx';
 import { Logo, Wordmark } from '../src/components/ui.jsx';
-import { BRAND, MARK_ART, MARK_BOX, MARK_LAYOUT, MARK_RATIO, MARK_DATA_URI, LETTER_PATHS, WORD, buildMarkSvg, buildLockupSvg, buildIconSvg, buildManifest, LOGO_FILE } from '../src/brand/icon.js';
+import fs from 'node:fs';
+import { BRAND, MARK_LAYOUT, DIM_ART, RULER_ART, HELMET_FILE, HELMET_RATIO, LETTER_PATHS, WORD, WORD_BOX, buildMarkSvg, buildLockupSvg, buildIconSvg, buildManifest, LOGO_FILE } from '../src/brand/icon.js';
+import { WORD_WEIGHT } from '../src/brand/wordArt.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let root;
@@ -22,64 +24,70 @@ afterEach(() => {
   host?.remove();
 });
 
-describe('isotype: dimension line + 3/4 hard hat + ruler', () => {
-  it('has the three levels in order: dimension line on top, hat in the middle, ruler at the bottom', () => {
+describe('isotype: static dimension line + supplied photoreal hard hat + static ruler', () => {
+  it('the hat is the supplied PNG (public/helmet.png), not code: no procedural geometry is left in the repo', () => {
+    expect(HELMET_FILE).toBe('helmet.png');
+    const png = fs.readFileSync('public/helmet.png');
+    expect(png.subarray(1, 4).toString()).toBe('PNG');
+    const ratio = png.readUInt32BE(16) / png.readUInt32BE(20); // IHDR width / height
+    expect(ratio).toBeCloseTo(HELMET_RATIO, 2);
+    expect(fs.existsSync('src/brand/markArt.js')).toBe(false);
+    expect(fs.existsSync('scripts/gen-brand-mark.mjs')).toBe(false);
+    expect(fs.readFileSync('src/brand/icon.js', 'utf8')).not.toMatch(/ellipsoid|catmull|url\(#shell\)|url\(#visor\)/i);
+  });
+
+  it('three levels in order: dimension line, hat <image> (meet = object-fit contain), ruler; transparent background', () => {
     const svg = buildMarkSvg();
     expect(svg).toContain('aria-label="CUBRAX"');
-    expect(svg).not.toMatch(/<rect[^>]*fill="#000/); // transparent: sits on the app's own black
-    const dim = MARK_ART.indexOf('stroke-width="8"');
-    const hat = MARK_ART.indexOf('fill="url(#shell)"');
-    const ruler = MARK_ART.indexOf('rx="6" fill="#ffffff"');
+    expect(svg).not.toMatch(/<rect[^>]*fill="#000/);
+    const dim = svg.indexOf(DIM_ART);
+    const img = svg.indexOf('<image ');
+    const ruler = svg.indexOf(RULER_ART);
     expect(dim).toBeGreaterThan(-1);
-    expect(hat).toBeGreaterThan(dim);
-    expect(ruler).toBeGreaterThan(hat);
-    expect(MARK_DATA_URI.startsWith('data:image/svg+xml')).toBe(true);
+    expect(img).toBeGreaterThan(dim);
+    expect(ruler).toBeGreaterThan(img);
+    expect(svg).toContain('preserveAspectRatio="xMidYMid meet"');
+    expect(svg).toContain(`href="./${HELMET_FILE}"`);
+    expect(buildMarkSvg({ helmetHref: 'data:image/png;base64,AAAA' })).toContain('href="data:image/png;base64,AAAA"');
   });
 
-  it('vertical rhythm: a clean transparent margin of at least 14 units between hat and ruler, and between dimension line and hat', () => {
-    const { helmet, ruler, dimension } = MARK_LAYOUT;
-    expect(ruler.y - helmet.bottom).toBeGreaterThanOrEqual(14);
-    expect(MARK_LAYOUT.gap).toBeGreaterThanOrEqual(14);
-    expect(helmet.top - dimension.y).toBeGreaterThanOrEqual(14 + 15); // 15 = half the extension ticks
-    // the dimension line is exactly as wide as the helmet (it never overflows it) and the box is centred on it
-    expect(dimension.x0 + dimension.x1).toBeCloseTo(512, 0);
-    expect(MARK_BOX.x + MARK_BOX.w / 2).toBeCloseTo(256, 0);
+  it('vertical rhythm: 14-30 units of transparent air above and below the hat; the hat box keeps the PNG proportions', () => {
+    const { dimension, helmet, ruler, gapTop, gapBottom, w } = MARK_LAYOUT;
+    expect(gapTop).toBeGreaterThanOrEqual(14);
+    expect(gapTop).toBeLessThanOrEqual(30);
+    expect(gapBottom).toBeGreaterThanOrEqual(14);
+    expect(gapBottom).toBeLessThanOrEqual(30);
+    expect(helmet.y - (dimension.y + dimension.h)).toBe(gapTop);
+    expect(ruler.y - (helmet.y + helmet.h)).toBe(gapBottom);
+    expect(w / helmet.h).toBeCloseTo(HELMET_RATIO, 1);
+    expect(dimension.h).toBeLessThan(helmet.h / 5); // the dimension line and the ruler are slim next to the hat
+    expect(ruler.h).toBeLessThan(helmet.h / 3);
   });
 
-  it('the visor is part of ONE opaque body: a single brim outline + edge, solid gradients, nothing translucent or stroked on its own', () => {
-    expect(MARK_ART.match(/fill="url\(#visor\)"/g)).toHaveLength(1); // one brim top face that already contains the visor
-    const grad = MARK_ART.match(/<linearGradient id="visor"[\s\S]*?<\/linearGradient>/)[0];
-    expect(grad).not.toContain('stop-opacity');
-    expect(MARK_ART).not.toMatch(/<path[^>]*url\(#visor\)[^>]*(stroke|opacity)/);
+  it('the dimension line is exactly as wide as the hat and has arrowheads; the ruler has 19 graduations and a green hook', () => {
+    expect(DIM_ART).toContain('M6 14H354');
+    expect(DIM_ART.match(/L6 14L|L354 14L/g)).toHaveLength(2);
+    expect(RULER_ART.match(/V\d+(?=M|")/g).length).toBe(19);
+    expect(RULER_ART).toContain('fill="#22c55e"');
+    expect(DIM_ART + RULER_ART).not.toContain('<image');
   });
 
-  it('ribs, crest highlight and three ventilation slots are drawn on the shell (clipped to it), with subtle light and shade', () => {
-    expect(MARK_ART).toContain('clip-path="url(#dome)"');
-    expect(MARK_ART.match(/fill="#052e16" fill-opacity="\.9"/g)).toHaveLength(3); // slots
-    expect(MARK_ART.match(/stroke="#052e16" stroke-opacity="\.38"/g).length).toBeGreaterThanOrEqual(1); // ribs
-    expect(MARK_ART).toContain('url(#lit)');
-    expect(MARK_ART).toContain('url(#shade)');
-  });
-
-  it('the ruler has 19 graduations and the dimension line has arrowheads at both ends', () => {
-    expect(MARK_ART.match(/V\d+(?=M|")/g).length).toBeGreaterThanOrEqual(19);
-    expect(MARK_ART.match(/L[\d.]+ [\d.]+L[\d.]+ [\d.]+"|M[\d.]+ [\d.]+L[\d.]+ [\d.]+L[\d.]+ [\d.]+/g).length).toBeGreaterThan(0);
-  });
-
-  it('the app icon is the whole isotype on OLED black (any + maskable), identical to the in-app mark', () => {
+  it('the app icon and the lockup draw the same three levels on OLED black (any + maskable)', () => {
     for (const maskable of [false, true]) {
       const svg = buildIconSvg({ maskable });
       expect(svg).toContain('fill="#000000"');
-      expect(svg).toContain(MARK_ART); // the same art, not a variant
+      expect(svg).toContain(DIM_ART);
+      expect(svg).toContain(RULER_ART);
+      expect(svg).toContain('<image ');
     }
     expect(buildManifest().icons.some((i) => i.purpose === 'maskable')).toBe(true);
-    expect(buildMarkSvg()).toContain(MARK_ART);
   });
 
   it('/logo.png is the full lockup: isotype, CUBRAX letters with a green X, and the centred credit', () => {
     const svg = buildLockupSvg();
     expect(LOGO_FILE).toBe('logo.png');
-    expect(svg).toContain(MARK_ART);
+    expect(svg).toContain(DIM_ART);
+    expect(svg).toContain('<image ');
     expect(svg).toContain('Un producto Japadigital');
     expect(svg).toContain('text-anchor="middle"');
     expect(svg).toContain(`fill="${BRAND.green}"`);
@@ -87,8 +95,9 @@ describe('isotype: dimension line + 3/4 hard hat + ruler', () => {
 });
 
 describe('lettering', () => {
-  it('is a geometric sans (Montserrat ExtraBold outlines): filled glyphs, no strokes, no font dependency, no stencil cuts', async () => {
+  it('is Montserrat Medium/SemiBold outlines (never ExtraBold): filled glyphs, no strokes, no font dependency, no stencil cuts', async () => {
     expect(WORD).toBe('CUBRAX');
+    expect([500, 600]).toContain(WORD_WEIGHT);
     for (const c of 'CUBRAX') {
       expect(LETTER_PATHS[c], c).toMatch(/^M/);
       if ('CUBR'.includes(c)) expect(LETTER_PATHS[c], c).toMatch(/[CQ]/); // real round curves, not 45-degree cut polygons
@@ -101,19 +110,29 @@ describe('lettering', () => {
     expect(host.querySelector('text')).toBeNull();
   });
 
-  it('Logo takes its size as HEIGHT and keeps the artwork proportions', async () => {
+  it('Logo takes its size as HEIGHT: <img> hat with object-fit contain between the two SVG levels, undistorted', async () => {
     await render(React.createElement(Logo, { size: 200 }));
-    const img = host.querySelector('img');
-    expect(img.getAttribute('src')).toBe(MARK_DATA_URI);
-    expect(Number(img.getAttribute('height'))).toBe(200);
-    expect(Number(img.getAttribute('width'))).toBe(Math.round(200 / MARK_RATIO));
+    const img = host.querySelector('img[data-testid="logo-helmet"]');
+    expect(img.getAttribute('src')).toMatch(/helmet\.png$/);
+    expect(img.style.objectFit).toBe('contain');
+    const k = 200 / MARK_LAYOUT.h;
+    expect(parseFloat(img.style.height)).toBeCloseTo(MARK_LAYOUT.helmet.h * k, 1);
+    expect(parseFloat(img.style.width)).toBeCloseTo(MARK_LAYOUT.w * k, 0);
+    const svgs = [...host.querySelectorAll('[data-testid="logo"] svg')];
+    expect(svgs).toHaveLength(2);
+    // order in the DOM: dimension svg, img, ruler svg
+    const order = [...host.querySelector('[data-testid="logo"]').querySelectorAll('svg, img')].map((n) => n.tagName.toLowerCase());
+    expect(order).toEqual(['svg', 'img', 'svg']);
+    expect(host.querySelector('[data-testid="logo"]').style.height).toBe('200px');
   });
 
-  it('keeps sharp proportions when reduced to 32 px (same viewBox, no fixed pixel strokes)', async () => {
+  it('scales to 32 px tall keeping the hat proportions and the air between levels', async () => {
     await render(React.createElement(Logo, { size: 32 }));
+    const k = 32 / MARK_LAYOUT.h;
     const img = host.querySelector('img');
-    expect(img.getAttribute('height')).toBe('32');
-    expect(buildMarkSvg()).toMatch(/viewBox="[\d.-]+ [\d.-]+ [\d.]+ [\d.]+"/);
+    expect(host.querySelector('[data-testid="logo"]').style.height).toBe('32px');
+    expect(parseFloat(img.style.width) / parseFloat(img.style.height)).toBeCloseTo(HELMET_RATIO, 1);
+    expect(parseFloat(img.style.marginTop)).toBeCloseTo(MARK_LAYOUT.gapTop * k, 1);
   });
 });
 

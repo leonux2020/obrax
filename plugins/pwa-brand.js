@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { buildIconSvg, buildLockupSvg, buildManifest, PNG_ICONS, LOGO_FILE, BRAND } from '../src/brand/icon.js';
+import { buildIconSvg, buildLockupSvg, buildManifest, PNG_ICONS, LOGO_FILE, HELMET_FILE, BRAND } from '../src/brand/icon.js';
 import { CSP_META, buildHeadersFile } from '../security/policy.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -13,6 +13,16 @@ async function renderPng(svg, size) {
     .resize(size, size)
     .png({ compressionLevel: 9 })
     .toBuffer();
+}
+
+/** The supplied hard hat as a data URI (full size, or a light version for the SVG icon) so every generated asset is self-contained. */
+async function helmetUri(root, width) {
+  const sharp = (await import('sharp')).default;
+  const file = path.join(root, 'public', HELMET_FILE);
+  const buf = width
+    ? await sharp(file).resize({ width }).png({ compressionLevel: 9, palette: true, quality: 90, colours: 256 }).toBuffer()
+    : fs.readFileSync(file);
+  return `data:image/png;base64,${buf.toString('base64')}`;
 }
 
 function walk(dir, base = dir, out = []) {
@@ -39,7 +49,8 @@ export default function pwaBrand() {
 
   const getPng = async (def) => {
     if (!pngCache.has(def.file)) {
-      pngCache.set(def.file, await renderPng(buildIconSvg({ maskable: def.maskable }), def.size));
+      const helmetHref = await helmetUri(root);
+      pngCache.set(def.file, await renderPng(buildIconSvg({ maskable: def.maskable, helmetHref }), def.size));
     }
     return pngCache.get(def.file);
   };
@@ -63,11 +74,11 @@ export default function pwaBrand() {
             }
             if (url === '/icon.svg') {
               res.setHeader('Content-Type', 'image/svg+xml');
-              return res.end(buildIconSvg());
+              return res.end(buildIconSvg({ helmetHref: await helmetUri(root, 360) }));
             }
             if (url === `/${LOGO_FILE}`) {
               res.setHeader('Content-Type', 'image/png');
-              return res.end(await renderPng(buildLockupSvg(), 1024));
+              return res.end(await renderPng(buildLockupSvg({ helmetHref: await helmetUri(root) }), 1024));
             }
             const def = PNG_ICONS.find((p) => `/${p.file}` === url);
             if (def) {
@@ -119,11 +130,11 @@ export default function pwaBrand() {
         if (!fs.existsSync(outDir)) return;
 
         fs.writeFileSync(path.join(outDir, 'manifest.json'), manifestJson());
-        fs.writeFileSync(path.join(outDir, 'icon.svg'), buildIconSvg());
+        fs.writeFileSync(path.join(outDir, 'icon.svg'), buildIconSvg({ helmetHref: await helmetUri(root, 360) }));
         for (const def of PNG_ICONS) {
           fs.writeFileSync(path.join(outDir, def.file), await getPng(def));
         }
-        fs.writeFileSync(path.join(outDir, LOGO_FILE), await renderPng(buildLockupSvg(), 1024));
+        fs.writeFileSync(path.join(outDir, LOGO_FILE), await renderPng(buildLockupSvg({ helmetHref: await helmetUri(root) }), 1024));
         fs.writeFileSync(path.join(outDir, '_headers'), buildHeadersFile());
 
         // Precache list + content-hash version => atomic, offline-safe updates.
