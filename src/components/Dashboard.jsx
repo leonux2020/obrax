@@ -6,6 +6,7 @@ import { Logo, Wordmark } from './ui.jsx';
 import HelmetIcon from './HelmetIcon.jsx';
 import { LEVEL_COLOR } from './levelStyle.js';
 import ProjectCard from './ProjectCard.jsx';
+import ProQaTag from './ProQaTag.jsx';
 
 /** Re-render once a minute (and when the tab becomes visible) so the traffic lights never go stale. */
 function useNow(intervalMs = 60_000) {
@@ -83,7 +84,10 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro }
           <span className="text-[11px] font-extrabold leading-none tracking-widest">PRO</span>
         </button>
       </header>
-      <h1 className="mb-3 truncate text-2xl font-extrabold tracking-tight">{t('nav.projects')}</h1>
+      <h1 className="mb-1 truncate text-2xl font-extrabold tracking-tight">{t('nav.projects')}</h1>
+      <p className="mb-3 min-h-[12px]">
+        <ProQaTag />
+      </p>
 
       {active.length > 0 && (
         <ul className="mb-3 flex items-center justify-around" data-testid="dash-pills" aria-label={t('light.label')}>

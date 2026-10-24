@@ -1,4 +1,5 @@
-// Freemium gate. There is no billing yet, so nobody is PRO: every locked feature opens the paywall.
+// Freemium gate. There is no billing yet, so nobody is PRO (unless the temporary quality-control switch below is on):
+// every locked feature opens the paywall.
 // Features that can be locked (ids match the benefits listed on ProPaywall):
 //   'projects' -> more than FREE_PROJECT_LIMIT projects
 //   'ai'       -> AI invoice reading (Phase 5, via the server proxy)
@@ -11,6 +12,17 @@ export const PRO_FEATURES = Object.freeze(['projects', 'ai']);
 // (the test button of the paywall, compiled out of production builds) that stores a local flag, so the PRO
 // flows can be tried on localhost. A real subscription must replace this with a server-verified entitlement.
 export const SIM_PRO_KEY = 'cp.pro.sim.v1';
+
+// TEMPORARY QUALITY-CONTROL SWITCH. While true, the paywall is open in EVERY environment (production, preview,
+// localhost): isPro() is always true, so the project limit and the AI scanners are unlocked, and the app shows a
+// subtle "MODO PRO (Prueba)" tag as a reminder. Set it to false to bring the paywall back (nothing else to change).
+// The test runner (MODE 'test') is the only exception, so the paywall logic stays testable; tests exercise the open
+// state through qaProOpen({ mode }). The AI server proxy keeps its own origin check and rate limits either way.
+export const PRO_QA_OPEN = true;
+export const PRO_QA_LABEL = 'MODO PRO (Prueba)';
+
+/** Is the paywall intentionally open for quality control? (always, except inside the test runner). */
+export const qaProOpen = ({ flag = PRO_QA_OPEN, mode = import.meta.env.MODE } = {}) => Boolean(flag) && mode !== 'test';
 
 const listeners = new Set();
 const notify = () => listeners.forEach((fn) => fn());
@@ -27,6 +39,7 @@ export function subscribePro(fn) {
 }
 
 export function isPro() {
+  if (qaProOpen()) return true; // quality-control build: premium features open for everybody
   if (!import.meta.env.DEV) return false;
   try {
     return localStorage.getItem(SIM_PRO_KEY) === '1';

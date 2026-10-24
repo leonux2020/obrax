@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { regionName } from '../lib/regions.js';
 import { googleConfigured } from '../lib/auth.js';
+import ProQaTag from './ProQaTag.jsx';
 import { Button, Switch } from './ui.jsx';
 import GoogleButton from './GoogleButton.jsx';
 import BottomSheet from './BottomSheet.jsx';
@@ -58,6 +59,7 @@ export default function SettingsSheet({ user, company, logo, regionCode, pwa, dr
   return (
     <BottomSheet title={t('settings.title')} onClose={onClose}>
       <div className="mt-3 space-y-5">
+        <ProQaTag className="block text-center" />
         {/* The only place where the company / professional profile can be edited. */}
         <div>
           <p className="label">{t('settings.profile')}</p>
