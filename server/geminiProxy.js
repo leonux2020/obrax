@@ -105,7 +105,7 @@ export const KINDS = Object.freeze(['invoice', 'receipt', 'prices']);
 export const PRICES_QUOTER_RULE =
   'Debes actuar como un cotizador experto. Identifica el país ({country_code}) y busca en internet los precios minoristas vigentes en los principales proveedores locales de construcción (ej. Chile: Sodimac/Easy; México: Home Depot/Cemex; España: Leroy Merlin/Bricomart). Devuelve el precio de mercado más reciente y realista posible, evitando promedios históricos obsoletos.';
 
-export function buildPricesPrompt(regionCode) {
+export function buildPricesPrompt(regionCode, { grounded = false } = {}) {
   const region = getRegion(regionCode);
   const retailers = region.chains.map((c) => c.name).filter(Boolean).join(', ');
   const catalog = Object.entries(CATALOG)
@@ -125,6 +125,13 @@ export function buildPricesPrompt(regionCode) {
     '',
     'MACHINE RENTALS:',
     machines,
+    ...(grounded
+      ? [
+          '',
+          'Use the Google Search tool for every lookup. Answer with ONLY one JSON object, no prose and no markdown, shaped exactly like:',
+          '{"materials":[{"id":"<material id>","price":<number>}],"rent":[{"id":"<machine id>","price":<number>}]}',
+        ]
+      : []),
   ].join('\n');
 }
 
@@ -137,7 +144,24 @@ export const PRICES_SCHEMA = Object.freeze({
   required: ['materials', 'rent'],
 });
 
-export function buildPricesRequest({ regionCode, model = DEFAULT_MODEL }) {
+/** The tool that makes the model SEARCH the web (grounding) instead of estimating blindly. Always part of the price request. */
+export const SEARCH_TOOLS = Object.freeze([{ google_search: {} }]);
+
+/**
+ * The price request. By default it is GROUNDED: `"tools": [{"google_search": {}}]` is always in the body so the model
+ * looks the prices up on the web. Google does not allow a forced JSON schema together with that tool on every model, so
+ * the grounded request describes the JSON in the prompt and the answer is validated by normalizeBook(); `grounded: false`
+ * is the plain schema-constrained request (only used as the last resort when the grounded one gave nothing usable).
+ */
+export function buildPricesRequest({ regionCode, model = DEFAULT_MODEL, grounded = true }) {
+  if (grounded) {
+    return {
+      systemInstruction: { parts: [{ text: buildPricesPrompt(regionCode, { grounded: true }) }] },
+      contents: [{ role: 'user', parts: [{ text: 'Search the web and return the price list.' }] }],
+      tools: SEARCH_TOOLS.map((t) => ({ ...t })),
+      generationConfig: { temperature: 0, maxOutputTokens: 8192, ...thinkingFor(model) },
+    };
+  }
   return {
     systemInstruction: { parts: [{ text: buildPricesPrompt(regionCode) }] },
     contents: [{ role: 'user', parts: [{ text: 'Return the price list.' }] }],
@@ -224,7 +248,15 @@ export function parseModelJson(response) {
   try {
     return JSON.parse(cleaned);
   } catch {
-    return null;
+    // a grounded answer may carry a sentence around the JSON: take the outermost object
+    const a = cleaned.indexOf('{');
+    const b = cleaned.lastIndexOf('}');
+    if (a < 0 || b <= a) return null;
+    try {
+      return JSON.parse(cleaned.slice(a, b + 1));
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -335,6 +367,7 @@ export function createInvoiceHandler({
     const pad = (n) => String(n).padStart(2, '0');
     const today = `${nowDate.getFullYear()}-${pad(nowDate.getMonth() + 1)}-${pad(nowDate.getDate())}`;
     const reqBody = { mime: m?.[1], data: m?.[2], currency: typeof body.currency === 'string' ? body.currency : '', kind, today };
+    const callModels = async (bodyFor) => {
     let payload = null;
     let last = fail(502, 'upstream');
     for (const mdl of models) {
@@ -345,7 +378,7 @@ export function createInvoiceHandler({
         upstream = await fetchImpl(`${GEMINI_BASE}/${encodeURIComponent(mdl)}:generateContent`, {
           method: 'POST',
           headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
-          body: JSON.stringify(kind === 'prices' ? buildPricesRequest({ regionCode: priceRegion.code, model: mdl }) : buildGeminiRequest({ ...reqBody, model: mdl })),
+          body: JSON.stringify(bodyFor(mdl)),
           signal: ctl.signal,
         });
       } catch (err) {
@@ -364,7 +397,7 @@ export function createInvoiceHandler({
         last = fail(502, 'upstream');
         note(`${mdl}: HTTP ${upstream.status} ${await upstreamMessage(upstream)}`);
         if (RETRYABLE.has(upstream.status)) continue;
-        return last; // 400/401/403: retrying another model will not help
+        return { payload: null, last }; // 400/401/403: retrying another model will not help
       }
       try {
         payload = await upstream.json();
@@ -375,6 +408,26 @@ export function createInvoiceHandler({
       }
       note(`${mdl}: ok`);
       break;
+    }
+    return { payload, last };
+    };
+    const bodyFor = (grounded) => (mdl) =>
+      kind === 'prices' ? buildPricesRequest({ regionCode: priceRegion.code, model: mdl, grounded }) : buildGeminiRequest({ ...reqBody, model: mdl });
+    // prices: the request is GROUNDED (google_search tool) so the model looks the prices up on the web
+    let { payload, last } = await callModels(bodyFor(true));
+    if (kind === 'prices') {
+      const usable = (p) => {
+        const parsed = p && !p.promptFeedback?.blockReason ? parseModelJson(p) : null;
+        return Boolean(parsed && normalizeBook({ ...parsed, region: priceRegion.code, at: 1 }, priceRegion.code));
+      };
+      if (!usable(payload)) {
+        // only when the grounded request produced nothing usable (tool refused, quota of the tool, unreadable text):
+        // one plain schema-constrained estimate, so the app still gets a price list
+        note('grounded search gave no usable prices: plain estimate');
+        const plain = await callModels(bodyFor(false));
+        payload = plain.payload;
+        last = plain.last;
+      }
     }
     if (!payload) return last;
     if (payload?.promptFeedback?.blockReason) return fail(422, 'unreadable');

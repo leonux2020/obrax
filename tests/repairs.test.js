@@ -350,8 +350,11 @@ describe('4b. proxy: kind "prices" takes ONLY a region code and answers a valida
     expect(Object.keys(res.body.book.materials)).toEqual(['cement_bag']);
     expect(res.body.book.rent).toEqual({}); // 1 CLP/day is far outside the band
     const sent = JSON.parse(f.mock.calls[0][1].body);
-    expect(sent.systemInstruction.parts[0].text).toBe(buildPricesPrompt('CL'));
-    expect(sent.generationConfig.responseSchema).toEqual(JSON.parse(JSON.stringify(PRICES_SCHEMA)));
+    expect(f).toHaveBeenCalledTimes(1); // the grounded answer was usable: no second request
+    expect(sent.systemInstruction.parts[0].text).toBe(buildPricesPrompt('CL', { grounded: true }));
+    expect(sent.tools).toEqual([{ google_search: {} }]); // web search is always requested
+    expect(sent.generationConfig.responseSchema).toBeUndefined(); // (a forced schema cannot be combined with the search tool)
+    expect(PRICES_SCHEMA.required).toEqual(['materials', 'rent']); // the plain request keeps its schema
     expect(f.mock.calls[0][1].body).not.toMatch(/ignore everything/);
   });
 

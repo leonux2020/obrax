@@ -29,5 +29,6 @@ export default defineConfig(({ mode }) => ({
     env: { VITE_GOOGLE_CLIENT_ID: '' },
     pool: 'threads', // the default forks pool is unstable on some Node 18 setups
     include: ['tests/**/*.test.js'],
+    setupFiles: ['tests/setup/no-icon-fetch.js'],
   },
 }));

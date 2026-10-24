@@ -14,7 +14,7 @@ import { BOOK_TTL_MS, hasAiPrices, mergeBooks, normalizeBook, withUserPrice } fr
 import { currentBook, currentStatus, publish } from './priceRegistry.js';
 import { priceStore } from './priceStore.js';
 
-export const PRICES_TIMEOUT_MS = 20_000;
+export const PRICES_TIMEOUT_MS = 55_000; // a grounded (web search) answer takes longer than a plain estimate
 
 // The automatic refresh is off in the test runner (no unexpected network); tests that need it switch it on.
 let enabled = import.meta.env.MODE !== 'test';
