@@ -47,7 +47,7 @@ export default function GlobalAccounting({ projects }) {
   return (
     <main className="mx-auto w-full max-w-3xl px-3 pb-44 pt-3 sm:px-4" data-testid="accounting">
       <header className="mb-3 flex items-center gap-3">
-        <Logo size={34} />
+        <Logo size={32} />
         <h1 className="min-w-0 flex-1 truncate text-2xl font-extrabold tracking-tight">{t('nav.accounting')}</h1>
         {projects.length > 0 && (
           <button

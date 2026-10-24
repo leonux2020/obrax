@@ -60,8 +60,8 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro }
   return (
     <main className="mx-auto w-full max-w-3xl px-3 pb-44 pt-3 sm:px-4">
       <header className="mb-2 flex items-center gap-3">
-        {/* isotype (max 36 px tall) + name, aligned on one line */}
-        <Logo size={34} />
+        {/* isotype (32 px tall) + name, aligned on one line */}
+        <Logo size={32} />
         <span className="sr-only">{t('app.name')}</span>
         <span className="flex min-w-0 flex-1 items-center">
           <Wordmark height={16} />

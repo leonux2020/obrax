@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react';
-import { LETTER_PATHS, MARK_DATA_URI, MARK_RATIO, WORD, WORD_BOX, BRAND } from '../brand/icon.js';
+import { LETTER_PATHS, MARK_DATA_URI, MARK_RATIO, WORD, WORD_BOX, WORD_VIEWBOX, BRAND } from '../brand/icon.js';
 import { sanitizeNumericText, parseDecimal } from '../lib/sanitize.js';
 
 /** The CUBRAX isotype (dimension line + 3/4 hard hat + ruler, vector, transparent): `size` is its HEIGHT in px. */
@@ -16,12 +16,12 @@ export function Logo({ size = 40, className = '' }) {
   );
 }
 
-/** The CUBRAX lettering (technological monoline, green X). Decorative: put the accessible name next to it. */
+/** The CUBRAX lettering (geometric sans, white, green X). Decorative: put the accessible name next to it. */
 export function Wordmark({ height = 28, className = '' }) {
   return (
-    <svg viewBox={`0 0 ${WORD_BOX.w} ${WORD_BOX.h}`} height={height} width={Math.round((height * WORD_BOX.w) / WORD_BOX.h)} aria-hidden="true" focusable="false" className={className} data-testid="wordmark">
-      {[...WORD].map((c, i) => (
-        <path key={c} d={LETTER_PATHS[c]} transform={`translate(${i * 72 + 2} 0)`} fill="none" stroke={c === 'X' ? BRAND.green : '#ffffff'} strokeWidth="12" strokeLinejoin="miter" strokeLinecap="square" />
+    <svg viewBox={WORD_VIEWBOX} height={height} width={Math.round((height * WORD_BOX.w) / WORD_BOX.h)} aria-hidden="true" focusable="false" className={className} data-testid="wordmark">
+      {[...WORD].map((c) => (
+        <path key={c} d={LETTER_PATHS[c]} fill={c === 'X' ? BRAND.green : '#ffffff'} />
       ))}
     </svg>
   );

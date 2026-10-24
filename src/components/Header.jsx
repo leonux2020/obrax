@@ -22,7 +22,7 @@ export default function Header({ subtitle, pwa, bare = false }) {
       {!bare && (
       <header className="no-print sticky top-0 z-20 border-b border-white/10 bg-black">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-3 py-2 sm:px-4">
-          <Logo size={34} />
+          <Logo size={32} />
           <div className="min-w-0 leading-tight">
             <div className="flex items-center" data-testid="header-brand">
               <span className="sr-only">{t('app.name')}</span>
