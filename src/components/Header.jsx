@@ -1,5 +1,5 @@
 import { useI18n } from '../lib/i18n.jsx';
-import { Logo } from './ui.jsx';
+import { Logo, Wordmark } from './ui.jsx';
 
 /** Slim top bar: brand only (language, country, company and profile live in the bottom navigation). */
 export default function Header({ subtitle, pwa, bare = false }) {
@@ -22,9 +22,12 @@ export default function Header({ subtitle, pwa, bare = false }) {
       {!bare && (
       <header className="no-print sticky top-0 z-20 border-b border-white/10 bg-black">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-3 py-2 sm:px-4">
-          <Logo size={40} />
+          <Logo size={34} />
           <div className="min-w-0 leading-tight">
-            <div className="truncate text-lg font-extrabold">{t('app.name')}</div>
+            <div className="flex items-center" data-testid="header-brand">
+              <span className="sr-only">{t('app.name')}</span>
+              <Wordmark height={15} />
+            </div>
             {subtitle && <div className="truncate text-xs text-neutral-400">{subtitle}</div>}
           </div>
         </div>

@@ -2,13 +2,13 @@ import { useEffect, useId, useState } from 'react';
 import { LETTER_PATHS, MARK_DATA_URI, MARK_RATIO, WORD, WORD_BOX, BRAND } from '../brand/icon.js';
 import { sanitizeNumericText, parseDecimal } from '../lib/sanitize.js';
 
-/** The CUBRAX hard hat (3/4 view, vector, transparent): `size` is its width in px. */
+/** The CUBRAX isotype (dimension line + 3/4 hard hat + ruler, vector, transparent): `size` is its HEIGHT in px. */
 export function Logo({ size = 40, className = '' }) {
   return (
     <img
       src={MARK_DATA_URI}
-      width={size}
-      height={Math.round(size * MARK_RATIO)}
+      width={Math.round(size / MARK_RATIO)}
+      height={size}
       alt=""
       draggable="false"
       className={`select-none ${className}`}

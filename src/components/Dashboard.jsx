@@ -59,12 +59,13 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro }
 
   return (
     <main className="mx-auto w-full max-w-3xl px-3 pb-44 pt-3 sm:px-4">
-      <header className="mb-3 flex items-center gap-3">
-        <Logo size={54} />
-        <div className="min-w-0 flex-1">
-          <Wordmark height={11} className="mb-1 opacity-90" />
-          <h1 className="truncate text-2xl font-extrabold tracking-tight">{t('nav.projects')}</h1>
-        </div>
+      <header className="mb-2 flex items-center gap-3">
+        {/* isotype (max 36 px tall) + name, aligned on one line */}
+        <Logo size={34} />
+        <span className="sr-only">{t('app.name')}</span>
+        <span className="flex min-w-0 flex-1 items-center">
+          <Wordmark height={16} />
+        </span>
         {/* PRO: always a real button that opens the plans screen (also when PRO is already active). Gold hard hat on top. */}
         <button
           type="button"
@@ -80,6 +81,7 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro }
           <span className="text-[11px] font-extrabold leading-none tracking-widest">PRO</span>
         </button>
       </header>
+      <h1 className="mb-3 truncate text-2xl font-extrabold tracking-tight">{t('nav.projects')}</h1>
 
       {active.length > 0 && (
         <ul className="mb-3 flex items-center justify-around" data-testid="dash-pills" aria-label={t('light.label')}>

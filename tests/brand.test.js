@@ -22,25 +22,37 @@ afterEach(() => {
   host?.remove();
 });
 
-describe('hard hat mark', () => {
-  it('has the shell, centre crest, front visor (bill) and three ventilation slots, all in green on transparent', () => {
+describe('isotype: dimension line + 3/4 hard hat + ruler', () => {
+  it('has the three levels, in order: dimension line on top, hat in the middle, ruler at the bottom', () => {
     const svg = buildMarkSvg();
     expect(svg).toContain('aria-label="CUBRAX"');
     expect(svg).not.toMatch(/<rect[^>]*fill="#000/); // transparent: sits on the app's own black
-    expect(MARK_ART).toContain('url(#shell)');
-    expect(MARK_ART).toContain('url(#crest)');
-    expect(MARK_ART).toContain('url(#bill)'); // front visor
-    expect(MARK_ART.match(/stroke="#052e16" stroke-width="15"/g)).toHaveLength(1);
-    expect(MARK_ART.match(/<path d="M3\d\d \d+L\d+ \d+"\/>|<path d="M\d+ \d+L\d+ \d+"\/><path d="M\d+ \d+L\d+ \d+"\/><path d="M\d+ \d+L\d+ \d+"\/>/g)?.length).toBeGreaterThan(0);
+    const dim = MARK_ART.indexOf('M96 82H416'); // dimension line + extension ticks + arrowheads
+    const hat = MARK_ART.indexOf('url(#shell)', MARK_ART.indexOf('</defs>'));
+    const ruler = MARK_ART.indexOf('<rect x="96" y="360"');
+    expect(dim).toBeGreaterThan(-1);
+    expect(hat).toBeGreaterThan(dim);
+    expect(ruler).toBeGreaterThan(hat);
+    expect(MARK_ART).toContain('M122 72L96 82L122 92'); // arrowheads
+    expect(MARK_ART).toContain('url(#visor)'); // front visor
+    expect(MARK_ART.match(/<rect x="3\d\d" y="\d+" width="3\d" height="9" rx="4.5"\/>/g)).toHaveLength(3); // ventilation slots
+    expect(MARK_ART.match(/M\d+ 366V\d+/g)).toHaveLength(17); // graduations
     expect(MARK_DATA_URI.startsWith('data:image/svg+xml')).toBe(true);
   });
 
-  it('the app icon is the hat on OLED black (any + maskable), not the old blueprint / tape artwork', () => {
+  it('is built from arcs, lines and rounded rects only: no free-hand cubic curves that could deform the visor', () => {
+    const ds = [...MARK_ART.matchAll(/ d="([^"]+)"/g)].map((m) => m[1]);
+    expect(ds.length).toBeGreaterThan(8);
+    for (const d of ds) expect(d, d).not.toMatch(/[CcSsTt]/); // only M L H V A Q (tiny corner radius) Z
+  });
+
+  it('the app icon is the whole isotype on OLED black (any + maskable), identical to the in-app mark', () => {
     for (const maskable of [false, true]) {
       const svg = buildIconSvg({ maskable });
       expect(svg).toContain('fill="#000000"');
       expect(svg).toContain('url(#shell)');
-      expect(svg).not.toMatch(/tape|blueprint/i);
+      expect(svg).toContain(MARK_ART); // the same art, not a variant
+      expect(svg).toContain('M96 82H416');
     }
     expect(buildManifest().icons.some((i) => i.purpose === 'maskable')).toBe(true);
   });
@@ -70,7 +82,8 @@ describe('lettering', () => {
     await render(React.createElement(Logo, { size: 200 }));
     const img = host.querySelector('img');
     expect(img.getAttribute('src')).toBe(MARK_DATA_URI);
-    expect(Number(img.getAttribute('height'))).toBeLessThan(200);
+    expect(Number(img.getAttribute('height'))).toBe(200); // size = height
+    expect(Number(img.getAttribute('width'))).toBeGreaterThan(200);
   });
 });
 
@@ -86,10 +99,12 @@ describe('splash + dashboard', () => {
     expect(credit.className).toContain('text-center');
   });
 
-  it('the dashboard header carries the new mark and lettering (source check)', async () => {
+  it('the dashboard and the top bar carry the isotype at 34 px tall next to the CUBRAX lettering', async () => {
     const fs = await import('node:fs');
     const src = fs.readFileSync('src/components/Dashboard.jsx', 'utf8');
     expect(src).toContain('<Wordmark');
-    expect(src).toContain('<Logo');
+    expect(src).toContain('<Logo size={34}');
+    expect(fs.readFileSync('src/components/Header.jsx', 'utf8')).toContain('<Logo size={34}');
+    expect(fs.readFileSync('src/components/Header.jsx', 'utf8')).toContain('<Wordmark');
   });
 });

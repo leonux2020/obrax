@@ -13,29 +13,37 @@ export const BRAND = Object.freeze({
   black: '#000000',
 });
 
-// ---- the mark: safety hard hat in 3/4 perspective (front visor, ventilation slots, centre crest) --------------
-// Pure vector, drawn in a 512 box; the artwork occupies x 22-446, y 100-384. Green on transparent: it sits on the
-// OLED black of the app, or on the black tile of the app icon.
+// ---- the isotype: THREE LEVELS, one precise composition -------------------------------------------------------
+//   top     architectural dimension line (extension ticks + arrowheads)
+//   centre  safety hard hat in 3/4 perspective: the centre crest and the ventilation slots sit on the right of the
+//           dome, the modern flat-edged visor points to the front-left. Only arcs, straight lines and rounded
+//           rectangles: no free-hand curves, nothing deformed
+//   bottom  graduated ruler / tape measure (green hook on the left) as the horizontal base
+// Drawn once in a 512 box (artwork: x 40-434, y 62-420), green / white on transparent: it sits on the OLED black
+// of the app or on the black tile of the app icon.
+const RULER_TICKS = Array.from({ length: 17 }, (_, i) => `M${112 + i * 18} 366V${i % 4 === 0 ? 392 : 380}`).join('');
 export const MARK_ART = `<defs>
- <clipPath id="dome"><path d="M92 316C92 196 170 108 268 108S432 196 432 316Z"/></clipPath>
- <linearGradient id="shell" x1="0.15" y1="0" x2="0.85" y2="1"><stop offset="0" stop-color="#6ee7a0"/><stop offset=".45" stop-color="#22c55e"/><stop offset="1" stop-color="#15803d"/></linearGradient>
- <linearGradient id="crest" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4ade80"/><stop offset="1" stop-color="#166534"/></linearGradient>
- <linearGradient id="brim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16a34a"/><stop offset="1" stop-color="#14532d"/></linearGradient>
- <linearGradient id="bill" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4ade80"/><stop offset="1" stop-color="#15803d"/></linearGradient>
+<linearGradient id="shell" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4ade80"/><stop offset="1" stop-color="#16a34a"/></linearGradient>
+<linearGradient id="visor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22c55e"/><stop offset="1" stop-color="#15803d"/></linearGradient>
+<clipPath id="dome"><path d="M120 300A136 150 0 0 1 392 300Z"/></clipPath>
 </defs>
-<path d="M92 316C92 196 170 108 268 108S432 196 432 316Z" fill="url(#shell)"/>
-<g clip-path="url(#dome)"><path d="M204 320C196 214 236 126 304 96L352 100C290 140 262 224 266 320Z" fill="url(#crest)"/><path d="M352 100C290 140 262 224 266 320" fill="none" stroke="#bbf7d0" stroke-opacity=".55" stroke-width="3"/></g>
-<g stroke="#052e16" stroke-width="15" stroke-linecap="round" fill="none">
- <path d="M352 190L384 236"/><path d="M336 224L372 276"/><path d="M322 258L358 306"/>
+<g fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+<path d="M96 82H416M96 66V98M416 66V98M122 72L96 82L122 92M390 72L416 82L390 92"/>
 </g>
-<path d="M120 290C128 214 172 156 224 132" fill="none" stroke="#ffffff" stroke-opacity=".5" stroke-width="9" stroke-linecap="round"/>
-<path d="M76 322C76 298 158 290 250 292C350 294 436 300 446 322C446 348 368 356 256 356C148 356 76 346 76 322Z" fill="url(#brim)"/>
-<path d="M76 322C76 298 158 290 250 292C350 294 436 300 446 322" fill="none" stroke="#86efac" stroke-opacity=".6" stroke-width="4"/>
-<path d="M76 322C46 322 22 340 34 358C52 380 140 384 214 362L196 340Z" fill="url(#bill)"/>
-<path d="M34 358C52 380 140 384 214 362" fill="none" stroke="#052e16" stroke-opacity=".5" stroke-width="4"/>
-<path d="M60 334C82 328 130 330 190 342" fill="none" stroke="#dcfce7" stroke-opacity=".55" stroke-width="4" stroke-linecap="round"/>`;
-export const MARK_BOX = Object.freeze({ x: 16, y: 84, w: 440, h: 316 }); // tight crop of the artwork
-export const MARK_RATIO = MARK_BOX.h / MARK_BOX.w;
+<path d="M120 300A136 150 0 0 1 392 300Z" fill="url(#shell)"/>
+<path d="M256 150A36 150 0 0 1 292 300H340A84 150 0 0 0 256 150Z" fill="#15803d" clip-path="url(#dome)"/>
+<path d="M152 276A106 136 0 0 1 203 182" fill="none" stroke="#ffffff" stroke-opacity=".45" stroke-width="8" stroke-linecap="round"/>
+<g fill="#052e16"><rect x="344" y="224" width="32" height="9" rx="4.5"/><rect x="348" y="250" width="34" height="9" rx="4.5"/><rect x="352" y="274" width="34" height="9" rx="4.5"/></g>
+<path d="M92 300H420A14 14 0 0 1 434 314V318A14 14 0 0 1 420 330H92A14 14 0 0 1 78 318V314A14 14 0 0 1 92 300Z" fill="#16a34a"/>
+<path d="M96 300H416" stroke="#86efac" stroke-opacity=".7" stroke-width="4" stroke-linecap="round"/>
+<path d="M150 306L50 324Q40 326 40 333Q40 340 50 342L208 344L228 306Z" fill="url(#visor)" stroke="#15803d" stroke-width="4" stroke-linejoin="round"/>
+<path d="M54 333L222 328" stroke="#bbf7d0" stroke-opacity=".5" stroke-width="3" stroke-linecap="round"/>
+<rect x="96" y="360" width="320" height="52" rx="6" fill="#ffffff"/>
+<path d="${RULER_TICKS}" stroke="#000000" stroke-width="5"/>
+<rect x="78" y="352" width="18" height="68" rx="4" fill="#22c55e"/>
+`;
+export const MARK_BOX = Object.freeze({ x: 30, y: 52, w: 420, h: 380 }); // tight crop of the artwork
+export const MARK_RATIO = MARK_BOX.h / MARK_BOX.w; // height / width
 
 /** Hard hat on transparent background (the in-app logo). */
 export function buildMarkSvg() {
@@ -67,7 +75,7 @@ export function buildLockupSvg() {
   return (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="CUBRAX">' +
     '<rect width="1024" height="1024" fill="#000000"/>' +
-    `<svg x="${512 - (w * s) / 2}" y="130" width="${w * s}" height="${h * s}" viewBox="${x} ${y} ${w} ${h}">${MARK_ART}</svg>` +
+    `<svg x="${512 - (w * s) / 2}" y="104" width="${w * s}" height="${h * s}" viewBox="${x} ${y} ${w} ${h}">${MARK_ART}</svg>` +
     `<g transform="translate(${512 - (WORD_BOX.w * 1.5) / 2} 560) scale(1.5)">${wordmarkInner()}</g>` +
     '<text x="512" y="780" text-anchor="middle" fill="#a3a3a3" font-family="system-ui,Segoe UI,Roboto,sans-serif" font-size="38" letter-spacing="2">Un producto Japadigital</text>' +
     '</svg>'

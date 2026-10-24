@@ -43,7 +43,7 @@ export default function SplashScreen({ onStart, auto = false, timing = SPLASH_TI
       data-testid="splash"
       data-leaving={leaving ? 'true' : undefined}
     >
-      <Logo size={248} />
+      <Logo size={216} />
       <h1 data-testid="splash-name" className="mt-8 flex w-full justify-center text-center">
         <span className="sr-only">{t('app.name')}</span>
         <Wordmark height={40} />
