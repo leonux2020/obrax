@@ -83,7 +83,7 @@ describe('Dashboard: counters instead of sentences, tabs, full-width clickable c
     expect(host.textContent).not.toMatch(/proyectos? activos?|tienes \d/i);
   });
 
-  it('indicators are small warning triangles: transparent inside, solid 2px border in the state colour, the number in the middle; undated started jobs count as on time', async () => {
+  it('indicators are small warning triangles: vivid state colour + number when > 0, EMPTY and dimmed at 0; undated started jobs count as on time', async () => {
     const list = [mk('Atrasada', -30, -4), mk('Sin fecha fin', -3, 0)];
     list[1].endDate = '';
     await render(React.createElement(Dashboard, { projects: list, tab: 'active', onTab: () => {}, onNew: () => {}, onOpen: () => {}, onPro: () => {} }));
@@ -93,17 +93,28 @@ describe('Dashboard: counters instead of sentences, tabs, full-width clickable c
     const colors = { red: '#ff2b2b', orange: '#ff9500', green: '#00d95f', future: '#2d8cff' };
     for (const [level, color] of Object.entries(colors)) {
       const tri = q(`tri-${level}`);
-      expect(tri.getAttribute('stroke')).toBe(color);
+      const li = q(`pill-${level}`);
+      const n = Number(li.getAttribute('data-count'));
       expect(tri.getAttribute('stroke-width')).toBe('2');
       expect(tri.getAttribute('fill')).toBe('none'); // OLED black / transparent inside
-      const li = q(`pill-${level}`);
       expect(li.className).not.toMatch(/opacity|bg-/);
       expect(li.className).toContain('h-[54px]'); // small, not a giant rectangle
-      expect(li.textContent).toBe(String(li.getAttribute('data-count'))); // the number, centred in the triangle
+      if (n > 0) {
+        expect(tri.getAttribute('stroke')).toBe(color); // vivid state colour
+        expect(tri.getAttribute('stroke-opacity')).toBe('1');
+        expect(li.textContent).toBe(String(n)); // the number, centred in the triangle
+        expect(li.getAttribute('data-empty')).toBeNull();
+      } else {
+        expect(tri.getAttribute('stroke')).not.toBe(color); // neutral, muted
+        expect(Number(tri.getAttribute('stroke-opacity'))).toBeLessThan(0.4);
+        expect(li.textContent).toBe(''); // completely empty inside
+        expect(li.getAttribute('data-empty')).toBe('true');
+        expect(li.getAttribute('aria-label')).toMatch(/: 0$/); // screen readers still hear the zero
+      }
     }
     const cards = qa('project-card');
     expect(cards.map((c) => c.getAttribute('data-level')).sort()).toEqual(['green', 'red']);
-    for (const c of cards) expect(c.style.borderColor).toMatch(/^(#|rgb)/);
+    for (const c of cards) expect(c.style.borderBottomColor).toMatch(/^(#|rgb)/);
     expect(Object.values(LEVEL_COLOR).slice(0, 4)).toEqual(Object.values(colors));
   });
 
@@ -148,13 +159,19 @@ describe('Dashboard: counters instead of sentences, tabs, full-width clickable c
     for (const c of cards) {
       expect(c.tagName).toBe('BUTTON');
       expect(c.className).toContain('w-full');
-      expect(c.className).toContain('border-b-[8px]');
-      expect(c.className).toContain('border-2');
+      expect(c.className).toContain('border-b-[3px]'); // slightly thicker bottom edge...
+      expect(c.className).toMatch(/\bborder\b/); // ...on a 1px perimeter
+      expect(c.className).toContain('border-white/10'); // hairline, neutral
+      expect(c.className).toContain('bg-transparent'); // no solid fill
+      expect(c.className).not.toMatch(/bg-(black|gradient)|from-|border-2|border-b-\[8px\]/);
+      expect(c.style.borderColor).toBe(''); // the state colour is ONLY on the bottom edge
+      expect(c.style.borderBottomColor).not.toBe('');
+      expect(c.querySelector('[data-testid="card-detail"]').style.color).toBe(''); // detail text is neutral too
       expect(c.querySelectorAll('button')).toHaveLength(0); // no Abrir / Editar inside
       expect(c.querySelector('[data-testid="card-flag"]').textContent).toBe('🇨🇱');
     }
     const late = cards.find((c) => c.getAttribute('data-level') === 'red');
-    expect(late.style.borderColor).not.toBe('');
+    expect(late.style.borderBottomColor).not.toBe('');
     expect(late.querySelector('[data-testid="card-detail"]').textContent).toContain('4');
     expect(LEVEL_COLOR.red).toBe('#ff2b2b');
     expect(cards.find((c) => c.getAttribute('data-level') === 'future')).toBeTruthy();

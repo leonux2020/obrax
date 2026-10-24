@@ -23,6 +23,8 @@ function useNow(intervalMs = 60_000) {
   return now;
 }
 
+const EMPTY_TRIANGLE = '#737373'; // neutral grey for a counter that is 0
+
 const PILLS = [
   ['red', 'pill.late'],
   ['orange', 'pill.soon'],
@@ -86,16 +88,21 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro }
       {active.length > 0 && (
         <ul className="mb-3 flex items-center justify-around" data-testid="dash-pills" aria-label={t('light.label')}>
           {PILLS.map(([level, key]) => {
+            const n = counts[level];
             const color = LEVEL_COLOR[level];
+            // zero state: an EMPTY, dimmed outline (no number, neutral colour, low opacity) so it does not compete for attention
+            const stroke = n > 0 ? color : EMPTY_TRIANGLE;
             return (
-              <li key={level} data-testid={`pill-${level}`} data-count={counts[level]} aria-label={`${t(key)}: ${counts[level]}`} title={t(key)} className="relative block h-[54px] w-[60px]">
-                {/* warning-sign triangle: transparent / OLED black inside, solid 2 px border in the state colour, number in the middle */}
-                <svg viewBox="0 0 60 54" className="absolute inset-0 h-full w-full" aria-hidden="true" focusable="false">
-                  <polygon points="30,3 57,51 3,51" fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" data-testid={`tri-${level}`} />
+              <li key={level} data-testid={`pill-${level}`} data-count={n} data-empty={n > 0 ? undefined : 'true'} aria-label={`${t(key)}: ${n}`} title={t(key)} className="relative block h-[54px] w-[60px]">
+                {/* warning-sign triangle: transparent / OLED black inside; vivid state colour + number when > 0, empty and dimmed at 0 */}
+                <svg viewBox="0 0 60 54" className="absolute inset-0 h-full w-full" aria-hidden="true" focusable="false" style={n > 0 ? { filter: `drop-shadow(0 0 5px ${color}66)` } : undefined}>
+                  <polygon points="30,3 57,51 3,51" fill="none" stroke={stroke} strokeWidth="2" strokeOpacity={n > 0 ? 1 : 0.28} strokeLinejoin="round" data-testid={`tri-${level}`} />
                 </svg>
-                <span aria-hidden="true" className="absolute inset-x-0 top-[25px] text-center text-xl font-black leading-none tabular-nums" style={{ color }}>
-                  {counts[level]}
-                </span>
+                {n > 0 && (
+                  <span aria-hidden="true" className="absolute inset-x-0 top-[25px] text-center text-xl font-black leading-none tabular-nums" style={{ color }}>
+                    {n}
+                  </span>
+                )}
               </li>
             );
           })}

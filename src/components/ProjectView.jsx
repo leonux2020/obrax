@@ -149,6 +149,7 @@ export function Logbook({ entries, onChange }) {
     commit(text);
   };
   const supported = Boolean(getSpeechRecognition());
+  const micIssue = ['log.dictateDenied', 'log.dictateUnsupported', 'log.dictateNetwork', 'log.dictateError'].includes(note); // shown as a visible red notice
 
   const toggleMic = () => {
     if (listening) {
@@ -166,13 +167,16 @@ export function Logbook({ entries, onChange }) {
       locale,
       getBase: () => textRef.current,
       onText: (full) => setText(sanitizeText(full, LEDGER_LIMITS.logChars)),
+      onActive: () => setNote('log.listening'), // the microphone is really open
       onEnd: (full) => {
         setListening(false);
         setNote(commit(full) ? 'log.autosaved' : ''); // end of the dictation = saved into the project
       },
       onError: (kind) => {
         setListening(false);
-        setNote(kind === 'denied' ? 'log.dictateDenied' : kind === 'unsupported' ? 'log.dictateUnsupported' : 'log.dictateError');
+        setNote(
+          kind === 'denied' ? 'log.dictateDenied' : kind === 'unsupported' ? 'log.dictateUnsupported' : kind === 'network' ? 'log.dictateNetwork' : 'log.dictateError',
+        );
       },
     });
     if (dictation.current.start()) setListening(true);
@@ -225,25 +229,32 @@ export function Logbook({ entries, onChange }) {
           aria-pressed={listening}
           data-testid="log-mic"
           data-listening={listening ? 'true' : 'false'}
-          className={`absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full border text-brand transition active:scale-95 ${
-            listening ? 'animate-pulse border-red-500 bg-red-500/15 text-red-400' : 'border-white/15 hover:border-brand'
+          className={`absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full border transition active:scale-95 ${
+            listening ? 'animate-pulse border-red-500 bg-red-500 text-white shadow-[0_0_16px_rgba(239,68,68,0.7)]' : 'border-white/15 text-brand hover:border-brand'
           }`}
         >
-          {listening ? (
-            <Icon size={20}>
-              <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />
-            </Icon>
-          ) : (
-            <Icon size={22}>
-              <rect x="9" y="3" width="6" height="11" rx="3" />
-              <path d="M5 11a7 7 0 0 0 14 0" />
-              <path d="M12 18v3" />
-            </Icon>
-          )}
+          {/* the microphone itself turns red and blinks while it listens; tap again to stop */}
+          <Icon size={22}>
+            <rect x="9" y="3" width="6" height="11" rx="3" />
+            <path d="M5 11a7 7 0 0 0 14 0" />
+            <path d="M12 18v3" />
+          </Icon>
         </button>
       </div>
       {note && (
-        <p role="status" data-testid="log-mic-hint" className="text-xs text-neutral-300">
+        <p
+          role={micIssue ? 'alert' : 'status'}
+          data-testid="log-mic-hint"
+          data-kind={listening ? 'listening' : micIssue ? 'error' : 'info'}
+          className={
+            listening
+              ? 'flex items-center gap-2 text-xs font-semibold text-red-400'
+              : micIssue
+                ? 'rounded-xl border border-red-500/60 px-3 py-2 text-sm font-semibold text-red-400'
+                : 'text-xs text-neutral-300'
+          }
+        >
+          {listening && <span aria-hidden="true" className="inline-block h-2 w-2 animate-pulse rounded-full bg-red-500" />}
           {t(note)}
         </p>
       )}

@@ -45,6 +45,13 @@ export async function requestPriceBook(regionCode, { fetchImpl = globalThis.fetc
   }
 }
 
+/** Short diagnostic code of a failed request ('not_configured' = the proxy has no AI key, 'timeout', 'upstream', 'network'...). */
+export function failureReason(err) {
+  const m = /^prices:(.+)$/.exec(err?.message || '');
+  if (m) return /^\d+$/.test(m[1]) ? `http_${m[1]}` : m[1];
+  return err?.name === 'AbortError' ? 'timeout' : 'network';
+}
+
 const inflight = new Map();
 
 /**
@@ -67,12 +74,12 @@ export function refreshPrices(regionCode, opts = {}) {
       publish(regionCode, { state: 'fresh', at: book.at }); // fetched recently (maybe in a previous session): do not ask again
       return 'fresh';
     }
-    const fallback = () => {
+    const fallback = (reason) => {
       const state = book ? 'cached' : 'sim';
-      publish(regionCode, { state, at: book?.at ?? 0 });
+      publish(regionCode, { state, at: book?.at ?? 0, reason });
       return state;
     };
-    if (!online()) return fallback();
+    if (!online()) return fallback('offline');
     publish(regionCode, { state: 'loading', at: book?.at ?? 0 });
     try {
       const fresh = await requestPriceBook(regionCode, { fetchImpl, now });
@@ -84,8 +91,8 @@ export function refreshPrices(regionCode, opts = {}) {
       }
       publish(regionCode, { book: merged, state: 'fresh', at: merged.at });
       return 'fresh';
-    } catch {
-      return fallback();
+    } catch (err) {
+      return fallback(failureReason(err));
     }
   })().finally(() => inflight.delete(regionCode));
   inflight.set(regionCode, job);

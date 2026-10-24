@@ -8,14 +8,14 @@ export const usePriceBook = (regionCode) => useSyncExternalStore(subscribeRegist
 /** Changes whenever ANY price book changes (for views that total many projects, possibly in several regions). */
 export const usePriceVersion = () => useSyncExternalStore(subscribeRegistry, registryVersion, () => 0);
 
-/** { state: 'idle'|'loading'|'fresh'|'cached'|'sim', at } of the region's price service. */
+/** { state: 'idle'|'loading'|'fresh'|'cached'|'sim', at, reason } of the region's price service (reason = why it fell back). */
 export function usePriceStatus(regionCode) {
   const key = useSyncExternalStore(subscribeRegistry, () => {
     const s = currentStatus(regionCode);
-    return `${s.state}|${s.at}`;
-  }, () => 'idle|0');
-  const [state, at] = key.split('|');
-  return { state, at: Number(at) };
+    return `${s.state}|${s.at}|${s.reason || ''}`;
+  }, () => 'idle|0|');
+  const [state, at, reason] = key.split('|');
+  return { state, at: Number(at), reason };
 }
 
 /** Keep the prices of one or more regions up to date: on start / change, and whenever the device comes back online. */

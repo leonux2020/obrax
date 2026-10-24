@@ -14,16 +14,17 @@ export function getSpeechRecognition(win = typeof window === 'undefined' ? null 
 /** Joins the text already in the field with what has just been dictated (single space, no double blanks). */
 export const joinSpeech = (base, spoken) => [base, spoken].map((s) => (s || '').trim()).filter(Boolean).join(' ');
 
-const ERRORS = { 'not-allowed': 'denied', 'service-not-allowed': 'denied', 'audio-capture': 'denied' };
+const ERRORS = { 'not-allowed': 'denied', 'service-not-allowed': 'denied', 'audio-capture': 'denied', network: 'network' };
 
 /**
  * One dictation session.
  *  - onText(fullText)  live transcript (base text + final results + the interim words still being recognised)
  *  - onEnd(fullText)   the session finished (stop tapped, silence timeout, or error): the caller saves it
- *  - onError(kind)     'denied' | 'unsupported' | 'error'   ('no-speech' / 'aborted' are NOT errors)
+ *  - onError(kind)     'denied' | 'network' | 'unsupported' | 'error'   ('no-speech' / 'aborted' are NOT errors)
+ *  - onActive()        the microphone is really open (audio capture started): the UI can show "listening"
  * Returns { start, stop, supported }.
  */
-export function createDictation({ lang = 'es', locale = '', getBase = () => '', onText, onEnd, onError, win } = {}) {
+export function createDictation({ lang = 'es', locale = '', getBase = () => '', onText, onEnd, onError, onActive, win } = {}) {
   const Ctor = getSpeechRecognition(win);
   let rec = null;
   let finals = '';
@@ -56,15 +57,21 @@ export function createDictation({ lang = 'es', locale = '', getBase = () => '', 
       rec.continuous = true;
       rec.interimResults = true;
       rec.maxAlternatives = 1;
+      rec.onaudiostart = () => onActive?.();
       rec.onresult = (ev) => {
+        // Rebuilt from ALL the results of the session on every event (final ones + the interim tail): robust to
+        // browsers that re-send earlier results or move `resultIndex` around, and the text can never be lost.
+        let spoken = '';
         let interim = '';
-        for (let i = ev.resultIndex ?? 0; i < ev.results.length; i += 1) {
-          const r = ev.results[i];
-          const piece = r[0]?.transcript || '';
-          if (r.isFinal) finals = joinSpeech(finals, piece);
+        const list = ev.results || [];
+        for (let i = 0; i < list.length; i += 1) {
+          const r = list[i];
+          const piece = r?.[0]?.transcript || '';
+          if (r?.isFinal) spoken = joinSpeech(spoken, piece);
           else interim = joinSpeech(interim, piece);
         }
-        latest = joinSpeech(base, joinSpeech(finals, interim));
+        finals = spoken;
+        latest = joinSpeech(base, joinSpeech(spoken, interim));
         onText?.(latest);
       };
       rec.onerror = (ev) => {

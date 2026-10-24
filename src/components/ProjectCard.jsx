@@ -11,8 +11,9 @@ import { LEVEL_COLOR, levelDetail } from './levelStyle.js';
 import Hourglass from './Hourglass.jsx';
 
 /**
- * One client job, full width. The WHOLE card is the button (no Open / Edit buttons): a thick bottom border in the
- * state colour, the country flag, the days that matter and an hourglass when a rented tool is due back today.
+ * One client job, full width. The WHOLE card is the button (no Open / Edit buttons): a hairline neutral outline and a
+ * slightly thicker bottom border that is the ONLY thing carrying the state colour, plus the country flag, the days
+ * that matter and an hourglass when a rented tool is due back today.
  */
 export default function ProjectCard({ project, now, onOpen }) {
   const { t, lang } = useI18n();
@@ -45,8 +46,8 @@ export default function ProjectCard({ project, now, onOpen }) {
         data-testid="project-card"
         data-level={level}
         aria-label={[title, client, detail].filter(Boolean).join(', ')}
-        style={{ borderColor: LEVEL_COLOR[level] }}
-        className="block w-full rounded-2xl border-2 border-b-[8px] bg-black p-4 text-left transition active:bg-white/[0.04]"
+        style={{ borderBottomColor: LEVEL_COLOR[level] }}
+        className="block w-full rounded-2xl border border-b-[3px] border-white/10 bg-transparent p-4 text-left transition active:bg-white/[0.04]"
       >
         <span className="flex items-start gap-3">
           <span className="min-w-0 flex-1">
@@ -61,8 +62,7 @@ export default function ProjectCard({ project, now, onOpen }) {
         <span className="mt-3 flex items-end justify-between gap-3">
           <span
             data-testid="card-detail"
-            className={`text-sm font-bold ${level === 'red' ? 'text-base' : ''}`}
-            style={{ color: level === 'closed' || level === 'none' ? '#a3a3a3' : LEVEL_COLOR[level] }}
+            className={`text-sm font-bold text-neutral-300 ${level === 'red' ? 'text-base' : ''}`}
           >
             {detail}
           </span>

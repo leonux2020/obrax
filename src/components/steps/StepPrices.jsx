@@ -9,6 +9,14 @@ import { chainLabel } from '../../lib/regions.js';
 import { Badge, Button, NumberField } from '../ui.jsx';
 import InvoiceSheet from '../InvoiceSheet.jsx';
 
+// colour of the data-source indicator: loading (blue, blinking), live AI (green), saved / offline (gold), simulation (grey)
+const FEED_TONE = {
+  loading: { dot: 'bg-sky-400', text: 'text-sky-300' },
+  fresh: { dot: 'bg-brand', text: 'text-neutral-300' },
+  cached: { dot: 'bg-[#e8c35f]', text: 'text-[#e8c35f]' },
+  sim: { dot: 'bg-white/40', text: 'text-neutral-400' },
+};
+
 export default function StepPrices({ draft, setDraft, result, now, onRefresh, onPro }) {
   const { t, region, money, num, unit, time, locale } = useI18n();
   // Genuine user input => 8 refreshes/min; scripted (untrusted-event) sessions => 2/min.
@@ -83,13 +91,29 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
           <p className="text-xs text-neutral-400" data-testid="prices-auto">
             {t('prices.auto')}
           </p>
-          <p role="status" className={`text-xs ${feed.state === 'cached' ? 'text-[#e8c35f]' : 'text-neutral-400'}`} data-testid="prices-feed" data-state={feed.state}>
-            {feed.state === 'loading'
-              ? t('prices.live.updating')
-              : feed.state === 'fresh' || feed.state === 'cached'
-                ? t(feed.state === 'fresh' ? 'prices.live.fresh' : 'prices.live.cached', { date: new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(feed.at)) })
-                : t('prices.live.sim')}
+          {/* where the numbers come from: AI request in flight / saved prices (offline) / simulation mode / live AI */}
+          <p
+            role="status"
+            className={`flex items-center gap-1.5 text-xs ${FEED_TONE[feed.state]?.text || 'text-neutral-400'}`}
+            data-testid="prices-feed"
+            data-state={feed.state}
+            data-reason={feed.reason || undefined}
+            title={feed.reason ? `${feed.state}: ${feed.reason}` : undefined}
+          >
+            <span aria-hidden="true" className={`inline-block h-2 w-2 shrink-0 rounded-full ${FEED_TONE[feed.state]?.dot || 'bg-white/20'} ${feed.state === 'loading' ? 'animate-pulse' : ''}`} />
+            <span>
+              {feed.state === 'loading'
+                ? t('prices.live.updating')
+                : feed.state === 'fresh' || feed.state === 'cached'
+                  ? t(feed.state === 'fresh' ? 'prices.live.fresh' : 'prices.live.cached', { date: new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(feed.at)) })
+                  : t('prices.live.sim')}
+            </span>
           </p>
+          {feed.reason === 'not_configured' && (feed.state === 'sim' || feed.state === 'cached') && (
+            <p className="text-xs text-neutral-500" data-testid="prices-feed-why">
+              {t('prices.live.noKey')}
+            </p>
+          )}
         </div>
         <Button variant="secondary" className="!min-h-[44px]" onClick={refresh}>
           ↻ {t('prices.refresh')}
