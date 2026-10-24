@@ -10,7 +10,7 @@
 import { getRegion } from './regions.js';
 import { roundMoney, marketBucket } from './pricing.js';
 import { MACHINES, MACHINE_IDS } from './machines.js';
-import { liveRent } from './priceBook.js';
+import { liveRent, savedRent } from './priceBook.js';
 
 export { MACHINES, MACHINE_IDS };
 
@@ -44,11 +44,16 @@ export function machineryRate(id, regionCode, bucket = marketBucket(), book = nu
   const noise = (seed) => (hash(seed) / 4294967295) * 2 - 1;
   const spread = 1 + noise(`${region.code}|machine|${id}`) * 0.05;
   const drift = 1 + noise(`${bucket}|${region.code}|machine|${id}`) * 0.015;
+  const saved = savedRent(book, region.code, id);
+  if (saved > 0) return roundMoney(saved, region); // the user's own daily rate (Priority 1): exactly what they typed
   const live = liveRent(book, region.code, id);
   if (live > 0) return roundMoney(live * spread, region); // a live market rate replaces the simulated base (and its drift)
   const rate = roundMoney(MACHINES[id].usd * region.fx * region.priceFactor * spread * drift, region);
   return rate > 0 ? rate : 10 ** -region.digits;
 }
+
+/** Where a machine's daily rate comes from: the user's saved rate, the live AI rate or the built-in simulation. */
+export const rentSource = (id, regionCode, book) => (savedRent(book, regionCode, id) > 0 ? 'saved' : liveRent(book, regionCode, id) > 0 ? 'ai' : 'ref');
 
 /**
  * Which machines does each valid partida need, for how many units and days?
@@ -95,7 +100,7 @@ export function planMachinery({ partidas, schedule, regionCode, config = DEFAULT
   const excluded = new Set(config?.excluded ?? []);
   const items = suggestMachinery(partidas, schedule).map((s) => {
     const rate = machineryRate(s.id, regionCode, bucket, book);
-    return { ...s, rate, total: roundMoney(s.qty * s.days * rate, region), included: include && !excluded.has(s.id) };
+    return { ...s, rate, source: rentSource(s.id, regionCode, book), total: roundMoney(s.qty * s.days * rate, region), included: include && !excluded.has(s.id) };
   });
   const byPartida = partidas.map(() => 0);
   let total = 0;

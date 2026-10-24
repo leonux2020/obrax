@@ -1,5 +1,6 @@
 // Last known price book per region: IndexedDB store `prices` (keyPath `region`), memory fallback when IndexedDB is
-// unavailable. This is the "último valor registrado" the quote falls back to when the price service cannot be reached.
+// unavailable. One row holds both layers (AI prices + the user's own prices, see priceBook.js): it is the "último valor
+// registrado" the quote falls back to when the price service cannot be reached, and what keeps the user's rates.
 
 import { STORE_PRICES, createRunner, hasIndexedDb } from './db.js';
 import { normalizeBook } from './priceBook.js';
@@ -14,6 +15,9 @@ export function memoryPriceBackend() {
     async put(row) {
       map.set(row.region, row);
     },
+    async remove(region) {
+      map.delete(region);
+    },
     async clear() {
       map.clear();
     },
@@ -26,6 +30,7 @@ export function idbPriceBackend(factory) {
     kind: 'indexeddb',
     get: (region) => run(STORE_PRICES, 'readonly', (s) => s.get(region)),
     put: (row) => run(STORE_PRICES, 'readwrite', (s) => s.put(row)),
+    remove: (region) => run(STORE_PRICES, 'readwrite', (s) => s.delete(region)),
     clear: () => run(STORE_PRICES, 'readwrite', (s) => s.clear()),
   };
 }
@@ -60,6 +65,8 @@ export function createPriceStore(primary = null) {
       await guard('put', clean);
       return clean;
     },
+    /** Forget a region's book (nothing left to keep: no AI prices and no user prices). */
+    remove: (regionCode) => guard('remove', regionCode),
     clear: () => guard('clear'),
   };
 }

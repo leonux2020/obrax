@@ -98,17 +98,25 @@ export const KINDS = Object.freeze(['invoice', 'receipt', 'prices']);
 
 // ---- third fixed prompt: "prices" (no image) --------------------------------------------------------------------
 // The browser only sends a REGION CODE; the product list, the units and the prompt are all server-side. The answer is
-// an ESTIMATE of typical retail prices by the model (it has no live shop feed): it is validated against a sanity band
-// around the built-in reference and the client keeps the last known value for anything missing or rejected.
+// an ESTIMATE by the model: it is validated against a sanity band around the built-in reference and the client keeps
+// the last known value for anything missing or rejected. The model is told to act as an expert quoter of THAT country
+// and to look for current shelf prices at its main local construction retailers (the region's own chains are listed).
+// Whatever it returns is only a suggestion: the user's own saved prices always win (see priceBook.js / priceFeed.js).
+export const PRICES_QUOTER_RULE =
+  'Debes actuar como un cotizador experto. Identifica el país ({country_code}) y busca en internet los precios minoristas vigentes en los principales proveedores locales de construcción (ej. Chile: Sodimac/Easy; México: Home Depot/Cemex; España: Leroy Merlin/Bricomart). Devuelve el precio de mercado más reciente y realista posible, evitando promedios históricos obsoletos.';
+
 export function buildPricesPrompt(regionCode) {
   const region = getRegion(regionCode);
+  const retailers = region.chains.map((c) => c.name).filter(Boolean).join(', ');
   const catalog = Object.entries(CATALOG)
     .map(([id, m]) => `- ${id}: ${DICT.es[`mat.${id}`] ?? id} | price of ONE sale unit (${m.sale}, = ${m.size} ${m.base})`)
     .join('\n');
   const machines = MACHINE_IDS.map((id) => `- ${id}: ${id === 'mixer' ? 'concrete mixer (trompo hormigonero)' : id === 'compactor' ? 'plate compactor' : 'certified scaffold, ONE set of two bays'} | rental price per DAY`).join('\n');
   return [
-    `You estimate the CURRENT typical retail prices of construction materials and the daily rental of site machinery in ${region.name.en} (${region.code}).`,
-    `Currency: ${region.currency}. Prices include the usual consumer taxes, as shown on a shop shelf of a large national hardware chain.`,
+    PRICES_QUOTER_RULE.split('{country_code}').join(region.code),
+    `País: ${region.name.en} (${region.code}). Moneda: ${region.currency}.${retailers ? ` Proveedores locales de referencia en este país: ${retailers}.` : ''}`,
+    `You estimate the CURRENT retail prices of construction materials and the daily rental of site machinery in ${region.name.en} (${region.code}), as a shop shelf of those local retailers shows them today.`,
+    `Prices are in ${region.currency} and include the usual consumer taxes. Prefer the most recent price you can find over any historical average.`,
     'Return ONLY JSON that follows the response schema: one entry per id below, with a plain number (no symbols, no thousands separators).',
     'If you do not know a product, leave it out: never invent ids and never return zero.',
     '',

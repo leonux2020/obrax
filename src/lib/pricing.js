@@ -6,7 +6,7 @@
 
 import { CATALOG } from './catalog.js';
 import { getRegion } from './regions.js';
-import { liveMaterial } from './priceBook.js';
+import { liveMaterial, savedMaterial } from './priceBook.js';
 
 export const MAX_PRICE = 1_000_000_000;
 
@@ -52,7 +52,9 @@ export function referencePrice(materialId, region, chain, bucket = marketBucket(
 /**
  * Resolve the effective unit price of each material.
  * chainId === 'best' => cheapest chain for every item.
- * @returns {Record<string,{price:number, ref:number, source:'ref'|'manual', chainId:string}>}
+ * Hierarchy (user first): this project's manual override > the price the user saved on this device (book.user) >
+ * the live AI price > the built-in simulation.
+ * @returns {Record<string,{price:number, ref:number, source:'manual'|'saved'|'ai'|'ref', chainId:string}>}
  */
 export function resolvePrices({ ids, regionCode, chainId, overrides = {}, bucket = marketBucket(), book = null }) {
   const region = getRegion(regionCode);
@@ -74,7 +76,15 @@ export function resolvePrices({ ids, regionCode, chainId, overrides = {}, bucket
     }
     const manual = overrides[id];
     const hasManual = typeof manual === 'number' && manual > 0 && manual <= MAX_PRICE;
-    out[id] = { price: hasManual ? manual : ref, ref, source: hasManual ? 'manual' : 'ref', chainId: chain.id };
+    const saved = savedMaterial(book, region.code, id);
+    const hasSaved = !hasManual && saved > 0;
+    const live = liveMaterial(book, region.code, id) > 0;
+    out[id] = {
+      price: hasManual ? manual : hasSaved ? saved : ref,
+      ref,
+      source: hasManual ? 'manual' : hasSaved ? 'saved' : live ? 'ai' : 'ref',
+      chainId: chain.id,
+    };
   }
   return out;
 }

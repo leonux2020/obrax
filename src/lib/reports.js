@@ -190,7 +190,7 @@ export function buildTechModel({ draft, result, company, region, t, num, unit, m
     buyDetail: i.saleSize !== 1 ? qty(i.purchased, i.baseUnit) : '',
     leftover: i.leftover / i.saleSize >= 0.01 ? qty(i.leftover, i.baseUnit) : '-',
     unitPrice: `${money(i.unitPrice)} / ${unit(i.saleUnit)}`,
-    manual: i.source === 'manual',
+    manual: i.source === 'manual' || i.source === 'saved', // the user's own price (this project's or the one saved on the device)
     total: i.total,
   }));
 

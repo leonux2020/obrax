@@ -3,11 +3,40 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { MAX_PRICE, taxRateFor } from '../../lib/pricing.js';
 import { useAiAccess } from '../../lib/usePro.js';
 import { usePriceStatus } from '../../lib/usePrices.js';
-import { refreshPrices } from '../../lib/priceFeed.js';
+import { refreshPrices, saveUserPrice } from '../../lib/priceFeed.js';
 import { createRateLimiter, humanVerified } from '../../lib/shield.js';
 import { chainLabel } from '../../lib/regions.js';
+import { savedMaterial } from '../../lib/priceBook.js';
+import { MACHINE_IDS } from '../../lib/machinery.js';
 import { Badge, Button, NumberField } from '../ui.jsx';
 import InvoiceSheet from '../InvoiceSheet.jsx';
+
+/** Where a price comes from: AI (green spark), the user's own saved price (gold), typed in this project, or the built-in reference. */
+function SourceBadge({ source, t }) {
+  if (source === 'ai')
+    return (
+      <span data-testid="src-ai" className="inline-flex items-center gap-1 rounded-md border border-brand/40 bg-brand/15 px-2 py-0.5 text-xs font-bold text-brand-light">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z" />
+        </svg>
+        {t('prices.src.ai')}
+      </span>
+    );
+  if (source === 'saved')
+    return (
+      <span data-testid="src-saved" className="inline-flex items-center gap-1 rounded-md border border-[#d4af37]/60 px-2 py-0.5 text-xs font-bold text-[#e8c35f]">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M5 12l5 5L20 7" />
+        </svg>
+        {t('prices.src.saved')}
+      </span>
+    );
+  return (
+    <span data-testid={source === 'manual' ? 'src-manual' : 'src-ref'} className="rounded-md border border-white/30 bg-white/10 px-2 py-0.5 text-xs font-bold text-white">
+      {source === 'manual' ? t('prices.manual') : t('prices.ref')}
+    </span>
+  );
+}
 
 // colour of the data-source indicator: loading (blue, blinking), live AI (green), saved / offline (gold), simulation (grey)
 const FEED_TONE = {
@@ -51,6 +80,24 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
       return { ...d, overrides };
     });
 
+  // The user edits a price: the quote recalculates at once and the value is saved in IndexedDB as THEIR standard price
+  // on this device (it beats the AI answer and the simulation from now on). Empty / zero while typing is ignored.
+  const regionCode = draft.regionCode;
+  const valid = (n) => typeof n === 'number' && n > 0 && n <= MAX_PRICE;
+  const editMaterial = (id, n) => {
+    if (!valid(n)) return;
+    setOverride(id, n); // this project, immediately
+    saveUserPrice(regionCode, 'materials', id, n);
+  };
+  const resetMaterial = (id) => {
+    setOverride(id, null);
+    saveUserPrice(regionCode, 'materials', id, null);
+  };
+  const editRent = (id, n) => {
+    if (valid(n)) saveUserPrice(regionCode, 'rent', id, n);
+  };
+  const resetRent = (id) => saveUserPrice(regionCode, 'rent', id, null);
+
   const refresh = () => {
     const allowed = humanVerified() ? humanLimiter.current() : botLimiter.current();
     if (allowed) {
@@ -74,6 +121,12 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
     setApplied(n);
     setInvoiceOpen(false);
   };
+
+  // one editable daily rate per machine type the project uses (a scaffold in two partidas is a single rate)
+  const rentRows = MACHINE_IDS.map((id) => {
+    const lines = (result.machinery?.items ?? []).filter((i) => i.id === id);
+    return lines.length ? { id, lines, rate: lines[0].rate, source: lines[0].source, total: lines.reduce((s, i) => s + i.total, 0) } : null;
+  }).filter(Boolean);
 
   const chips = [
     { id: 'best', label: t('prices.best'), total: result.chainTotals.best },
@@ -170,7 +223,10 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
 
       <ul className="grid gap-3 lg:grid-cols-2">
         {result.quote.items.map((item) => {
-          const manual = item.source === 'manual';
+          const typed = item.source === 'manual';
+          const isSaved = (typed && savedMaterial(result.book, regionCode, item.id) === item.unitPrice) || item.source === 'saved';
+          const origin = isSaved ? 'saved' : item.source; // 'saved' | 'manual' | 'ai' | 'ref'
+          const manual = typed || item.source === 'saved';
           return (
             <li key={item.id} className="card">
               <div className="flex items-start justify-between gap-3">
@@ -202,18 +258,18 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
                   label={`${t('prices.override')} - ${t(`mat.${item.id}`)}`}
                   decimals={region.digits === 0 ? 0 : 2}
                   unit={region.currency}
-                  placeholder={num(item.refPrice, region.digits)}
-                  value={draft.overrides[item.id] ?? null}
-                  onChange={(n) => setOverride(item.id, n)}
+                  placeholder={num(item.unitPrice, region.digits)}
+                  value={item.unitPrice}
+                  onChange={(n) => editMaterial(item.id, n)}
                 />
                 {manual && (
-                  <Button variant="ghost" className="!min-h-[52px] !px-3 text-sm" onClick={() => setOverride(item.id, null)}>
+                  <Button variant="ghost" className="!min-h-[52px] !px-3 text-sm" onClick={() => resetMaterial(item.id)}>
                     {t('prices.reset')}
                   </Button>
                 )}
               </div>
               <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-neutral-300">
-                <Badge tone={manual ? 'white' : 'green'}>{manual ? t('prices.manual') : t('prices.ref')}</Badge>
+                <SourceBadge source={origin} t={t} />
                 {money(item.refPrice)} / {unit(item.saleUnit)} · {chainName(item.chainId)}
               </p>
             </li>
@@ -221,10 +277,54 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
         })}
       </ul>
 
+      {rentRows.length > 0 && (
+        <section aria-labelledby="rent-title" className="space-y-3" data-testid="rent-prices">
+          <h3 id="rent-title" className="text-lg font-bold">
+            {t('prices.rent.title')}
+          </h3>
+          <ul className="grid gap-3 lg:grid-cols-2">
+            {rentRows.map((r) => (
+              <li key={r.id} className="card" data-testid={`rent-${r.id}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-bold leading-snug">{t(`mach.${r.id}`)}</p>
+                    <p className="text-sm text-neutral-300">{r.lines.map((i) => t('mach.line', { qty: num(i.qty, 0), days: num(i.days, 0), rate: money(i.rate) })).join(' + ')}</p>
+                  </div>
+                  <p className="shrink-0 text-lg font-extrabold tabular-nums">{money(r.total)}</p>
+                </div>
+                <div className="mt-3 flex items-end gap-2">
+                  <NumberField
+                    className="flex-1"
+                    hideLabel
+                    label={t('prices.rent.label', { name: t(`mach.${r.id}`) })}
+                    decimals={region.digits === 0 ? 0 : 2}
+                    unit={region.currency}
+                    placeholder={num(r.rate, region.digits)}
+                    value={r.rate}
+                    onChange={(n) => editRent(r.id, n)}
+                  />
+                  {r.source === 'saved' && (
+                    <Button variant="ghost" className="!min-h-[52px] !px-3 text-sm" onClick={() => resetRent(r.id)}>
+                      {t('prices.reset')}
+                    </Button>
+                  )}
+                </div>
+                <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-neutral-300">
+                  <SourceBadge source={r.source} t={t} />
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <div className="card flex items-center justify-between border-brand/50">
         <span className="text-lg font-bold">{t('prices.materials')}</span>
         <span className="text-2xl font-extrabold tabular-nums text-brand">{money(result.quote.materials)}</span>
       </div>
+      <p className="text-xs text-neutral-400" data-testid="prices-save-hint">
+        {t('prices.src.hint')}
+      </p>
       <p className="text-sm text-neutral-400">{t('prices.disclaimer')}</p>
     </section>
   );
