@@ -7,7 +7,7 @@
 
 import { PHOTO_LIMITS, PhotoError, compressImage } from './photos.js';
 import { STORE_PHOTOS, createRunner, hasIndexedDb } from './db.js';
-import { dataUrlToBlob, hasBlob, isBlob } from './blobs.js';
+import { blobToDataUrl, dataUrlToBlob, hasBlob, isBlob } from './blobs.js';
 
 const scope = (projectId) => `${projectId}#notes`;
 const keyOf = (projectId, noteId) => `${projectId}:note:${noteId}`;
@@ -125,3 +125,48 @@ export const blobUrl = (blob) => (typeof URL !== 'undefined' && URL.createObject
 export const revokeBlobUrl = (url) => {
   if (url && typeof URL !== 'undefined' && URL.revokeObjectURL) URL.revokeObjectURL(url);
 };
+
+// ---- Drive backup <-> IndexedDB ------------------------------------------------------------------------------------------------
+// The Blobs are turned into base64 ONLY to build the backup JSON (the payload that goes to Drive) and back into Blobs when a
+// backup is restored; on the device they always stay Blobs. One photo at a time, yielding to the main thread in between.
+const yieldToMain = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+/**
+ * The photos of the notes of a project as { [noteId]: { dataUrl, width, height, at } } for the backup payload.
+ * Only notes flagged `photo: true` are read; a photo that cannot be read is skipped (it never breaks the backup).
+ */
+export async function readNotePhotos(store, logbook = []) {
+  const out = {};
+  for (const note of logbook) {
+    if (note?.photo !== true || typeof note.id !== 'string') continue;
+    try {
+      const photo = await store.get(note.id);
+      if (!photo) continue;
+      const dataUrl = await blobToDataUrl(photo.blob);
+      if (dataUrl) out[note.id] = { dataUrl, width: photo.width, height: photo.height, at: photo.at };
+    } catch {
+      /* skipped */
+    }
+    await yieldToMain();
+  }
+  return out;
+}
+
+/**
+ * Writes backup photos ({ [noteId]: { dataUrl, width, height, at } }) into the store as Blobs.
+ * `overwrite: false` only fills the notes that have no local Blob. Returns how many were written.
+ */
+export async function writeNotePhotos(store, photos = {}, { overwrite = true } = {}) {
+  let written = 0;
+  for (const [noteId, photo] of Object.entries(photos)) {
+    try {
+      if (!overwrite && (await store.get(noteId))) continue;
+      await store.put(noteId, photo); // data URL -> Blob -> IndexedDB
+      written += 1;
+    } catch {
+      /* one bad photo never stops the restore */
+    }
+    await yieldToMain();
+  }
+  return written;
+}

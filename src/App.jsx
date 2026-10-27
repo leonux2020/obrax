@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { emptySlots } from './lib/photos.js';
 import { migrateLegacyPhotos, photoStoreFor } from './lib/photoStore.js';
-import { notePhotosFor } from './lib/notePhotos.js';
+import { notePhotosFor, readNotePhotos } from './lib/notePhotos.js';
 import { projectStore } from './lib/projectStore.js';
 import { logoStore } from './lib/companyStore.js';
 import { hasIndexedDb } from './lib/db.js';
@@ -171,7 +171,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     () =>
       createDriveSync({
         client: driveClient,
-        collect: () => collectBackup({ ...latest.current, projects: latest.current.projects || [], loadPhotos: (id) => photoStoreFor(id).load().catch(() => []) }),
+        collect: () => collectBackup({ ...latest.current, projects: latest.current.projects || [], loadPhotos: (id) => photoStoreFor(id).load().catch(() => []), loadNotePhotos: (p) => readNotePhotos(notePhotosFor(p.id), p.logbook) }),
         // in the background Google is only asked (silently) when this device has been connected before
         ensureToken: ({ interactive }) => (interactive || isDriveLinked() ? ensureDriveToken({ interactive }) : Promise.resolve(getDriveToken())),
         isEnabled: () => backupOnRef.current,
@@ -477,7 +477,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
         const found = await driveClient.latestBackup(parseBackup);
         if (!found) return { ok: true, restored: false };
         const local = latest.current;
-        const merged = await restoreBackup({ ...local, projects: local.projects || [] }, found.value, { projectStore, photoStoreFor, logoStore });
+        const merged = await restoreBackup({ ...local, projects: local.projects || [] }, found.value, { projectStore, photoStoreFor, notePhotosFor, logoStore });
         setProjects(merged.projects);
         if (merged.profileRestored) {
           setCompany(merged.company);
