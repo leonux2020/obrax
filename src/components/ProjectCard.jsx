@@ -4,7 +4,7 @@ import { computeAll } from '../lib/engine.js';
 import { pricingTime, planningTimeline } from '../lib/signature.js';
 import { marketBucket } from '../lib/pricing.js';
 import { getRegion } from '../lib/regions.js';
-import { usePriceBook } from '../lib/usePrices.js';
+import { useProjectBook } from '../lib/usePrices.js';
 import { hasRentalDue } from '../lib/ledger.js';
 import { isClosed, projectClient, projectLevel, projectTitle } from '../lib/projects.js';
 import { LEVEL_COLOR, levelDetail } from './levelStyle.js';
@@ -28,7 +28,7 @@ export default function ProjectCard({ project, now, onOpen }) {
   const priceTime = pricingTime(project.draft, now);
   const bucket = marketBucket(priceTime);
   const day = new Date(priceTime).toDateString();
-  const book = usePriceBook(project.draft.regionCode);
+  const book = useProjectBook(project.draft.regionCode, project.location);
   const total = useMemo(() => {
     const r = computeAll(project.draft, priceTime, { timeline: planningTimeline(project.draft, project), book, chains: false });
     return r.valid ? makeI18n(lang, project.draft.regionCode).money(r.quote.total) : null;

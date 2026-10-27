@@ -10,7 +10,7 @@ import { runExport } from '../lib/exportActions.js';
 import { warmPdfEngine } from '../lib/reportPdf.js';
 import { sanitizeText } from '../lib/sanitize.js';
 import { useAiAccess } from '../lib/usePro.js';
-import { usePriceBook, usePriceFeed } from '../lib/usePrices.js';
+import { useProjectBook, usePriceFeed } from '../lib/usePrices.js';
 import { Button, DateInput, NumberField, TextField } from './ui.jsx';
 import { LEVEL_COLOR, levelDetail } from './levelStyle.js';
 import PercentSlider from './PercentSlider.jsx';
@@ -208,8 +208,8 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
 
   const priceTime = pricingTime(draft, now);
   const timeline = planningTimeline(draft, project);
-  usePriceFeed(draft.regionCode);
-  const book = usePriceBook(draft.regionCode);
+  usePriceFeed(draft.regionCode, { [draft.regionCode]: [project.location ? { lat: project.location.lat, lng: project.location.lng } : null] });
+  const book = useProjectBook(draft.regionCode, project.location);
   const result = useMemo(
     () => computeAll(draft, priceTime, { timeline, book }),
     // eslint-disable-next-line react-hooks/exhaustive-deps

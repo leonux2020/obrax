@@ -11,9 +11,10 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'dot', '0', 'back'];
  * reachable with the thumb.
  *
  *   title / unit   header line and the small "per m³" caption     foot   the line under the display (where the number goes)
+ *   top            optional node above the title (the supplier tags of the price pads)
  *   decimals       0 hides the decimal key                          onReset  optional "Restablecer" button
  */
-export default function NumberPad({ title, unit = '', value, decimals = 2, max = null, foot = '', onChange, onReset = null, onClose, testId = 'price-numpad' }) {
+export default function NumberPad({ title, unit = '', value, decimals = 2, max = null, foot = '', top = null, onChange, onReset = null, onClose, testId = 'price-numpad' }) {
   const { t, locale } = useI18n();
   const [state, dispatch] = useReducer(padReduce, undefined, () => padInit(value, decimals));
   const decimal = new Intl.NumberFormat(locale).formatToParts(1.5).find((p) => p.type === 'decimal')?.value ?? '.';
@@ -49,6 +50,7 @@ export default function NumberPad({ title, unit = '', value, decimals = 2, max =
     <div className="no-print fixed inset-0 z-50 flex items-end justify-center" data-testid={testId}>
       <button type="button" tabIndex={-1} aria-hidden="true" className="absolute inset-0 cursor-default bg-black/60" onClick={onClose} />
       <div role="dialog" aria-modal="true" aria-label={title} className="relative w-full max-w-lg rounded-t-3xl border border-b-0 border-white/10 bg-black px-4 pt-4 [padding-bottom:max(1rem,env(safe-area-inset-bottom))]">
+        {top}
         <div className="flex items-baseline justify-between gap-3">
           <p className="min-w-0 flex-1 truncate text-sm font-bold text-[#E0E0E0]/80">{title}</p>
           <p className="text-xs text-[#E0E0E0]/60">{unit}</p>

@@ -345,7 +345,7 @@ describe('4. local price engine: live values, last-known fallback, simulation, a
     await expect(requestPriceBook('CL', { fetchImpl: bad(200, { ok: true, book: { materials: [], rent: [] } }) })).rejects.toThrow();
     const f = okFetch(bookOf(1.1));
     await requestPriceBook('CL', { fetchImpl: f });
-    expect(JSON.parse(f.mock.calls[0][1].body)).toEqual({ kind: 'prices', region: 'CL' }); // only a region code leaves the device
+    expect(JSON.parse(f.mock.calls[0][1].body)).toEqual({ kind: 'prices', region: 'CL', countryCode: 'CL' }); // only a region code leaves the device
   });
 
   it('projectTotal uses the live book of the registry (cards and accounting) unless the quote is frozen', async () => {

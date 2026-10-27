@@ -105,16 +105,28 @@ export const KINDS = Object.freeze(['invoice', 'receipt', 'prices']);
 export const PRICES_QUOTER_RULE =
   'Debes actuar como un cotizador experto. Identifica el país ({country_code}) y busca en internet los precios minoristas vigentes en los principales proveedores locales de construcción (ej. Chile: Sodimac/Easy; México: Home Depot/Cemex; España: Leroy Merlin/Bricomart). Devuelve el precio de mercado más reciente y realista posible, evitando promedios históricos obsoletos.';
 
-export function buildPricesPrompt(regionCode, { grounded = false } = {}) {
+/**
+ * The ids the client does NOT want priced (its user's own nearby suppliers already cover them): validated against the
+ * catalogs, so nothing from the browser ever reaches the prompt as free text.
+ */
+export function cleanSkip(raw) {
+  const pick = (list, ok) => [...new Set(Array.isArray(list) ? list.filter((id) => typeof id === 'string' && ok(id)) : [])];
+  return { materials: pick(raw?.materials, (id) => Object.prototype.hasOwnProperty.call(CATALOG, id)), rent: pick(raw?.rent, (id) => MACHINE_IDS.includes(id)) };
+}
+
+export function buildPricesPrompt(regionCode, { grounded = false, skip = null } = {}) {
   const region = getRegion(regionCode);
+  const skipped = cleanSkip(skip);
   const retailers = region.chains.map((c) => c.name).filter(Boolean).join(', ');
   const catalog = Object.entries(CATALOG)
+    .filter(([id]) => !skipped.materials.includes(id))
     .map(([id, m]) => `- ${id}: ${DICT.es[`mat.${id}`] ?? id} | price of ONE sale unit (${m.sale}, = ${m.size} ${m.base})`)
     .join('\n');
-  const machines = MACHINE_IDS.map((id) => `- ${id}: ${id === 'mixer' ? 'concrete mixer (trompo hormigonero)' : id === 'compactor' ? 'plate compactor' : 'certified scaffold, ONE set of two bays'} | rental price per DAY`).join('\n');
+  const machines = MACHINE_IDS.filter((id) => !skipped.rent.includes(id)).map((id) => `- ${id}: ${id === 'mixer' ? 'concrete mixer (trompo hormigonero)' : id === 'compactor' ? 'plate compactor' : 'certified scaffold, ONE set of two bays'} | rental price per DAY`).join('\n');
   return [
     PRICES_QUOTER_RULE.split('{country_code}').join(region.code),
     `País: ${region.name.en} (${region.code}). Moneda: ${region.currency}.${retailers ? ` Proveedores locales de referencia en este país: ${retailers}.` : ''}`,
+    `MERCADO OBJETIVO = ${region.name.en} (${region.code}), elegido para este proyecto. Busca SOLO en minoristas de ese país (p. ej. ${retailers || 'sus cadenas locales'}), sin importar el idioma en que el usuario ve la aplicación ni el país donde se encuentre. No uses precios de otros países.`,
     `You estimate the CURRENT retail prices of construction materials and the daily rental of site machinery in ${region.name.en} (${region.code}), as a shop shelf of those local retailers shows them today.`,
     `Prices are in ${region.currency} and include the usual consumer taxes. Prefer the most recent price you can find over any historical average.`,
     'Return ONLY JSON that follows the response schema: one entry per id below, with a plain number (no symbols, no thousands separators).',
@@ -153,17 +165,17 @@ export const SEARCH_TOOLS = Object.freeze([{ google_search: {} }]);
  * the grounded request describes the JSON in the prompt and the answer is validated by normalizeBook(); `grounded: false`
  * is the plain schema-constrained request (only used as the last resort when the grounded one gave nothing usable).
  */
-export function buildPricesRequest({ regionCode, model = DEFAULT_MODEL, grounded = true }) {
+export function buildPricesRequest({ regionCode, model = DEFAULT_MODEL, grounded = true, skip = null }) {
   if (grounded) {
     return {
-      systemInstruction: { parts: [{ text: buildPricesPrompt(regionCode, { grounded: true }) }] },
+      systemInstruction: { parts: [{ text: buildPricesPrompt(regionCode, { grounded: true, skip }) }] },
       contents: [{ role: 'user', parts: [{ text: 'Search the web and return the price list.' }] }],
       tools: SEARCH_TOOLS.map((t) => ({ ...t })),
       generationConfig: { temperature: 0, maxOutputTokens: 8192, ...thinkingFor(model) },
     };
   }
   return {
-    systemInstruction: { parts: [{ text: buildPricesPrompt(regionCode) }] },
+    systemInstruction: { parts: [{ text: buildPricesPrompt(regionCode, { skip }) }] },
     contents: [{ role: 'user', parts: [{ text: 'Return the price list.' }] }],
     generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: PRICES_SCHEMA, maxOutputTokens: 4096, ...thinkingFor(model) },
   };
@@ -353,7 +365,9 @@ export function createInvoiceHandler({
     }
     // `kind` only selects one of the fixed server-side prompts (anything unknown is an invoice)
     const kind = body?.kind === 'receipt' ? 'receipt' : body?.kind === 'prices' ? 'prices' : 'invoice';
-    const priceRegion = kind === 'prices' && typeof body.region === 'string' ? getRegion(body.region) : null;
+    // `countryCode` = the market chosen for the PROJECT (independent of the UI language); `region` is the older field of the same meaning
+    const priceRegion = kind === 'prices' ? getRegion(typeof body.countryCode === 'string' && getRegion(body.countryCode) ? body.countryCode : body.region) : null;
+    const priceSkip = kind === 'prices' ? cleanSkip(body.skip) : null;
     if (kind === 'prices' && !priceRegion) return fail(400, 'bad_region');
     const m = kind === 'prices' ? null : typeof body?.image === 'string' ? IMAGE_RE.exec(body.image) : null;
     if (kind !== 'prices' && (!m || !m[2].startsWith(MAGIC[m[1]]) || m[2].length < 100)) return fail(400, 'bad_image');
@@ -412,7 +426,7 @@ export function createInvoiceHandler({
     return { payload, last };
     };
     const bodyFor = (grounded) => (mdl) =>
-      kind === 'prices' ? buildPricesRequest({ regionCode: priceRegion.code, model: mdl, grounded }) : buildGeminiRequest({ ...reqBody, model: mdl });
+      kind === 'prices' ? buildPricesRequest({ regionCode: priceRegion.code, model: mdl, grounded, skip: priceSkip }) : buildGeminiRequest({ ...reqBody, model: mdl });
     // prices: the request is GROUNDED (google_search tool) so the model looks the prices up on the web
     let { payload, last } = await callModels(bodyFor(true));
     if (kind === 'prices') {

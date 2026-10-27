@@ -3,12 +3,17 @@
 //                           (per day). It is the user's own truth: it always wins and nothing overwrites it.
 //   AI layer    `materials` / `rent`   the latest estimate of the price service (AI through the server proxy, see
 //                           priceFeed.js), validated against a sanity band. Used when the user has no price of their own.
+//   supplier meta `user.meta`  next to each user price: WHERE it was bought ({supplierName, lat, lng}). Optional: books written
+//                           before suppliers existed simply have none. (`distanceKm` / `nearby` only appear on the derived book
+//                           of a project, see suppliers.js applyNearby.)
 // With neither layer the quote falls back to the built-in simulation. The whole book lives in IndexedDB (last known
 // value) and a signed / frozen quote keeps a copy of it. Pure functions only (shared with the server proxy).
 
 import { CATALOG } from './catalog.js';
 import { MACHINES, MACHINE_IDS } from './machines.js';
 import { getRegion } from './regions.js';
+import { normalizeCoords } from './geoDistance.js';
+import { sanitizeText } from './sanitize.js';
 
 /** A value must stay within this band around the built-in reference, otherwise it is a model slip and is ignored. */
 export const PRICE_BAND = Object.freeze({ min: 0.3, max: 3.5 });
@@ -49,23 +54,37 @@ function cleanMap(src, region, has, bandOf) {
   return out;
 }
 
+/** Supplier meta of one price: a clean {supplierName, lat?, lng?, distanceKm?, nearby?} or null when there is nothing to keep. */
+export function cleanMeta(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const supplierName = sanitizeText(raw.supplierName, 60).trim();
+  const c = normalizeCoords(raw);
+  const d = Number(raw.distanceKm);
+  if (!supplierName && !c) return null;
+  return { supplierName, ...(c ? c : {}), ...(Number.isFinite(d) && d >= 0 ? { distanceKm: Math.round(d * 10) / 10 } : {}), ...(raw.nearby === true ? { nearby: true } : {}) };
+}
+
 /** The user layer: any positive number up to MAX_USER_PRICE for a known id (no sanity band: it is the user's decision). */
 function cleanUser(raw, region) {
-  const one = (src, has) => {
+  const meta = { materials: {}, rent: {} };
+  const one = (src, has, kind) => {
     const out = {};
     if (!src || typeof src !== 'object') return out;
     for (const [id, v] of Object.entries(src)) {
       const price = Number(v);
       if (!has(id) || !Number.isFinite(price) || price <= 0 || price > MAX_USER_PRICE) continue;
       out[id] = round(price, region);
+      const m = cleanMeta(raw?.meta?.[kind]?.[id]);
+      if (m) meta[kind][id] = m;
     }
     return out;
   };
-  const materials = one(raw?.materials, (id) => Object.prototype.hasOwnProperty.call(CATALOG, id));
-  const rent = one(raw?.rent, (id) => MACHINE_IDS.includes(id));
+  const materials = one(raw?.materials, (id) => Object.prototype.hasOwnProperty.call(CATALOG, id), 'materials');
+  const rent = one(raw?.rent, (id) => MACHINE_IDS.includes(id), 'rent');
   if (!Object.keys(materials).length && !Object.keys(rent).length) return null;
   const at = Number(raw?.at);
-  return { materials, rent, at: Number.isFinite(at) && at > 0 ? at : 0 };
+  const hasMeta = Object.keys(meta.materials).length || Object.keys(meta.rent).length;
+  return { materials, rent, ...(hasMeta ? { meta } : {}), at: Number.isFinite(at) && at > 0 ? at : 0 };
 }
 
 /**
@@ -92,15 +111,27 @@ export const hasAiPrices = (book) => Boolean(book && (Object.keys(book.materials
 
 /**
  * The same book with ONE user price set (price > 0) or removed (null / 0). `kind` is 'materials' | 'rent'.
- * Pure: returns a new book, or null when nothing is left (no AI prices, no user prices). Never touches the AI layer.
+ * `meta` ({supplierName, lat, lng}) says where the price comes from; a price saved without it carries none (a new price
+ * never inherits the supplier of the old one). Pure: returns a new book, or null when nothing is left (no AI prices, no
+ * user prices). Never touches the AI layer.
  */
-export function withUserPrice(book, regionCode, kind, id, price, now = Date.now()) {
+export function withUserPrice(book, regionCode, kind, id, price, now = Date.now(), meta = null) {
   const region = getRegion(regionCode);
   if (!region || (kind !== 'materials' && kind !== 'rent')) return book || null;
   const base = book && book.region === region.code ? book : { region: region.code, at: 0, materials: {}, rent: {} };
-  const user = { materials: { ...(base.user?.materials || {}) }, rent: { ...(base.user?.rent || {}) }, at: now };
-  if (typeof price === 'number' && price > 0) user[kind][id] = price;
-  else delete user[kind][id];
+  const prev = base.user?.meta || {};
+  const user = {
+    materials: { ...(base.user?.materials || {}) },
+    rent: { ...(base.user?.rent || {}) },
+    meta: { materials: { ...(prev.materials || {}) }, rent: { ...(prev.rent || {}) } },
+    at: now,
+  };
+  delete user.meta[kind][id];
+  if (typeof price === 'number' && price > 0) {
+    user[kind][id] = price;
+    const m = cleanMeta(meta);
+    if (m) user.meta[kind][id] = m;
+  } else delete user[kind][id];
   return normalizeBook({ ...base, user }, region.code);
 }
 
@@ -108,12 +139,23 @@ export function withUserPrice(book, regionCode, kind, id, price, now = Date.now(
 export function mergeBooks(prev, next) {
   if (!next) return prev || null;
   if (!prev || prev.region !== next.region) return next;
-  const user = prev.user || next.user ? { materials: { ...prev.user?.materials, ...next.user?.materials }, rent: { ...prev.user?.rent, ...next.user?.rent }, at: Math.max(prev.user?.at || 0, next.user?.at || 0) } : null;
+  let user = null;
+  if (prev.user || next.user) {
+    const meta = { materials: { ...prev.user?.meta?.materials, ...next.user?.meta?.materials }, rent: { ...prev.user?.meta?.rent, ...next.user?.meta?.rent } };
+    user = {
+      materials: { ...prev.user?.materials, ...next.user?.materials },
+      rent: { ...prev.user?.rent, ...next.user?.rent },
+      ...(Object.keys(meta.materials).length || Object.keys(meta.rent).length ? { meta } : {}),
+      at: Math.max(prev.user?.at || 0, next.user?.at || 0),
+    };
+  }
   return { region: next.region, at: next.at || prev.at, materials: { ...prev.materials, ...next.materials }, rent: { ...prev.rent, ...next.rent }, ...(user ? { user } : {}) };
 }
 
 /** The price the USER saved on this device for a material (per sale unit) or undefined. Priority 1. */
 export const savedMaterial = (book, regionCode, id) => (book && book.region === regionCode ? book.user?.materials?.[id] : undefined);
+/** Where the user's price of a material / machine comes from ({supplierName, lat?, lng?, distanceKm?, nearby?}) or undefined. */
+export const savedMeta = (book, regionCode, kind, id) => (book && book.region === regionCode ? book.user?.meta?.[kind]?.[id] : undefined);
 /** The daily rental the USER saved for a machine or undefined. Priority 1. */
 export const savedRent = (book, regionCode, id) => (book && book.region === regionCode ? book.user?.rent?.[id] : undefined);
 

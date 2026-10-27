@@ -6,6 +6,9 @@ import { MAX_PRICE } from './pricing.js';
 import { dayDiff, isClosed, parseDay, projectLevel } from './projects.js';
 import { clampCrew, parseISODay, toISODay } from './schedule.js';
 import { DEFAULT_MACHINERY, MACHINE_IDS } from './machinery.js';
+import { savedMeta } from './priceBook.js';
+import { aiRetailer } from './suppliers.js';
+import { getRegion } from './regions.js';
 
 // ---- state of the job: the four-colour traffic light ---------------------------------------------------------------
 /** Blue = not started, green = on time, orange = close to the limit, red = overdue; grey = finished (Historial). */
@@ -51,6 +54,31 @@ export function withPriceOverride(draft, id, price) {
   else if (price === null) delete overrides[id];
   else return draft;
   return { ...draft, overrides };
+}
+
+/**
+ * The PROJECT's market (country / currency / retailers) ONLY, independent of the UI language: the quote is priced and
+ * the AI searches in `code`'s country. What belonged to the old market is dropped (prices typed for this project, the
+ * chosen chain, a tax typed by hand); measures, crew, schedule and the rest stay. Refuses (SAME draft) while the quote is
+ * locked, for an unknown country or when nothing changes. Amounts already in payments / expenses / advances are NOT converted.
+ */
+export function withMarket(draft, code) {
+  if (quoteLock(draft) || !getRegion(code) || code === draft.regionCode) return draft;
+  return { ...draft, regionCode: code, chainId: 'best', overrides: {}, finance: { ...draft.finance, tax: null } };
+}
+
+/**
+ * The small line under a price: WHO says so. The supplier the user named ("Ferretería Don Pepe · 3 km"), the AI estimate
+ * attributed to the market's reference retailer ("Estimación IA (Sodimac)") or the bundled reference price. '' when the
+ * user's own price has no supplier.
+ */
+export function priceCaption(t, { origin, meta = null, regionCode }) {
+  if (origin === 'user') {
+    if (!meta?.supplierName) return '';
+    return meta.nearby && meta.distanceKm !== undefined ? t('ws.supplier.near', { name: meta.supplierName, km: String(meta.distanceKm) }) : meta.supplierName;
+  }
+  if (origin === 'ai') return t('ws.supplier.ai', { retailer: aiRetailer(regionCode) });
+  return t('ws.supplier.base');
 }
 
 /**
@@ -104,17 +132,29 @@ export function crewModel(result) {
 }
 
 /** One editable daily rate per machine type the quote uses (a scaffold in two partidas is a single rate). */
-export function rentRows(result) {
+export function rentRows(result, regionCode = null) {
   const items = result?.machinery?.items ?? [];
   return MACHINE_IDS.map((id) => {
     const lines = items.filter((i) => i.id === id);
-    return lines.length ? { id, lines, rate: lines[0].rate, source: lines[0].source, total: lines.reduce((sum, i) => sum + i.total, 0), included: lines.every((i) => i.included) } : null;
+    return lines.length ? { id, lines, rate: lines[0].rate, source: lines[0].source, supplier: lines[0].source === 'saved' ? savedMeta(result.book, regionCode, 'rent', id) ?? null : null, total: lines.reduce((sum, i) => sum + i.total, 0), included: lines.every((i) => i.included) } : null;
   }).filter(Boolean);
 }
 
 // ---- zone B: the living list ---------------------------------------------------------------------------------------------
 /** Where a unit price comes from, for the small badge: the user's own, the live AI answer or the bundled base catalog. */
 export const priceOrigin = (source) => (source === 'manual' || source === 'saved' ? 'user' : source === 'ai' ? 'ai' : 'base');
+
+/**
+ * Where the price a quote used for a material comes from, when it is the user's own price AT a supplier. This project's own
+ * price (typed here) counts too, as long as it is the number the supplier entry holds (they are saved together).
+ */
+function supplierOf(result, regionCode, id) {
+  const used = result.prices?.[id];
+  if (!used || (used.source !== 'saved' && used.source !== 'manual')) return null;
+  const meta = savedMeta(result.book, regionCode, 'materials', id);
+  if (!meta) return null;
+  return used.source === 'saved' || Math.abs(Number(result.book?.user?.materials?.[id]) - used.price) < 0.005 ? meta : null;
+}
 
 /**
  * Partidas of a computed quote, each with its money and the material lines it consumes.
@@ -138,6 +178,7 @@ export function partidaGroups(result, draft) {
         total: it.total * f,
         shared: Object.keys(it.shares).length > 1,
         origin: priceOrigin(result.prices?.[it.id]?.source),
+        supplier: supplierOf(result, draft.regionCode, it.id),
       });
     }
     return {
@@ -177,7 +218,7 @@ export function headerModel({ project, total, valid, cash, now = Date.now() }) {
 }
 
 // ---- screen state (what is open) ---------------------------------------------------------------------------------------------
-export const SHEETS = Object.freeze(['log', 'camera', 'scan', 'export', 'cash', 'unlock', 'sign']);
+export const SHEETS = Object.freeze(['log', 'camera', 'scan', 'export', 'cash', 'unlock', 'sign', 'market']);
 
 export const initialWorkspaceState = () => ({ open: {}, pad: null, sheet: null });
 

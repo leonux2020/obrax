@@ -10,16 +10,22 @@
 // v4 adds:
 //   receipt_queue   keyPath `id`                           receipt photos scanned without a connection (Blob + status),
 //                                                          sent to the AI proxy when the network is back (receiptQueue.js)
+// v5 adds:
+//   supplier_prices keyPath `id`                           prices the user saved WITH a supplier and a place ("Radar de
+//                                                          Mercado", suppliers.js). Nothing is migrated or dropped: older rows
+//                                                          of every store stay exactly as they were (their prices simply have
+//                                                          no supplier / place until the user saves them again).
 //   (project_photos rows now hold the picture as a Blob; rows written by older versions keep their data URL and still read)
 
 export const DB_NAME = 'obrax';
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 export const STORE_LEGACY_PHOTOS = 'photos';
 export const STORE_PHOTOS = 'project_photos';
 export const STORE_PROJECTS = 'projects';
 export const STORE_COMPANY = 'company';
 export const STORE_PRICES = 'prices';
 export const STORE_RECEIPTS = 'receipt_queue';
+export const STORE_SUPPLIERS = 'supplier_prices';
 
 export function openDb(factory) {
   return new Promise((resolve, reject) => {
@@ -32,6 +38,7 @@ export function openDb(factory) {
       if (!has(STORE_COMPANY)) db.createObjectStore(STORE_COMPANY, { keyPath: 'key' });
       if (!has(STORE_PRICES)) db.createObjectStore(STORE_PRICES, { keyPath: 'region' });
       if (!has(STORE_RECEIPTS)) db.createObjectStore(STORE_RECEIPTS, { keyPath: 'id' });
+      if (!has(STORE_SUPPLIERS)) db.createObjectStore(STORE_SUPPLIERS, { keyPath: 'id' });
     };
     req.onsuccess = () => {
       const db = req.result;

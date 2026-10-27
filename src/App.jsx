@@ -137,7 +137,13 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
 
   const region = getRegion(settings.region);
   // live material / rental prices for the regions in use (the user's country + every project's); only inside the app
-  usePriceFeed(stage === 'app' ? [settings.region, ...(projects ?? []).map((p) => p.draft.regionCode)] : []);
+  // `projectLocations`: where the projects of each market are, so the AI is not asked for what the user's nearby suppliers cover
+  const projectLocations = useMemo(() => {
+    const out = {};
+    for (const p of projects ?? []) (out[p.draft.regionCode] ||= []).push(p.location ? { lat: p.location.lat, lng: p.location.lng } : null);
+    return out;
+  }, [projects]);
+  usePriceFeed(stage === 'app' ? [settings.region, ...(projects ?? []).map((p) => p.draft.regionCode)] : [], projectLocations);
   const active = useMemo(() => projects?.find((p) => p.id === activeId) ?? null, [projects, activeId]);
   const activeRef = useRef(null);
   const projectsRef = useRef([]); // always the latest list, readable from async callbacks (receipt sync)

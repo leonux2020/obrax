@@ -7,6 +7,13 @@ const Chevron = () => (
     <path d="M15 18l-6-6 6-6" />
   </svg>
 );
+const Globe = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18" />
+    <path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z" />
+  </svg>
+);
 const Pencil = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M12 20h9" />
@@ -34,7 +41,7 @@ function Bar({ id, label, pct, tone, text }) {
  * ZONE A: the header that never scrolls away. Name, client, place, traffic light with its days, the live total, the
  * lock and the progress bars. Colour = only a 2 px left border and the lettering of the state line.
  */
-export default function HeaderZone({ project, model, title, client, region, offline, onBack, onEdit, onCash, onUnlock }) {
+export default function HeaderZone({ project, model, title, client, region, offline, onBack, onEdit, onMarket, onCash, onUnlock }) {
   const { t, money } = useI18n();
   const where = locationLabel(project.location);
   const detail = model.closed ? t('proj.closed') : levelDetail(t, model.info) || t(`light.${model.info.level}`);
@@ -55,6 +62,9 @@ export default function HeaderZone({ project, model, title, client, region, offl
             <span data-testid="ws-location">{where || t('ws.noLocation')}</span>
           </p>
         </div>
+        <button type="button" onClick={onMarket} aria-label={`${t('ws.market.title')}: ${region.code}`} data-testid="ws-market" data-region={region.code} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 active:border-white/40">
+          <Globe />
+        </button>
         <button type="button" onClick={onEdit} aria-label={t('proj.edit')} data-testid="ws-edit" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 active:border-white/40">
           <Pencil />
         </button>

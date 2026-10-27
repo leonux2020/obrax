@@ -4,6 +4,7 @@ import { partidaTitle } from '../../lib/reports.js';
 import { sanitizeText } from '../../lib/sanitize.js';
 import { LEVEL_COLOR } from '../levelStyle.js';
 import { WASTE_LIMITS } from '../../lib/tasks.js';
+import { priceCaption } from '../../lib/workspaceModel.js';
 import { TextField } from '../ui.jsx';
 import PercentSlider from '../PercentSlider.jsx';
 import LockedZone from './LockedZone.jsx';
@@ -105,6 +106,9 @@ export default function PartidaList({ draft, groups, open, locked, onBlocked, on
                           <span className="block text-[10px] font-semibold" style={{ color: r.origin === 'user' ? '#e8c35f' : 'rgba(224,224,224,0.6)' }}>
                             {r.shared && <span aria-hidden="true">↔ </span>}
                             {t(`ws.origin.${r.origin}`)}
+                          </span>
+                          <span data-testid={`supplier-${r.id}`} className="block max-w-[11rem] truncate text-xs text-gray-500">
+                            {priceCaption(t, { origin: r.origin, meta: r.supplier, regionCode: draft.regionCode })}
                           </span>
                         </button>
                       </li>

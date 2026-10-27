@@ -3,10 +3,14 @@
 
 import { computeAll } from './engine.js';
 import { planningTimeline, pricingTime } from './signature.js';
+import { currentBook, currentSuppliers } from './priceRegistry.js';
+import { applyNearby } from './suppliers.js';
 
 /** Total with tax, or null while the project has no valid measures yet. */
 export function projectTotal(project, now = Date.now()) {
-  const r = computeAll(project.draft, pricingTime(project.draft, now), { timeline: planningTimeline(project.draft, project), chains: false });
+  const code = project.draft.regionCode;
+  const book = applyNearby(currentBook(code), code, currentSuppliers(code), project.location); // the supplier prices within 50 km of the job
+  const r = computeAll(project.draft, pricingTime(project.draft, now), { timeline: planningTimeline(project.draft, project), book, chains: false });
   return r.valid ? r.quote.total : null;
 }
 
