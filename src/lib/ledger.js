@@ -81,7 +81,7 @@ export const normalizeExpenses = (raw) =>
 export const normalizeLogbook = (raw) =>
   listOf(raw, LEDGER_LIMITS.logbook, (p, used) => {
     const text = sanitizeText(p.text, LEDGER_LIMITS.logChars).trim();
-    return text ? { id: idOf(p.id, used), at: stamp(p.at), text } : null;
+    return text ? { id: idOf(p.id, used), at: stamp(p.at), text, ...(p.photo === true ? { photo: true } : {}) } : null; // `photo`: a Blob in IndexedDB (notePhotos.js) belongs to this note
   });
 
 /** { lat, lng, label } or null. Coordinates only: nothing is sent anywhere to name the place. */

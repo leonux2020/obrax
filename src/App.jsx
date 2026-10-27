@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { emptySlots } from './lib/photos.js';
 import { migrateLegacyPhotos, photoStoreFor } from './lib/photoStore.js';
+import { notePhotosFor } from './lib/notePhotos.js';
 import { projectStore } from './lib/projectStore.js';
 import { logoStore } from './lib/companyStore.js';
 import { hasIndexedDb } from './lib/db.js';
@@ -382,6 +383,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   const deleteProject = (id) => {
     projectStore.remove(id).catch(() => {});
     photoStoreFor(id).clear().catch(() => {});
+    notePhotosFor(id).clear().catch(() => {}); // the photos of its logbook notes go with it
     receiptQueue.removeProject(id).catch(() => {});
     setProjects((list) => list.filter((p) => p.id !== id));
     if (activeRef.current?.id === id) {

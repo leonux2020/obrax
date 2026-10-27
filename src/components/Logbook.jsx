@@ -3,7 +3,10 @@ import { useI18n } from '../lib/i18n.jsx';
 import { LEDGER_LIMITS, newEntryId } from '../lib/ledger.js';
 import { sanitizeText } from '../lib/sanitize.js';
 import { createDictation, getSpeechRecognition } from '../lib/speech.js';
+import { PhotoError } from '../lib/photos.js';
+import { prepareNotePhoto } from '../lib/notePhotos.js';
 import { Button } from './ui.jsx';
+import { NoteThumb, PhotoLightbox } from './workspace/NotePhoto.jsx';
 
 const Icon = ({ children, size = 24 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -16,14 +19,21 @@ const Icon = ({ children, size = 24 }) => (
  * text area WHILE you speak and, when the dictation ends, the note is saved by itself into the project (IndexedDB, through
  * the usual persistence of the open project). Typing and the "Guardar nota" button keep working.
  * `showList={false}`: only the capture part (the workspace shows the notes in its own accordion); `onSaved` runs after a note
- * has been added.
+ * has been added. `photoStore` (notePhotos.js) turns on the 📸 button: the photo is kept as a Blob in IndexedDB under the new note.
  */
-export default function Logbook({ entries, onChange, showList = true, onSaved }) {
+export default function Logbook({ entries, onChange, showList = true, onSaved, photoStore = null }) {
   const { t, lang, locale } = useI18n();
   const [text, setText] = useState('');
   const [listening, setListening] = useState(false);
   const [note, setNote] = useState(''); // i18n key of the status line
   const field = useRef(null);
+  const fileRef = useRef(null);
+  const [photo, setPhoto] = useState(null); // { blob, width, height } waiting for the note it will belong to
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState('');
+  const [viewer, setViewer] = useState('');
+  const photoRef = useRef(null);
+  photoRef.current = photo;
   const dictation = useRef(null);
   // refs so the speech callbacks (created once per session) always see the latest values
   const textRef = useRef('');
@@ -35,18 +45,40 @@ export default function Logbook({ entries, onChange, showList = true, onSaved })
   savedRef.current = onSaved;
   textRef.current = text;
 
-  const commit = (raw) => {
+  const commit = (raw, { photoOnly = false } = {}) => {
     const clean = sanitizeText(raw, LEDGER_LIMITS.logChars).trim();
-    if (!clean) return false;
-    changeRef.current([{ id: newEntryId(), at: Date.now(), text: clean }, ...entriesRef.current].slice(0, LEDGER_LIMITS.logbook));
+    const attached = photoStore ? photoRef.current : null;
+    if (!clean && !(photoOnly && attached)) return false;
+    const id = newEntryId();
+    if (attached) {
+      photoStore.put(id, attached).catch(() => {}); // Blob -> IndexedDB (never base64 / localStorage)
+    }
+    const entry = { id, at: Date.now(), text: clean || t('ws.log.photoOnly'), ...(attached ? { photo: true } : {}) };
+    changeRef.current([entry, ...entriesRef.current].slice(0, LEDGER_LIMITS.logbook));
     setText('');
     textRef.current = '';
+    setPhoto(null);
+    photoRef.current = null;
     savedRef.current?.();
     return true;
   };
   const save = () => {
     setNote('');
-    commit(text);
+    commit(text, { photoOnly: true });
+  };
+  const onPickPhoto = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setPhotoError('');
+    setPhotoBusy(true);
+    try {
+      setPhoto(await prepareNotePhoto(file));
+    } catch (err) {
+      setPhotoError(err instanceof PhotoError ? `photo.err.${err.code}` : 'photo.err.store');
+    } finally {
+      setPhotoBusy(false);
+    }
   };
   const supported = Boolean(getSpeechRecognition());
   const micIssue = ['log.dictateDenied', 'log.dictateUnsupported', 'log.dictateNetwork', 'log.dictateError'].includes(note); // shown as a visible red notice
@@ -141,6 +173,37 @@ export default function Logbook({ entries, onChange, showList = true, onSaved })
           </Icon>
         </button>
       </div>
+      {photoStore && (
+        <div className="flex items-center gap-3">
+          <input ref={fileRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true" data-testid="log-photo-input" onChange={onPickPhoto} />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={photoBusy}
+            data-testid="log-photo"
+            className="flex min-h-[44px] min-w-[44px] items-center gap-2 rounded-xl border border-white/15 px-3 text-sm font-bold text-[#E0E0E0] active:border-white/50 disabled:opacity-60"
+          >
+            <span aria-hidden="true" className="text-xl leading-none">
+              📸
+            </span>
+            {photoBusy ? t('ws.log.photoBusy') : photo ? t('ws.log.photoChange') : t('ws.log.photoAdd')}
+          </button>
+          {photo && (
+            <>
+              <NoteThumb photo={photo} label={t('ws.log.photoOpen')} onOpen={setViewer} testId="log-photo-thumb" />
+              <button type="button" onClick={() => setPhoto(null)} aria-label={t('ws.log.photoRemove')} data-testid="log-photo-remove" className="flex h-11 w-11 items-center justify-center text-[#E0E0E0]/60 active:text-red-400">
+                ✕
+              </button>
+            </>
+          )}
+        </div>
+      )}
+      {photoError && (
+        <p role="alert" className="text-sm font-semibold text-red-400" data-testid="log-photo-error">
+          {t(photoError)}
+        </p>
+      )}
+      {viewer && <PhotoLightbox url={viewer} onClose={() => setViewer('')} />}
       {note && (
         <p
           role={micIssue ? 'alert' : 'status'}
@@ -158,7 +221,7 @@ export default function Logbook({ entries, onChange, showList = true, onSaved })
           {t(note)}
         </p>
       )}
-      {text.trim() && !listening && (
+      {(text.trim() || photo) && !listening && (
         <Button className="w-full" onClick={save} data-testid="log-save">
           {t('log.save')}
         </Button>

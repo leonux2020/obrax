@@ -19,6 +19,7 @@ import { warmPdfEngine } from '../lib/reportPdf.js';
 import { headerModel, initialWorkspaceState, partidaGroups, quoteLock, unlockQuote, withMarket, withPriceOverride, workspaceReducer } from '../lib/workspaceModel.js';
 import BottomSheet from './BottomSheet.jsx';
 import Logbook from './Logbook.jsx';
+import { notePhotosFor } from '../lib/notePhotos.js';
 import ReceiptSheet from './ReceiptSheet.jsx';
 import SignatureSheet from './SignatureSheet.jsx';
 import SnapGrid from './SnapGrid.jsx';
@@ -202,7 +203,7 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
         <MachineryBlock draft={draft} result={result} regionCode={regionCode} projectLocation={location} locked={Boolean(locked)} onBlocked={blocked} setDraft={setDraft} open={ui.open.machinery} onToggle={toggle} />
         <FinanceBlock draft={draft} locked={Boolean(locked)} onBlocked={blocked} setDraft={edit} open={ui.open.finance} onToggle={toggle} />
         <CashBlock total={total} payments={project.payments} onChange={setList('payments')} open={ui.open.cash} onToggle={toggle} />
-        <LogBlock entries={project.logbook} onChange={setList('logbook')} open={ui.open.log} onToggle={toggle} />
+        <LogBlock entries={project.logbook} onChange={setList('logbook')} open={ui.open.log} onToggle={toggle} projectId={project.id} />
         <ExpensesBlock expenses={project.expenses} queued={queued} receipts={receipts} onChange={setList('expenses')} open={ui.open.expenses} onToggle={toggle} />
       </div>
 
@@ -247,7 +248,7 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
       {ui.sheet === 'log' && (
         <BottomSheet title={t('log.title')} onClose={closeSheet}>
           <div className="mt-3">
-            <Logbook entries={project.logbook} onChange={setList('logbook')} showList={false} onSaved={closeSheet} />
+            <Logbook entries={project.logbook} onChange={setList('logbook')} showList={false} onSaved={closeSheet} photoStore={notePhotosFor(project.id)} />
           </div>
         </BottomSheet>
       )}
