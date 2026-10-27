@@ -13,7 +13,7 @@ import { Logbook } from '../src/components/ProjectView.jsx';
 import { __resetInstallForTests, startInstallCapture, getInstallState, promptInstall } from '../src/pwa/installPrompt.js';
 import { createFakeDrive } from './helpers/fakeDrive.js';
 import { CLIENT, backToDashboard, q, flush, click, typeInto, installFakeGoogle, createHost } from './helpers/appHarness.js';
-import { createDictation, getSpeechRecognition, joinSpeech, speechLocale } from '../src/lib/speech.js';
+import { createDictation, getSpeechRecognition, joinSpeech, speechLocale, mergeFinals, closeSentence } from '../src/lib/speech.js';
 import { devAiBypass, aiAccess } from '../src/lib/pro.js';
 import { computeAll } from '../src/lib/engine.js';
 import { newDraft } from '../src/lib/draft.js';
@@ -454,18 +454,19 @@ describe('5. voice logbook (Web Speech API)', () => {
     const rec = instances[0];
     expect(rec.started).toBe(true);
     expect(rec.lang).toBe('es-CL');
-    expect(rec.continuous && rec.interimResults).toBe(true);
+    expect(rec.interimResults).toBe(false); // no stuttering partial text
+    expect(rec.continuous).toBe(false);
     expect(q('log-mic').dataset.listening).toBe('true');
     await act(async () => rec.say([['se vació la', false]]));
-    expect(q('log-input').value).toBe('se vació la'); // real time, before the sentence is final
-    await act(async () => rec.say([['se vació la losa', true], ['del primer piso', false]]));
+    expect(q('log-input').value).toBe(''); // interim words are never written
+    await act(async () => rec.say([['se vació la losa del primer piso', true]]));
     expect(q('log-input').value).toBe('se vació la losa del primer piso');
     expect(changes).toHaveLength(0); // nothing saved while still dictating
     await click(q('log-mic')); // stop
     await flush(10);
     expect(changes).toHaveLength(1);
-    expect(changes[0][0].text).toBe('se vació la losa del primer piso'); // saved into the project
-    expect(q('log-list').textContent).toContain('se vació la losa del primer piso');
+    expect(changes[0][0].text).toBe('se vació la losa del primer piso.'); // saved into the project, closed with a full stop
+    expect(q('log-list').textContent).toContain('se vació la losa del primer piso.');
     expect(q('log-input').value).toBe('');
     expect(q('log-mic-hint').textContent).toContain('guardada');
     expect(q('log-mic').dataset.listening).toBe('false');
@@ -483,7 +484,7 @@ describe('5. voice logbook (Web Speech API)', () => {
     expect(q('log-input').value).toBe('Hormigón: 20 m3');
     await click(q('log-mic'));
     await flush(10);
-    expect(changes[0][0].text).toBe('Hormigón: 20 m3');
+    expect(changes[0][0].text).toBe('Hormigón: 20 m3.');
     changes.length = 0;
     await click(q('log-mic'));
     await click(q('log-mic'));
@@ -517,6 +518,42 @@ describe('5. voice logbook (Web Speech API)', () => {
     expect(errors).toEqual(['unsupported']);
     instances.at(-1).onend();
     expect(ended).toEqual(['x']);
+  });
+
+  it('cleanup: ending a session detaches its listeners; a new session silences the old recognizer; unmounting stops it', async () => {
+    const d1 = createDictation({ win: { SpeechRecognition: FakeRecognition } });
+    d1.start();
+    const first = instances.at(-1);
+    first.abort = vi.fn();
+    const d2 = createDictation({ win: { SpeechRecognition: FakeRecognition } });
+    d2.start();
+    expect(first.abort).toHaveBeenCalledTimes(1);
+    expect(first.onresult).toBeNull(); // only one recognizer listens
+    const second = instances.at(-1);
+    expect(typeof second.onresult).toBe('function');
+    d2.stop();
+    await flush(10);
+    expect(second.onresult).toBeNull();
+    expect(second.onend).toBeNull();
+    // leaving the Logbook while dictating stops the recognizer
+    await render();
+    await click(q('log-mic'));
+    const live = instances.at(-1);
+    expect(live.started).toBe(true);
+    await act(async () => root.render(React.createElement('div')));
+    expect(live.started).toBe(false);
+    await flush(10);
+    expect(live.onresult).toBeNull();
+  });
+
+  it('mergeFinals / closeSentence: cumulative fragments replace, others join; one full stop at the end', () => {
+    expect(mergeFinals(['traer', 'traer la', 'traer la comida'])).toBe('traer la comida');
+    expect(mergeFinals(['hola', 'equipo'])).toBe('hola equipo');
+    expect(mergeFinals(['no', 'no'])).toBe('no'); // the same text twice is a re-send, not a new phrase
+    expect(mergeFinals(['no', 'no hay'])).toBe('no hay');
+    expect(closeSentence('traer la comida')).toBe('traer la comida.');
+    expect(closeSentence('¿listo?')).toBe('¿listo?');
+    expect(closeSentence('  ')).toBe('');
   });
 });
 

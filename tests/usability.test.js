@@ -77,16 +77,31 @@ describe('voice logbook', () => {
     expect(mic.className).not.toContain('bg-red-500');
   });
 
-  it('onresult injects the text into the textarea (React state) live, from the whole result list, even when resultIndex jumps', async () => {
+  it('onresult injects only FINAL text, from resultIndex, and never repeats it (no echo)', async () => {
     await act(async () => root.render(h(Wrap)));
     await click(q('log-mic'));
-    await act(async () => say(recs[0], [['hola', false]]));
-    expect(q('log-input').value).toBe('hola');
-    // a browser that re-sends earlier results and moves resultIndex: nothing is lost or duplicated
-    await act(async () => say(recs[0], [['hola equipo', true], ['vaciado de', false]], 1));
-    expect(q('log-input').value).toBe('hola equipo vaciado de');
-    await act(async () => say(recs[0], [['hola equipo', true], ['vaciado de losa', true]], 2));
+    expect(recs[0].interimResults).toBe(false);
+    expect(recs[0].continuous).toBe(false);
+    await act(async () => say(recs[0], [['hola', false]])); // interim words never reach the state
+    expect(q('log-input').value).toBe('');
+    await act(async () => say(recs[0], [['hola equipo', true]]));
+    expect(q('log-input').value).toBe('hola equipo');
+    // a browser that re-sends the same result (or an earlier one) does not duplicate it
+    await act(async () => say(recs[0], [['hola equipo', true]], 0));
+    expect(q('log-input').value).toBe('hola equipo');
+    await act(async () => say(recs[0], [['hola equipo', true], ['vaciado de losa', true]], 1));
     expect(q('log-input').value).toBe('hola equipo vaciado de losa');
+  });
+
+  it('the Android "cumulative finals" bug: traer / traer la / traer la comida / al perro is NOT echoed', async () => {
+    await act(async () => root.render(h(Wrap)));
+    await click(q('log-mic'));
+    await act(async () =>
+      say(recs[0], [['traer', true], ['traer la', true], ['traer la comida', true], ['traer la comida al perro', true]]),
+    );
+    expect(q('log-input').value).toBe('traer la comida al perro');
+    await act(async () => say(recs[0], [['traer', true], ['traer la', true], ['traer la comida', true], ['traer la comida al perro', true]], 2));
+    expect(q('log-input').value).toBe('traer la comida al perro');
   });
 
   it('a denied microphone shows a visible red alert on screen (not just a hint); network failures get their own message', async () => {
