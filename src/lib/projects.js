@@ -129,7 +129,7 @@ export function adoptCompany(project, company, logo = '') {
 }
 
 // ---- project model --------------------------------------------------------------------------------------
-export function newProject({ regionCode, mode = 'quick', company = null, logo = '', name = '', client = '', startDate = '', endDate = '', location = null, now = Date.now() }) {
+export function newProject({ regionCode, mode = 'quick', company = null, logo = '', name = '', client = '', startDate = '', endDate = '', location = null, parentId = '', now = Date.now() }) {
   const draft = newDraft(regionCode, mode);
   draft.project = { name: sanitizeText(name, 60).trim(), client: sanitizeText(client, 60).trim() };
   const start = parseDay(startDate) ? startDate : '';
@@ -143,12 +143,43 @@ export function newProject({ regionCode, mode = 'quick', company = null, logo = 
     company: snapshotCompany(company, logo),
     location: normalizeLocation(location),
     closedAt: 0,
+    ...(parentId && ID_RE.test(parentId) ? { parentId } : {}),
     payments: [],
     advances: [],
     expenses: [],
     logbook: [],
     draft,
   };
+}
+
+/** The id of the ORIGINAL job of a chain of extensions (a project that extends nothing is its own root). */
+export const rootId = (project) => project.parentId || project.id;
+
+/**
+ * "Crear extensión": a NEW phase of a finished job. It copies ONLY the client, the place and the market (country) of
+ * `parent`; it has no partidas and no money, and `parentId` links it to the ORIGINAL job (never to another extension), so the
+ * past quote is untouched and a client's jobs can be added up later. Named "{original} - {label} {n}" (n = the next free
+ * number among the extensions of that original). `company` / `logo` are the CURRENT profile, as for any new project.
+ */
+export function newExtension(parent, projects = [], { label = 'Extensión', company = null, logo = '', now = Date.now() } = {}) {
+  const root = rootId(parent);
+  const n = projects.filter((p) => p.parentId === root).length + 1;
+  const own = projectTitle(parent) || '';
+  const base = (parent.parentId ? own.replace(/\s-\s\S+\s\d+$/, '') : own).trim(); // an extension of an extension keeps the ORIGINAL name
+  const suffix = ` - ${label} ${n}`;
+  const name = `${base.slice(0, Math.max(0, 60 - suffix.length)).trimEnd()}${suffix}`.trimStart();
+  return newProject({
+    regionCode: parent.draft.regionCode,
+    mode: 'project',
+    company,
+    logo,
+    name,
+    client: projectClient(parent),
+    startDate: toDayString(new Date(now)),
+    location: parent.location,
+    parentId: root,
+    now,
+  });
 }
 
 /** Validate an untrusted stored project. Returns a clean project or null. */
@@ -170,6 +201,7 @@ export function normalizeProject(obj) {
     company: snapshotCompany(obj.company, obj.company?.logo),
     location: normalizeLocation(obj.location),
     closedAt: Number.isFinite(Number(obj.closedAt)) && Number(obj.closedAt) > 0 ? Number(obj.closedAt) : 0,
+    ...(typeof obj.parentId === 'string' && ID_RE.test(obj.parentId) ? { parentId: obj.parentId } : {}), // the job this one extends (older records have none)
     payments: normalizePayments(obj.payments),
     advances: normalizeAdvances(obj.advances),
     expenses: normalizeExpenses(obj.expenses),

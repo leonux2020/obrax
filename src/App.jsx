@@ -7,7 +7,7 @@ import { hasIndexedDb } from './lib/db.js';
 import { I18nProvider, makeI18n } from './lib/i18n.jsx';
 import { getRegion, LANGS } from './lib/regions.js';
 import { wipeLocalData } from './lib/session.js';
-import { adoptCompany, documentCompany, newProject, projectTitle, toDayString } from './lib/projects.js';
+import { adoptCompany, documentCompany, isClosed, newExtension, newProject, projectTitle, toDayString } from './lib/projects.js';
 import { normalizeLocation } from './lib/ledger.js';
 import { computeAll } from './lib/engine.js';
 import { planningTimeline, pricingTime } from './lib/signature.js';
@@ -44,6 +44,8 @@ import Header from './components/Header.jsx';
 import Wizard from './components/Wizard.jsx';
 import ProjectView from './components/ProjectView.jsx';
 import ProjectWorkspace from './components/ProjectWorkspace.jsx';
+import PostMortem from './components/PostMortem.jsx';
+import { useHistoryBack } from './lib/useHistoryBack.js';
 import ToastHost from './components/workspace/ToastHost.jsx';
 import { workspaceEnabled } from './lib/flags.js';
 import { askNotifyPermission, pushToast, systemNotify } from './lib/notify.js';
@@ -101,6 +103,11 @@ function bootProjects(region) {
   }
   return bootPromise;
 }
+
+/** Test hook: forget the shared boot so a fresh mount reads the store again. */
+export const resetBoot = () => {
+  bootPromise = null;
+};
 
 /** Back to the opening screen with a clean page load (the app lives at the site root). */
 const goToStart = () => window.location.replace(import.meta.env?.BASE_URL || '/');
@@ -285,6 +292,14 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     setPhotos(emptySlots());
   }, []);
 
+  // The device's BACK button (Android / browser) does exactly what the "←" arrow does: back to the Dashboard.
+  const leaveByBack = useCallback(() => {
+    setSheet(null);
+    setPaywall(null);
+    closeProject();
+  }, [closeProject]);
+  useHistoryBack(activeId, leaveByBack);
+
   // The open project's draft: all wizard / project-view edits flow through here.
   const setDraft = useCallback(
     (update) =>
@@ -332,6 +347,19 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     openProject(project.id);
     // the workspace is the whole project (measures included): a new job lands right in it; only the legacy flow opens the wizard
     if (!wsOn) setEditor(true);
+  };
+
+  // "Crear extensión": a NEW phase of a finished job (same client, place and market, no items), linked by parentId.
+  const createExtension = (parent) => {
+    if (projectLimitReached(projects?.length ?? 0, pro)) {
+      setPaywall('projects');
+      return;
+    }
+    const label = makeI18n(settings.lang, parent.draft.regionCode).t('pm.extension.word');
+    const created = newExtension(parent, projects ?? [], { label, company, logo });
+    const project = { ...created, draft: { ...created.draft, step: 1 } };
+    commit(project);
+    openProject(project.id);
   };
 
   const editProject = (project, fields) => {
@@ -540,20 +568,34 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
 
           {projects === null ? null : active ? (
             wsOn ? (
-              <ProjectWorkspace
-                key={active.id}
-                project={active}
-                setProject={setProject}
-                setDraft={setDraft}
-                photos={photos}
-                setPhotos={changePhotos}
-                company={projectCompany(active, company)}
-                receipts={receipts}
-                enqueueReceipt={enqueueReceipt}
-                onBack={closeProject}
-                onEdit={() => setSheet({ type: 'edit', id: active.id })}
-                onPro={openPaywall}
-              />
+              isClosed(active) ? (
+                <PostMortem
+                  key={active.id}
+                  project={active}
+                  parent={active.parentId ? projects.find((p) => p.id === active.parentId) ?? null : null}
+                  company={projectCompany(active, company)}
+                  photos={photos}
+                  setDraft={setDraft}
+                  onBack={closeProject}
+                  onReopen={() => commit({ ...active, closedAt: 0, updatedAt: Date.now() })}
+                  onExtend={() => createExtension(active)}
+                />
+              ) : (
+                <ProjectWorkspace
+                  key={active.id}
+                  project={active}
+                  setProject={setProject}
+                  setDraft={setDraft}
+                  photos={photos}
+                  setPhotos={changePhotos}
+                  company={projectCompany(active, company)}
+                  receipts={receipts}
+                  enqueueReceipt={enqueueReceipt}
+                  onBack={closeProject}
+                  onEdit={() => setSheet({ type: 'edit', id: active.id })}
+                  onPro={openPaywall}
+                />
+              )
             ) : editor ? (
               <Wizard
                 key={active.id}
