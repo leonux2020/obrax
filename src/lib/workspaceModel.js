@@ -197,10 +197,11 @@ export function partidaGroups(result, draft) {
 
 // ---- zone A: the header that never leaves -----------------------------------------------------------------------------------
 /**
- * Everything the sticky header shows. `cash` comes from cashSummary(); `total` from the live quote.
+ * Everything the sticky header shows. `cash` comes from cashSummary(); `total` from the live quote; `liquid` is the real cash
+ * on hand (ledger.liquidity: payments - expenses - worker advances) and rides on the Caja bar.
  * Bars: Plazo (time elapsed of the schedule) and Caja (paid of the budget). A bar with `pct: null` is not drawn.
  */
-export function headerModel({ project, total, valid, cash, now = Date.now() }) {
+export function headerModel({ project, total, valid, cash, liquid = 0, now = Date.now() }) {
   const st = workspaceState(project, now);
   const time = timeProgress(project, now);
   return {
@@ -212,7 +213,7 @@ export function headerModel({ project, total, valid, cash, now = Date.now() }) {
     total: valid ? total : null,
     bars: [
       { id: 'time', pct: time.pct, tone: st.tone, elapsed: time.elapsed, of: time.total },
-      { id: 'cash', pct: valid && cash ? cash.pct : null, tone: cash?.overpaid ? '#e8c35f' : '#22c55e', paid: cash?.paid ?? 0, pending: cash?.pending ?? 0 },
+      { id: 'cash', pct: valid && cash ? cash.pct : null, tone: cash?.overpaid ? '#e8c35f' : '#22c55e', paid: cash?.paid ?? 0, pending: cash?.pending ?? 0, liquid: Number.isFinite(liquid) ? liquid : 0 },
     ],
   };
 }

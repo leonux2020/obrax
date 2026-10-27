@@ -17,17 +17,23 @@ const Pencil = () => (
 );
 
 /** One thin progress bar. The only colour is the fill (a progress indicator, not a state background). */
-function Bar({ id, label, pct, tone, text }) {
-  if (pct === null || pct === undefined) return null;
+function Bar({ id, label, pct, tone, text, sub = null }) {
+  const drawn = pct !== null && pct !== undefined;
+  if (!drawn && !sub) return null;
   return (
-    <div data-testid={`bar-${id}`} data-pct={Math.round(pct)}>
-      <div className="flex items-baseline justify-between text-[11px] font-semibold text-[#E0E0E0]/70">
+    <div data-testid={`bar-${id}`} data-pct={drawn ? Math.round(pct) : undefined} className="min-w-0">
+      <div className="flex items-baseline justify-between gap-2 text-[11px] font-semibold text-[#E0E0E0]/70">
         <span>{label}</span>
-        <span className="tabular-nums">{text}</span>
+        <span className="min-w-0 truncate text-right tabular-nums">
+          {drawn && text}
+          {sub}
+        </span>
       </div>
-      <div className="mt-0.5 h-1 overflow-hidden rounded-full border border-white/15" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}>
-        <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.max(0, pct))}%`, backgroundColor: tone }} />
-      </div>
+      {drawn && (
+        <div className="mt-0.5 h-1 overflow-hidden rounded-full border border-white/15" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}>
+          <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.max(0, pct))}%`, backgroundColor: tone }} />
+        </div>
+      )}
     </div>
   );
 }
@@ -86,9 +92,24 @@ export default function HeaderZone({ project, model, title, client, region, offl
         </button>
       </div>
 
-      <div className="mt-2 grid grid-cols-2 gap-3">
+      <div className="mt-2 grid grid-cols-[1fr_1.35fr] gap-3">
         <Bar id="time" label={t('ws.bar.time')} pct={time.pct} tone={time.tone} text={`${time.elapsed}/${time.of} d`} />
-        <Bar id="cash" label={t('ws.bar.cash')} pct={cash.pct} tone={cash.tone} text={`${Math.round(cash.pct ?? 0)} %`} />
+        <Bar
+          id="cash"
+          label={t('ws.bar.cash')}
+          pct={cash.pct}
+          tone={cash.tone}
+          text={`${Math.round(cash.pct ?? 0)} %`}
+          // the real cash on hand (paid by the client - expenses - worker advances), in the money of THIS project's market
+          sub={
+            (cash.pct !== null || cash.liquid !== 0) && (
+            <span data-testid="cash-liquid" data-liquid={cash.liquid} data-negative={cash.liquid < 0 ? 'true' : undefined} className={`text-sm font-semibold ${cash.liquid < 0 ? 'text-[#e8c35f]/80' : 'text-[#E0E0E0]/60'}`}>
+              {cash.pct !== null && cash.pct !== undefined && <span aria-hidden="true"> · </span>}
+              {money(cash.liquid)}
+            </span>
+            )
+          }
+        />
       </div>
 
       {model.locked && (

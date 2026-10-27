@@ -116,6 +116,14 @@ export function laborPool(laborAmount, advances = []) {
 
 export const expensesTotal = (expenses = []) => cents(sum(expenses));
 
+/**
+ * REAL cash on hand of the job: what the client has paid (advances / payments) minus what has gone out of the pocket
+ * (registered expenses + cash advanced to workers). Negative = the contractor is financing the job. Always a finite number.
+ */
+export function liquidity(payments = [], expenses = [], advances = []) {
+  return cents(cents(sum(payments)) - cents(sum(expenses)) - cents(sum(advances)));
+}
+
 /** Day string (local calendar) of a timestamp. */
 export function dayOf(ms) {
   const d = new Date(ms);

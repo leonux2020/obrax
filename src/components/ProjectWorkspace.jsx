@@ -3,7 +3,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { useMarketClock } from '../lib/marketClock.js';
 import { computeAll } from '../lib/engine.js';
 import { freezeSignature, pricingTime, planningTimeline } from '../lib/signature.js';
-import { LEDGER_LIMITS, cashSummary } from '../lib/ledger.js';
+import { LEDGER_LIMITS, cashSummary, liquidity } from '../lib/ledger.js';
 import { MAX_PARTIDAS, newPartida } from '../lib/draft.js';
 import { TASKS, defaultDims } from '../lib/tasks.js';
 import { projectClient, projectTitle } from '../lib/projects.js';
@@ -71,7 +71,7 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
   );
   const total = result.valid ? result.quote.total : 0;
   const cash = cashSummary(total, project.payments);
-  const model = headerModel({ project, total, valid: result.valid, cash, now: Date.now() });
+  const model = headerModel({ project, total, valid: result.valid, cash, liquid: liquidity(project.payments, project.expenses, project.advances), now: Date.now() });
   const locked = quoteLock(draft);
   const groups = useMemo(() => partidaGroups(result, draft), [result, draft]);
   const queued = receipts?.rows.filter((r) => r.projectId === project.id) ?? [];
