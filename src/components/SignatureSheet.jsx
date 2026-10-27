@@ -11,7 +11,7 @@ import SignaturePad from './SignaturePad.jsx';
  * On accept the ink is exported as a small transparent PNG (base64) and handed back together with the
  * client data and the quote total it vouches for.
  */
-export default function SignatureSheet({ signature, total, pricedAt, onSave, onRemove = null, onClose }) {
+export default function SignatureSheet({ signature, total, pricedAt, onSave, onRemove = null, onSkip = null, skipLabel = '', onClose }) {
   const { t } = useI18n();
   const pad = useRef(null);
   const [name, setName] = useState(signature?.name || '');
@@ -57,6 +57,11 @@ export default function SignatureSheet({ signature, total, pricedAt, onSave, onR
             {t('sign.accept')}
           </Button>
         </div>
+        {onSkip && (
+          <Button variant="ghost" className="w-full !min-h-[44px] text-sm" onClick={onSkip} data-testid="signature-skip">
+            {skipLabel}
+          </Button>
+        )}
         {onRemove && (
           <Button variant="ghost" className="w-full !min-h-[44px] text-sm" onClick={onRemove} data-testid="signature-remove">
             {t('sign.remove')}

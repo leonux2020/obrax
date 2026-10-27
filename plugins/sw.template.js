@@ -24,6 +24,16 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Background Sync ("cubrax-receipts"): a receipt scanned offline is waiting in IndexedDB. The worker cannot write into the
+// app's project state, so it wakes every open window, which drains the queue (see src/lib/receiptSync.js). With the app
+// closed nothing is lost: the queue is drained the next time it starts.
+self.addEventListener('sync', (event) => {
+  if (event.tag !== 'cubrax-receipts') return;
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => wins.forEach((w) => w.postMessage({ type: 'SYNC_RECEIPTS' })))
+  );
+});
+
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });

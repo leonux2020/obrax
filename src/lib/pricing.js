@@ -7,6 +7,7 @@
 import { CATALOG } from './catalog.js';
 import { getRegion } from './regions.js';
 import { liveMaterial, savedMaterial } from './priceBook.js';
+import { baseUsd } from './baseCatalog.js';
 
 export const MAX_PRICE = 1_000_000_000;
 
@@ -42,7 +43,7 @@ export function referencePrice(materialId, region, chain, bucket = marketBucket(
     const price = roundMoney(live * chain.factor * (1 + noise(`${region.code}|${chain.id}|${materialId}`) * 0.06), region);
     return price > 0 ? price : 10 ** -region.digits;
   }
-  const base = mat.usd * region.fx * region.priceFactor * chain.factor;
+  const base = baseUsd(materialId, mat.usd) * region.fx * region.priceFactor * chain.factor; // layer 3: the bundled base catalog
   const spread = 1 + noise(`${region.code}|${chain.id}|${materialId}`) * 0.06;
   const drift = 1 + noise(`${bucket}|${region.code}|${materialId}`) * 0.015;
   const price = roundMoney(base * spread * drift, region);

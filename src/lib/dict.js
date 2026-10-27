@@ -10,6 +10,7 @@ import { P4 } from './dict_p4.js';
 import { P5 } from './dict_p5.js';
 import { P6 } from './dict_p6.js';
 import { P7 } from './dict_p7.js';
+import { P8 } from './dict_p8.js';
 
 export const DICT = {
   es: {
@@ -486,6 +487,6 @@ for (const [code, dict] of Object.entries({ pt: PT, fr: FR, it: IT, de: DE })) {
 }
 
 // v4: phase 1 (company logo, project dashboard, traffic light, bottom navigation)
-for (const code of Object.keys(P1)) Object.assign(DICT[code], P1[code], P2[code], P3[code], P4[code], P5[code], P6[code], P7[code]);
+for (const code of Object.keys(P1)) Object.assign(DICT[code], P1[code], P2[code], P3[code], P4[code], P5[code], P6[code], P7[code], P8[code]);
 
 export const LANG_CODES = ['es', 'en', 'pt', 'fr', 'it', 'de'];

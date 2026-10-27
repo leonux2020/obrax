@@ -4,7 +4,7 @@ import { migrateLegacyPhotos, photoStoreFor } from './lib/photoStore.js';
 import { projectStore } from './lib/projectStore.js';
 import { logoStore } from './lib/companyStore.js';
 import { hasIndexedDb } from './lib/db.js';
-import { I18nProvider } from './lib/i18n.jsx';
+import { I18nProvider, makeI18n } from './lib/i18n.jsx';
 import { getRegion, LANGS } from './lib/regions.js';
 import { wipeLocalData } from './lib/session.js';
 import { adoptCompany, documentCompany, newProject, projectTitle, toDayString } from './lib/projects.js';
@@ -43,6 +43,13 @@ import Login from './components/Login.jsx';
 import Header from './components/Header.jsx';
 import Wizard from './components/Wizard.jsx';
 import ProjectView from './components/ProjectView.jsx';
+import ProjectWorkspace from './components/ProjectWorkspace.jsx';
+import ToastHost from './components/workspace/ToastHost.jsx';
+import { workspaceEnabled } from './lib/flags.js';
+import { askNotifyPermission, pushToast, systemNotify } from './lib/notify.js';
+import { receiptQueue } from './lib/receiptQueue.js';
+import { addExpenses, registerBackgroundSync } from './lib/receiptSync.js';
+import { useReceiptSync } from './lib/useReceiptSync.js';
 import GlobalAccounting from './components/GlobalAccounting.jsx';
 import Dashboard from './components/Dashboard.jsx';
 import BottomNav from './components/BottomNav.jsx';
@@ -126,12 +133,15 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   const [pickingRegion, setPickingRegion] = useState(false);
   const [paywall, setPaywall] = useState(null); // null | 'promo' | 'projects' | 'drive' | 'ai': which locked feature opened the PRO screen
   const [photos, setPhotos] = useState(emptySlots);
+  const [wsOn] = useState(workspaceEnabled); // single-screen project workspace (flag, see lib/flags.js)
 
   const region = getRegion(settings.region);
   // live material / rental prices for the regions in use (the user's country + every project's); only inside the app
   usePriceFeed(stage === 'app' ? [settings.region, ...(projects ?? []).map((p) => p.draft.regionCode)] : []);
   const active = useMemo(() => projects?.find((p) => p.id === activeId) ?? null, [projects, activeId]);
   const activeRef = useRef(null);
+  const projectsRef = useRef([]); // always the latest list, readable from async callbacks (receipt sync)
+  projectsRef.current = projects ?? projectsRef.current;
   const wipingRef = useRef(false); // true while signing out: nothing may be written back to the (erased) device
   activeRef.current = active;
   const [restoring, setRestoring] = useState(false); // reading the Drive backup before the Dashboard is shown
@@ -223,6 +233,34 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     projectStore.save(project).catch(() => {});
   }, []);
 
+  // ---- deferred receipts (offline scanner) ---------------------------------------------------------------------
+  // A receipt photographed without a connection waits in IndexedDB (receiptQueue). This global sync sends it to the AI
+  // proxy when the network is back, writes the tabulated expenses into ITS project (open or not) and tells the user.
+  const applyReceipt = useCallback(async (projectId, expenses) => {
+    const target = projectsRef.current.find((p) => p.id === projectId);
+    if (!target) return false; // the project was deleted meanwhile
+    const next = addExpenses(target, expenses);
+    projectsRef.current = projectsRef.current.map((p) => (p.id === projectId ? next : p)); // two receipts in a row stack up
+    setProjects((list) => list.map((p) => (p.id === projectId ? addExpenses(p, expenses) : p)));
+    if (activeRef.current?.id !== projectId) projectStore.save(next).catch(() => {}); // the open project saves itself
+    return true;
+  }, []);
+  const notifyUser = useCallback(
+    ({ key, params, tone }) => {
+      pushToast({ key, params, tone, ms: 6000 });
+      const i18n = makeI18n(settings.lang, settings.region);
+      systemNotify(i18n.t('app.name'), i18n.t(key, params));
+    },
+    [settings.lang, settings.region]
+  );
+  const receipts = useReceiptSync({ apply: applyReceipt, notify: notifyUser, enabled: stage === 'app' && projects !== null });
+  const enqueueReceipt = useCallback(async (job) => {
+    const row = await receiptQueue.enqueue(job);
+    registerBackgroundSync(); // Chromium: wakes the page when the connection returns (the online event covers the rest)
+    askNotifyPermission(); // we are inside the user's tap: the only moment the browser lets us ask
+    return row;
+  }, []);
+
   const openProject = useCallback((id) => {
     setActiveId(id);
     setEditor(false);
@@ -276,9 +314,8 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     window.scrollTo({ top: 0 });
   };
 
-  // A NEW project goes straight to choosing the kind of work and typing the measures: "Partida simple" opens the task
-  // picker (Radier, Pintura, Tabiquería...), "Proyecto completo" opens the list of partidas. The financial module
-  // (ProjectView) only comes after that, when the user leaves the editor.
+  // A NEW project lands in the workspace (the SPA): its first partida is already open to type the measures, and
+  // "Proyecto completo" starts with "+ Agregar partida". (Legacy flow, ?workspace=0: the wizard opens first, then ProjectView.)
   const createProject = (fields) => {
     // The company profile is COPIED into the new project: later profile changes never rewrite it.
     const created = newProject({ regionCode: settings.region, company, logo, ...fields });
@@ -287,7 +324,8 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     setSheet(null);
     setTab('projects');
     openProject(project.id);
-    setEditor(true);
+    // the workspace is the whole project (measures included): a new job lands right in it; only the legacy flow opens the wizard
+    if (!wsOn) setEditor(true);
   };
 
   const editProject = (project, fields) => {
@@ -310,6 +348,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   const deleteProject = (id) => {
     projectStore.remove(id).catch(() => {});
     photoStoreFor(id).clear().catch(() => {});
+    receiptQueue.removeProject(id).catch(() => {});
     setProjects((list) => list.filter((p) => p.id !== id));
     if (activeRef.current?.id === id) {
       setActiveId(null);
@@ -494,7 +533,22 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
           <Header bare={!(active && editor)} subtitle={active ? projectTitle(active) || user.name : user.name} pwa={pwa} />
 
           {projects === null ? null : active ? (
-            editor ? (
+            wsOn ? (
+              <ProjectWorkspace
+                key={active.id}
+                project={active}
+                setProject={setProject}
+                setDraft={setDraft}
+                photos={photos}
+                setPhotos={changePhotos}
+                company={projectCompany(active, company)}
+                receipts={receipts}
+                enqueueReceipt={enqueueReceipt}
+                onBack={closeProject}
+                onEdit={() => setSheet({ type: 'edit', id: active.id })}
+                onPro={openPaywall}
+              />
+            ) : editor ? (
               <Wizard
                 key={active.id}
                 projectId={active.id}
@@ -584,6 +638,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
             />
           )}
           {paywall && <ProPaywall feature={paywall} onClose={() => setPaywall(null)} />}
+          <ToastHost />
         </>
       )}
     </I18nProvider>

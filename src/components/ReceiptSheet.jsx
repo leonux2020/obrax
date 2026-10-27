@@ -9,12 +9,14 @@ import BottomSheet from './BottomSheet.jsx';
 import Hourglass from './Hourglass.jsx';
 
 /**
+ * Offline: when `onQueue` is given and there is no connection (or the request dies on the network), the compressed photo
+ * is parked in the deferred queue (phase 'queued') instead of failing; it is read later, silently, by receiptSync.js.
  * "Escanear Boleta con IA" (PRO): photo -> the AI tabulates the lines at once -> the user glances at them -> they are
  * stored in the project as expenses for the rendición. Rented tools / machinery come with the day they go back, which
  * is what lights the hourglass on the project card.
  * The photo is compressed on the device and sent ONLY to our own proxy; the Gemini key never reaches this code.
  */
-export default function ReceiptSheet({ onSave, onClose, prepareImage = compressInvoiceImage, fetchImpl, today = Date.now }) {
+export default function ReceiptSheet({ onSave, onClose, onQueue, prepareImage = compressInvoiceImage, fetchImpl, today = Date.now }) {
   const { t, region, lang, money } = useI18n();
   const [phase, setPhase] = useState('pick'); // 'pick' | 'reading' | 'review'
   const [error, setError] = useState('');
@@ -40,7 +42,22 @@ export default function ReceiptSheet({ onSave, onClose, prepareImage = compressI
     abortRef.current = ctl;
     try {
       const img = await prepareImage(file);
-      const r = await requestReceipt(img.dataUrl, { currency: region.currency, lang, signal: ctl.signal, ...(fetchImpl ? { fetchImpl } : {}) });
+      if (onQueue && typeof navigator !== 'undefined' && navigator.onLine === false) {
+        await onQueue(img.dataUrl); // no connection: no OCR here, the AI reads it when the network is back
+        if (alive.current) setPhase('queued');
+        return;
+      }
+      let r;
+      try {
+        r = await requestReceipt(img.dataUrl, { currency: region.currency, lang, signal: ctl.signal, ...(fetchImpl ? { fetchImpl } : {}) });
+      } catch (err) {
+        if (onQueue && err instanceof InvoiceError && (err.code === 'network' || err.code === 'timeout')) {
+          await onQueue(img.dataUrl); // the line died while reading: keep the photo for later
+          if (alive.current) setPhase('queued');
+          return;
+        }
+        throw err;
+      }
       if (!alive.current) return;
       setReceipt(r);
       setRows(r.items.map((it, i) => ({ ...it, key: `r${i}`, selected: true })));
@@ -51,7 +68,7 @@ export default function ReceiptSheet({ onSave, onClose, prepareImage = compressI
         setPhase('pick');
         return;
       }
-      setError(err instanceof PhotoError ? 'photo' : err instanceof InvoiceError ? err.code : 'upstream');
+      setError(err instanceof PhotoError ? 'photo' : err instanceof InvoiceError ? err.code : err?.message === 'queue_full' ? 'queue_full' : 'upstream');
       setPhase('pick');
     }
   };
@@ -88,6 +105,19 @@ export default function ReceiptSheet({ onSave, onClose, prepareImage = compressI
               {t('inv.upload')}
             </Button>
             <p className="pt-2 text-xs text-neutral-400">{t('inv.privacy')}</p>
+          </div>
+        )}
+
+        {phase === 'queued' && (
+          <div className="space-y-4 py-10 text-center" role="status" data-testid="receipt-queued">
+            <p className="text-lg font-bold text-[#e8c35f]">{t('q.parked')}</p>
+            <p className="text-sm text-neutral-300">{t('q.parkedHint')}</p>
+            <Button className="w-full" onClick={() => setPhase('pick')} data-testid="receipt-another">
+              {t('q.another')}
+            </Button>
+            <Button variant="ghost" className="w-full" onClick={onClose}>
+              {t('common.close')}
+            </Button>
           </div>
         )}
 

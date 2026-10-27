@@ -4,6 +4,25 @@
 
 import { normalizePhoto, normalizePhotos } from './photos.js';
 import { STORE_LEGACY_PHOTOS, STORE_PHOTOS, createRunner, hasIndexedDb, openDb } from './db.js';
+import { blobToDataUrl, dataUrlToBlob } from './blobs.js';
+
+/**
+ * A photo row as it is written to IndexedDB: the picture is a Blob (`blob`), not a base64 string, so a project full of
+ * photos weighs ~25 % less and never touches localStorage. Without Blob support (very old WebViews) the data URL is kept.
+ */
+function toRow(photo, projectId) {
+  const blob = dataUrlToBlob(photo.dataUrl);
+  const { dataUrl, ...rest } = photo;
+  return { ...rest, ...(blob ? { blob } : { dataUrl }), projectId, key: `${projectId}:${photo.slot}` };
+}
+
+/** ...and back to the in-memory shape the UI and the PDF use ({ dataUrl, ... }). Rows from older versions already have one. */
+async function fromRow(row) {
+  if (!row || typeof row !== 'object') return row;
+  const { blob, ...rest } = row;
+  if (!blob) return rest;
+  return { ...rest, dataUrl: await blobToDataUrl(blob) };
+}
 
 export function memoryBackend() {
   const map = new Map();
@@ -34,9 +53,9 @@ export function idbBackend(factory, projectId = '_') {
   return {
     kind: 'indexeddb',
     async getAll() {
-      return (await run(STORE_PHOTOS, 'readonly', (s) => s.getAll())).filter(mine);
+      return Promise.all((await run(STORE_PHOTOS, 'readonly', (s) => s.getAll())).filter(mine).map(fromRow));
     },
-    put: (photo) => run(STORE_PHOTOS, 'readwrite', (s) => s.put({ ...photo, projectId, key: `${projectId}:${photo.slot}` })),
+    put: (photo) => run(STORE_PHOTOS, 'readwrite', (s) => s.put(toRow(photo, projectId))),
     remove: (slot) => run(STORE_PHOTOS, 'readwrite', (s) => s.delete(`${projectId}:${slot}`)),
     clear: () =>
       run(STORE_PHOTOS, 'readwrite', (s) => {
@@ -64,7 +83,7 @@ export async function migrateLegacyPhotos(factory, projectId) {
       for (const row of all.result) {
         const clean = normalizePhoto(row);
         if (!clean) continue;
-        target.put({ ...clean, projectId, key: `${projectId}:${clean.slot}` });
+        target.put(toRow(clean, projectId));
         moved += 1;
       }
       legacy.clear();

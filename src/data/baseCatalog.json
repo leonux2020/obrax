@@ -1,0 +1,172 @@
+{
+ "version": 1,
+ "currency": "USD",
+ "note": "Reference price of ONE sale unit before regional index and chain factor.",
+ "items": {
+  "cement_bag": {
+   "sale": "bag",
+   "size": 1,
+   "usd": 4.8
+  },
+  "sand": {
+   "sale": "bigbag",
+   "size": 0.5,
+   "usd": 14.5
+  },
+  "gravel": {
+   "sale": "bigbag",
+   "size": 0.5,
+   "usd": 16.5
+  },
+  "mesh": {
+   "sale": "panel",
+   "size": 14.4,
+   "usd": 37.5
+  },
+  "poly": {
+   "sale": "roll",
+   "size": 100,
+   "usd": 35
+  },
+  "block_10": {
+   "sale": "unit",
+   "size": 1,
+   "usd": 0.85
+  },
+  "block_14": {
+   "sale": "unit",
+   "size": 1,
+   "usd": 1.05
+  },
+  "block_19": {
+   "sale": "unit",
+   "size": 1,
+   "usd": 1.4
+  },
+  "plate_125": {
+   "sale": "sheet",
+   "size": 2.9768,
+   "usd": 9.5
+  },
+  "plate_15": {
+   "sale": "sheet",
+   "size": 2.9768,
+   "usd": 11.5
+  },
+  "stud": {
+   "sale": "piece",
+   "size": 2.4,
+   "usd": 3.2
+  },
+  "track": {
+   "sale": "piece",
+   "size": 2.4,
+   "usd": 2.8
+  },
+  "screws": {
+   "sale": "box",
+   "size": 1000,
+   "usd": 9
+  },
+  "tape": {
+   "sale": "roll",
+   "size": 90,
+   "usd": 3.5
+  },
+  "compound": {
+   "sale": "bucket",
+   "size": 25,
+   "usd": 14
+  },
+  "roof_zinc": {
+   "sale": "sheet",
+   "size": 2.8,
+   "usd": 11
+  },
+  "roof_tile": {
+   "sale": "unit",
+   "size": 1,
+   "usd": 0.95
+  },
+  "ridge_zinc": {
+   "sale": "piece",
+   "size": 1.8,
+   "usd": 6.5
+  },
+  "ridge_tile": {
+   "sale": "piece",
+   "size": 0.4,
+   "usd": 1.6
+  },
+  "purlin": {
+   "sale": "piece",
+   "size": 6,
+   "usd": 14
+  },
+  "insulation": {
+   "sale": "roll",
+   "size": 14.4,
+   "usd": 22
+  },
+  "roof_screws": {
+   "sale": "box",
+   "size": 100,
+   "usd": 6
+  },
+  "gutter": {
+   "sale": "piece",
+   "size": 3,
+   "usd": 7
+  },
+  "downspout": {
+   "sale": "piece",
+   "size": 1,
+   "usd": 6
+  },
+  "floor_30": {
+   "sale": "box",
+   "size": 1.53,
+   "usd": 8
+  },
+  "floor_45": {
+   "sale": "box",
+   "size": 1.62,
+   "usd": 10.5
+  },
+  "floor_60": {
+   "sale": "box",
+   "size": 1.44,
+   "usd": 13
+  },
+  "adhesive": {
+   "sale": "bag",
+   "size": 25,
+   "usd": 7.5
+  },
+  "grout": {
+   "sale": "bag",
+   "size": 5,
+   "usd": 6.5
+  },
+  "paint": {
+   "sale": "gallon",
+   "size": 3.785,
+   "usd": 17
+  },
+  "paint_bucket": {
+   "sale": "bucket",
+   "size": 18.925,
+   "usd": 62
+  },
+  "primer": {
+   "sale": "gallon",
+   "size": 3.785,
+   "usd": 14
+  },
+  "putty": {
+   "sale": "bucket",
+   "size": 20,
+   "usd": 11
+  }
+ }
+}

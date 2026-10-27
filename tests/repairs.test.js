@@ -156,7 +156,30 @@ describe('3. a new project goes to the kind of work + measures, not to the finan
     await flush(60);
   };
 
-  it('"Partida simple" opens the work-type picker (Radier, Pintura, Tabiquería...), and only leaving the editor shows the finances', async () => {
+  it('a new project lands in the workspace: the first partida is open with the work-type picker (Radier, Pintura...) and the measures', async () => {
+    h = createHost(App);
+    await h.mount();
+    await create('Casa', 'quick');
+    expect(q('project-workspace')).not.toBeNull(); // the SPA, not the wizard
+    expect(q('wizard-back')).toBeNull();
+    expect(q('pv-back')).toBeNull();
+    expect(q('partida-0').open).toBe(true);
+    expect(h.host.textContent).toContain('Radier');
+    expect(h.host.textContent).toContain('Pintura');
+  });
+
+  it('"Trabajo completo" lands in the workspace with an empty list and "+ Agregar partida"', async () => {
+    h = createHost(App);
+    await h.mount();
+    await create('Edificio', 'project');
+    expect(q('project-workspace')).not.toBeNull();
+    expect(q('partida-add')).not.toBeNull();
+    await backToDashboard();
+    expect(h.host.querySelectorAll('[data-testid="project-card"]')).toHaveLength(1);
+  });
+
+  it('legacy flow (?workspace=0): "Partida simple" opens the work-type picker (Radier, Pintura, Tabiquería...), and only leaving the editor shows the finances', async () => {
+    localStorage.setItem('cp.flag.workspace', '0');
     h = createHost(App);
     await h.mount();
     await create('Casa', 'quick');
@@ -168,7 +191,8 @@ describe('3. a new project goes to the kind of work + measures, not to the finan
     expect(q('pv-back')).not.toBeNull();
   });
 
-  it('"Trabajo completo" opens the partidas list', async () => {
+  it('legacy flow (?workspace=0): "Trabajo completo" opens the partidas list', async () => {
+    localStorage.setItem('cp.flag.workspace', '0');
     h = createHost(App);
     await h.mount();
     await create('Edificio', 'project');
