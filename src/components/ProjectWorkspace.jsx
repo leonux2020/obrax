@@ -18,12 +18,12 @@ import { runExport } from '../lib/exportActions.js';
 import { warmPdfEngine } from '../lib/reportPdf.js';
 import { headerModel, initialWorkspaceState, partidaGroups, quoteLock, unlockQuote, withMarket, withPriceOverride, workspaceReducer } from '../lib/workspaceModel.js';
 import BottomSheet from './BottomSheet.jsx';
-import CashSheet from './CashSheet.jsx';
 import Logbook from './Logbook.jsx';
 import ReceiptSheet from './ReceiptSheet.jsx';
 import SignatureSheet from './SignatureSheet.jsx';
 import SnapGrid from './SnapGrid.jsx';
 import { Button } from './ui.jsx';
+import CashBlock from './workspace/CashBlock.jsx';
 import CrewBlock from './workspace/CrewBlock.jsx';
 import Dock from './workspace/Dock.jsx';
 import ExpensesBlock from './workspace/ExpensesBlock.jsx';
@@ -94,6 +94,12 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
     setDraft(unlockQuote);
     closeSheet();
     pushToast({ key: 'ws.unlocked', tone: 'ok' });
+  };
+
+  // ---- Caja: the header total / bar take the user to the payments accordion (Zone B) instead of a separate sheet ----------------
+  const openCash = () => {
+    dispatch({ type: 'toggle', id: 'cash', open: true });
+    setTimeout(() => document.querySelector('[data-testid="ws-cash"]')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' }), 60);
   };
 
   // ---- market of THIS project (the app's language stays as it is) --------------------------------------------------------------
@@ -174,13 +180,14 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
 
   return (
     <main className="mx-auto min-h-[100dvh] w-full max-w-3xl bg-black pb-40 text-[#E0E0E0]" data-testid="project-workspace" data-locked={locked || undefined}>
-      <HeaderZone project={project} model={model} title={title} client={projectClient(project)} region={region} offline={!online} onBack={onBack} onEdit={onEdit} onMarket={openMarket} onCash={() => dispatch({ type: 'sheet', name: 'cash' })} onUnlock={() => dispatch({ type: 'sheet', name: 'unlock' })} />
+      <HeaderZone project={project} model={model} title={title} client={projectClient(project)} region={region} offline={!online} onBack={onBack} onEdit={onEdit} onMarket={openMarket} onCash={openCash} onUnlock={() => dispatch({ type: 'sheet', name: 'unlock' })} />
 
       <div className="space-y-3 px-3 pt-3">
         <PartidaList draft={draft} groups={groups} open={ui.open} locked={Boolean(locked)} onBlocked={blocked} showErrors onToggle={toggle} onUpdate={updatePartida} onTask={changeTask} onAdd={addPartida} onRemove={removePartida} onPrice={openPrice} />
         <CrewBlock project={project} result={result} locked={Boolean(locked)} onBlocked={blocked} setDraft={setDraft} setProject={setProject} open={ui.open.crew} onToggle={toggle} />
         <MachineryBlock draft={draft} result={result} regionCode={regionCode} projectLocation={location} locked={Boolean(locked)} onBlocked={blocked} setDraft={setDraft} open={ui.open.machinery} onToggle={toggle} />
         <FinanceBlock draft={draft} locked={Boolean(locked)} onBlocked={blocked} setDraft={edit} open={ui.open.finance} onToggle={toggle} />
+        <CashBlock total={total} payments={project.payments} onChange={setList('payments')} open={ui.open.cash} onToggle={toggle} />
         <ExpensesBlock expenses={project.expenses} queued={queued} receipts={receipts} onChange={setList('expenses')} open={ui.open.expenses} onToggle={toggle} />
       </div>
 
@@ -237,7 +244,6 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
         </BottomSheet>
       )}
       {ui.sheet === 'scan' && <ReceiptSheet onSave={saveExpenses} onQueue={park} onClose={closeSheet} />}
-      {ui.sheet === 'cash' && <CashSheet total={total} payments={project.payments} onChange={setList('payments')} onClose={closeSheet} />}
     </main>
   );
 }

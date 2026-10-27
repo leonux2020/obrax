@@ -174,14 +174,32 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
           </>
         )}
 
-        <div className="grid grid-cols-2 gap-3 pt-1">
-          <Button variant="ghost" onClick={onClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button type="submit" disabled={badRange} data-testid="project-save">
-            {t(editing ? 'proj.save' : 'proj.create')}
-          </Button>
-        </div>
+        {editing ? (
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <Button variant="ghost" onClick={onClose}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" disabled={badRange} data-testid="project-save">
+              {t('proj.save')}
+            </Button>
+          </div>
+        ) : (
+          // the clear end of the form: one big OLED button (green border + lettering, black inside) that says "done, start"
+          <div className="space-y-2 pt-2">
+            <button
+              type="submit"
+              disabled={badRange}
+              data-testid="project-save"
+              className="flex min-h-[64px] w-full select-none items-center justify-center gap-2 rounded-2xl border-2 border-brand bg-black px-5 text-lg font-extrabold text-brand transition active:scale-[0.98] disabled:opacity-40"
+            >
+              {t('proj.create')}
+              <span aria-hidden="true">→</span>
+            </button>
+            <Button variant="ghost" className="w-full !min-h-[44px] text-sm" onClick={onClose}>
+              {t('common.cancel')}
+            </Button>
+          </div>
+        )}
         {editing && (
           <Button
             variant="danger"

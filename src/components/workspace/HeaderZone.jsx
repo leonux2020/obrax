@@ -2,11 +2,6 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { levelDetail } from '../levelStyle.js';
 import { locationLabel } from '../../lib/ledger.js';
 
-const Chevron = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M15 18l-6-6 6-6" />
-  </svg>
-);
 const Globe = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <circle cx="12" cy="12" r="9" />
@@ -49,8 +44,8 @@ export default function HeaderZone({ project, model, title, client, region, offl
   return (
     <header data-testid="ws-zone-a" className="sticky top-0 z-20 border-b border-white/10 bg-black px-3 pb-2 pt-2">
       <div className="flex items-center gap-2">
-        <button type="button" onClick={onBack} aria-label={t('common.back')} data-testid="ws-back" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 active:border-white/40">
-          <Chevron />
+        <button type="button" onClick={onBack} aria-label={t('common.back')} data-testid="ws-back" className="-ml-1 flex h-11 w-11 shrink-0 items-center justify-center text-3xl font-light leading-none text-[#E0E0E0] active:opacity-50">
+          <span aria-hidden="true">←</span>
         </button>
         <div className="min-w-0 flex-1">
           <h1 data-testid="ws-title" className="truncate text-xl font-extrabold leading-tight">
