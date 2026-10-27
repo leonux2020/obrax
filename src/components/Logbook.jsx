@@ -15,8 +15,10 @@ const Icon = ({ children, size = 24 }) => (
  * Bitácora con dictado por voz (Web Speech API): the microphone icon starts/stops the dictation, the words appear in the
  * text area WHILE you speak and, when the dictation ends, the note is saved by itself into the project (IndexedDB, through
  * the usual persistence of the open project). Typing and the "Guardar nota" button keep working.
+ * `showList={false}`: only the capture part (the workspace shows the notes in its own accordion); `onSaved` runs after a note
+ * has been added.
  */
-export default function Logbook({ entries, onChange }) {
+export default function Logbook({ entries, onChange, showList = true, onSaved }) {
   const { t, lang, locale } = useI18n();
   const [text, setText] = useState('');
   const [listening, setListening] = useState(false);
@@ -27,8 +29,10 @@ export default function Logbook({ entries, onChange }) {
   const textRef = useRef('');
   const entriesRef = useRef(entries);
   const changeRef = useRef(onChange);
+  const savedRef = useRef(onSaved);
   entriesRef.current = entries;
   changeRef.current = onChange;
+  savedRef.current = onSaved;
   textRef.current = text;
 
   const commit = (raw) => {
@@ -37,6 +41,7 @@ export default function Logbook({ entries, onChange }) {
     changeRef.current([{ id: newEntryId(), at: Date.now(), text: clean }, ...entriesRef.current].slice(0, LEDGER_LIMITS.logbook));
     setText('');
     textRef.current = '';
+    savedRef.current?.();
     return true;
   };
   const save = () => {
@@ -82,7 +87,7 @@ export default function Logbook({ entries, onChange }) {
   const stamp = (ms) => (ms ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(ms)) : '');
   return (
     <div className="space-y-3">
-      {entries.length > 0 && (
+      {showList && entries.length > 0 && (
         <ul className="space-y-2" data-testid="log-list">
           {entries.map((e) => (
             <li key={e.id} className="rounded-xl border border-white/10 px-4 py-3">

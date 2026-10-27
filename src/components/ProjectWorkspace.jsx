@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { useMarketClock } from '../lib/marketClock.js';
 import { computeAll } from '../lib/engine.js';
@@ -29,6 +29,7 @@ import Dock from './workspace/Dock.jsx';
 import ExpensesBlock from './workspace/ExpensesBlock.jsx';
 import ExportSheet from './workspace/ExportSheet.jsx';
 import FinanceBlock from './workspace/FinanceBlock.jsx';
+import LogBlock from './workspace/LogBlock.jsx';
 import HeaderZone from './workspace/HeaderZone.jsx';
 import MachineryBlock from './workspace/MachineryBlock.jsx';
 import SupplierPad from './workspace/SupplierPad.jsx';
@@ -101,6 +102,19 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
     dispatch({ type: 'toggle', id: 'cash', open: true });
     setTimeout(() => document.querySelector('[data-testid="ws-cash"]')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' }), 60);
   };
+
+  // ---- Bitácora: a NEW note (dictated from the dock or typed) opens its accordion by itself, as the visual confirmation ----------------
+  const newestNote = project.logbook[0]?.id ?? '';
+  const noteCount = project.logbook.length;
+  const seenNotes = useRef({ id: newestNote, count: noteCount });
+  useEffect(() => {
+    const seen = seenNotes.current;
+    seenNotes.current = { id: newestNote, count: noteCount };
+    if (newestNote && newestNote !== seen.id && noteCount > seen.count) {
+      dispatch({ type: 'toggle', id: 'log', open: true });
+      setTimeout(() => document.querySelector('[data-testid="ws-log"]')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' }), 60);
+    }
+  }, [newestNote, noteCount]);
 
   // ---- market of THIS project (the app's language stays as it is) --------------------------------------------------------------
   const openMarket = () => (locked ? blocked() : dispatch({ type: 'sheet', name: 'market' }));
@@ -188,6 +202,7 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
         <MachineryBlock draft={draft} result={result} regionCode={regionCode} projectLocation={location} locked={Boolean(locked)} onBlocked={blocked} setDraft={setDraft} open={ui.open.machinery} onToggle={toggle} />
         <FinanceBlock draft={draft} locked={Boolean(locked)} onBlocked={blocked} setDraft={edit} open={ui.open.finance} onToggle={toggle} />
         <CashBlock total={total} payments={project.payments} onChange={setList('payments')} open={ui.open.cash} onToggle={toggle} />
+        <LogBlock entries={project.logbook} onChange={setList('logbook')} open={ui.open.log} onToggle={toggle} />
         <ExpensesBlock expenses={project.expenses} queued={queued} receipts={receipts} onChange={setList('expenses')} open={ui.open.expenses} onToggle={toggle} />
       </div>
 
@@ -232,7 +247,7 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
       {ui.sheet === 'log' && (
         <BottomSheet title={t('log.title')} onClose={closeSheet}>
           <div className="mt-3">
-            <Logbook entries={project.logbook} onChange={setList('logbook')} />
+            <Logbook entries={project.logbook} onChange={setList('logbook')} showList={false} onSaved={closeSheet} />
           </div>
         </BottomSheet>
       )}
