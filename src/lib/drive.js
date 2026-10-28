@@ -189,5 +189,84 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
     return old ?? null;
   }
 
-  return { findFolder, ensureFolder, saveBackup, latestBackup, peekBackup, forgetFolder: () => { folderId = null; } };
+  // ---- structured export (human-readable expediente): nested folders and plain files -------------------------------------------------
+  // Folder ids are cached ("parent/name" -> id) and a lookup / creation in flight is shared, so the "Proyectos" folder is asked for ONCE
+  // however many photos go up in parallel.
+  const childIds = new Map();
+  const childInflight = new Map();
+  const esc = (v) => String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); // Drive query strings: \ and ' are escaped
+
+  /** The folder `name` inside `parentId`, created when missing (never twice, even with parallel calls). */
+  function ensureChildFolder(parentId, name) {
+    const key = `${parentId}/${name}`;
+    if (childIds.has(key)) return Promise.resolve(childIds.get(key));
+    if (!childInflight.has(key)) {
+      const job = (async () => {
+        const [found] = await list(`mimeType='${FOLDER_MIME}' and name='${esc(name)}' and '${parentId}' in parents and trashed=false`, 'files(id,name)');
+        let id = found?.id;
+        if (!id) {
+          const created = await json(`${API}/files?fields=id`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, mimeType: FOLDER_MIME, parents: [parentId] }),
+          });
+          if (!ID_RE.test(String(created?.id))) throw new DriveError('bad_response');
+          id = created.id;
+        }
+        childIds.set(key, id);
+        return id;
+      })().finally(() => childInflight.delete(key));
+      childInflight.set(key, job);
+    }
+    return childInflight.get(key);
+  }
+
+  /** "CUBRAX - Respaldos Obra" -> ...names. Resolves the id of the last folder (every level is looked up once, then cached). */
+  async function ensureFolderPath(names) {
+    let id = await ensureFolder();
+    for (const name of names) id = await ensureChildFolder(id, name);
+    return id;
+  }
+
+  /** The plain files inside a folder as Map(name -> { id, size }) (all pages: one query per hundreds of files, not one per file). */
+  async function listFiles(parentId) {
+    const out = new Map();
+    let pageToken = '';
+    for (let page = 0; page < 20; page += 1) {
+      const params = new URLSearchParams({ q: `'${parentId}' in parents and mimeType!='${FOLDER_MIME}' and trashed=false`, fields: 'nextPageToken,files(id,name,size)', spaces: 'drive', pageSize: '1000' });
+      if (pageToken) params.set('pageToken', pageToken);
+      const data = await json(`${API}/files?${params}`);
+      for (const f of Array.isArray(data?.files) ? data.files : []) if (ID_RE.test(String(f?.id)) && !out.has(f.name)) out.set(f.name, { id: f.id, size: Number(f.size) || 0 });
+      pageToken = data?.nextPageToken || '';
+      if (!pageToken) break;
+    }
+    return out;
+  }
+
+  /** Create (or overwrite, when `existingId` is given) a binary file. `bytes` is a Uint8Array. Resolves { id }. */
+  async function uploadFile(parentId, { name, mimeType = 'application/octet-stream', bytes, existingId = '' }) {
+    if (existingId) {
+      const res = await json(`${UPLOAD}/files/${existingId}?uploadType=media&fields=id`, { method: 'PATCH', headers: { 'Content-Type': mimeType }, body: bytes });
+      return { id: res?.id ?? existingId };
+    }
+    const boundary = `cubrax${Math.random().toString(36).slice(2)}`;
+    const enc = new TextEncoder();
+    const head = enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name, parents: [parentId], mimeType })}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`);
+    const tail = enc.encode(`\r\n--${boundary}--`);
+    const body = new Uint8Array(head.length + bytes.length + tail.length);
+    body.set(head, 0);
+    body.set(bytes, head.length);
+    body.set(tail, head.length + bytes.length);
+    const res = await json(`${UPLOAD}/files?uploadType=multipart&fields=id`, { method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body });
+    if (!ID_RE.test(String(res?.id))) throw new DriveError('bad_response');
+    return { id: res.id };
+  }
+
+  /** A cached folder was deleted from Drive (404): forget every cached id so the next try looks them up again. */
+  const forgetFolders = () => {
+    folderId = null;
+    childIds.clear();
+  };
+
+  return { findFolder, ensureFolder, ensureChildFolder, ensureFolderPath, listFiles, uploadFile, forgetFolders, saveBackup, latestBackup, peekBackup, forgetFolder: () => { folderId = null; } };
 }

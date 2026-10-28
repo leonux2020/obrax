@@ -11,7 +11,11 @@ export function createFakeDrive({ token: initialToken = 'tok-valid-123456' } = {
 
   const fetchImpl = async (url, init = {}) => {
     const method = init.method || 'GET';
-    calls.push({ method, url: String(url), body: init.body });
+    // binary bodies (Uint8Array) are kept byte for byte as a latin1 string: `size` is then the real number of bytes
+    const raw = init.body;
+    const text = raw instanceof Uint8Array ? new TextDecoder('latin1').decode(raw) : raw;
+    init = { ...init, body: text };
+    calls.push({ method, url: String(url), body: text });
     if (state.offline) throw new TypeError('Failed to fetch');
     if (state.failNext > 0) {
       state.failNext -= 1;
@@ -24,13 +28,14 @@ export function createFakeDrive({ token: initialToken = 'tok-valid-123456' } = {
 
     if (method === 'GET' && u.pathname === '/drive/v3/files') {
       const q = u.searchParams.get('q') || '';
-      const name = /name='([^']+)'/.exec(q)?.[1];
+      const name = /name='((?:[^'\\]|\\.)*)'/.exec(q)?.[1]?.replace(/\\(.)/g, '$1');
       const parent = /'([^']+)' in parents/.exec(q)?.[1];
-      const isFolder = q.includes('google-apps.folder');
+      const notFolder = q.includes('mimeType!=');
+      const isFolder = !notFolder && q.includes('google-apps.folder');
       const out = [...files.values()]
         .filter((f) => (!name || f.name === name) && (!parent || f.parents.includes(parent)) && (isFolder ? f.mimeType.includes('folder') : !f.mimeType.includes('folder')))
         .sort((a, b) => b.modifiedTime - a.modifiedTime)
-        .map(({ id: fid, name: nm, modifiedTime }) => ({ id: fid, name: nm, modifiedTime: new Date(modifiedTime).toISOString() }));
+        .map(({ id: fid, name: nm, modifiedTime, body }) => ({ id: fid, name: nm, size: String(String(body ?? '').length), modifiedTime: new Date(modifiedTime).toISOString() }));
       return res({ files: out });
     }
     if (method === 'POST' && u.pathname === '/drive/v3/files') {

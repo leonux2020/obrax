@@ -3,7 +3,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { useMarketClock } from '../lib/marketClock.js';
 import { computeAll } from '../lib/engine.js';
 import { freezeSignature, pricingTime, planningTimeline } from '../lib/signature.js';
-import { LEDGER_LIMITS, cashSummary, liquidity } from '../lib/ledger.js';
+import { LEDGER_LIMITS, cashSummary, liquidity, newEntryId } from '../lib/ledger.js';
 import { MAX_PARTIDAS, newPartida } from '../lib/draft.js';
 import { TASKS, defaultDims } from '../lib/tasks.js';
 import { projectClient, projectTitle } from '../lib/projects.js';
@@ -14,12 +14,13 @@ import { useAiAccess } from '../lib/usePro.js';
 import { useOnline } from '../lib/useOnline.js';
 import { useProjectBook, usePriceFeed } from '../lib/usePrices.js';
 import { pushToast } from '../lib/notify.js';
-import { runExport } from '../lib/exportActions.js';
+import { buildDossierDocuments, runExport } from '../lib/exportActions.js';
 import { warmPdfEngine } from '../lib/reportPdf.js';
 import { headerModel, initialWorkspaceState, partidaGroups, quoteLock, unlockQuote, withMarket, withPriceOverride, workspaceReducer } from '../lib/workspaceModel.js';
 import BottomSheet from './BottomSheet.jsx';
 import Logbook from './Logbook.jsx';
 import { notePhotosFor } from '../lib/notePhotos.js';
+import { receiptPhotosFor } from '../lib/receiptPhotos.js';
 import ReceiptSheet from './ReceiptSheet.jsx';
 import SignatureSheet from './SignatureSheet.jsx';
 import SnapGrid from './SnapGrid.jsx';
@@ -50,7 +51,7 @@ import PartidaList from './workspace/PartidaList.jsx';
  * Locked (PDF generated or client signature): Zone B is read-only and a tap answers "Precios bloqueados" until the user
  * unlocks it. Offline-first: nothing here needs the network (see the receipt queue, the base catalog and Blob photos).
  */
-export default function ProjectWorkspace({ project, setProject, setDraft, photos, setPhotos, company, receipts, enqueueReceipt, onBack, onEdit, onPro }) {
+export default function ProjectWorkspace({ project, setProject, setDraft, photos, setPhotos, company, receipts, enqueueReceipt, onBack, onEdit, onPro, onSyncDossier = null, dossierBusy = false }) {
   const i18n = useI18n();
   const { t, region } = i18n;
   const draft = project.draft;
@@ -162,6 +163,8 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
       pushToast({ key: 'ws.export.error', tone: 'warn' });
     }
   };
+  // "Sincronizar Expediente a Drive": hands the App the way to build the documents; everything else runs in the background
+  const syncDossier = () => onSyncDossier(project.id, () => buildDossierDocuments({ project, result, total, company, photos, i18n }));
   /** "PDF Cliente" asks for the signature first; the other documents go straight out. */
   const exportDoc = (kind) => {
     if (kind === 'client' && !draft.signature) {
@@ -186,8 +189,19 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
   // ---- dock + the rest ----------------------------------------------------------------------------------------------------------------
   const openDock = (name) => (name === 'scan' && !aiAccess ? onPro('ai') : dispatch({ type: 'sheet', name }));
   const setList = (key) => (list) => setProject((p) => ({ ...p, [key]: list }));
-  const saveExpenses = (list) => {
-    setProject((p) => ({ ...p, expenses: [...list, ...p.expenses].slice(0, LEDGER_LIMITS.expenses) }));
+  const saveExpenses = async (list, extra = {}) => {
+    let lines = list;
+    if (extra.image) {
+      // the receipt photo stays on the device (Blob) and its lines point at it: the expediente puts it in "Comprobantes"
+      const receiptId = newEntryId();
+      try {
+        await receiptPhotosFor(project.id).put(receiptId, { ...extra.image, at: Date.now() });
+        lines = list.map((e) => ({ ...e, receiptId }));
+      } catch {
+        /* a photo that cannot be kept never blocks the expenses */
+      }
+    }
+    setProject((p) => ({ ...p, expenses: [...lines, ...p.expenses].slice(0, LEDGER_LIMITS.expenses) }));
     closeSheet();
   };
   const park = (image) => enqueueReceipt({ projectId: project.id, image, regionCode, currency: region.currency, lang: i18n.lang });
@@ -243,7 +257,7 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
         </BottomSheet>
       )}
       {ui.sheet === 'market' && <MarketSheet current={regionCode} onChange={changeMarket} onClose={closeSheet} />}
-      {ui.sheet === 'export' && <ExportSheet canPdf={result.valid} onExport={exportDoc} onClose={closeSheet} />}
+      {ui.sheet === 'export' && <ExportSheet canPdf={result.valid} onExport={exportDoc} onSync={onSyncDossier ? syncDossier : null} syncing={dossierBusy} onClose={closeSheet} />}
       {ui.sheet === 'sign' && <SignatureSheet total={total} pricedAt={priceTime} onSave={onSign} onSkip={onSkipSign} skipLabel={t('ws.sign.skip')} onClose={closeSheet} />}
       {ui.sheet === 'log' && (
         <BottomSheet title={t('log.title')} onClose={closeSheet}>

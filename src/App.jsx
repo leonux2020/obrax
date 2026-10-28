@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { emptySlots } from './lib/photos.js';
 import { migrateLegacyPhotos, photoStoreFor } from './lib/photoStore.js';
 import { notePhotosFor, readNotePhotos } from './lib/notePhotos.js';
+import { receiptPhotosFor } from './lib/receiptPhotos.js';
 import { projectStore } from './lib/projectStore.js';
 import { logoStore } from './lib/companyStore.js';
 import { hasIndexedDb } from './lib/db.js';
@@ -49,7 +50,8 @@ import PostMortem from './components/PostMortem.jsx';
 import { useHistoryBack } from './lib/useHistoryBack.js';
 import ToastHost from './components/workspace/ToastHost.jsx';
 import { workspaceEnabled } from './lib/flags.js';
-import { askNotifyPermission, pushToast, systemNotify } from './lib/notify.js';
+import { askNotifyPermission, pushToast, systemNotify, updateToast } from './lib/notify.js';
+import { collectDossierImages, syncDossier } from './lib/driveExport.js';
 import { receiptQueue } from './lib/receiptQueue.js';
 import { addExpenses, registerBackgroundSync } from './lib/receiptSync.js';
 import { useReceiptSync } from './lib/useReceiptSync.js';
@@ -324,9 +326,18 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   // ---- deferred receipts (offline scanner) ---------------------------------------------------------------------
   // A receipt photographed without a connection waits in IndexedDB (receiptQueue). This global sync sends it to the AI
   // proxy when the network is back, writes the tabulated expenses into ITS project (open or not) and tells the user.
-  const applyReceipt = useCallback(async (projectId, expenses) => {
+  const applyReceipt = useCallback(async (projectId, expenses, row) => {
     const target = projectsRef.current.find((p) => p.id === projectId);
     if (!target) return false; // the project was deleted meanwhile
+    if (row?.blob) {
+      // the queued photo is kept with its lines (Comprobantes of the expediente) before the queue row is dropped
+      try {
+        await receiptPhotosFor(projectId).put(row.id, { blob: row.blob, at: row.createdAt });
+        expenses = expenses.map((e) => ({ ...e, receiptId: row.id }));
+      } catch {
+        /* the expenses matter more than the picture */
+      }
+    }
     const next = addExpenses(target, expenses);
     projectsRef.current = projectsRef.current.map((p) => (p.id === projectId ? next : p)); // two receipts in a row stack up
     setProjects((list) => list.map((p) => (p.id === projectId ? addExpenses(p, expenses) : p)));
@@ -461,6 +472,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     projectStore.remove(id).catch(() => {});
     photoStoreFor(id).clear().catch(() => {});
     notePhotosFor(id).clear().catch(() => {}); // the photos of its logbook notes go with it
+    receiptPhotosFor(id).clear().catch(() => {}); // and the pictures of its receipts
     receiptQueue.removeProject(id).catch(() => {});
     setProjects((list) => list.filter((p) => p.id !== id));
     if (activeRef.current?.id === id) {
@@ -541,6 +553,56 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
       return { ok: true };
     },
     [sync, onSignedOut]
+  );
+
+  // ---- "Sincronizar Expediente a Drive" -----------------------------------------------------------------------
+  // Proyectos/<name>/ with the PDF + Excel, "Fotos Obra" and "Comprobantes". Runs in the background (async, never blocks the screen):
+  // a toast says "Sincronizando expediente en Drive..." while the user keeps working, then turns into the result.
+  const [dossierBusy, setDossierBusy] = useState([]); // ids of the projects being synced
+  const dossierRunning = useRef(new Set());
+  const syncExpediente = useCallback(
+    (projectId, buildDocuments) => {
+      if (dossierRunning.current.has(projectId)) return { started: false, reason: 'busy' };
+      if (!googleConfigured) {
+        pushToast({ key: 'setup.drive.err.not_configured', tone: 'amber', ms: 6000 });
+        return { started: false, reason: 'not_configured' };
+      }
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        pushToast({ key: 'dossier.err.offline', tone: 'amber', ms: 6000 });
+        return { started: false, reason: 'offline' };
+      }
+      dossierRunning.current.add(projectId);
+      setDossierBusy([...dossierRunning.current]);
+      const toastId = pushToast({ key: 'dossier.syncing', tone: 'info', ms: 0 });
+      const finish = (patch) => {
+        if (!updateToast(toastId, patch)) pushToast(patch); // the user may have tapped the toast away: say the result anyway
+      };
+      (async () => {
+        try {
+          const token = await ensureDriveToken({ interactive: true, hint: userRef.current?.email || '' }); // a tap: the consent may open
+          if (!token) throw Object.assign(new Error('auth'), { code: 'auth' });
+          const project = projectsRef.current.find((p) => p.id === projectId);
+          if (!project) throw new Error('gone');
+          const images = await collectDossierImages(project, {
+            cameraPhotos: () => photoStoreFor(projectId).load().catch(() => []),
+            notePhoto: (noteId) => notePhotosFor(projectId).get(noteId),
+            receiptPhoto: (receiptId) => receiptPhotosFor(projectId).get(receiptId),
+          });
+          const title = projectTitle(project) || makeI18n(settings.lang, settings.region).t('proj.untitled');
+          const stats = await syncDossier({ client: driveClient, title, documents: buildDocuments, images });
+          setLinkedNow(true);
+          finish(stats.failed ? { key: 'dossier.partial', params: { n: stats.failed }, tone: 'amber', ms: 8000 } : { key: 'dossier.done', tone: 'ok', ms: 6000 });
+        } catch (err) {
+          const code = err?.code;
+          finish({ key: code === 'offline' ? 'dossier.err.offline' : code === 'auth' ? 'dossier.err.auth' : code === 'quota' ? 'dossier.err.quota' : 'dossier.err', tone: 'amber', ms: 7000 });
+        } finally {
+          dossierRunning.current.delete(projectId);
+          setDossierBusy([...dossierRunning.current]);
+        }
+      })();
+      return { started: true };
+    },
+    [driveClient, settings.lang, settings.region]
   );
 
   // ---- restore from Drive --------------------------------------------------------------------------------------
@@ -706,6 +768,8 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
                   company={projectCompany(active, company)}
                   receipts={receipts}
                   enqueueReceipt={enqueueReceipt}
+                  onSyncDossier={syncExpediente}
+                  dossierBusy={dossierBusy.includes(active.id)}
                   onBack={closeProject}
                   onEdit={() => setSheet({ type: 'edit', id: active.id })}
                   onPro={openPaywall}

@@ -29,6 +29,14 @@ export function pushToast({ key, params, tone = 'info', ms = 3500 }) {
   if (ms > 0) setTimeout(() => dismissToast(id), ms);
   return id;
 }
+/** Change a toast that is already on screen (same place, new text / tone). A new `ms` re-arms its auto-dismiss; 0 keeps it. Returns false when it is gone. */
+export function updateToast(id, { key, params, tone, ms = 3500 }) {
+  if (!toasts.some((x) => x.id === id)) return false;
+  toasts = toasts.map((x) => (x.id === id ? { ...x, key, params, tone: tone ?? x.tone } : x));
+  emit();
+  if (ms > 0) setTimeout(() => dismissToast(id), ms);
+  return true;
+}
 export const resetToasts = () => {
   toasts = [];
   emit();

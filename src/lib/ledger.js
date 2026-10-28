@@ -60,6 +60,8 @@ export const normalizeAdvances = (raw) =>
     return a === null || !worker ? null : { id: idOf(p.id, used), worker, amount: a, at: stamp(p.at) };
   });
 
+const RECEIPT_ID_RE = /^[a-z0-9]{4,24}$/;
+
 export const normalizeExpenses = (raw) =>
   listOf(raw, LEDGER_LIMITS.expenses, (p, used) => {
     const a = amount(p.amount);
@@ -76,6 +78,8 @@ export const normalizeExpenses = (raw) =>
       // only rented tools / machinery have a day to give them back
       returnDate: rental ? day(p.returnDate) : '',
       returned: rental && p.returned === true,
+      // the photo of the receipt these lines came from (a Blob in IndexedDB, see receiptPhotos.js); several lines can share one
+      ...(typeof p.receiptId === 'string' && RECEIPT_ID_RE.test(p.receiptId) ? { receiptId: p.receiptId } : {}),
     };
   });
 

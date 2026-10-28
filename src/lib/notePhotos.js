@@ -9,8 +9,10 @@ import { PHOTO_LIMITS, PhotoError, compressImage } from './photos.js';
 import { STORE_PHOTOS, createRunner, hasIndexedDb } from './db.js';
 import { blobToDataUrl, dataUrlToBlob, hasBlob, isBlob } from './blobs.js';
 
-const scope = (projectId) => `${projectId}#notes`;
-const keyOf = (projectId, noteId) => `${projectId}:note:${noteId}`;
+// `kind`: 'notes' (photos of logbook notes) or 'receipts' (photos of the receipts behind the expenses, see receiptPhotos.js):
+// the same store, each one in its own scope so no screen ever reads the other's rows.
+const scope = (projectId, kind = 'notes') => `${projectId}#${kind}`;
+const keyOf = (projectId, noteId, kind = 'notes') => `${projectId}:${kind === 'notes' ? 'note' : 'receipt'}:${noteId}`;
 
 /** A clean { blob, width, height, at } or null. Accepts what the compressor returns ({ dataUrl, width, height }) or a Blob row. */
 export function normalizeNotePhoto(input) {
@@ -44,17 +46,17 @@ export function memoryNoteBackend() {
 }
 
 /** IndexedDB backend of ONE project's note photos. */
-export function idbNoteBackend(factory, projectId) {
+export function idbNoteBackend(factory, projectId, kind = 'notes') {
   const run = createRunner(factory);
-  const mine = (row) => row && row.projectId === scope(projectId);
+  const mine = (row) => row && row.projectId === scope(projectId, kind);
   return {
     kind: 'indexeddb',
     async get(noteId) {
-      const row = await run(STORE_PHOTOS, 'readonly', (s) => s.get(keyOf(projectId, noteId)));
+      const row = await run(STORE_PHOTOS, 'readonly', (s) => s.get(keyOf(projectId, noteId, kind)));
       return mine(row) ? row : null;
     },
-    put: (noteId, photo) => run(STORE_PHOTOS, 'readwrite', (s) => s.put({ ...photo, key: keyOf(projectId, noteId), projectId: scope(projectId), noteId })),
-    remove: (noteId) => run(STORE_PHOTOS, 'readwrite', (s) => s.delete(keyOf(projectId, noteId))),
+    put: (noteId, photo) => run(STORE_PHOTOS, 'readwrite', (s) => s.put({ ...photo, key: keyOf(projectId, noteId, kind), projectId: scope(projectId, kind), noteId })),
+    remove: (noteId) => run(STORE_PHOTOS, 'readwrite', (s) => s.delete(keyOf(projectId, noteId, kind))),
     clear: () =>
       run(STORE_PHOTOS, 'readwrite', (s) => {
         const all = s.getAll();
@@ -65,7 +67,7 @@ export function idbNoteBackend(factory, projectId) {
 }
 
 /** Store of the note photos of one project, with graceful fallback to memory (same pattern as photoStore.js). */
-export function createNotePhotoStore(primary = null) {
+export function createNotePhotoStore(primary = null, normalize = normalizeNotePhoto) {
   const fallback = memoryNoteBackend();
   let backend = primary || fallback;
   const pending = new Map(); // written to the screen at once, to disk a moment later: reads never miss it
@@ -84,7 +86,7 @@ export function createNotePhotoStore(primary = null) {
     },
     /** Saves the photo of a note. Rejects when the picture is not a valid image Blob. */
     async put(noteId, photo) {
-      const clean = normalizeNotePhoto(photo);
+      const clean = normalize(photo);
       if (!clean) throw new Error('invalid note photo');
       pending.set(noteId, clean);
       try {
@@ -98,7 +100,7 @@ export function createNotePhotoStore(primary = null) {
     async get(noteId) {
       if (pending.has(noteId)) return pending.get(noteId);
       const row = await guard('get', noteId);
-      return row ? normalizeNotePhoto(row) : null;
+      return row ? normalize(row) : null;
     },
     remove: (noteId) => guard('remove', noteId),
     clear: () => guard('clear'),
