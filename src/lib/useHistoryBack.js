@@ -12,9 +12,9 @@ import { useEffect, useRef } from 'react';
 const KEY = 'cubraxProject';
 const SELF_POP_MS = 600; // a popstate this soon after our own history.back() is that very pop
 
-const marker = () => {
+const marker = (key = KEY) => {
   try {
-    return window.history.state?.[KEY] ?? null;
+    return window.history.state?.[key] ?? null;
   } catch {
     return null;
   }
@@ -23,8 +23,10 @@ const marker = () => {
 /**
  * @param activeId  id of the open project, or null at the Dashboard
  * @param onLeave   called when the device's back button is pressed while a project is open
+ * @param key       history-state marker; the default is the project one. A sheet / modal that must close with the device's back
+ *                  button uses its own key (`useHistoryBack(open ? 'sheet' : null, close, 'cubraxSheet')`), so it never collides
  */
-export function useHistoryBack(activeId, onLeave) {
+export function useHistoryBack(activeId, onLeave, key = KEY) {
   const leave = useRef(onLeave);
   const active = useRef(activeId);
   const pushed = useRef(false); // true while the entry WE pushed is on top of the history
@@ -34,7 +36,7 @@ export function useHistoryBack(activeId, onLeave) {
 
   // a reload keeps window.history.state: the app starts at the Dashboard, so a stale marker is cleared (never "back" out of the app)
   useEffect(() => {
-    if (marker()) window.history.replaceState(null, '');
+    if (marker(key)) window.history.replaceState(null, '');
   }, []);
 
   useEffect(() => {
@@ -52,16 +54,16 @@ export function useHistoryBack(activeId, onLeave) {
 
   useEffect(() => {
     if (activeId) {
-      if (marker() === activeId) {
+      if (marker(key) === activeId) {
         pushed.current = true;
-      } else if (marker()) {
-        window.history.replaceState({ [KEY]: activeId }, ''); // another project from inside one: same entry
+      } else if (marker(key)) {
+        window.history.replaceState({ [key]: activeId }, ''); // another project from inside one: same entry
         pushed.current = true;
       } else {
-        window.history.pushState({ [KEY]: activeId }, '');
+        window.history.pushState({ [key]: activeId }, '');
         pushed.current = true;
       }
-    } else if (pushed.current && marker()) {
+    } else if (pushed.current && marker(key)) {
       pushed.current = false;
       selfPop.current = Date.now() + SELF_POP_MS;
       window.history.back(); // the app closed the project: drop the entry it had pushed

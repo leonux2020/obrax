@@ -278,3 +278,36 @@ export function projectDateRange(project, locale = 'es') {
   if (created > 0) return { kind: 'created', text: fmt(new Date(created), dmy) };
   return { kind: 'none', text: '' };
 }
+
+/** Per currency, over the ACTIVE projects, every figure of the breakdown sheet: received, spent, advanced, liquid, tax, receivable. */
+export function globalBreakdown(projects, budgets) {
+  const lines = new Map();
+  for (const p of arr(projects)) {
+    if (!isActiveProject(p)) continue;
+    const { currency, regionCode } = projectMarket(p);
+    if (!currency) continue;
+    const line = lines.get(currency) ?? { currency, regionCode, received: 0, spent: 0, advanced: 0, liquid: 0, tax: 0, receivable: 0 };
+    line.received = cents(line.received + total(p.payments));
+    line.spent = cents(line.spent + total(p.expenses));
+    line.advanced = cents(line.advanced + total(p.advances));
+    line.liquid = cents(line.received - line.spent - line.advanced);
+    line.tax = cents(line.tax + projectTaxReserve(p));
+    line.receivable = cents(line.receivable + projectReceivable(p, budgets?.get?.(p.id)));
+    lines.set(currency, line);
+  }
+  return [...lines.values()].sort((a, b) => a.currency.localeCompare(b.currency));
+}
+
+/** Active projects with a balance still to collect: [{ id, currency, regionCode, pending, late }] - late ones first, then by amount. */
+export function receivableList(projects, budgets, now = Date.now(), limit = 15) {
+  return arr(projects)
+    .map((p) => ({ id: p.id, ...projectMarket(p), pending: isActiveProject(p) ? projectReceivable(p, budgets?.get?.(p.id)) : 0, late: collectionDelay(p, budgets?.get?.(p.id), now, limit) }))
+    .filter((x) => x.pending > 0 && x.currency)
+    .sort((a, b) => b.late - a.late || b.pending - a.pending);
+}
+
+/** Short name of the tax of the active projects ("IVA", "VAT"...): the common one, or '' when the markets use different names. */
+export function globalTaxLabel(projects) {
+  const names = new Set(arr(projects).filter(isActiveProject).map((p) => getRegion(p?.draft?.regionCode)?.taxName).filter(Boolean));
+  return names.size === 1 ? [...names][0] : '';
+}

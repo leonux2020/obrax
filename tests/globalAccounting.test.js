@@ -16,6 +16,9 @@ import {
   taxIncluded,
   projectTaxReserve,
   globalLiquidity,
+  globalBreakdown,
+  receivableList,
+  globalTaxLabel,
   globalTaxReserve,
   globalReceivables,
   collectionDelay,
@@ -186,6 +189,47 @@ describe('Rango de fechas y formato', () => {
   });
 });
 
+describe('Desglose global (funciones puras)', () => {
+  const a = mk('CL', { payments: [pay(119000, ago(2))], expenses: [{ id: 'e', amount: 30000, at: ago(1) }], advances: [{ id: 'v', amount: 9000, at: ago(1) }] });
+  const b = mk('ES', { payments: [pay(121, ago(2))] });
+  const budgets = new Map([[a.id, 200000], [b.id, 0]]);
+
+  it('cada cifra del desglose coincide con las funciones globales y la fórmula (+) − − = ', () => {
+    const rows = globalBreakdown([a, b], budgets);
+    const cl = rows.find((x) => x.currency === 'CLP');
+    expect(cl).toMatchObject({ received: 119000, spent: 30000, advanced: 9000, liquid: 80000, tax: 19000, receivable: 81000 });
+    expect(cl.liquid).toBe(cl.received - cl.spent - cl.advanced);
+    expect(rows.map((x) => ({ currency: x.currency, regionCode: x.regionCode, amount: x.liquid }))).toEqual(globalLiquidity([a, b]));
+    expect(rows.map((x) => ({ currency: x.currency, regionCode: x.regionCode, amount: x.tax }))).toEqual(globalTaxReserve([a, b]));
+    expect(rows.map((x) => ({ currency: x.currency, regionCode: x.regionCode, amount: x.receivable }))).toEqual(globalReceivables([a, b], budgets));
+  });
+
+  it('vacío o sin lista no falla', () => {
+    expect(globalBreakdown([], undefined)).toEqual([]);
+    expect(globalBreakdown(undefined, undefined)).toEqual([]);
+    expect(globalBreakdown([mk('CL')], undefined)).toEqual([{ currency: 'CLP', regionCode: 'CL', received: 0, spent: 0, advanced: 0, liquid: 0, tax: 0, receivable: 0 }]);
+  });
+
+  it('lista de por cobrar: solo activas con saldo, las atrasadas primero y luego por monto', () => {
+    const late = mk('CL', { payments: [pay(10, ago(30))] });
+    const big = mk('CL', { payments: [pay(10, ago(1))] });
+    const small = mk('CL', { payments: [pay(10, ago(1))] });
+    const paid = mk('CL', { payments: [pay(1000, ago(1))] });
+    const closed = mk('CL', { closedAt: ago(1) });
+    const bud = new Map([[late.id, 500], [big.id, 9000], [small.id, 100], [paid.id, 1000], [closed.id, 5000]]);
+    expect(receivableList([small, closed, paid, big, late], bud, NOW).map((x) => x.id)).toEqual([late.id, big.id, small.id]);
+    expect(receivableList([late], bud, NOW)[0]).toMatchObject({ pending: 490, late: 30, currency: 'CLP' });
+    expect(receivableList([], undefined)).toEqual([]);
+  });
+
+  it('identificador tributario: el del país (IVA, VAT...) o vacío si los mercados difieren', () => {
+    expect(globalTaxLabel([mk('CL'), mk('ES'), mk('MX')])).toBe('IVA');
+    expect(globalTaxLabel([mk('CL', { closedAt: ago(1) }), mk('ES')])).toBe('IVA');
+    expect(globalTaxLabel([mk('CL'), mk('GB')])).toBe('');
+    expect(globalTaxLabel([])).toBe('');
+  });
+});
+
 describe('No hay migración de esquema', () => {
   it('IndexedDB sigue en v5', () => {
     expect(DB_VERSION).toBe(5);
@@ -197,6 +241,12 @@ describe('Vista Contabilidad Global', () => {
   let root;
   const q = (id) => host.querySelector(`[data-testid="${id}"]`);
   const flush = (ms = 0) => act(async () => new Promise((r) => setTimeout(r, ms)));
+  const click = async (el) => {
+    await act(async () => {
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    await flush(10);
+  };
   const render = async (projects) => {
     await act(async () => {
       root.render(React.createElement(I18nProvider, { lang: 'es', regionCode: 'CL' }, React.createElement(GlobalAccounting, { projects })));
@@ -233,7 +283,7 @@ describe('Vista Contabilidad Global', () => {
     expect(q('acc-liquid-CLP').textContent).not.toMatch(/€/);
     expect(q('acc-tax-CLP').textContent).toMatch(/19/);
     expect(q('acc-tax-EUR').textContent).toMatch(/21/);
-    expect(q('acc-tax').textContent).toContain('A reservar fisco');
+    expect(q('acc-tax').textContent).not.toContain('A reservar'); // ultra-compact: the explanation lives in the sheet
     expect(q('acc-receivable-CLP')).not.toBeNull();
     expect(hud.className).toContain('border-white/10');
     expect(hud.className).toContain('bg-black');
@@ -289,7 +339,131 @@ describe('Vista Contabilidad Global', () => {
     expect(q(`acc-late-${late.id}`).className).toContain('text-orange-400');
     expect(q(`acc-late-${late.id}`).textContent).toContain('20');
     expect(q(`acc-late-${fine.id}`)).toBeNull();
-    expect(q('acc-late-badge').textContent).toContain('1');
+    expect(q('acc-late-badge').getAttribute('aria-label')).toContain('1');
+  });
+
+  it('es UN solo rectángulo táctil con 3 columnas sin cajas internas y etiquetas cortas', async () => {
+    const cl = sized(mk('CL', { payments: [pay(119000, back(1))] }));
+    await render([cl]);
+    const hud = q('acc-hud');
+    expect(hud.tagName).toBe('BUTTON');
+    expect(host.querySelectorAll('[data-testid^="acc-hud"]')).toHaveLength(1);
+    for (const c of ['grid-cols-3', 'rounded-2xl', 'border', 'border-white/10', 'bg-black', 'cursor-pointer', 'active:opacity-80', 'text-center']) expect(hud.className).toContain(c);
+    for (const id of ['acc-liquid', 'acc-tax', 'acc-receivable']) {
+      expect(hud.contains(q(id))).toBe(true);
+      expect(q(id).className).not.toMatch(/border|rounded|bg-/); // floating: no per-column box or divider
+    }
+    const labels = [q('acc-liquid'), q('acc-tax'), q('acc-receivable')].map((el) => el.firstChild);
+    labels.forEach((l) => {
+      expect(l.className).toContain('uppercase');
+      expect(l.className).toContain('text-white/50');
+    });
+    expect(labels.map((l) => l.textContent.toUpperCase())).toEqual(['DISPONIBLE', 'IVA', 'POR COBRAR']);
+  });
+
+  it('el rótulo de impuesto es el del país y cae a uno genérico con mercados distintos', async () => {
+    await render([mk('ES')]);
+    expect(q('acc-tax').firstChild.textContent).toBe('IVA');
+    await render([mk('ES'), mk('GB')]);
+    expect(q('acc-tax').firstChild.textContent.toUpperCase()).toBe('IMPUESTOS');
+  });
+
+  it('los montos no saltan de línea y reducen la letra cuando son largos (pantallas de 320 px)', async () => {
+    const big = mk('CL', { payments: [pay(1234567890, back(1))] });
+    const small = mk('ES', { payments: [pay(5, back(1))] });
+    await render([big, small]);
+    for (const code of ['CLP', 'EUR']) expect(q(`acc-liquid-${code}`).className).toContain('whitespace-nowrap');
+    expect(q('acc-liquid-CLP').className).toMatch(/text-\[1[01]px\]|text-xs/);
+    expect(q('acc-liquid-EUR').className).toContain('text-sm');
+  });
+
+  it('tocar el rectángulo abre la ficha "Desglose Financiero Global" con las tres secciones', async () => {
+    const a = sized(mk('CL', { name: 'Casa Norte', createdAt: back(40), payments: [pay(119000, back(20))], expenses: [{ id: 'e', amount: 30000, at: back(20) }], advances: [{ id: 'v', amount: 9000, at: back(20) }] }));
+    await render([a]);
+    expect(q('acc-sheet')).toBeNull();
+    await click(q('acc-hud'));
+    expect(q('acc-sheet')).not.toBeNull();
+    expect(document.body.textContent).toContain('Desglose Financiero Global');
+    expect(q('acc-sheet-in-CLP').textContent).toMatch(/119/);
+    expect(q('acc-sheet-exp-CLP').textContent).toMatch(/30/);
+    expect(q('acc-sheet-adv-CLP').textContent).toMatch(/9/);
+    expect(q('acc-sheet-liquid-CLP').textContent).toMatch(/80/);
+    expect(q('acc-sheet-avail').textContent).toContain('Efectivo real para operar hoy');
+    expect(q('acc-sheet-taxamt-CLP').textContent).toMatch(/19/);
+    expect(q('acc-sheet-tax').textContent).toContain('Monto a apartar para evitar imprevistos fiscales');
+    expect(q('acc-sheet-tax').textContent).toContain('IVA');
+    expect(q(`acc-sheet-rec-${a.id}`).textContent).toContain('Casa Norte');
+    expect(q(`acc-sheet-late-${a.id}`).className).toContain('text-orange-400'); // 20 days without payments
+  });
+
+  it('en la ficha una obra al día no lleva el distintivo naranja y sin pendientes lo dice', async () => {
+    const fine = sized(mk('CL', { payments: [pay(10, back(1))] }));
+    await render([fine]);
+    await click(q('acc-hud'));
+    expect(q(`acc-sheet-rec-${fine.id}`)).not.toBeNull();
+    expect(q(`acc-sheet-late-${fine.id}`)).toBeNull();
+    await click(document.querySelector('[data-sheet-close]'));
+    await render([mk('CL')]); // no quote yet: nothing to collect
+    await click(q('acc-hud'));
+    expect(q('acc-sheet-rec').textContent).toContain('Nada pendiente de cobro');
+  });
+
+  it('se cierra con ✕ (≥44 px), tocando fuera, Escape y deslizando hacia abajo', async () => {
+    await render([sized(mk('CL', { payments: [pay(10, back(1))] }))]);
+    const close = () => document.querySelector('[data-sheet-close]');
+    const dialog = () => document.querySelector('[role="dialog"]');
+    await click(q('acc-hud'));
+    expect(close().className).toContain('h-11');
+    expect(close().className).toContain('w-11');
+    expect(dialog().className).toContain('bg-black');
+    await click(close());
+    expect(q('acc-sheet')).toBeNull();
+    await click(q('acc-hud'));
+    await click(document.querySelector('button[aria-hidden="true"].absolute')); // backdrop
+    expect(q('acc-sheet')).toBeNull();
+    await click(q('acc-hud'));
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(q('acc-sheet')).toBeNull();
+    // swipe down: short drag springs back, long drag closes
+    const touch = (type, y) =>
+      act(async () => {
+        const e = new Event(type, { bubbles: true });
+        e.touches = type === 'touchend' ? [] : [{ clientY: y }];
+        dialog().dispatchEvent(e);
+      });
+    await click(q('acc-hud'));
+    await touch('touchstart', 100);
+    await touch('touchmove', 140);
+    await touch('touchend', 140);
+    expect(q('acc-sheet')).not.toBeNull();
+    await touch('touchstart', 100);
+    await touch('touchmove', 260);
+    await touch('touchend', 260);
+    expect(q('acc-sheet')).toBeNull();
+  });
+
+  it('el botón Atrás del dispositivo cierra la ficha sin salir de la vista', async () => {
+    await render([sized(mk('CL', { payments: [pay(10, back(1))] }))]);
+    await click(q('acc-hud'));
+    expect(window.history.state).toMatchObject({ cubraxSheet: 'breakdown' });
+    await act(async () => {
+      window.history.back();
+    });
+    await flush(30);
+    expect(q('acc-sheet')).toBeNull();
+    expect(q('acc-hud')).not.toBeNull(); // still in Contabilidad Global
+    expect(window.history.state?.cubraxSheet).toBeUndefined();
+  });
+
+  it('cerrar con ✕ retira la entrada del historial (no se acumula) y no toca el marcador de proyecto', async () => {
+    await render([sized(mk('CL', { payments: [pay(10, back(1))] }))]);
+    await click(q('acc-hud'));
+    await click(document.querySelector('[data-sheet-close]'));
+    await flush(50);
+    expect(window.history.state?.cubraxSheet).toBeUndefined();
+    expect(window.history.state?.cubraxProject).toBeUndefined();
   });
 
   it('con una lista vacía solo se ve el estado vacío (sin HUD)', async () => {

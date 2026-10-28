@@ -134,6 +134,21 @@ input[type='range'].slider-min:focus-visible {
   border-radius: 9999px;
 }
 
+/* Bottom sheet that slides up (swipeToClose sheets) */
+@keyframes sheet-up {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.sheet-slide {
+  animation: sheet-up 0.2s ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;

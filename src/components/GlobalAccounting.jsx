@@ -7,14 +7,15 @@ import {
   collectionDelay,
   daysAgo,
   getLastProjectActivity,
-  globalLiquidity,
-  globalReceivables,
-  globalTaxReserve,
-  lateCollections,
+  globalBreakdown,
+  globalTaxLabel,
   projectDateRange,
   projectLiquidity,
+  receivableList,
   sortByActivity,
 } from '../lib/ledger.js';
+import { useHistoryBack } from '../lib/useHistoryBack.js';
+import GlobalBreakdownSheet from './GlobalBreakdownSheet.jsx';
 import { projectClient, projectTitle } from '../lib/projects.js';
 import { projectTotals } from '../lib/projectTotals.js';
 import { usePriceVersion } from '../lib/usePrices.js';
@@ -31,27 +32,35 @@ import { Button, Logo } from './ui.jsx';
  */
 const AMBER = 'text-[#e8c35f]';
 
-/** One HUD block: one line per currency, never mixed. */
-function HudBlock({ id, label, hint, lines, fmtOf, warn = false, extra = null }) {
+/** Font size by length of the amount, so a figure always fits its third of the HUD on a 320 px screen (never wraps or clips). */
+const sizeFor = (text) =>
+  text.length <= 9 ? 'text-sm' : text.length <= 11 ? 'text-[13px]' : text.length <= 13 ? 'text-xs' : text.length <= 15 ? 'text-[11px]' : 'text-[10px]';
+
+/** One floating HUD column: compact label + one amount per currency (never mixed). No box, no divider. */
+function HudColumn({ id, label, lines, fmtOf, warn = false, flag = null }) {
   return (
-    <div data-testid={id} className="min-w-0 rounded-xl border border-white/10 bg-black px-2.5 py-2">
-      <p className="truncate text-[11px] font-semibold text-[#E0E0E0]/60">{label}</p>
+    <span data-testid={id} className="block min-w-0">
+      <span className="block whitespace-nowrap text-[11px] font-semibold uppercase tracking-tight text-white/50 sm:text-xs">
+        {label}
+        {flag}
+      </span>
       {lines.length === 0 ? (
-        <p className="mt-0.5 text-sm font-extrabold tabular-nums text-[#E0E0E0]/50">—</p>
+        <span className="mt-1 block text-sm font-extrabold tabular-nums text-[#E0E0E0]/50">—</span>
       ) : (
-        lines.map((l) => (
-          <p
-            key={l.currency}
-            data-testid={`${id}-${l.currency}`}
-            className={`mt-0.5 break-words text-[13px] font-extrabold leading-tight tabular-nums ${warn && l.amount < 0 ? AMBER : 'text-[#E0E0E0]'}`}
-          >
-            {fmtOf(l.regionCode)(l.amount)}
-          </p>
-        ))
+        lines.map((l) => {
+          const text = fmtOf(l.regionCode)(l.amount);
+          return (
+            <span
+              key={l.currency}
+              data-testid={`${id}-${l.currency}`}
+              className={`mt-1 block whitespace-nowrap font-extrabold tabular-nums ${sizeFor(text)} ${warn && l.amount < 0 ? AMBER : 'text-[#E0E0E0]'}`}
+            >
+              {text}
+            </span>
+          );
+        })
       )}
-      {hint && <p className="mt-0.5 truncate text-[10px] text-[#E0E0E0]/40">{hint}</p>}
-      {extra}
-    </div>
+    </span>
   );
 }
 
@@ -77,15 +86,17 @@ export default function GlobalAccounting({ projects }) {
     const byId = new Map(rows.map((x) => [x.project.id, x]));
     return sortByActivity(projects).map((p) => byId.get(p.id));
   }, [projects, rows]);
-  const hud = useMemo(
-    () => ({
-      liquid: globalLiquidity(projects),
-      tax: globalTaxReserve(projects),
-      receivable: globalReceivables(projects, totals),
-      late: lateCollections(projects, totals, now),
-    }),
-    [projects, totals, now],
-  );
+  const breakdown = useMemo(() => globalBreakdown(projects, totals), [projects, totals]);
+  const receivables = useMemo(() => receivableList(projects, totals, now), [projects, totals, now]);
+  const taxLabel = useMemo(() => globalTaxLabel(projects), [projects]);
+  const lines = (key) => breakdown.map((l) => ({ currency: l.currency, regionCode: l.regionCode, amount: l[key] }));
+  const lateCount = receivables.filter((x) => x.late > 0).length;
+  const [open, setOpen] = useState(false);
+  useHistoryBack(open ? 'breakdown' : null, () => setOpen(false), 'cubraxSheet'); // the device's Back closes the sheet, not the view
+  const titleOf = (id) => {
+    const p = projects.find((x) => x.id === id);
+    return (p && projectTitle(p)) || t('proj.untitled');
+  };
   const moneyOf = useMemo(() => {
     const cache = new Map();
     return (code) => cache.get(code) ?? (cache.set(code, makeI18n(lang, code).money), cache.get(code));
@@ -150,26 +161,43 @@ export default function GlobalAccounting({ projects }) {
         </p>
       ) : (
         <>
-          <section aria-label={t('acc.hud')} data-testid="acc-hud" className="mb-3 grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-black p-2">
-            <HudBlock id="acc-liquid" label={t('acc.hud.liquid')} lines={hud.liquid} fmtOf={moneyOf} warn />
-            <HudBlock id="acc-tax" label={t('acc.hud.tax')} hint={t('acc.hud.tax.hint')} lines={hud.tax} fmtOf={moneyOf} />
-            <HudBlock
+          <button
+            type="button"
+            data-testid="acc-hud"
+            onClick={() => setOpen(true)}
+            aria-label={`${t('acc.sheet.open')}: ${t('acc.hud')}`}
+            aria-haspopup="dialog"
+            className="mb-3 grid w-full cursor-pointer grid-cols-3 gap-1 rounded-2xl border border-white/10 bg-black px-2 py-3 text-center transition-opacity active:opacity-80"
+          >
+            <HudColumn id="acc-liquid" label={t('acc.hud.liquid')} lines={lines('liquid')} fmtOf={moneyOf} warn />
+            <HudColumn id="acc-tax" label={taxLabel || t('acc.hud.tax')} lines={lines('tax')} fmtOf={moneyOf} />
+            <HudColumn
               id="acc-receivable"
               label={t('acc.hud.receivable')}
-              lines={hud.receivable}
+              lines={lines('receivable')}
               fmtOf={moneyOf}
-              extra={
-                hud.late.length > 0 && (
+              flag={
+                lateCount > 0 && (
                   <span
                     data-testid="acc-late-badge"
-                    className="mt-1 inline-block max-w-full truncate rounded-full border border-orange-400/50 px-1.5 text-[10px] font-semibold text-orange-400"
-                  >
-                    {t('acc.hud.late', { n: hud.late.length })}
-                  </span>
+                    role="img"
+                    aria-label={t('acc.hud.late', { n: lateCount })}
+                    className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-orange-400 align-middle"
+                  />
                 )
               }
             />
-          </section>
+          </button>
+          {open && (
+            <GlobalBreakdownSheet
+              breakdown={breakdown}
+              receivables={receivables}
+              taxLabel={taxLabel}
+              titleOf={titleOf}
+              moneyOf={moneyOf}
+              onClose={() => setOpen(false)}
+            />
+          )}
           <ul className="space-y-2" aria-label={t('nav.accounting')}>
             {sorted.map(({ project: p, balance: b, fmt }) => {
               const on = selected.includes(p.id);
