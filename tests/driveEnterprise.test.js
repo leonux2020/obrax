@@ -1,9 +1,9 @@
 // Drive integration, enterprise grade: dedicated app folder, silent token renewal on 401, persistent connection and offline resilience.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createDriveClient, BACKUP_FOLDER, LEGACY_BACKUP_FOLDER, BACKUP_FILE } from '../src/lib/drive.js';
-import { createDriveSync } from '../src/lib/driveSync.js';
+import { createDriveSync, backupAge } from '../src/lib/driveSync.js';
 import { setDriveToken, getDriveToken, clearDriveToken, DRIVE_TOKEN_KEY } from '../src/lib/driveToken.js';
-import { ensureDriveToken, requestDriveAccess } from '../src/lib/auth.js';
+import { ensureDriveToken, requestDriveAccess, googleConfigStatus, cleanClientId } from '../src/lib/auth.js';
 import { createFakeDrive } from './helpers/fakeDrive.js';
 
 const ok = (t) => (t.startsWith('{') ? JSON.parse(t) : null);
@@ -225,5 +225,28 @@ describe('3. offline resilience of the sync engine', () => {
     drive.state.offline = false;
     expect((await sync.retryNow()).ok).toBe(true);
     expect(drive.backupFiles()).toHaveLength(1);
+  });
+});
+
+describe('6. VITE_GOOGLE_CLIENT_ID: reading and diagnosis', () => {
+  const GOOD = 'abc-123.apps.googleusercontent.com';
+  it('absent, empty, "undefined" or whitespace -> missing (the admin diagnostic); a real client id -> ok', () => {
+    for (const v of [undefined, null, '', '   ', 'undefined', 'null', '""', "''"]) expect(googleConfigStatus(v)).toBe('missing');
+    expect(googleConfigStatus(GOOD)).toBe('ok');
+  });
+  it('quotes and spaces pasted into the Vercel panel are tolerated; a value that is not a client id is "invalid"', () => {
+    expect(cleanClientId(`  "${GOOD}"  `)).toBe(GOOD);
+    expect(googleConfigStatus(`'${GOOD}'\n`)).toBe('ok');
+    expect(googleConfigStatus('my-secret-key')).toBe('invalid');
+    expect(googleConfigStatus('abc.apps.googleusercontent.com.evil.com')).toBe('invalid');
+  });
+  it('the last backup reads "Hace un momento" / minutes / hours / days and never goes negative', () => {
+    const now = 1_000_000_000_000;
+    expect(backupAge(0, now)).toBeNull();
+    expect(backupAge(now - 5_000, now)).toEqual({ key: 'backup.ago.now', n: 0 });
+    expect(backupAge(now + 60_000, now)).toEqual({ key: 'backup.ago.now', n: 0 });
+    expect(backupAge(now - 5 * 60_000, now)).toEqual({ key: 'backup.ago.min', n: 5 });
+    expect(backupAge(now - 3 * 3_600_000, now)).toEqual({ key: 'backup.ago.hour', n: 3 });
+    expect(backupAge(now - 2 * 86_400_000, now)).toEqual({ key: 'backup.ago.day', n: 2 });
   });
 });

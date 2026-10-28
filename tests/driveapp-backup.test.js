@@ -20,6 +20,7 @@ const seed = () => {
   localStorage.setItem('cp.user.v1', JSON.stringify({ provider: 'google', name: 'Ana', email: 'ana@example.com' }));
   localStorage.setItem('cp.company.v1', JSON.stringify({ name: 'Aurora' }));
   localStorage.setItem('cp.profile.v1', JSON.stringify({ onboarded: true, drive: true }));
+  localStorage.setItem('cp.drive.linked.v1', '1'); // this device was connected before: the card shows "Respaldar ahora"
 };
 
 const backedUp = () => {
@@ -68,7 +69,7 @@ describe('Drive backup (device A)', () => {
     expect(b.settings.region).toBe('CL');
     expect(b.meta.onboarded).toBe(true);
     expect(q('backup-status').dataset.status).toBe('synced');
-    expect(q('backup-status').textContent).toContain('Respaldado');
+    expect(q('backup-status').textContent).toBe('Último respaldo: Hace un momento');
   });
 
   it('after the first connection every change is uploaded silently (debounced) to the SAME file', async () => {

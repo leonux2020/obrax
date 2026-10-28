@@ -7,8 +7,27 @@
 import { sanitizeText, sanitizeEmail, sanitizeAvatarUrl } from './sanitize.js';
 import { getDriveToken, setDriveToken } from './driveToken.js';
 
-export const GOOGLE_CLIENT_ID = String(import.meta.env?.VITE_GOOGLE_CLIENT_ID || '').trim();
-export const googleConfigured = /^[\w-]+\.apps\.googleusercontent\.com$/.test(GOOGLE_CLIENT_ID);
+const CLIENT_ID_RE = /^[\w-]+\.apps\.googleusercontent\.com$/;
+
+/** The id as typed in the host's env panel: trimmed, without the quotes people paste around it, "undefined"/"null" = nothing. */
+export const cleanClientId = (value) => {
+  const id = String(value ?? '').trim().replace(/^["'`]+|["'`]+$/g, '').trim();
+  return /^(undefined|null)$/i.test(id) ? '' : id;
+};
+
+/**
+ * Is Google configured in THIS build? 'ok' | 'missing' (VITE_GOOGLE_CLIENT_ID is not defined: on Vercel it must exist when the build RUNS,
+ * Vite bakes it into the bundle) | 'invalid' (defined, but not shaped like <number>-<hash>.apps.googleusercontent.com).
+ */
+export function googleConfigStatus(value) {
+  const id = cleanClientId(value);
+  if (!id) return 'missing';
+  return CLIENT_ID_RE.test(id) ? 'ok' : 'invalid';
+}
+
+export const GOOGLE_CLIENT_ID = cleanClientId(import.meta.env?.VITE_GOOGLE_CLIENT_ID);
+export const GOOGLE_CONFIG_STATUS = googleConfigStatus(import.meta.env?.VITE_GOOGLE_CLIENT_ID);
+export const googleConfigured = GOOGLE_CONFIG_STATUS === 'ok';
 
 const GSI_SRC = 'https://accounts.google.com/gsi/client';
 

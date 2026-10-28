@@ -22,6 +22,16 @@ const readState = (storage) => {
   }
 };
 
+/** "Hace un momento / hace N min / h / d" of a backup time: { key, n } for the dictionary, or null without a time. Never negative. */
+export function backupAge(at, now = Date.now()) {
+  if (!(Number(at) > 0)) return null;
+  const secs = Math.max(0, Math.floor((now - Number(at)) / 1000));
+  if (secs < 60) return { key: 'backup.ago.now', n: 0 };
+  if (secs < 3600) return { key: 'backup.ago.min', n: Math.floor(secs / 60) };
+  if (secs < 86_400) return { key: 'backup.ago.hour', n: Math.floor(secs / 3600) };
+  return { key: 'backup.ago.day', n: Math.floor(secs / 86_400) };
+}
+
 export function createDriveSync({
   client, // createDriveClient(...)
   collect, // () => Promise<backup object> : the CURRENT state of the app

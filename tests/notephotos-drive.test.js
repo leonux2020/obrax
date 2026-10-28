@@ -34,6 +34,7 @@ const profile = () => {
   localStorage.setItem('cp.user.v1', JSON.stringify({ provider: 'google', name: 'Ana', email: 'ana@example.com' }));
   localStorage.setItem('cp.company.v1', JSON.stringify({ name: 'Aurora' }));
   localStorage.setItem('cp.profile.v1', JSON.stringify({ onboarded: true, drive: true }));
+  localStorage.setItem('cp.drive.linked.v1', '1'); // this device was connected before: the card shows "Respaldar ahora"
 };
 const wipe = async () => {
   for (const p of await projectStore.load()) {

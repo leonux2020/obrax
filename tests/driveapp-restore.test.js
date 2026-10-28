@@ -117,6 +117,7 @@ describe('Restore from Ajustes on a device that already has data', () => {
     localStorage.setItem('cp.user.v1', JSON.stringify({ provider: 'google', name: 'Ana', email: 'a@x.com' }));
     localStorage.setItem('cp.company.v1', JSON.stringify({ name: 'Mi empresa local' }));
     localStorage.setItem('cp.profile.v1', JSON.stringify({ onboarded: true, drive: true }));
+    localStorage.setItem('cp.drive.linked.v1', '1');
     h = createHost(App);
     await h.mount();
     expect(cards()).toHaveLength(0);
@@ -132,6 +133,7 @@ describe('Restore from Ajustes on a device that already has data', () => {
     localStorage.setItem('cp.user.v1', JSON.stringify({ provider: 'google', name: 'Ana', email: 'a@x.com' }));
     localStorage.setItem('cp.company.v1', JSON.stringify({ name: 'Mi empresa' }));
     localStorage.setItem('cp.profile.v1', JSON.stringify({ onboarded: true, drive: true }));
+    localStorage.setItem('cp.drive.linked.v1', '1');
     h = createHost(App);
     await h.mount();
     await click(h.tab('Ajustes'));

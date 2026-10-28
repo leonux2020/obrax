@@ -30,7 +30,7 @@ import {
   loadProfileMeta,
   saveProfileMeta,
 } from './lib/draft.js';
-import { ensureDriveToken, googleConfigured, localUser } from './lib/auth.js';
+import { ensureDriveToken, googleConfigured, GOOGLE_CONFIG_STATUS, localUser } from './lib/auth.js';
 import { clearDriveToken, getDriveToken, isDriveLinked } from './lib/driveToken.js';
 import { createDriveClient } from './lib/drive.js';
 import { createDriveSync } from './lib/driveSync.js';
@@ -59,7 +59,7 @@ import BottomNav from './components/BottomNav.jsx';
 import ProjectSheet from './components/ProjectSheet.jsx';
 import SettingsSheet from './components/SettingsSheet.jsx';
 import ProfileSheet from './components/ProfileSheet.jsx';
-import { clearOAuthResult, peekOAuthResult } from './lib/oauthCallback.js';
+import { clearOAuthResult, connectDrive, peekOAuthResult } from './lib/oauthCallback.js';
 import SplashScreen, { SPLASH_TIMING } from './components/SplashScreen.jsx';
 import ProfileSetup from './components/ProfileSetup.jsx';
 import ProPaywall from './components/ProPaywall.jsx';
@@ -191,6 +191,42 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   );
   const [backup, setBackup] = useState(() => sync.getState());
   useEffect(() => sync.subscribe(setBackup), [sync]);
+  // "This device is connected to Google Drive": a consent was given here before (or a copy has gone up)
+  const [linkedNow, setLinkedNow] = useState(false);
+  const driveLinked = linkedNow || backup.at > 0 || isDriveLinked() || Boolean(getDriveToken());
+  // Google's own authorization (pop-up; full-page redirect when the browser blocks it). As soon as it is granted the exclusive folder is
+  // created and the first backup goes up in the background (sync.flush: find / create "CUBRAX - Respaldos Obra", then upload).
+  const connectAndBackup = useCallback(async () => {
+    if (!googleConfigured) return { ok: false, reason: 'not_configured' };
+    try {
+      await connectDrive();
+    } catch (err) {
+      return { ok: false, reason: err?.code === 'redirect' ? 'redirect' : err?.code || 'denied' };
+    }
+    setLinkedNow(true);
+    setMeta((m) => (m.drive ? m : { ...m, drive: true }));
+    sync.flush({ force: true, interactive: true }).catch(() => {}); // in the background: the card shows "Sincronizando…" then "Último respaldo"
+    return { ok: true };
+  }, [sync]);
+  // The toggle: ON for an account that is not linked yet starts that authorization at once; if Google says no, it goes back to OFF.
+  const changeDrive = useCallback(
+    async (on) => {
+      setMeta((m) => ({ ...m, drive: on }));
+      if (!on || !googleConfigured || driveLinked) return { ok: true };
+      const r = await connectAndBackup();
+      if (!r.ok && r.reason !== 'redirect') setMeta((m) => ({ ...m, drive: false }));
+      return r;
+    },
+    [connectAndBackup, driveLinked]
+  );
+  // came back from Google's full-page consent: put the first copy up (the folder is created if missing)
+  const returnedBackup = useRef(false);
+  useEffect(() => {
+    if (!oauth?.granted || returnedBackup.current || projects === null || !googleConfigured || !meta.onboarded) return;
+    returnedBackup.current = true;
+    setLinkedNow(true);
+    sync.flush({ force: true }).catch(() => {});
+  }, [oauth, projects, meta.onboarded, sync]);
   // No coverage: ONE discreet toast per offline episode ("the backup will be tried when the signal returns"); the pending change
   // is uploaded by itself when the browser reports the connection is back.
   useEffect(() => {
@@ -703,7 +739,8 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
               regionCode={settings.region}
               pwa={pwa}
               drive={meta.drive}
-              onDriveChange={(v) => setMeta((m) => ({ ...m, drive: v }))}
+              onDriveChange={changeDrive}
+              onConnect={connectAndBackup}
               onEditProfile={() => setSheet({ type: 'profile' })}
               onSignIn={signIn}
               onChangeLang={changeLang}
@@ -711,7 +748,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
                 setSheet(null);
                 setPickingRegion(true);
               }}
-              backup={{ configured: googleConfigured, enabled: backupOn, state: backup }}
+              backup={{ configured: googleConfigured, configStatus: GOOGLE_CONFIG_STATUS, enabled: backupOn, linked: driveLinked, state: backup }}
               onBackupNow={async () => {
                 const r = await sync.flush({ force: true, interactive: true });
                 if (r.ok) setMeta((m) => (m.drive ? m : { ...m, drive: true }));

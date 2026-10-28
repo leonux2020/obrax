@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { regionName } from '../lib/regions.js';
 import { googleConfigured } from '../lib/auth.js';
+import { BACKUP_FOLDER } from '../lib/drive.js';
+import { backupAge } from '../lib/driveSync.js';
 import ProQaTag from './ProQaTag.jsx';
 import { Button, Switch } from './ui.jsx';
 import GoogleButton from './GoogleButton.jsx';
@@ -10,7 +12,7 @@ import LangSelect from './LangSelect.jsx';
 import InstallButton from './InstallButton.jsx';
 
 /** Language, default country for new projects, PWA install and local profile switch. */
-export default function SettingsSheet({ user, company, logo, regionCode, pwa, drive, onDriveChange, onEditProfile, onSignIn, onChangeLang, onChangeRegion, onLogout, onClose, backup = null, onBackupNow = null, onRestore = null }) {
+export default function SettingsSheet({ user, company, logo, regionCode, pwa, drive, onDriveChange, onConnect = async () => ({ ok: false }), onEditProfile, onSignIn, onChangeLang, onChangeRegion, onLogout, onClose, backup = null, onBackupNow = null, onRestore = null }) {
   const { t, lang, region } = useI18n();
   const [phase, setPhase] = useState('idle'); // idle | confirming | syncing | failed (sign-out)
   const [working, setWorking] = useState(''); // '' | 'backup' | 'restore'
@@ -40,6 +42,26 @@ export default function SettingsSheet({ user, company, logo, regionCode, pwa, dr
     setPhase('syncing');
     const r = await onLogout(opts);
     if (r && r.ok === false) setPhase('failed'); // nothing was erased: the user decides
+  };
+  const agoText = (at) => {
+    const age = backupAge(at);
+    return age ? t(age.key, { n: age.n }) : '';
+  };
+  const connect = async () => {
+    setWorking('connect');
+    setNote('');
+    const r = await onConnect();
+    setWorking('');
+    if (r && r.ok === false && r.reason !== 'redirect') setNote(connectError(r.reason));
+  };
+  const connectError = (reason) => t(['not_configured', 'offline', 'denied'].includes(reason) ? `setup.drive.err.${reason}` : 'setup.drive.err.denied');
+  // the toggle: switching it ON for an account that is not linked yet opens Google's own authorization at once
+  const toggleDrive = async (on) => {
+    setNote('');
+    if (on && backup?.configured && !backup?.linked) setWorking('connect');
+    const r = await onDriveChange(on);
+    setWorking('');
+    if (on && r && r.ok === false && r.reason !== 'redirect') setNote(connectError(r.reason));
   };
   const backupNow = async () => {
     setWorking('backup');
@@ -94,35 +116,86 @@ export default function SettingsSheet({ user, company, logo, regionCode, pwa, dr
           </div>
         </div>
 
-        {/* FREE feature: Google Drive backup preference (the cloud copy itself is still to come). */}
-        <Switch checked={drive} onChange={onDriveChange} label={t('setup.drive')} description={t('setup.drive.desc')} data-testid="settings-drive" />
+        {/* FREE feature: Google Drive backup. One card tells the state without doubt: not configured (admin diagnostic), not connected
+            (big connect button) or connected (account, exclusive folder, last backup, "Respaldar ahora"). */}
+        <Switch checked={drive} onChange={toggleDrive} label={t('setup.drive')} description={t('setup.drive.desc')} data-testid="settings-drive" />
 
         {backup && (
-          <div className="rounded-xl border border-white/10 px-4 py-3" data-testid="settings-backup">
-            <p className="font-semibold">{t('backup.title')}</p>
+          <div className="rounded-xl border border-white/10 bg-black px-4 py-3" data-testid="settings-backup" data-state={!backup.configured ? 'unconfigured' : !backup.enabled ? 'off' : backup.linked ? 'connected' : 'disconnected'}>
             {!backup.configured ? (
-              <p className="mt-1 text-sm text-neutral-400">{t('backup.notConfigured')}</p>
+              <>
+                <p className="font-semibold">{t('backup.title')}</p>
+                <p className="mt-1 text-xs leading-snug text-[#e8c35f]" role="status" data-testid="backup-config-diagnostic" data-config={backup.configStatus || 'missing'}>
+                  {t(backup.configStatus === 'invalid' ? 'backup.cfg.invalid' : 'backup.cfg.missing')}
+                </p>
+              </>
             ) : !backup.enabled ? (
-              <p className="mt-1 text-sm text-neutral-400">{t('backup.off')}</p>
+              <>
+                <p className="font-semibold">{t('backup.title')}</p>
+                <p className="mt-1 text-sm text-[#E0E0E0]/60">{t('backup.off')}</p>
+              </>
+            ) : !backup.linked ? (
+              <>
+                <p className="font-semibold">{t('backup.title')}</p>
+                <p className="mt-1 text-sm text-[#E0E0E0]/60">{t('backup.connect.hint')}</p>
+                <button
+                  type="button"
+                  onClick={connect}
+                  disabled={Boolean(working)}
+                  data-testid="backup-connect"
+                  className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-black px-3 text-sm font-bold text-brand hover:border-brand disabled:opacity-50"
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11.5 4.4" />
+                    <path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07l1.33-1.3" />
+                  </svg>
+                  {working === 'connect' ? t('backup.connecting') : t('backup.connect')}
+                </button>
+              </>
             ) : (
               <>
-                <p className={`mt-1 text-sm ${st?.status === 'pending' ? 'text-amber-300' : 'text-neutral-300'}`} role="status" data-testid="backup-status" data-status={st?.status}>
-                  {statusText}
+                <div className="flex items-center gap-2" data-testid="backup-connected">
+                  <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-brand" />
+                  <p className="min-w-0 flex-1 truncate font-semibold">{t('backup.connected')}</p>
+                  {st?.status === 'synced' && (
+                    <span className="shrink-0 text-xs font-semibold text-brand" data-testid="backup-synced-tag">
+                      {t('backup.synced.short')}
+                    </span>
+                  )}
+                </div>
+                {(user?.email || user?.name) && (
+                  <p className="mt-1 truncate text-sm text-[#E0E0E0]/80" data-testid="backup-account">
+                    {user.name}
+                    {user.email && user.name ? ' · ' : ''}
+                    {user.email}
+                  </p>
+                )}
+                <p className="mt-2 inline-block max-w-full truncate rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-[#E0E0E0]/60" data-testid="backup-folder">
+                  {t('backup.folder', { name: BACKUP_FOLDER })}
+                </p>
+                <p className={`mt-2 text-sm ${st?.status === 'pending' ? 'text-[#e8c35f]' : 'text-[#E0E0E0]/70'}`} role="status" data-testid="backup-status" data-status={st?.status}>
+                  {st?.status === 'synced' && st.at ? t('backup.last', { when: agoText(st.at) }) : statusText}
                 </p>
                 <div className="mt-3 grid grid-cols-2 gap-3">
-                  <button type="button" onClick={backupNow} disabled={Boolean(working)} data-testid="backup-now" className="min-h-[44px] rounded-lg border border-white/10 px-3 text-sm font-bold hover:border-brand disabled:opacity-50">
+                  <button
+                    type="button"
+                    onClick={backupNow}
+                    disabled={Boolean(working)}
+                    data-testid="backup-now"
+                    className="min-h-[44px] rounded-lg bg-brand px-3 text-sm font-bold text-black hover:bg-brand-light disabled:opacity-50"
+                  >
                     {working === 'backup' ? t('backup.status.syncing') : t('backup.now')}
                   </button>
                   <button type="button" onClick={restore} disabled={Boolean(working)} data-testid="backup-restore" className="min-h-[44px] rounded-lg border border-white/10 px-3 text-sm font-bold hover:border-brand disabled:opacity-50">
                     {working === 'restore' ? t('restore.title') : t('backup.restore')}
                   </button>
                 </div>
-                {note && (
-                  <p className="mt-2 text-sm text-neutral-300" role="status" data-testid="backup-note">
-                    {note}
-                  </p>
-                )}
               </>
+            )}
+            {note && (
+              <p className="mt-2 text-sm text-[#E0E0E0]/80" role="status" data-testid="backup-note">
+                {note}
+              </p>
             )}
           </div>
         )}
