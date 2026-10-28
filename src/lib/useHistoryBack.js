@@ -8,6 +8,11 @@ import { useEffect, useRef } from 'react';
 // (arrow, deleting it...) the entry it pushed is popped too, so the history never piles up and a later "back" at the Dashboard
 // behaves like in any other web page. Opening another project from inside one (an extension) re-labels the entry instead of
 // pushing a second one.
+//
+// The same machinery serves any layer that must close with the device's back button WITHOUT leaving the screen underneath
+// (a bottom sheet, the Accounting tab): each layer owns a history-state `key`. A popstate is handled by the hook whose marker the
+// new entry no longer carries (its own entry was the one popped) and it is consumed (stopImmediatePropagation) so no other layer
+// sees it; a hook whose marker is still in the new state knows a layer ABOVE it was popped and does nothing.
 
 const KEY = 'cubraxProject';
 const SELF_POP_MS = 600; // a popstate this soon after our own history.back() is that very pop
@@ -25,8 +30,10 @@ const marker = (key = KEY) => {
  * @param onLeave   called when the device's back button is pressed while a project is open
  * @param key       history-state marker; the default is the project one. A sheet / modal that must close with the device's back
  *                  button uses its own key (`useHistoryBack(open ? 'sheet' : null, close, 'cubraxSheet')`), so it never collides
+ * @param options   { state: extra fields pushed with the marker (e.g. { modalOpen: true }),
+ *                    cleanup: also drop our entry when the component unmounts while it is still open }
  */
-export function useHistoryBack(activeId, onLeave, key = KEY) {
+export function useHistoryBack(activeId, onLeave, key = KEY, { state = null, cleanup = false } = {}) {
   const leave = useRef(onLeave);
   const active = useRef(activeId);
   const pushed = useRef(false); // true while the entry WE pushed is on top of the history
@@ -40,27 +47,46 @@ export function useHistoryBack(activeId, onLeave, key = KEY) {
   }, []);
 
   useEffect(() => {
-    const onPop = () => {
+    const onPop = (ev) => {
       if (Date.now() < selfPop.current) {
-        selfPop.current = 0; // our own pop (the app closed the project first)
+        selfPop.current = 0; // our own pop (the app closed the layer first)
+        ev.stopImmediatePropagation();
         return;
       }
+      if (active.current && ev?.state?.[key] === active.current) return; // a layer ABOVE ours was popped: ours is still there
+      const mine = pushed.current;
       pushed.current = false;
-      if (active.current) leave.current();
+      if (active.current) {
+        if (mine) ev.stopImmediatePropagation(); // our entry was consumed by the back press: nobody else reacts to it
+        leave.current();
+      }
     };
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, []);
+    window.addEventListener('popstate', onPop, true);
+    return () => window.removeEventListener('popstate', onPop, true);
+  }, [key]);
+
+  // unmounted while open (opt-in): do not leave our entry behind
+  useEffect(
+    () => () => {
+      if (cleanup && pushed.current && marker(key)) {
+        pushed.current = false;
+        selfPop.current = Date.now() + SELF_POP_MS;
+        window.history.back();
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   useEffect(() => {
     if (activeId) {
       if (marker(key) === activeId) {
         pushed.current = true;
       } else if (marker(key)) {
-        window.history.replaceState({ [key]: activeId }, ''); // another project from inside one: same entry
+        window.history.replaceState({ [key]: activeId, ...state }, ''); // another project from inside one: same entry
         pushed.current = true;
       } else {
-        window.history.pushState({ [key]: activeId }, '');
+        window.history.pushState({ [key]: activeId, ...state }, '');
         pushed.current = true;
       }
     } else if (pushed.current && marker(key)) {

@@ -14,7 +14,6 @@ import {
   receivableList,
   sortByActivity,
 } from '../lib/ledger.js';
-import { useHistoryBack } from '../lib/useHistoryBack.js';
 import GlobalBreakdownSheet from './GlobalBreakdownSheet.jsx';
 import { projectClient, projectTitle } from '../lib/projects.js';
 import { projectTotals } from '../lib/projectTotals.js';
@@ -92,7 +91,6 @@ export default function GlobalAccounting({ projects }) {
   const lines = (key) => breakdown.map((l) => ({ currency: l.currency, regionCode: l.regionCode, amount: l[key] }));
   const lateCount = receivables.filter((x) => x.late > 0).length;
   const [open, setOpen] = useState(false);
-  useHistoryBack(open ? 'breakdown' : null, () => setOpen(false), 'cubraxSheet'); // the device's Back closes the sheet, not the view
   const titleOf = (id) => {
     const p = projects.find((x) => x.id === id);
     return (p && projectTitle(p)) || t('proj.untitled');

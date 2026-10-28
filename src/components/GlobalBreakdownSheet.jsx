@@ -34,7 +34,7 @@ export default function GlobalBreakdownSheet({ breakdown, receivables, taxLabel,
   const currencyTag = (l) => (many ? <p className="mb-0.5 mt-2 text-xs font-bold text-[#E0E0E0]/70">{l.currency}</p> : null);
 
   return (
-    <BottomSheet title={t('acc.sheet.title')} onClose={onClose} swipeToClose>
+    <BottomSheet title={t('acc.sheet.title')} onClose={onClose} swipeToClose backClose>
       <div className="space-y-6" data-testid="acc-sheet">
         <section data-testid="acc-sheet-avail">
           <Heading>{t('acc.sheet.avail')}</Heading>

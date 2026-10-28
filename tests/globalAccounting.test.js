@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // Contabilidad Global: HUD (net cash, tax shield, receivables), activity pulse, ordering and the amber / orange signals.
 // Everything is deduced from records already stored: pure functions in ledger.js, no schema change.
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { I18nProvider } from '../src/lib/i18n.jsx';
@@ -262,6 +262,7 @@ describe('Vista Contabilidad Global', () => {
 
   beforeEach(() => {
     localStorage.clear();
+    window.history.replaceState(null, '');
     host = document.createElement('div');
     document.body.appendChild(host);
     root = createRoot(host);
@@ -269,6 +270,7 @@ describe('Vista Contabilidad Global', () => {
   afterEach(() => {
     act(() => root.unmount());
     host.remove();
+    vi.restoreAllMocks();
   });
 
   it('muestra el HUD de 3 bloques antes de la lista, sin mezclar monedas', async () => {
@@ -419,7 +421,7 @@ describe('Vista Contabilidad Global', () => {
     await click(close());
     expect(q('acc-sheet')).toBeNull();
     await click(q('acc-hud'));
-    await click(document.querySelector('button[aria-hidden="true"].absolute')); // backdrop
+    await click(q('sheet-backdrop')); // backdrop
     expect(q('acc-sheet')).toBeNull();
     await click(q('acc-hud'));
     await act(async () => {
@@ -447,7 +449,7 @@ describe('Vista Contabilidad Global', () => {
   it('el botón Atrás del dispositivo cierra la ficha sin salir de la vista', async () => {
     await render([sized(mk('CL', { payments: [pay(10, back(1))] }))]);
     await click(q('acc-hud'));
-    expect(window.history.state).toMatchObject({ cubraxSheet: 'breakdown' });
+    expect(window.history.state).toMatchObject({ cubraxSheet: 'open', modalOpen: true });
     await act(async () => {
       window.history.back();
     });
@@ -457,6 +459,66 @@ describe('Vista Contabilidad Global', () => {
     expect(window.history.state?.cubraxSheet).toBeUndefined();
   });
 
+  it('tocar el fondo negro cierra la ficha; tocar dentro de ella no hace nada', async () => {
+    await render([sized(mk('CL', { payments: [pay(10, back(1))] }))]);
+    await click(q('acc-hud'));
+    const backdrop = q('sheet-backdrop');
+    for (const inside of [document.querySelector('[role="dialog"]'), q('acc-sheet'), q('acc-sheet-avail'), q('acc-sheet-liquid-CLP')]) {
+      await click(inside);
+      expect(q('acc-sheet')).not.toBeNull();
+    }
+    expect(backdrop.contains(document.querySelector('[role="dialog"]'))).toBe(true); // the dialog is a CHILD of the overlay
+    await click(backdrop);
+    expect(q('acc-sheet')).toBeNull();
+  });
+
+  it('cada forma de cerrar (✕, fondo, deslizar) retira la entrada del historial con UN solo history.back()', async () => {
+    const dialog = () => document.querySelector('[role="dialog"]');
+    const swipe = async () => {
+      const touch = (type, y) =>
+        act(async () => {
+          const e = new Event(type, { bubbles: true });
+          e.touches = type === 'touchend' ? [] : [{ clientY: y }];
+          dialog().dispatchEvent(e);
+        });
+      await touch('touchstart', 0);
+      await touch('touchmove', 200);
+      await touch('touchend', 200);
+    };
+    const ways = [() => click(document.querySelector('[data-sheet-close]')), () => click(q('sheet-backdrop')), swipe];
+    for (const closeIt of ways) {
+      window.history.replaceState(null, '');
+      const spy = vi.spyOn(window.history, 'back');
+      await render([sized(mk('CL', { payments: [pay(10, back(1))] }))]);
+      await click(q('acc-hud'));
+      expect(window.history.state).toMatchObject({ modalOpen: true });
+      await closeIt();
+      await flush(30);
+      expect(q('acc-sheet')).toBeNull();
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(window.history.state?.modalOpen).toBeUndefined(); // no leftover: no "Back twice"
+      spy.mockRestore();
+    }
+  });
+
+  it('el botón Atrás físico (popstate) solo cierra la ficha: no llama history.back otra vez ni se propaga', async () => {
+    await render([sized(mk('CL', { payments: [pay(10, back(1))] }))]);
+    const spy = vi.spyOn(window.history, 'back');
+    const seen = vi.fn();
+    window.addEventListener('popstate', seen); // a bubbling listener = "the rest of the app"
+    await click(q('acc-hud'));
+    await act(async () => {
+      window.history.back(); // the device's back: the real pop, not our own
+    });
+    await flush(30);
+    spy.mockClear();
+    window.removeEventListener('popstate', seen);
+    expect(q('acc-sheet')).toBeNull();
+    expect(q('acc-hud')).not.toBeNull();
+    expect(spy).not.toHaveBeenCalled(); // the entry was already consumed by the user's Back
+    expect(seen).not.toHaveBeenCalled(); // consumed: stopImmediatePropagation
+  });
+
   it('cerrar con ✕ retira la entrada del historial (no se acumula) y no toca el marcador de proyecto', async () => {
     await render([sized(mk('CL', { payments: [pay(10, back(1))] }))]);
     await click(q('acc-hud'));
@@ -464,6 +526,15 @@ describe('Vista Contabilidad Global', () => {
     await flush(50);
     expect(window.history.state?.cubraxSheet).toBeUndefined();
     expect(window.history.state?.cubraxProject).toBeUndefined();
+  });
+
+  it('si la vista se desmonta con la ficha abierta tampoco deja basura en el historial', async () => {
+    await render([sized(mk('CL', { payments: [pay(10, back(1))] }))]);
+    await click(q('acc-hud'));
+    expect(window.history.state?.cubraxSheet).toBe('open');
+    await render([]); // same root: the GlobalAccounting stays, the sheet goes away with the list
+    await flush(50);
+    expect(window.history.state?.cubraxSheet).toBeUndefined();
   });
 
   it('con una lista vacía solo se ve el estado vacío (sin HUD)', async () => {

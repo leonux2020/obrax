@@ -300,6 +300,9 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     closeProject();
   }, [closeProject]);
   useHistoryBack(activeId, leaveByBack);
+  // Bottom navigation: Contabilidad is ONE history entry on top of Proyectos, so the device's Back goes ordered to the previous screen
+  // (Proyectos) instead of leaving the app; tapping "Proyectos" drops that entry. A project / sheet opened over it stacks on top.
+  useHistoryBack(tab === 'accounting' ? 'accounting' : null, () => setTab('projects'), 'cubraxTab');
 
   // The open project's draft: all wizard / project-view edits flow through here.
   const setDraft = useCallback(

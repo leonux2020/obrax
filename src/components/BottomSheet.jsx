@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
+import { useHistoryBack } from '../lib/useHistoryBack.js';
 
 const SWIPE_CLOSE_PX = 90;
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
@@ -8,10 +9,13 @@ const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([di
  * Bottom sheet (one-hand ergonomics): anchored to the bottom of the screen, pure #000 with an ultra
  * thin border. Focus is trapped inside, Escape / backdrop close it and focus returns to the opener.
  */
-export default function BottomSheet({ title, subtitle, onClose, fullscreen = false, swipeToClose = false, children }) {
+export default function BottomSheet({ title, subtitle, onClose, fullscreen = false, swipeToClose = false, backClose = false, children }) {
   const { t } = useI18n();
   const titleId = useId();
   const ref = useRef(null);
+  // backClose: while the sheet is open ONE history entry ({ modalOpen: true }) is pushed; the device's Back pops it and only closes the
+  // sheet (the screen underneath stays). Any other way of closing (x, backdrop, swipe, Escape) drops that entry, so no "Back twice".
+  useHistoryBack(backClose ? 'open' : null, onClose, 'cubraxSheet', { state: { modalOpen: true }, cleanup: true });
   const drag = useRef(null); // { y0, dy } while a downward swipe that started at the very top of the sheet is under way
 
   // opt-in swipe down to close: only when the sheet is scrolled to its top, past SWIPE_CLOSE_PX it closes, otherwise it springs back
@@ -70,8 +74,13 @@ export default function BottomSheet({ title, subtitle, onClose, fullscreen = fal
   }, []);
 
   return (
-    <div className="no-print fixed inset-0 z-50 flex items-end justify-center bg-black/80">
-      <button type="button" tabIndex={-1} aria-hidden="true" className="absolute inset-0 cursor-default" onClick={onClose} />
+    <div
+      className="no-print fixed inset-0 z-50 flex items-end justify-center bg-black/80"
+      data-testid="sheet-backdrop"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose(); // only the dark area: a tap inside the sheet does nothing
+      }}
+    >
       <div
         ref={ref}
         role="dialog"
