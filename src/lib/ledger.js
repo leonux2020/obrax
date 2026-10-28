@@ -7,6 +7,7 @@
 //   location  - where the job is (coordinates of the phone when the user taps "ubicación actual")
 
 import { sanitizeText } from './sanitize.js';
+import { getRegion, taxRateFor } from './regions.js';
 
 export const LEDGER_LIMITS = Object.freeze({ payments: 200, advances: 200, expenses: 500, logbook: 500, maxAmount: 1e12, noteChars: 80, logChars: 2000 });
 
@@ -138,3 +139,142 @@ export function rentalsDue(expenses = [], now = Date.now()) {
 }
 
 export const hasRentalDue = (project, now = Date.now()) => rentalsDue(project?.expenses, now).length > 0;
+
+// ---- Contabilidad Global: pure aggregation over the projects already stored (no new data, no schema change) -------------------------
+// Money of different currencies is NEVER added together: every aggregate is a list [{ currency, regionCode, amount }] with one
+// line per currency (sorted by currency code), formatted by the caller with the money of that market.
+
+const DAY_MS = 86_400_000;
+const arr = (v) => (Array.isArray(v) ? v.filter((x) => x && typeof x === 'object') : []);
+const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+const total = (list) => cents(arr(list).reduce((s, x) => s + num(x.amount), 0));
+
+/** A project that is still running (not finished / historical). */
+export const isActiveProject = (project) => !(Number(project?.closedAt) > 0);
+
+/** Currency and market of a project (its own country, not the app's). */
+export const projectMarket = (project) => {
+  const region = getRegion(project?.draft?.regionCode);
+  return { currency: region ? region.currency : '', regionCode: region ? region.code : project?.draft?.regionCode || '' };
+};
+
+/** Real cash of ONE project: Σ client payments - Σ expenses - Σ worker advances. */
+export const projectLiquidity = (project) => liquidity(arr(project?.payments), arr(project?.expenses), arr(project?.advances));
+
+/** Tax rate applied to ONE project (the market's, or the one the contractor set where it is editable): 0.19 = 19 %. */
+export function projectTaxRate(project) {
+  const region = getRegion(project?.draft?.regionCode);
+  return region ? taxRateFor(region, project?.draft?.finance) : 0;
+}
+
+/**
+ * Tax contained in an amount that was collected WITH tax included (the quote total includes it): amount x rate / (1 + rate).
+ * 119 collected at 19 % holds 19 of tax. Never negative, to the cent.
+ */
+export const taxIncluded = (amount, rate) => (num(amount) > 0 && num(rate) > 0 ? cents((num(amount) * num(rate)) / (1 + num(rate))) : 0);
+
+/** Σ tax contained in what the client really paid on ONE project. */
+export const projectTaxReserve = (project) => taxIncluded(total(project?.payments), projectTaxRate(project));
+
+/** Pending to collect from the client on ONE project (budget with tax - payments), 0 when the quote is not valid yet. */
+export const projectReceivable = (project, budget) => (num(budget) > 0 ? cents(Math.max(0, num(budget) - total(project?.payments))) : 0);
+
+/** The most recent REAL interaction of a project: newest of logbook notes, expenses, client payments and worker advances. 0 if none. */
+export function getLastProjectActivity(project) {
+  let last = 0;
+  for (const list of [project?.logbook, project?.expenses, project?.payments, project?.advances]) {
+    for (const entry of arr(list)) if (num(entry.at) > last) last = num(entry.at);
+  }
+  return last;
+}
+
+/** Order key of the accounting list: last movement, or (while there is none) the creation / last edit of the project. */
+export const activityKey = (project) => getLastProjectActivity(project) || num(project?.createdAt) || num(project?.updatedAt);
+
+/** Whole calendar days between a moment and now (0 = today, 1 = yesterday...), or null without a moment. Never negative. */
+export function daysAgo(ms, now = Date.now()) {
+  if (!(num(ms) > 0)) return null;
+  const a = new Date(num(ms));
+  const b = new Date(now);
+  const diff = Math.round((new Date(b.getFullYear(), b.getMonth(), b.getDate()) - new Date(a.getFullYear(), a.getMonth(), a.getDate())) / DAY_MS);
+  return Math.max(0, diff);
+}
+
+/** Projects, most recent movement first (stable: the input order breaks ties). */
+export const sortByActivity = (projects) =>
+  arr(projects)
+    .map((p, i) => ({ p, i, k: activityKey(p) }))
+    .sort((a, b) => b.k - a.k || a.i - b.i)
+    .map((x) => x.p);
+
+/** Days since the last client payment (or since the project began while nothing was paid), or null. */
+export const daysWithoutPayment = (project, now = Date.now()) => daysAgo(Math.max(0, ...arr(project?.payments).map((x) => num(x.at))) || num(project?.createdAt), now);
+
+/** Collection warning: balance still pending and more than `limit` days without a payment. Returns the days, or 0 when all is well. */
+export function collectionDelay(project, budget, now = Date.now(), limit = 15) {
+  if (!isActiveProject(project) || !(projectReceivable(project, budget) > 0)) return 0;
+  const days = daysWithoutPayment(project, now);
+  return days !== null && days > limit ? days : 0;
+}
+
+/** Adds `valueOf(project)` of every ACTIVE project per currency -> [{ currency, regionCode, amount }]. Empty list when nothing to add. */
+function perCurrency(projects, valueOf) {
+  const lines = new Map();
+  for (const p of arr(projects)) {
+    if (!isActiveProject(p)) continue;
+    const { currency, regionCode } = projectMarket(p);
+    if (!currency) continue; // unknown market: there is no money to format
+    const line = lines.get(currency) ?? { currency, regionCode, amount: 0 };
+    line.amount = cents(line.amount + num(valueOf(p)));
+    lines.set(currency, line);
+  }
+  return [...lines.values()].sort((a, b) => a.currency.localeCompare(b.currency));
+}
+
+/** Net cash available across the active projects (Σ payments - Σ expenses - Σ advances), per currency. */
+export const globalLiquidity = (projects) => perCurrency(projects, projectLiquidity);
+
+/** Tax shield: tax contained in the payments really collected, per currency (the amount to set aside for the tax office). */
+export const globalTaxReserve = (projects) => perCurrency(projects, projectTaxReserve);
+
+/** Pending to collect from clients (budget - payments), per currency. `budgets` is Map(projectId -> total with tax | null). */
+export const globalReceivables = (projects, budgets) => perCurrency(projects, (p) => projectReceivable(p, budgets?.get?.(p.id)));
+
+/** Active projects with a collection warning -> [{ id, days }] (`budgets` as in globalReceivables). */
+export const lateCollections = (projects, budgets, now = Date.now(), limit = 15) =>
+  arr(projects)
+    .map((p) => ({ id: p.id, days: collectionDelay(p, budgets?.get?.(p.id), now, limit) }))
+    .filter((x) => x.days > 0);
+
+/**
+ * "12 Mar – 28 Apr 2026": the project's dates (start - estimated end); only the start when there is no end; the creation date when
+ * there are none. Returns { kind: 'range' | 'start' | 'created' | 'none', text }. Never throws on missing / odd dates.
+ */
+export function projectDateRange(project, locale = 'es') {
+  const parse = (v) => {
+    if (typeof v !== 'string' || !DAY_RE.test(v)) return null;
+    const [y, m, d] = v.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d ? date : null;
+  };
+  let fmt;
+  try {
+    fmt = (date, opts) => new Intl.DateTimeFormat(locale, opts).format(date);
+    fmt(new Date(), {});
+  } catch {
+    fmt = (date, opts) => new Intl.DateTimeFormat('es', opts).format(date);
+  }
+  const start = parse(project?.startDate);
+  const end = parse(project?.endDate);
+  const dm = { day: 'numeric', month: 'short' };
+  const dmy = { ...dm, year: 'numeric' };
+  if (start && end) {
+    const sameYear = start.getFullYear() === end.getFullYear();
+    return { kind: 'range', text: `${fmt(start, sameYear ? dm : dmy)} – ${fmt(end, dmy)}` };
+  }
+  if (start) return { kind: 'start', text: fmt(start, dmy) };
+  if (end) return { kind: 'start', text: fmt(end, dmy) };
+  const created = num(project?.createdAt);
+  if (created > 0) return { kind: 'created', text: fmt(new Date(created), dmy) };
+  return { kind: 'none', text: '' };
+}

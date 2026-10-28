@@ -190,3 +190,10 @@ export function searchRegions(query, lang = 'es') {
     : all;
   return [...hits].sort((a, b) => regionName(a, lang).localeCompare(regionName(b, lang), lang));
 }
+
+/** Tax rate actually applied: the user's value for editable regions, otherwise the official rate. */
+export function taxRateFor(region, finance) {
+  const custom = finance && typeof finance.tax === 'number' ? finance.tax : null;
+  if (region.taxEditable && custom !== null && custom >= 0 && custom <= 50) return custom / 100;
+  return region.taxRate;
+}

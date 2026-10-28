@@ -5,7 +5,7 @@
 // User manual corrections always win over the reference price.
 
 import { CATALOG } from './catalog.js';
-import { getRegion } from './regions.js';
+import { getRegion, taxRateFor } from './regions.js';
 import { liveMaterial, savedMaterial } from './priceBook.js';
 import { baseUsd } from './baseCatalog.js';
 
@@ -209,12 +209,8 @@ export function planAll(partidas) {
   return plans;
 }
 
-/** Tax rate actually applied: the user's value for editable regions, otherwise the official rate. */
-export function taxRateFor(region, finance) {
-  const custom = finance && typeof finance.tax === 'number' ? finance.tax : null;
-  if (region.taxEditable && custom !== null && custom >= 0 && custom <= 50) return custom / 100;
-  return region.taxRate;
-}
+// (lives in regions.js, which has no dependencies, so the ledger can use it on the server too)
+export { taxRateFor };
 
 /** Accept the multi-partida shape, or the legacy single-list shape used by older callers/tests. */
 function toPartidas({ partidas, lines, finance }) {
