@@ -166,20 +166,51 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   backupOnRef.current = backupOn && !wipingRef.current;
 
   // ---- Google Drive backup (silent) ---------------------------------------------------------------------------
-  const driveClient = useMemo(() => createDriveClient({ getToken: async () => getDriveToken(), onAuthRejected: () => clearDriveToken() }), []);
+  const userRef = useRef(null);
+  userRef.current = user;
+  // a 401 (the token expired while working) renews it SILENTLY (no Google screen) and repeats the request: the user never notices
+  const driveClient = useMemo(
+    () =>
+      createDriveClient({
+        getToken: async () => getDriveToken(),
+        refreshToken: () => ensureDriveToken({ interactive: false, hint: userRef.current?.email || '' }),
+        onAuthRejected: () => clearDriveToken(),
+      }),
+    []
+  );
   const sync = useMemo(
     () =>
       createDriveSync({
         client: driveClient,
         collect: () => collectBackup({ ...latest.current, projects: latest.current.projects || [], loadPhotos: (id) => photoStoreFor(id).load().catch(() => []), loadNotePhotos: (p) => readNotePhotos(notePhotosFor(p.id), p.logbook) }),
         // in the background Google is only asked (silently) when this device has been connected before
-        ensureToken: ({ interactive }) => (interactive || isDriveLinked() ? ensureDriveToken({ interactive }) : Promise.resolve(getDriveToken())),
+        ensureToken: ({ interactive }) => (interactive || isDriveLinked() ? ensureDriveToken({ interactive, hint: userRef.current?.email || '' }) : Promise.resolve(getDriveToken())),
         isEnabled: () => backupOnRef.current,
       }),
     [driveClient]
   );
   const [backup, setBackup] = useState(() => sync.getState());
   useEffect(() => sync.subscribe(setBackup), [sync]);
+  // No coverage: ONE discreet toast per offline episode ("the backup will be tried when the signal returns"); the pending change
+  // is uploaded by itself when the browser reports the connection is back.
+  useEffect(() => {
+    let told = false;
+    const off = sync.subscribe((st) => {
+      if (st.status === 'pending' && st.reason === 'offline') {
+        if (!told) pushToast({ key: 'backup.offline.toast', tone: 'amber', ms: 6000 });
+        told = true;
+      } else if (st.status === 'synced') told = false;
+    });
+    const online = () => {
+      told = false;
+      sync.retryNow().catch(() => {});
+    };
+    window.addEventListener('online', online);
+    return () => {
+      off();
+      window.removeEventListener('online', online);
+    };
+  }, [sync]);
 
   useEffect(() => saveSettings(settings), [settings]);
   useEffect(() => saveUser(user), [user]);
@@ -474,7 +505,8 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   // settings only fill an empty device), writes IndexedDB and then updates the screen state.
   const restoreFromDrive = useCallback(
     async ({ interactive = false } = {}) => {
-      const token = await ensureDriveToken({ interactive });
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return { ok: false, reason: 'offline' }; // no coverage: nothing to ask
+      const token = await ensureDriveToken({ interactive, hint: userRef.current?.email || '' });
       if (!token) return { ok: false, reason: 'auth' };
       try {
         const found = await driveClient.latestBackup(parseBackup);

@@ -60,7 +60,7 @@ describe('Drive backup (device A)', () => {
     expect(q('backup-status').dataset.status).toBe('idle'); // nothing in Drive yet
     await click(q('backup-now'));
     await flush(60);
-    expect(drive.folders().map((f) => f.name)).toEqual(['CUBRAX']);
+    expect(drive.folders().map((f) => f.name)).toEqual(['CUBRAX - Respaldos Obra']);
     expect(drive.backupFiles()).toHaveLength(1);
     const b = backedUp();
     expect(names()).toEqual(['Casa Norte']);

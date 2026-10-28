@@ -75,9 +75,12 @@ const driveError = (code) => Object.assign(new Error(`drive:${code}`), { code })
 /**
  * Ask Google (consent pop-up of Google Identity Services) for access to the app's own Drive folder.
  * Resolves { granted: true } only when Google confirms the scope; rejects with an Error whose `code` is
- * 'not_configured' | 'offline' | 'denied' | 'popup' (the pop-up could not open). The access token is kept for this browser session only (driveToken.js), never persisted: it is what the silent backup uses.
+ * 'not_configured' | 'offline' | 'denied' | 'popup' (the pop-up could not open). The access token is kept only while it is valid (driveToken.js): it is what the silent backup uses.
+ * `prompt: 'none'` is the SILENT renewal (no screen: it works while Google still remembers the consent, else it rejects 'denied');
+ * it gives up after `silentTimeoutMs` ('timeout') so a blocked silent request never leaves the backup waiting. `hint` (the Google
+ * account e-mail) lets Google pick the right account without asking.
  */
-export async function requestDriveAccess({ clientId = GOOGLE_CLIENT_ID, enabled = googleConfigured, load = loadGsi, prompt = '' } = {}) {
+export async function requestDriveAccess({ clientId = GOOGLE_CLIENT_ID, enabled = googleConfigured, load = loadGsi, prompt = '', hint = '', silentTimeoutMs = 15_000 } = {}) {
   if (!enabled) throw driveError('not_configured');
   let google;
   try {
@@ -88,9 +91,17 @@ export async function requestDriveAccess({ clientId = GOOGLE_CLIENT_ID, enabled 
   const oauth = google?.accounts?.oauth2;
   if (!oauth?.initTokenClient) throw driveError('offline');
   return new Promise((resolve, reject) => {
+    const timer = prompt === 'none' && silentTimeoutMs > 0 ? setTimeout(() => reject(driveError('timeout')), silentTimeoutMs) : null;
+    const done = (fn) => (v) => {
+      clearTimeout(timer);
+      fn(v);
+    };
+    resolve = done(resolve);
+    reject = done(reject);
     const client = oauth.initTokenClient({
       client_id: clientId,
       scope: DRIVE_SCOPE,
+      ...(hint ? { hint } : {}),
       callback: (resp) => {
         const ok = resp?.access_token && !resp.error && (typeof oauth.hasGrantedAllScopes !== 'function' || oauth.hasGrantedAllScopes(resp, DRIVE_SCOPE));
         if (ok) {
@@ -110,13 +121,21 @@ export async function requestDriveAccess({ clientId = GOOGLE_CLIENT_ID, enabled 
  * `interactive: false` never shows a screen (works only while Google still remembers the consent, else resolves
  * null), `interactive: true` may open the consent pop-up (call it from a tap). Never throws.
  */
-export async function ensureDriveToken({ interactive = false, request = requestDriveAccess } = {}) {
+export async function ensureDriveToken({ interactive = false, request = requestDriveAccess, hint = '' } = {}) {
   const held = getDriveToken();
   if (held) return held;
-  try {
-    await request({ prompt: interactive ? '' : 'none' });
-  } catch {
-    return null;
-  }
-  return getDriveToken();
+  // ONE request at a time (single flight): a backup round and a 401 renewal asking together share the same answer
+  const key = interactive ? 'interactive' : 'silent';
+  renewals[key] ??= (async () => {
+    try {
+      await request({ prompt: interactive ? '' : 'none', ...(hint ? { hint } : {}) });
+    } catch {
+      return null;
+    } finally {
+      renewals[key] = null;
+    }
+    return getDriveToken();
+  })();
+  return renewals[key];
 }
+const renewals = { silent: null, interactive: null };

@@ -31,6 +31,7 @@ export function createDriveSync({
   now = () => Date.now(),
   debounceMs = 3000,
   silentRetryMs = 60_000,
+  isOnline = () => typeof navigator === 'undefined' || navigator.onLine !== false, // false = airplane mode / no coverage
   setTimer = (fn, ms) => setTimeout(fn, ms),
   clearTimer = (id) => clearTimeout(id),
 }) {
@@ -56,6 +57,11 @@ export function createDriveSync({
   };
 
   async function round({ interactive }) {
+    if (!isOnline()) {
+      // no coverage: nothing is sent (it cannot crash or hang); the change stays pending and goes up when the signal returns
+      emit({ status: 'pending', reason: 'offline', dirty: true });
+      return { ok: false, reason: 'offline' };
+    }
     const silentBlocked = !interactive && lastSilentFail && now() - lastSilentFail < silentRetryMs;
     const token = silentBlocked ? null : await ensureToken({ interactive });
     if (!token) {
@@ -124,6 +130,11 @@ export function createDriveSync({
     /** Resume after start-up / re-enable: upload whatever was left pending. */
     resume() {
       if (state.dirty) schedule();
+    },
+    /** The signal came back (browser 'online' event): upload what was left pending, silently. */
+    retryNow() {
+      if (!state.dirty || !isEnabled()) return Promise.resolve({ ok: true });
+      return flush();
     },
     flush,
     getState: () => ({ ...state }),

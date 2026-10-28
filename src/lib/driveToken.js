@@ -1,6 +1,9 @@
-// The Google Drive access token (OAuth, scope drive.file). It is short-lived (≈1 h) and is kept ONLY for the
-// current browser session: in memory, mirrored in sessionStorage so a full-page OAuth redirect or a reload does not
-// lose it. It is never written to localStorage / IndexedDB, and signing out erases it (see session.js).
+// The Google Drive access token (OAuth, scope drive.file). Google Identity Services issues NO refresh token to a browser app
+// (that needs a server secret), so the token is short-lived (≈1 h) and the "persistent login" is built from two pieces:
+//   - the token itself, kept while it is valid: in memory, mirrored in sessionStorage (a reload / OAuth redirect keeps it) and in
+//     localStorage (closing and reopening the PWA keeps it). It is bound to its own expiry: an expired, refused (401) or signed-out
+//     token is erased from every place (session.js wipes localStorage at sign-out). drive.file can only touch files the app created.
+//   - the "linked" flag: this device has consented before, so a NEW token is requested silently (prompt: 'none') without any screen.
 
 export const DRIVE_TOKEN_KEY = 'cp.drive.token.v1';
 export const DRIVE_LINKED_KEY = 'cp.drive.linked.v1'; // "this device has been connected to Drive before" (no secret): allows silent re-connection
@@ -18,13 +21,22 @@ const session = () => {
 };
 
 /** Remember a token returned by Google. Returns true when it was accepted. */
-export function setDriveToken(token, expiresInSec = 3600, { storage = session(), now = Date.now(), linked = typeof localStorage === 'undefined' ? null : localStorage } = {}) {
+const local = () => {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage;
+  } catch {
+    return null;
+  }
+};
+
+export function setDriveToken(token, expiresInSec = 3600, { storage = session(), now = Date.now(), linked = local() } = {}) {
   if (typeof token !== 'string' || !TOKEN_RE.test(token)) return false;
   const secs = Number(expiresInSec);
   const rec = { token, exp: now + (Number.isFinite(secs) && secs > 0 ? Math.min(secs, 3600) : 3600) * 1000 - SAFETY_MS };
   memory = rec;
   try {
     storage?.setItem(DRIVE_TOKEN_KEY, JSON.stringify(rec));
+    if (linked && linked !== storage) linked.setItem(DRIVE_TOKEN_KEY, JSON.stringify(rec)); // survives closing the PWA while valid
     linked?.setItem(DRIVE_LINKED_KEY, '1');
   } catch {
     /* memory only */
@@ -33,30 +45,37 @@ export function setDriveToken(token, expiresInSec = 3600, { storage = session(),
 }
 
 /** The current valid token, or null. */
-export function getDriveToken({ storage = session(), now = Date.now() } = {}) {
+export function getDriveToken({ storage = session(), now = Date.now(), persistent = local() } = {}) {
   let rec = memory;
   if (!rec) {
-    try {
-      const raw = JSON.parse(storage?.getItem(DRIVE_TOKEN_KEY) ?? 'null');
-      if (raw && typeof raw.token === 'string' && TOKEN_RE.test(raw.token) && Number.isFinite(raw.exp)) rec = raw;
-    } catch {
-      rec = null;
+    for (const store of [storage, persistent]) {
+      try {
+        const raw = JSON.parse(store?.getItem(DRIVE_TOKEN_KEY) ?? 'null');
+        if (raw && typeof raw.token === 'string' && TOKEN_RE.test(raw.token) && Number.isFinite(raw.exp) && raw.exp > now) {
+          rec = raw;
+          break;
+        }
+      } catch {
+        /* unreadable copy: the next store / null */
+      }
     }
   }
   if (!rec || rec.exp <= now) {
-    clearDriveToken({ storage });
+    clearDriveToken({ storage, persistent });
     return null;
   }
   memory = rec;
   return rec.token;
 }
 
-export function clearDriveToken({ storage = session() } = {}) {
+export function clearDriveToken({ storage = session(), persistent = local() } = {}) {
   memory = null;
-  try {
-    storage?.removeItem?.(DRIVE_TOKEN_KEY);
-  } catch {
-    /* ignore */
+  for (const store of [storage, persistent]) {
+    try {
+      store?.removeItem?.(DRIVE_TOKEN_KEY);
+    } catch {
+      /* ignore */
+    }
   }
 }
 

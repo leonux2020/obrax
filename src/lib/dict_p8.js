@@ -162,6 +162,7 @@ export const P8 = {
     'acc.sheet.rec': 'Por cobrar',
     'acc.sheet.rec.none': 'Nada pendiente de cobro',
     'acc.sheet.rec.late': '{n} d sin abonos',
+    'backup.offline.toast': 'Sin conexión. El respaldo se intentará cuando recupere la señal',
   },
   en: {
     'ws.locked': 'Prices locked',
@@ -324,6 +325,7 @@ export const P8 = {
     'acc.sheet.rec': 'To collect',
     'acc.sheet.rec.none': 'Nothing pending to collect',
     'acc.sheet.rec.late': '{n} d without payments',
+    'backup.offline.toast': 'No connection. The backup will be tried when the signal returns',
   },
   pt: {
     'ws.locked': 'Preços bloqueados',
@@ -486,6 +488,7 @@ export const P8 = {
     'acc.sheet.rec': 'A receber',
     'acc.sheet.rec.none': 'Nada pendente de recebimento',
     'acc.sheet.rec.late': '{n} d sem pagamentos',
+    'backup.offline.toast': 'Sem conexão. O backup será tentado quando o sinal voltar',
   },
   fr: {
     'ws.locked': 'Prix verrouillés',
@@ -648,6 +651,7 @@ export const P8 = {
     'acc.sheet.rec': 'À encaisser',
     'acc.sheet.rec.none': 'Rien à encaisser',
     'acc.sheet.rec.late': '{n} j sans acompte',
+    'backup.offline.toast': 'Hors connexion. La sauvegarde sera tentée au retour du signal',
   },
   it: {
     'ws.locked': 'Prezzi bloccati',
@@ -810,6 +814,7 @@ export const P8 = {
     'acc.sheet.rec': 'Da incassare',
     'acc.sheet.rec.none': 'Niente da incassare',
     'acc.sheet.rec.late': '{n} g senza acconti',
+    'backup.offline.toast': 'Nessuna connessione. Il backup verrà ritentato quando torna il segnale',
   },
   de: {
     'ws.locked': 'Preise gesperrt',
@@ -972,5 +977,6 @@ export const P8 = {
     'acc.sheet.rec': 'Ausstehend',
     'acc.sheet.rec.none': 'Nichts offen',
     'acc.sheet.rec.late': '{n} T ohne Zahlung',
+    'backup.offline.toast': 'Keine Verbindung. Die Sicherung wird versucht, sobald das Signal zurück ist',
   },
 };

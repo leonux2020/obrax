@@ -1,7 +1,7 @@
 import { useI18n } from '../../lib/i18n.jsx';
 import { dismissToast, useToasts } from '../../lib/notify.js';
 
-const TONE = { info: '#E0E0E0', ok: '#00d95f', warn: '#ff9500' };
+const TONE = { info: '#E0E0E0', ok: '#00d95f', warn: '#ff9500', amber: '#e8c35f' };
 
 /** In-app toasts, above the dock. Colour only on the left border and the text, never as a fill. */
 export default function ToastHost() {

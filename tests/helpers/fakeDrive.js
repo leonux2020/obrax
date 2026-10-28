@@ -1,6 +1,7 @@
 // A tiny in-memory imitation of the parts of the Google Drive v3 REST API the CUBRAX backup uses
 // (list / create folder / multipart create / media update / media download). It enforces the bearer token.
-export function createFakeDrive({ token = 'tok-valid-123456' } = {}) {
+export function createFakeDrive({ token: initialToken = 'tok-valid-123456' } = {}) {
+  let token = initialToken; // the token Drive accepts; rotate() = the old one expired
   const files = new Map(); // id -> { id, name, mimeType, parents, body, modifiedTime }
   const calls = [];
   let n = 0;
@@ -35,7 +36,7 @@ export function createFakeDrive({ token = 'tok-valid-123456' } = {}) {
     if (method === 'POST' && u.pathname === '/drive/v3/files') {
       const meta = JSON.parse(init.body);
       n += 1;
-      const f = { id: `fld${n}xxxxxx`, name: meta.name, mimeType: meta.mimeType, parents: [], body: '', modifiedTime: (clock += 1) };
+      const f = { id: `fld${n}xxxxxx`, name: meta.name, mimeType: meta.mimeType, parents: meta.parents || [], body: '', modifiedTime: (clock += 1) };
       files.set(f.id, f);
       return res({ id: f.id });
     }
@@ -64,7 +65,12 @@ export function createFakeDrive({ token = 'tok-valid-123456' } = {}) {
   };
 
   return {
-    token,
+    get token() {
+      return token;
+    },
+    rotate: (next) => {
+      token = next;
+    },
     files,
     calls,
     state,
