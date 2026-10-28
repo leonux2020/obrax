@@ -34,7 +34,7 @@ import { ensureDriveToken, googleConfigured, GOOGLE_CONFIG_STATUS, localUser } f
 import { clearDriveToken, getDriveToken, isDriveLinked } from './lib/driveToken.js';
 import { createDriveClient } from './lib/drive.js';
 import { createDriveSync } from './lib/driveSync.js';
-import { collectBackup, isDeviceEmpty, parseBackup, restoreBackup } from './lib/backup.js';
+import { collectBackup, hasNoProjects, parseBackup, restoreBackup } from './lib/backup.js';
 import { projectLimitReached } from './lib/pro.js';
 import { usePro } from './lib/usePro.js';
 import { usePriceFeed } from './lib/usePrices.js';
@@ -63,7 +63,7 @@ import { clearOAuthResult, connectDrive, peekOAuthResult } from './lib/oauthCall
 import SplashScreen, { SPLASH_TIMING } from './components/SplashScreen.jsx';
 import ProfileSetup from './components/ProfileSetup.jsx';
 import ProPaywall from './components/ProPaywall.jsx';
-import RestoreScreen from './components/RestoreScreen.jsx';
+import RestorePrompt from './components/RestorePrompt.jsx';
 
 // Loads the saved projects and performs the one-off migration of the pre-dashboard single draft.
 // It is shared (one in-flight promise) so React StrictMode's double effect — or a quick remount —
@@ -158,7 +158,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   projectsRef.current = projects ?? projectsRef.current;
   const wipingRef = useRef(false); // true while signing out: nothing may be written back to the (erased) device
   activeRef.current = active;
-  const [restoring, setRestoring] = useState(false); // reading the Drive backup before the Dashboard is shown
+  const [restoreOffer, setRestoreOffer] = useState(false); // Drive holds a backup and this device has no work: the one-click restore sheet
   const latest = useRef(null); // the CURRENT state, read by the backup engine and the restore
   latest.current = { settings, company, meta, logo, projects };
   const backupOn = googleConfigured && meta.drive;
@@ -193,6 +193,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   useEffect(() => sync.subscribe(setBackup), [sync]);
   // "This device is connected to Google Drive": a consent was given here before (or a copy has gone up)
   const [linkedNow, setLinkedNow] = useState(false);
+  const offerRef = useRef(null); // offerRestore (defined with the restore code below)
   const driveLinked = linkedNow || backup.at > 0 || isDriveLinked() || Boolean(getDriveToken());
   // Google's own authorization (pop-up; full-page redirect when the browser blocks it). As soon as it is granted the exclusive folder is
   // created and the first backup goes up in the background (sync.flush: find / create "CUBRAX - Respaldos Obra", then upload).
@@ -205,6 +206,9 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     }
     setLinkedNow(true);
     setMeta((m) => (m.drive ? m : { ...m, drive: true }));
+    // a backup already in this Google account and nothing on this device: offer to restore it (uploads wait, so it is never overwritten)
+    const offer = await offerRef.current?.();
+    if (offer?.offered) return { ok: true, offered: true };
     sync.flush({ force: true, interactive: true }).catch(() => {}); // in the background: the card shows "Sincronizando…" then "Último respaldo"
     return { ok: true };
   }, [sync]);
@@ -225,7 +229,10 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     if (!oauth?.granted || returnedBackup.current || projects === null || !googleConfigured || !meta.onboarded) return;
     returnedBackup.current = true;
     setLinkedNow(true);
-    sync.flush({ force: true }).catch(() => {});
+    Promise.resolve(offerRef.current?.())
+      .catch(() => null)
+      .then((offer) => (offer?.offered ? null : sync.flush({ force: true }))) // an existing backup is offered first, never overwritten
+      .catch(() => {});
   }, [oauth, projects, meta.onboarded, sync]);
   // No coverage: ONE discreet toast per offline episode ("the backup will be tried when the signal returns"); the pending change
   // is uploaded by itself when the browser reports the connection is back.
@@ -546,7 +553,10 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
       if (!token) return { ok: false, reason: 'auth' };
       try {
         const found = await driveClient.latestBackup(parseBackup);
-        if (!found) return { ok: true, restored: false };
+        if (!found) {
+          sync.release(); // nothing usable in the cloud: there is nothing to protect
+          return { ok: true, restored: false };
+        }
         const local = latest.current;
         const merged = await restoreBackup({ ...local, projects: local.projects || [] }, found.value, { projectStore, photoStoreFor, notePhotosFor, logoStore });
         setProjects(merged.projects);
@@ -556,18 +566,43 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
           setSettings(merged.settings);
           setMeta(merged.meta);
         } else setMeta((m) => (m.drive ? m : { ...m, drive: true }));
+        sync.release(); // the cloud copy is now part of this device: uploads resume
         return { ok: true, restored: true, profile: merged.profileRestored, company: merged.company, projects: merged.wonProjects.length };
       } catch (err) {
         return { ok: false, reason: err?.code || 'error' };
       }
     },
-    [driveClient]
+    [driveClient, sync]
   );
-  // First-run setup connected Drive: if this Google account already has a backup, it is restored and the user lands
-  // on the Dashboard with everything back (nothing to type).
-  const onDriveConnected = useCallback(async () => {
-    if (!isDeviceEmpty(latest.current)) return { ok: true, restored: false };
-    const r = await restoreFromDrive();
+  // Light detection after a login: ONLY the metadata of cubrax-backup.json is requested (never its content). When the file exists and this
+  // device has no work, the one-click restore sheet opens and uploads are held so the cloud copy cannot be overwritten meanwhile.
+  const offerRestore = useCallback(
+    async ({ interactive = false } = {}) => {
+      if (!googleConfigured || (typeof navigator !== 'undefined' && navigator.onLine === false)) return { offered: false };
+      for (let i = 0; i < 40 && !Array.isArray(latest.current.projects); i += 1) await new Promise((res) => setTimeout(res, 50)); // IndexedDB still loading
+      if (!hasNoProjects(latest.current)) return { offered: false };
+      const token = await ensureDriveToken({ interactive, hint: userRef.current?.email || '' });
+      if (!token) return { offered: false };
+      try {
+        const found = await driveClient.peekBackup();
+        if (!found) {
+          sync.release();
+          return { offered: false };
+        }
+        if (!hasNoProjects(latest.current)) return { offered: false }; // the user started working while we looked
+        sync.hold();
+        setRestoreOffer(true);
+        return { offered: true, modifiedTime: found.modifiedTime || '' };
+      } catch {
+        return { offered: false };
+      }
+    },
+    [driveClient, sync]
+  );
+  offerRef.current = offerRestore;
+  // "Restaurar ahora": download + rebuild + hydrate. A backup that carries the profile also completes the first-run setup.
+  const restoreOffered = useCallback(async () => {
+    const r = await restoreFromDrive({ interactive: true });
     if (r.ok && r.restored && r.profile) {
       setUser((u) => u || localUser(r.company.proName || r.company.name));
       setStage('app');
@@ -575,6 +610,20 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     }
     return r;
   }, [restoreFromDrive]);
+  // after the short success message: the Dashboard with the projects just restored
+  const finishOffer = useCallback(() => {
+    setRestoreOffer(false);
+    setSheet(null);
+    setTab('projects');
+    closeProject();
+    window.scrollTo({ top: 0 });
+  }, [closeProject]);
+  // First-run setup connected Drive: if this Google account already has a backup, it is restored and the user lands
+  // on the Dashboard with everything back (nothing to type).
+  const onDriveConnected = useCallback(async () => {
+    const offer = await offerRestore();
+    return { ok: true, restored: false, offered: offer.offered };
+  }, [offerRestore]);
   // Successful sign-in (Google or local profile): the user is stored (effect above), and we land on the
   // main view: no splash, no open sheet, no pending region picker.
   const signIn = useCallback(
@@ -584,15 +633,10 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
       setPickingRegion(false);
       setStage('app');
       window.scrollTo({ top: 0 });
-      // Google on a new device / after signing out: look for the backup in Drive BEFORE the Dashboard is shown.
-      if (u.provider === 'google' && googleConfigured && isDeviceEmpty(latest.current)) {
-        setRestoring(true);
-        restoreFromDrive({ interactive: true })
-          .catch(() => null)
-          .finally(() => setRestoring(false));
-      }
+      // Google on a new device / after signing out: a light look in Drive (metadata only); a backup found is OFFERED, not forced.
+      if (u.provider === 'google' && googleConfigured) offerRef.current?.({ interactive: true })?.catch(() => null);
     },
-    [restoreFromDrive]
+    []
   );
 
   const returning = meta.onboarded || !isCompanyEmpty(company);
@@ -611,9 +655,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
 
   return (
     <I18nProvider lang={settings.lang} regionCode={active ? active.draft.regionCode : settings.region}>
-      {restoring ? (
-        <RestoreScreen />
-      ) : stage === 'splash' ? (
+      {stage === 'splash' ? (
         <SplashScreen onStart={start} auto={Boolean(user) || returning || Boolean(oauth)} timing={splash} pwa={pwa} />
       ) : stage === 'setup' ? (
         !region || pickingRegion ? (
@@ -748,9 +790,9 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
                 setSheet(null);
                 setPickingRegion(true);
               }}
-              backup={{ configured: googleConfigured, configStatus: GOOGLE_CONFIG_STATUS, enabled: backupOn, linked: driveLinked, state: backup }}
+              backup={{ configured: googleConfigured, configStatus: GOOGLE_CONFIG_STATUS, enabled: backupOn, linked: driveLinked, held: Boolean(backup.held), state: backup }}
               onBackupNow={async () => {
-                const r = await sync.flush({ force: true, interactive: true });
+                const r = await sync.flush({ force: true, interactive: true, override: true }); // the user's explicit choice also lifts the hold
                 if (r.ok) setMeta((m) => (m.drive ? m : { ...m, drive: true }));
                 return r;
               }}
@@ -763,6 +805,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
           <ToastHost />
         </>
       )}
+      {restoreOffer && <RestorePrompt onRestore={restoreOffered} onLater={() => setRestoreOffer(false)} onDone={finishOffer} />}
     </I18nProvider>
   );
 }

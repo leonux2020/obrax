@@ -192,6 +192,16 @@ export default function SettingsSheet({ user, company, logo, regionCode, pwa, dr
                 </div>
               </>
             )}
+            {backup.configured && backup.held && (
+              <div className="mt-3" data-testid="backup-held">
+                <p className="text-xs leading-snug text-[#e8c35f]">{t('backup.held')}</p>
+                {!(backup.enabled && backup.linked) && (
+                  <button type="button" onClick={restore} disabled={Boolean(working)} data-testid="backup-restore" className="mt-2 min-h-[44px] w-full rounded-lg border border-white/10 px-3 text-sm font-bold hover:border-brand disabled:opacity-50">
+                    {working === 'restore' ? t('restore.title') : t('backup.restore')}
+                  </button>
+                )}
+              </div>
+            )}
             {note && (
               <p className="mt-2 text-sm text-[#E0E0E0]/80" role="status" data-testid="backup-note">
                 {note}

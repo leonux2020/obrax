@@ -176,5 +176,18 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
     return legacy ? readFrom(legacy, accept) : null;
   }
 
-  return { findFolder, ensureFolder, saveBackup, latestBackup, forgetFolder: () => { folderId = null; } };
+  /**
+   * Light existence check: ONLY file metadata (id, name, modifiedTime) is requested, the backup content is never downloaded.
+   * Looks where `latestBackup` reads (the app folder, then the legacy "CUBRAX" one). Resolves { id, name, modifiedTime } or null.
+   */
+  async function peekBackup() {
+    const folder = await findFolder();
+    const [mine] = folder ? await backupsIn(folder) : [];
+    if (mine) return mine;
+    const legacy = await folderNamed(LEGACY_BACKUP_FOLDER);
+    const [old] = legacy ? await backupsIn(legacy) : [];
+    return old ?? null;
+  }
+
+  return { findFolder, ensureFolder, saveBackup, latestBackup, peekBackup, forgetFolder: () => { folderId = null; } };
 }

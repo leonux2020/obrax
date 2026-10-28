@@ -66,6 +66,9 @@ describe('Restore from Drive on a new device (setup screen)', () => {
     expect(q('setup')).not.toBeNull(); // a new device starts at the registration...
     await click(q('setup-drive')); // ...connects Drive (Google consent)...
     await flush(200);
+    expect(q('restore-offer')).not.toBeNull(); // a backup was found (metadata only): the one-click offer opens...
+    await click(q('restore-offer-now'));
+    await flush(300);
     expect(q('setup')).toBeNull(); // ...and nothing else has to be typed
     expect(q('restore-screen')).toBeNull();
     expect(cards().join('|')).toContain('Casa Restaurada');
@@ -106,6 +109,8 @@ describe('Restore from Drive on a new device (setup screen)', () => {
     h = createHost(App);
     await h.mount();
     await flush(200);
+    await click(q('restore-offer-now')); // the same one-click offer after the redirect
+    await flush(300);
     expect(q('setup')).toBeNull();
     expect(cards().join('|')).toContain('Obra tras redirección');
   });

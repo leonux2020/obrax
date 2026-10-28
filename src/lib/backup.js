@@ -97,6 +97,12 @@ export function parseBackup(text) {
   };
 }
 
+/**
+ * "Substantially empty" for the one-click restore offer: the local database is loaded and holds no projects (a fresh install, or a
+ * device whose work is gone). While the projects are still loading (null) it is NOT empty: nothing is offered on a guess.
+ */
+export const hasNoProjects = ({ projects }) => Array.isArray(projects) && projects.length === 0;
+
 /** A device with nothing of its own yet: no projects, no company profile, never onboarded. */
 export const isDeviceEmpty = ({ projects, company, meta }) => !(projects || []).length && isCompanyEmpty(company) && !meta?.onboarded;
 

@@ -16,9 +16,9 @@ export const BACKUP_STATE_KEY = 'cp.backup.v1';
 const readState = (storage) => {
   try {
     const raw = JSON.parse(storage?.getItem(BACKUP_STATE_KEY) ?? 'null');
-    return { at: Number(raw?.at) > 0 ? Number(raw.at) : 0, dirty: raw?.dirty === true };
+    return { at: Number(raw?.at) > 0 ? Number(raw.at) : 0, dirty: raw?.dirty === true, held: raw?.held === true };
   } catch {
-    return { at: 0, dirty: false };
+    return { at: 0, dirty: false, held: false };
   }
 };
 
@@ -46,7 +46,7 @@ export function createDriveSync({
   clearTimer = (id) => clearTimeout(id),
 }) {
   const persisted = readState(storage);
-  const state = { status: 'idle', reason: '', at: persisted.at, dirty: persisted.dirty };
+  const state = { status: 'idle', reason: '', at: persisted.at, dirty: persisted.dirty, held: persisted.held };
   const listeners = new Set();
   let timer = null;
   let inflight = null;
@@ -54,7 +54,7 @@ export function createDriveSync({
 
   const persist = () => {
     try {
-      storage?.setItem(BACKUP_STATE_KEY, JSON.stringify({ at: state.at, dirty: state.dirty }));
+      storage?.setItem(BACKUP_STATE_KEY, JSON.stringify({ at: state.at, dirty: state.dirty, held: state.held }));
     } catch {
       /* storage blocked: the in-memory flag still works */
     }
@@ -97,9 +97,13 @@ export function createDriveSync({
 
   /**
    * Upload now. `force` uploads even if nothing is marked dirty (used before signing out).
+   * While the backup is HELD (the cloud has a backup this device has not restored yet) nothing is uploaded, so an empty or young
+   * device can never replace it; only an explicit `override` (the user's "Respaldar ahora") sends it anyway and releases the hold.
    * Resolves { ok } or { ok: false, reason }.
    */
-  async function flush({ force = false, interactive = false } = {}) {
+  async function flush({ force = false, interactive = false, override = false } = {}) {
+    if (state.held && !override) return { ok: true, held: true };
+    if (state.held && override) emit({ held: false });
     if (timer) {
       clearTimer(timer);
       timer = null;
@@ -124,7 +128,7 @@ export function createDriveSync({
   }
 
   function schedule() {
-    if (timer || !isEnabled()) return;
+    if (timer || !isEnabled() || state.held) return;
     timer = setTimer(() => {
       timer = null;
       flush().catch(() => {});
@@ -143,10 +147,20 @@ export function createDriveSync({
     },
     /** The signal came back (browser 'online' event): upload what was left pending, silently. */
     retryNow() {
-      if (!state.dirty || !isEnabled()) return Promise.resolve({ ok: true });
+      if (!state.dirty || !isEnabled() || state.held) return Promise.resolve({ ok: true });
       return flush();
     },
     flush,
+    /** The cloud has a backup this device has not restored: uploads wait (persisted) until it is restored or overridden. */
+    hold() {
+      if (!state.held) emit({ held: true });
+    },
+    /** Restored (or nothing to protect): uploads resume, and whatever changed meanwhile goes up. */
+    release() {
+      if (!state.held) return;
+      emit({ held: false });
+      if (state.dirty) schedule();
+    },
     getState: () => ({ ...state }),
     subscribe(fn) {
       listeners.add(fn);
