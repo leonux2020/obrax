@@ -7,6 +7,11 @@
     color-scheme: dark;
   }
   html,
+  body {
+    /* no pull-to-refresh / elastic bounce on the page itself: the PWA is one solid block (inner lists keep their own scroll) */
+    overscroll-behavior-y: none;
+  }
+  html,
   body,
   #root {
     background: #000;
@@ -17,7 +22,6 @@
     font-family: theme('fontFamily.sans');
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
-    overscroll-behavior-y: none;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
   :focus-visible {

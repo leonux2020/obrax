@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useI18n } from '../../lib/i18n.jsx';
+import { useBackLayer } from '../../lib/backStack.js';
 import { blobUrl, revokeBlobUrl } from '../../lib/notePhotos.js';
 
 /** Object URL of a Blob for as long as the component lives (revoked afterwards): the picture is never turned into base64. */
@@ -53,6 +54,7 @@ export function NoteThumb({ photo, label, onOpen, size = 56, testId }) {
 /** Simple full-screen viewer (OLED black). Tap anywhere, the ✕ or Escape to close. */
 export function PhotoLightbox({ url, onClose }) {
   const { t } = useI18n();
+  useBackLayer(onClose); // the device's Back closes the viewer only
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);

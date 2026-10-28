@@ -191,7 +191,7 @@ describe('device back button inside the real App', () => {
     expect(q('project-card')).not.toBeNull();
   });
 
-  it('back with a sheet open over the project also lands on the Dashboard (no orphan sheet)', async () => {
+  it('back with a sheet open over the project closes ONLY the sheet (LIFO); a second back lands on the Dashboard', async () => {
     await seed();
     await mountApp();
     await click(q('fab-new'));
@@ -201,6 +201,8 @@ describe('device back button inside the real App', () => {
     expect(q('edit-form')).not.toBeNull();
     await pop();
     expect(q('edit-form')).toBeNull();
+    expect(q('ws-title')).not.toBeNull(); // the project is still open under the closed sheet
+    await pop();
     expect(q('project-workspace')).toBeNull();
     expect(q('project-card')).not.toBeNull();
   });

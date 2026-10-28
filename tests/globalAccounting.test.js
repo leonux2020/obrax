@@ -449,14 +449,14 @@ describe('Vista Contabilidad Global', () => {
   it('el botón Atrás del dispositivo cierra la ficha sin salir de la vista', async () => {
     await render([sized(mk('CL', { payments: [pay(10, back(1))] }))]);
     await click(q('acc-hud'));
-    expect(window.history.state).toMatchObject({ cubraxSheet: 'open', modalOpen: true });
+    expect(window.history.state).toMatchObject({ modalOpen: true });
     await act(async () => {
       window.history.back();
     });
     await flush(30);
     expect(q('acc-sheet')).toBeNull();
     expect(q('acc-hud')).not.toBeNull(); // still in Contabilidad Global
-    expect(window.history.state?.cubraxSheet).toBeUndefined();
+    expect(window.history.state?.cubraxLayer).toBeUndefined();
   });
 
   it('tocar el fondo negro cierra la ficha; tocar dentro de ella no hace nada', async () => {
@@ -524,17 +524,17 @@ describe('Vista Contabilidad Global', () => {
     await click(q('acc-hud'));
     await click(document.querySelector('[data-sheet-close]'));
     await flush(50);
-    expect(window.history.state?.cubraxSheet).toBeUndefined();
+    expect(window.history.state?.cubraxLayer).toBeUndefined();
     expect(window.history.state?.cubraxProject).toBeUndefined();
   });
 
   it('si la vista se desmonta con la ficha abierta tampoco deja basura en el historial', async () => {
     await render([sized(mk('CL', { payments: [pay(10, back(1))] }))]);
     await click(q('acc-hud'));
-    expect(window.history.state?.cubraxSheet).toBe('open');
+    expect(window.history.state?.cubraxLayer).toBeTruthy();
     await render([]); // same root: the GlobalAccounting stays, the sheet goes away with the list
     await flush(50);
-    expect(window.history.state?.cubraxSheet).toBeUndefined();
+    expect(window.history.state?.cubraxLayer).toBeUndefined();
   });
 
   it('con una lista vacía solo se ve el estado vacío (sin HUD)', async () => {

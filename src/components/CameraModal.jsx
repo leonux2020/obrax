@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useBackLayer } from '../lib/backStack.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { PhotoError, compressVideoFrame } from '../lib/photos.js';
 
@@ -8,6 +9,7 @@ import { PhotoError, compressVideoFrame } from '../lib/photos.js';
  * insecure origin) shows a message and offers a clean fallback to a normal file upload.
  */
 export default function CameraModal({ slotLabel, onCapture, onClose, onUpload, getStream }) {
+  useBackLayer(onClose); // the device's Back closes the camera only
   const { t } = useI18n();
   const videoRef = useRef(null);
   const dialogRef = useRef(null);

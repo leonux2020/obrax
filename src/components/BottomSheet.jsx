@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
-import { useHistoryBack } from '../lib/useHistoryBack.js';
+import { useBackLayer } from '../lib/backStack.js';
 
 const SWIPE_CLOSE_PX = 90;
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
@@ -9,13 +9,13 @@ const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([di
  * Bottom sheet (one-hand ergonomics): anchored to the bottom of the screen, pure #000 with an ultra
  * thin border. Focus is trapped inside, Escape / backdrop close it and focus returns to the opener.
  */
-export default function BottomSheet({ title, subtitle, onClose, fullscreen = false, swipeToClose = false, backClose = false, children }) {
+export default function BottomSheet({ title, subtitle, onClose, fullscreen = false, swipeToClose = false, children }) {
   const { t } = useI18n();
   const titleId = useId();
   const ref = useRef(null);
-  // backClose: while the sheet is open ONE history entry ({ modalOpen: true }) is pushed; the device's Back pops it and only closes the
-  // sheet (the screen underneath stays). Any other way of closing (x, backdrop, swipe, Escape) drops that entry, so no "Back twice".
-  useHistoryBack(backClose ? 'open' : null, onClose, 'cubraxSheet', { state: { modalOpen: true }, cleanup: true });
+  // Back-stack layer: opening pushes one history entry; the device's Back closes only this sheet (or the topmost layer above it);
+  // closing by x / backdrop / swipe / Escape drops the entry again (see lib/backStack.js).
+  useBackLayer(onClose);
   const drag = useRef(null); // { y0, dy } while a downward swipe that started at the very top of the sheet is under way
 
   // opt-in swipe down to close: only when the sheet is scrolled to its top, past SWIPE_CLOSE_PX it closes, otherwise it springs back
@@ -88,7 +88,7 @@ export default function BottomSheet({ title, subtitle, onClose, fullscreen = fal
         aria-labelledby={titleId}
         data-swipe-close={swipeToClose ? 'true' : undefined}
         {...swipe}
-        className={`${swipeToClose ? 'sheet-slide ' : ''}relative w-full overflow-y-auto border border-white/10 bg-black p-5 [padding-bottom:max(1.25rem,env(safe-area-inset-bottom))] ${
+        className={`${swipeToClose ? 'sheet-slide ' : ''}relative w-full overflow-y-auto overscroll-contain border border-white/10 bg-black p-5 [padding-bottom:max(1.25rem,env(safe-area-inset-bottom))] ${
           fullscreen ? 'h-[100dvh] max-w-none border-0 sm:mx-auto sm:max-w-3xl sm:border' : 'max-h-[92vh] max-w-lg rounded-t-3xl border-b-0'
         }`}
       >
