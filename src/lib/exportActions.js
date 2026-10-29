@@ -8,27 +8,36 @@
 
 import { freezeQuote } from './signature.js';
 import { photosForReport } from './photos.js';
-import { createReportPdf, pdfToFile } from './reportPdf.js';
+import { createLogbookPdf, createReportPdf, pdfToFile } from './reportPdf.js';
 import { buildRenditionFile } from './rendition.js';
 import { shareOrDownload } from './shareFile.js';
 import { projectTitle } from './projects.js';
 
 export const EXPORT_KINDS = Object.freeze(['client', 'tech', 'xlsx']);
 
-/**
- * The documents that go to the root of the project's Drive folder (see driveExport.js): the technical PDF (when the quote is complete)
- * and the Excel rendición, which carries the payments, expenses, advances and the Bitácora as tables. Same engines as the export sheet,
- * but nothing is shared or downloaded and the quote is NOT frozen. Resolves [{ name, mimeType, bytes }].
- */
 // one living document per kind: the date of the day is dropped from the name so a later sync replaces it instead of piling up copies
 const stableName = (name) => String(name).replace(/[-_ ]?\d{4}-\d{2}-\d{2}(?=\.[A-Za-z0-9]+$)/, '');
 
+/**
+ * The documents that go to the root of the project's Drive folder (see driveExport.js): the technical PDF (when the quote is complete),
+ * the Bitácora PDF (when there are notes) and the Excel rendición (payments, expenses, advances and the Bitácora as tables). Same engines as the export sheet,
+ * but nothing is shared or downloaded and the quote is NOT frozen. Resolves [{ name, mimeType, bytes }].
+ */
 export async function buildDossierDocuments({ project, result, total, company, photos, i18n }) {
   const { t, locale, region } = i18n;
   const docs = [];
   if (result.valid) {
     const { doc, fileName } = await createReportPdf('tech', { draft: project.draft, result, company, i18n, photos: photosForReport(photos, t) });
     docs.push({ name: stableName(fileName), mimeType: 'application/pdf', bytes: new Uint8Array(doc.output('arraybuffer')) });
+  }
+  // the Bitácora as a readable PDF; a project without notes gets no (empty) file, and a failure here never costs the other documents
+  if ((project.logbook || []).length > 0) {
+    try {
+      const { doc, fileName } = await createLogbookPdf({ project, title: projectTitle(project) || t('proj.untitled'), company, i18n });
+      docs.push({ name: fileName, mimeType: 'application/pdf', bytes: new Uint8Array(doc.output('arraybuffer')) });
+    } catch {
+      /* skipped */
+    }
   }
   const sheet = buildRenditionFile([project], new Map([[project.id, result.valid ? total : null]]), { t, locale, currency: region.currency, digits: region.digits });
   docs.push({ name: stableName(sheet.name), mimeType: sheet.type || 'application/octet-stream', bytes: new Uint8Array(await sheet.arrayBuffer()) });

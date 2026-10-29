@@ -601,6 +601,36 @@ export async function renderTechPdf(model, { t, money, num = (n) => String(n), l
   return doc;
 }
 
+// ---- LOGBOOK (Bitácora) ------------------------------------------------------------------------------------
+/**
+ * Clean, corporate list of the Bitácora: Date | Note | Author, oldest first, full text. A note with a photo says where the picture is
+ * (the images themselves are not embedded: they are separate files in "Fotos Obra").
+ * @param model buildLogbookModel() result
+ */
+export async function renderLogbookPdf(model, { t, logo = null, appName = 'CUBRAX' }) {
+  const doc = await newDoc(`${model.heading} - ${model.project}`, model.author);
+  const w = new Writer(doc, appName);
+  w.header(model, { logo, title: model.heading.toUpperCase() });
+  w.pairs([
+    [model.projectLabel, model.project],
+    ...(model.client ? [[model.clientLabel, model.client]] : []),
+    [model.authorLabel, model.author],
+    [model.countLabel, String(model.count)],
+  ]);
+  w.section(model.heading);
+  w.table(
+    [
+      { label: t('logpdf.col.date'), width: 36 },
+      { label: t('logpdf.col.note'), width: CONTENT_W - 36 - 34 },
+      { label: t('logpdf.col.author'), width: 34 },
+    ],
+    model.entries.map((e) => [e.when, { text: e.text, sub: e.photo ? t('logpdf.photo') : undefined }, e.author]),
+    { size: 8.5 }
+  );
+  w.footers(`${model.footer}${model.company.name ? ` - ${model.company.name}` : ''}`);
+  return doc;
+}
+
 // ---- browser helpers ---------------------------------------------------------------------------------------
 /** Rasterise the SVG brand icon to a PNG data URL for the PDF header. Returns null if unavailable. */
 export function rasterizeLogo(svgDataUri, size = 160) {

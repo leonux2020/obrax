@@ -121,7 +121,9 @@ describe('Sincronizar Expediente a Drive', () => {
     const casa = drive.folders().find((f) => f.name === "Casa D'Arcy");
     expect(proyectos.parents).toEqual([root.id]);
     expect(casa.parents).toEqual([proyectos.id]);
-    expect(names("Casa D'Arcy")).toEqual(['rendicion-Casa-D-Arcy.xlsx']); // bitácora + rendición tables (no PDF: this quote is incomplete); no date in the name
+    // the Excel (bitácora + rendición tables) and the readable Bitácora PDF side by side; no PDF Contratista: this quote is incomplete; no dates in the names
+    expect(names("Casa D'Arcy")).toEqual(['Bitacora_Casa-D-Arcy.pdf', 'rendicion-Casa-D-Arcy.xlsx']);
+    expect(drive.backupFiles().find((f) => f.name === 'Bitacora_Casa-D-Arcy.pdf').body.startsWith('%PDF')).toBe(true);
     expect(names('Fotos Obra')).toEqual(['Bitacora_2026-10-02_Material-danado_nota00.jpg', 'Obra_2026-10-01_1.jpg']);
     expect(names('Comprobantes')).toEqual(['Comprobante_2026-10-03_Ferreteria-Sur_rcpt00.jpg']);
     const photo = drive.backupFiles().find((f) => f.name === 'Obra_2026-10-01_1.jpg');

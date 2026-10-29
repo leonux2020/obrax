@@ -261,6 +261,38 @@ export function buildTechModel({ draft, result, company, region, t, num, unit, m
 }
 
 /** Crew plan for the technical dossier: HH, dead technical time and the site duration, per partida. */
+/**
+ * The Bitácora as a readable document: the notes in CHRONOLOGICAL order (oldest first), each with its date and time, its FULL text and
+ * who wrote it. A note with a photo only says so (the picture itself lives in the "Fotos Obra" folder). Pure.
+ * The notes carry no author of their own (one profile per device), so every line shows the professional of the company profile.
+ * @param whenOf (timestamp) => string   date and time in the user's language
+ */
+export function buildLogbookModel({ project, company, region, t, date, whenOf, title }) {
+  const info = companyInfo(company, region, t);
+  const author = info.signer || info.name || '';
+  // the list is kept newest first: reversing before the (stable) sort keeps the order of notes written in the same instant
+  const entries = [...(project.logbook || [])]
+    .reverse()
+    .sort((a, b) => (a.at || 0) - (b.at || 0))
+    .map((e) => ({ when: e.at ? whenOf(e.at) : '-', text: e.text, author: author || '-', photo: e.photo === true }));
+  return {
+    kind: 'logbook',
+    heading: t('logpdf.heading'),
+    date: date(),
+    company: info,
+    projectLabel: t('com.project'),
+    project: title,
+    clientLabel: t('com.client'),
+    client: project.draft?.project?.client || '',
+    authorLabel: t('logpdf.author'),
+    author: author || '-',
+    countLabel: t('logpdf.count'),
+    count: entries.length,
+    entries,
+    footer: t('report.generatedBy'),
+  };
+}
+
 export function buildPlanningModel({ result, t }) {
   const s = result.schedule;
   if (!s) return null;

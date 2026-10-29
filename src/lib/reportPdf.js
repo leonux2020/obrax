@@ -3,8 +3,8 @@
 // that decides which model and renderer run, so switching tabs while a PDF is being generated can never
 // mix the two reports. Sharing goes through the native Web Share API (the real file when the browser allows it; no custom menu).
 
-import { buildClientModel, buildTechModel } from './reports.js';
-import { pdfFileName, pdfMoneyFormatter, rasterizeLogo, renderClientPdf, renderTechPdf } from './pdf.js';
+import { buildClientModel, buildLogbookModel, buildTechModel } from './reports.js';
+import { pdfFileName, pdfMoneyFormatter, rasterizeLogo, renderClientPdf, renderLogbookPdf, renderTechPdf } from './pdf.js';
 import { PDF_LOGO_URL } from '../brand/icon.js';
 
 export const REPORT_KINDS = Object.freeze(['client', 'tech']);
@@ -63,6 +63,24 @@ export async function createReportPdf(kind, { draft, result, company, i18n, phot
   }
   const fileName = pdfFileName(kind === 'client' ? t('pdf.file.client') : t('pdf.file.tech'), draft.project.name);
   return { doc, fileName, title: t('report.shareTitle'), kind };
+}
+
+/**
+ * The Bitácora as its own PDF (`Bitacora_<project>.pdf`, no date in the name so a later sync replaces it). Built in memory.
+ * @returns {Promise<{doc, fileName, title}>}
+ */
+export async function createLogbookPdf({ project, title, company, i18n }) {
+  const { t, region, locale, date } = i18n;
+  const whenOf = (at) => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(at));
+  const model = buildLogbookModel({ project, company, region, t, date, whenOf, title });
+  const doc = await renderLogbookPdf(model, { t, logo: await pdfLogo(company), appName: t('app.name') });
+  const safe = String(title || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+  return { doc, fileName: `Bitacora_${safe || 'Proyecto'}.pdf`, title: model.heading };
 }
 
 /** jsPDF document -> real File (what the system share sheet needs to attach to WhatsApp / e-mail). */
