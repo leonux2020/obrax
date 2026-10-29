@@ -2,11 +2,11 @@ import { useI18n } from '../lib/i18n.jsx';
 import { LANGS, LANG_NAMES } from '../lib/regions.js';
 
 /** Six-language switcher. Option labels are always in the native language so anyone can find theirs. */
-export default function LangSelect({ onChange, className = '' }) {
+export default function LangSelect({ onChange, className = '', hideLabel = false, label = '' }) {
   const { t, lang } = useI18n();
   return (
     <label className="relative block">
-      <span className="sr-only">{t('lang.label')}</span>
+      <span className={hideLabel ? 'sr-only' : 'label'}>{label || t('lang.label')}</span>
       <select
         value={lang}
         onChange={(e) => onChange(e.target.value)}

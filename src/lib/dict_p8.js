@@ -201,6 +201,9 @@ export const P8 = {
     'logpdf.col.note': "Nota",
     'logpdf.col.author': "Autor",
     'logpdf.photo': "Con foto adjunta (carpeta \"Fotos Obra\")",
+    'settings.locale': "Idioma y País",
+    'settings.cloud': "Google Drive y Respaldo",
+    'settings.logo.edit': "Cambiar",
   },
   en: {
     'ws.locked': 'Prices locked',
@@ -402,6 +405,9 @@ export const P8 = {
     'logpdf.col.note': "Note",
     'logpdf.col.author': "Author",
     'logpdf.photo': "Photo attached (folder \"Site Photos\")",
+    'settings.locale': "Language and Country",
+    'settings.cloud': "Google Drive and Backup",
+    'settings.logo.edit': "Change",
   },
   pt: {
     'ws.locked': 'Preços bloqueados',
@@ -603,6 +609,9 @@ export const P8 = {
     'logpdf.col.note': "Nota",
     'logpdf.col.author': "Autor",
     'logpdf.photo': "Com foto anexa (pasta \"Fotos da Obra\")",
+    'settings.locale': "Idioma e País",
+    'settings.cloud': "Google Drive e Backup",
+    'settings.logo.edit': "Trocar",
   },
   fr: {
     'ws.locked': 'Prix verrouillés',
@@ -804,6 +813,9 @@ export const P8 = {
     'logpdf.col.note': "Note",
     'logpdf.col.author': "Auteur",
     'logpdf.photo': "Photo jointe (dossier \"Photos Chantier\")",
+    'settings.locale': "Langue et Pays",
+    'settings.cloud': "Google Drive et Sauvegarde",
+    'settings.logo.edit': "Changer",
   },
   it: {
     'ws.locked': 'Prezzi bloccati',
@@ -1005,6 +1017,9 @@ export const P8 = {
     'logpdf.col.note': "Nota",
     'logpdf.col.author': "Autore",
     'logpdf.photo': "Con foto allegata (cartella \"Foto Cantiere\")",
+    'settings.locale': "Lingua e Paese",
+    'settings.cloud': "Google Drive e Backup",
+    'settings.logo.edit': "Cambia",
   },
   de: {
     'ws.locked': 'Preise gesperrt',
@@ -1206,5 +1221,8 @@ export const P8 = {
     'logpdf.col.note': "Notiz",
     'logpdf.col.author': "Autor",
     'logpdf.photo': "Mit Foto (Ordner \"Baustellenfotos\")",
+    'settings.locale': "Sprache und Land",
+    'settings.cloud': "Google Drive und Sicherung",
+    'settings.logo.edit': "Ändern",
   },
 };

@@ -186,7 +186,9 @@ describe('after onboarding, the profile lives only in Ajustes', () => {
   it('Ajustes shows the profile and is the only way to edit it', async () => {
     await onboarded();
     await click(tab('Ajustes'));
-    expect(q('settings-profile').textContent).toContain('Aurora');
+    expect(q('settings-profile')).not.toBeNull();
+    expect(q('settings-company-name').value).toBe('Aurora');
+    expect(q('settings-pro-name').value).toBe('Ana Ruiz');
     await click(q('settings-edit-profile'));
     const sheet = document.querySelector('[role="dialog"]');
     expect(sheet.textContent).toContain('Empresa y profesional');
@@ -195,7 +197,8 @@ describe('after onboarding, the profile lives only in Ajustes', () => {
     await click(q('profile-save'));
     await flush(80);
     // back in Ajustes with the new data
-    expect(document.querySelector('[role="dialog"]').textContent).toContain('Aurora');
+    expect(q('settings-company-name').value).toBe('Aurora');
+    expect(q('settings-pro-name').value).toBe('Ana Ruiz Soto');
     expect(loadCompany().proName).toBe('Ana Ruiz Soto');
     expect(loadProfileMeta().onboarded).toBe(true);
   });

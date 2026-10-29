@@ -175,7 +175,7 @@ export function DateInput({ className = '', onClick, ...props }) {
   );
 }
 
-export function TextField({ label, value, onChange, placeholder, maxLength = 80, optional, sanitize }) {
+export function TextField({ label, value, onChange, onBlur, placeholder, maxLength = 80, optional, sanitize, testId }) {
   const id = useId();
   return (
     <div>
@@ -190,7 +190,9 @@ export function TextField({ label, value, onChange, placeholder, maxLength = 80,
         maxLength={maxLength}
         value={value}
         placeholder={placeholder}
-        onChange={(e) => onChange(sanitize(e.target.value))}
+        onChange={(e) => onChange(sanitize ? sanitize(e.target.value) : e.target.value)}
+        onBlur={onBlur}
+        data-testid={testId}
         className="field-input"
       />
     </div>

@@ -848,8 +848,12 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
               onDriveChange={changeDrive}
               onConnect={connectAndBackup}
               onEditProfile={() => setSheet({ type: 'profile' })}
+              onSaveProfile={async (data) => {
+                await saveProfile(data); // stays on Ajustes: email / phone / logo land in localStorage + IndexedDB and the PDFs
+              }}
               onSignIn={signIn}
               onChangeLang={changeLang}
+              onConfirmRegion={(code) => confirmRegion(code)}
               onChangeRegion={() => {
                 setSheet(null);
                 setPickingRegion(true);
