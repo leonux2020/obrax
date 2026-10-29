@@ -183,31 +183,28 @@ describe('after onboarding, the profile lives only in Ajustes', () => {
     expect(read('components/BottomNav.jsx')).not.toContain('onCompany');
   });
 
-  it('Ajustes shows the profile and is the only way to edit it', async () => {
+  it('Ajustes shows the profile and is the only way to edit it (inline, autosave)', async () => {
     await onboarded();
     await click(tab('Ajustes'));
     expect(q('settings-profile')).not.toBeNull();
+    expect(q('settings-edit-profile')).toBeNull(); // no competing "Editar" / modal
     expect(q('settings-company-name').value).toBe('Aurora');
     expect(q('settings-pro-name').value).toBe('Ana Ruiz');
-    await click(q('settings-edit-profile'));
-    const sheet = document.querySelector('[role="dialog"]');
-    expect(sheet.textContent).toContain('Empresa y profesional');
-    expect(inputByLabel(sheet, 'Nombre del profesional').value).toBe('Ana Ruiz');
-    type(inputByLabel(sheet, 'Nombre del profesional'), 'Ana Ruiz Soto');
-    await click(q('profile-save'));
-    await flush(80);
-    // back in Ajustes with the new data
-    expect(q('settings-company-name').value).toBe('Aurora');
+    expect(q('settings-company-tax')).not.toBeNull();
+    expect(q('settings-company-city')).not.toBeNull();
+    expect(q('settings-signature').textContent).toContain('Configurar Firma Digital');
+    type(q('settings-pro-name'), 'Ana Ruiz Soto');
+    await flush(400); // debounced autosave
     expect(q('settings-pro-name').value).toBe('Ana Ruiz Soto');
     expect(loadCompany().proName).toBe('Ana Ruiz Soto');
     expect(loadProfileMeta().onboarded).toBe(true);
+    expect(q('settings-saved').textContent).toContain('Guardado');
   });
 
-  it('nothing else can open the profile editor', () => {
-    for (const f of ['components/Dashboard.jsx', 'components/BottomNav.jsx', 'components/steps/StepReport.jsx', 'components/Wizard.jsx']) {
-      expect(read(f), f).not.toMatch(/ProfileSheet|onCompany|onEditCompany/);
+  it('nothing else can open a profile editor modal', () => {
+    for (const f of ['components/Dashboard.jsx', 'components/BottomNav.jsx', 'components/steps/StepReport.jsx', 'components/Wizard.jsx', 'App.jsx']) {
+      expect(read(f), f).not.toMatch(/onEditProfile|setSheet\(\{ type: 'profile'/);
     }
-    expect(read('App.jsx')).toMatch(/onEditProfile=\{\(\) => setSheet\(\{ type: 'profile' \}\)\}/);
   });
 
   it('a user who has an empty company profile (legacy) lands on the dashboard, not on a splash, and reaches Ajustes from the nav', async () => {

@@ -60,7 +60,6 @@ import Dashboard from './components/Dashboard.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import ProjectSheet from './components/ProjectSheet.jsx';
 import SettingsSheet from './components/SettingsSheet.jsx';
-import ProfileSheet from './components/ProfileSheet.jsx';
 import { clearOAuthResult, connectDrive, peekOAuthResult } from './lib/oauthCallback.js';
 import SplashScreen, { SPLASH_TIMING } from './components/SplashScreen.jsx';
 import ProfileSetup from './components/ProfileSetup.jsx';
@@ -136,7 +135,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   // a stored user goes straight to the app. 'setup' is the registration (first run), 'app' shows Login when
   // there is no user.
   const [stage, setStage] = useState('splash'); // the opening screen is ALWAYS the first thing shown
-  const [sheet, setSheet] = useState(null); // { type: 'new' | 'edit' | 'settings' | 'profile', id? } (profile is reached from Ajustes)
+  const [sheet, setSheet] = useState(null); // { type: 'new' | 'edit' | 'settings', id? }
   const [tab, setTab] = useState('projects'); // bottom navigation: 'projects' | 'accounting' (Ajustes is a sheet)
   const [dashTab, setDashTab] = useState('active'); // dashboard tabs: 'active' | 'history'
   const [editor, setEditor] = useState(false); // the technical editor (measures, prices, schedule) of the open project
@@ -504,10 +503,6 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     setSheet(null);
   };
 
-  const saveProfileFromSettings = async (data) => {
-    await saveProfile(data);
-    setSheet({ type: 'settings' }); // back to Ajustes, where the edit started
-  };
 
   const confirmRegion = useCallback(
     (code) => {
@@ -713,7 +708,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     return setStage('setup');
   };
   const editing = sheet?.type === 'edit' ? projects?.find((p) => p.id === sheet.id) : null;
-  const navActive = sheet?.type === 'settings' || sheet?.type === 'profile' ? 'settings' : tab;
+  const navActive = sheet?.type === 'settings' ? 'settings' : tab;
 
   return (
     <I18nProvider lang={settings.lang} regionCode={active ? active.draft.regionCode : settings.region}>
@@ -834,9 +829,6 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
           {editing && (
             <ProjectSheet project={editing} onSave={(f) => editProject(editing, f)} onDelete={() => deleteProject(editing.id)} onClose={() => setSheet(null)} />
           )}
-          {sheet?.type === 'profile' && (
-            <ProfileSheet company={company} logo={logo} drive={meta.drive} onSave={saveProfileFromSettings} onClose={() => setSheet({ type: 'settings' })} />
-          )}
           {sheet?.type === 'settings' && (
             <SettingsSheet
               user={user}
@@ -847,7 +839,6 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
               drive={meta.drive}
               onDriveChange={changeDrive}
               onConnect={connectAndBackup}
-              onEditProfile={() => setSheet({ type: 'profile' })}
               onSaveProfile={async (data) => {
                 await saveProfile(data); // stays on Ajustes: email / phone / logo land in localStorage + IndexedDB and the PDFs
               }}

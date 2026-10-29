@@ -78,14 +78,16 @@ export function sanitizeTaxId(raw, maxLen = 20) {
     .slice(0, maxLen);
 }
 
-/** Phone: digits, one leading +, spaces, dashes and parentheses. */
-export function sanitizePhone(raw, maxLen = 24) {
-  const s = String(raw ?? '')
+/** Phone: digits, one leading "+", spaces, dashes and parentheses (e.g. "+56 9 1234 5678"). Never digits-only. */
+export function sanitizePhone(raw, maxLen = 32) {
+  let s = String(raw ?? '')
     .normalize('NFKC')
-    .replace(/[^0-9+\-() ]/g, '')
-    .replace(/(?!^)\+/g, '')
-    .replace(/\s+/g, ' ')
-    .trimStart();
+    .replace(/[^0-9+\-() ]/g, '') // keep +, spaces, dashes, ()
+    .replace(/\s+/g, ' ');
+  // a single "+" only at the very start (after optional spaces that we then drop)
+  s = s.replace(/^\s+/, '');
+  const lead = s.startsWith('+') ? '+' : '';
+  s = lead + s.slice(lead ? 1 : 0).replace(/\+/g, '');
   return s.slice(0, maxLen);
 }
 

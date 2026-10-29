@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
-import { sanitizeEmail, sanitizeEmailInput, sanitizePhone, sanitizeText } from '../lib/sanitize.js';
+import { sanitizeEmail, sanitizeEmailInput, sanitizePhone, sanitizeTaxId, sanitizeText } from '../lib/sanitize.js';
 import { EMPTY_COMPANY } from '../lib/draft.js';
 import { googleConfigured } from '../lib/auth.js';
 import { BACKUP_FOLDER } from '../lib/drive.js';
@@ -14,6 +14,7 @@ import BottomSheet from './BottomSheet.jsx';
 import LangSelect from './LangSelect.jsx';
 import RegionCombobox from './RegionCombobox.jsx';
 import InstallButton from './InstallButton.jsx';
+import ContractorSignatureSheet from './ContractorSignatureSheet.jsx';
 
 /**
  * Ajustes as three OLED cards (black + white/10):
@@ -31,7 +32,6 @@ export default function SettingsSheet({
   drive,
   onDriveChange,
   onConnect = async () => ({ ok: false }),
-  onEditProfile,
   onSaveProfile,
   onSignIn,
   onChangeLang,
@@ -43,7 +43,7 @@ export default function SettingsSheet({
   onBackupNow = null,
   onRestore = null,
 }) {
-  const { t, lang } = useI18n();
+  const { t, lang, region } = useI18n();
   const [phase, setPhase] = useState('idle'); // idle | confirming | syncing | failed (sign-out)
   const [working, setWorking] = useState(''); // '' | 'backup' | 'restore' | 'connect'
   const [note, setNote] = useState('');
@@ -52,6 +52,8 @@ export default function SettingsSheet({
   const [emailError, setEmailError] = useState(false);
   const [logoError, setLogoError] = useState('');
   const [logoBusy, setLogoBusy] = useState(false);
+  const [signing, setSigning] = useState(false); // only the signature canvas (never the old profile modal)
+  const [savedFlash, setSavedFlash] = useState(false); // "Guardado" after a successful autosave
   const logoRef = useRef(null);
   const saving = useRef(null);
   const formRef = useRef(form);
@@ -59,6 +61,11 @@ export default function SettingsSheet({
   const dirty = useRef(false);
   // do NOT write `formRef.current = form` on every render: a parent re-render would wipe a value just typed
   // before React has committed setForm, and blur / debounce would persist the empty previous profile
+  useEffect(() => {
+    if (!savedFlash) return undefined;
+    const id = setTimeout(() => setSavedFlash(false), 2000);
+    return () => clearTimeout(id);
+  }, [savedFlash]);
   const cloud = Boolean(backup?.enabled);
   const busy = phase === 'syncing';
 
@@ -145,6 +152,7 @@ export default function SettingsSheet({
     const job = Promise.resolve(onSaveProfile(payload))
       .then(() => {
         baseline.current = JSON.stringify({ company: { ...EMPTY_COMPANY, ...nextForm, email }, logo: nextLogo || '' });
+        setSavedFlash(true);
       })
       .catch(() => setLogoError(t('company.logo.err.store')));
     saving.current = job;
@@ -208,20 +216,41 @@ export default function SettingsSheet({
     </div>
   );
 
+  if (signing) {
+    return (
+      <ContractorSignatureSheet
+        value={form.signature}
+        onSave={(ink) => {
+          const next = { ...formRef.current, signature: ink };
+          formRef.current = next;
+          dirty.current = true;
+          setForm(next);
+          setSigning(false);
+          persist(next, picRef.current);
+        }}
+        onClose={() => setSigning(false)}
+      />
+    );
+  }
+
   return (
     <BottomSheet title={t('settings.title')} onClose={onClose}>
       <div className="mt-3 space-y-4">
         <ProQaTag className="block text-center" />
 
         {/* ---- 1. Perfil de Empresa ---------------------------------------------------------------------------------- */}
-        <section className="card space-y-4" aria-labelledby="settings-profile-title" data-testid="settings-profile">
+        <section className="card relative space-y-4" aria-labelledby="settings-profile-title" data-testid="settings-profile">
           <div className="flex items-center justify-between gap-3">
             <h2 id="settings-profile-title" className="text-lg font-bold">
               {t('settings.profile')}
             </h2>
-            <button type="button" onClick={onEditProfile} data-testid="settings-edit-profile" className="min-h-[44px] shrink-0 rounded-lg border border-white/10 px-3 text-sm font-bold hover:border-brand">
-              {t('settings.profile.edit')}
-            </button>
+            <span
+              aria-live="polite"
+              data-testid="settings-saved"
+              className={`text-xs font-semibold text-brand transition-opacity duration-500 ${savedFlash ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+            >
+              {t('settings.saved')}
+            </span>
           </div>
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
@@ -266,8 +295,56 @@ export default function SettingsSheet({
                 </p>
               )}
             </div>
-            <TextField label={t('company.phone')} value={form.phone} onChange={setField('phone')} onBlur={commitField} testId="settings-company-phone" maxLength={24} optional={t('common.optional')} sanitize={sanitizePhone} placeholder="+00 000 000 000" />
+            <TextField
+              label={t('company.phone')}
+              value={form.phone}
+              onChange={setField('phone')}
+              onBlur={commitField}
+              testId="settings-company-phone"
+              type="tel"
+              inputMode="tel"
+              maxLength={32}
+              optional={t('common.optional')}
+              sanitize={sanitizePhone}
+              placeholder="+56 9 1234 5678"
+            />
           </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <TextField
+              label={t(`company.taxId.${region?.code || 'CL'}`)}
+              value={form.taxId}
+              onChange={setField('taxId')}
+              onBlur={commitField}
+              testId="settings-company-tax"
+              maxLength={20}
+              optional={t('common.optional')}
+              sanitize={sanitizeTaxId}
+              placeholder={t(`company.taxId.ph.${region?.code || 'CL'}`)}
+            />
+            <TextField label={t('company.city')} value={form.city} onChange={setField('city')} onBlur={commitField} testId="settings-company-city" maxLength={60} optional={t('common.optional')} sanitize={(v) => sanitizeText(v, 60)} placeholder={t('company.city.ph')} />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setSigning(true)}
+            data-testid="settings-signature"
+            className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-xl border border-white/10 px-4 text-left transition hover:border-brand"
+          >
+            <span className="min-w-0">
+              <span className="block text-sm font-bold">{t('settings.sign')}</span>
+              <span className="block truncate text-xs text-[#E0E0E0]/55">{t(form.signature ? 'sign.pro.change' : 'sign.pro.empty')}</span>
+            </span>
+            {form.signature ? (
+              <span className="flex h-10 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-white px-1">
+                <img src={form.signature.dataUrl} alt="" className="max-h-full max-w-full object-contain" />
+              </span>
+            ) : (
+              <span aria-hidden="true" className="text-lg text-[#E0E0E0]/40">
+                ›
+              </span>
+            )}
+          </button>
         </section>
 
         {/* ---- 2. Idioma y País -------------------------------------------------------------------------------------- */}

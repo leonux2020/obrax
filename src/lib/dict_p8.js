@@ -204,6 +204,8 @@ export const P8 = {
     'settings.locale': "Idioma y País",
     'settings.cloud': "Google Drive y Respaldo",
     'settings.logo.edit': "Cambiar",
+    'settings.saved': "Guardado ✅",
+    'settings.sign': "Configurar Firma Digital",
   },
   en: {
     'ws.locked': 'Prices locked',
@@ -408,6 +410,8 @@ export const P8 = {
     'settings.locale': "Language and Country",
     'settings.cloud': "Google Drive and Backup",
     'settings.logo.edit': "Change",
+    'settings.saved': "Saved ✅",
+    'settings.sign': "Set up digital signature",
   },
   pt: {
     'ws.locked': 'Preços bloqueados',
@@ -612,6 +616,8 @@ export const P8 = {
     'settings.locale': "Idioma e País",
     'settings.cloud': "Google Drive e Backup",
     'settings.logo.edit': "Trocar",
+    'settings.saved': "Salvo ✅",
+    'settings.sign': "Configurar assinatura digital",
   },
   fr: {
     'ws.locked': 'Prix verrouillés',
@@ -816,6 +822,8 @@ export const P8 = {
     'settings.locale': "Langue et Pays",
     'settings.cloud': "Google Drive et Sauvegarde",
     'settings.logo.edit': "Changer",
+    'settings.saved': "Enregistré ✅",
+    'settings.sign': "Configurer la signature numérique",
   },
   it: {
     'ws.locked': 'Prezzi bloccati',
@@ -1020,6 +1028,8 @@ export const P8 = {
     'settings.locale': "Lingua e Paese",
     'settings.cloud': "Google Drive e Backup",
     'settings.logo.edit': "Cambia",
+    'settings.saved': "Salvato ✅",
+    'settings.sign': "Configura firma digitale",
   },
   de: {
     'ws.locked': 'Preise gesperrt',
@@ -1224,5 +1234,7 @@ export const P8 = {
     'settings.locale': "Sprache und Land",
     'settings.cloud': "Google Drive und Sicherung",
     'settings.logo.edit': "Ändern",
+    'settings.saved': "Gespeichert ✅",
+    'settings.sign': "Digitale Unterschrift einrichten",
   },
 };

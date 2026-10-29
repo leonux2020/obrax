@@ -60,7 +60,7 @@ describe('PRO paywall open for quality control', () => {
   it('Ajustes carries the same reminder', async () => {
     vi.stubEnv('MODE', 'production');
     vi.stubEnv('DEV', false);
-    await mount(React.createElement(SettingsSheet, { settings: { region: 'CL', lang: 'es' }, user: { name: 'Ana', email: 'a@b.cl', provider: 'local' }, company: null, logo: '', onClose: () => {}, onChange: () => {}, onEditProfile: () => {} }));
+    await mount(React.createElement(SettingsSheet, { settings: { region: 'CL', lang: 'es' }, user: { name: 'Ana', email: 'a@b.cl', provider: 'local' }, company: null, logo: '', onClose: () => {}, onChange: () => {},  }));
     expect(q('qa-pro-tag')?.textContent).toBe('MODO PRO (Prueba)');
   });
 

@@ -41,14 +41,30 @@ describe('Ajustes: three cards', () => {
     expect(q('settings-region')).not.toBeNull();
     expect(q('settings-logo').getAttribute('aria-label')).toBeTruthy();
     expect(q('settings-logo').textContent).toContain('Cambiar');
+    expect(q('settings-edit-profile')).toBeNull();
+    expect(q('settings-company-phone').getAttribute('type')).toBe('tel');
+    expect(q('settings-company-tax')).not.toBeNull();
+    expect(q('settings-company-city')).not.toBeNull();
+    expect(q('settings-signature').textContent).toContain('Configurar Firma Digital');
 
     await typeInto(q('settings-company-email'), 'obra@aurora.cl');
-    await typeInto(q('settings-company-phone'), '+56912345678');
+    await typeInto(q('settings-company-phone'), '+56 9 1234 5678');
+    await typeInto(q('settings-company-tax'), '76.123.456-7');
+    await typeInto(q('settings-company-city'), 'Santiago');
     await flush(400); // debounced auto-save
 
     expect(q('settings-company-email').value).toBe('obra@aurora.cl');
+    expect(q('settings-company-phone').value).toBe('+56 9 1234 5678');
     expect(loadCompany().email).toBe('obra@aurora.cl');
-    expect(loadCompany().phone).toBe('+56912345678');
+    expect(loadCompany().phone).toBe('+56 9 1234 5678');
+    expect(loadCompany().taxId).toBe('76.123.456-7');
+    expect(loadCompany().city).toBe('Santiago');
     expect(loadCompany().name).toBe('Aurora');
+    expect(q('settings-saved').className).toMatch(/opacity-100/);
+    expect(q('settings-saved').textContent).toContain('Guardado');
+
+    await click(q('settings-signature'));
+    expect(q('contractor-sign-sheet')).not.toBeNull();
+    expect(q('settings-profile')).toBeNull(); // only the signature canvas, not the old profile modal
   });
 });

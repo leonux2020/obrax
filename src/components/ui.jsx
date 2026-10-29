@@ -175,7 +175,7 @@ export function DateInput({ className = '', onClick, ...props }) {
   );
 }
 
-export function TextField({ label, value, onChange, onBlur, placeholder, maxLength = 80, optional, sanitize, testId }) {
+export function TextField({ label, value, onChange, onBlur, placeholder, maxLength = 80, optional, sanitize, testId, type = 'text', inputMode }) {
   const id = useId();
   return (
     <div>
@@ -185,7 +185,8 @@ export function TextField({ label, value, onChange, onBlur, placeholder, maxLeng
       </label>
       <input
         id={id}
-        type="text"
+        type={type}
+        inputMode={inputMode}
         autoComplete="off"
         maxLength={maxLength}
         value={value}
