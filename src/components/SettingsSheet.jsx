@@ -279,9 +279,9 @@ export default function SettingsSheet({
                 disabled={logoBusy || !onSaveProfile}
                 data-testid="settings-logo"
                 aria-label={t(pic ? 'company.logo.replace' : 'company.logo.add')}
-                className="group relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white p-1.5 transition hover:border-brand disabled:opacity-60"
+                className="group relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-xl bg-transparent p-1.5 transition disabled:opacity-60"
               >
-                {pic ? <img src={pic} alt="" className="max-h-full max-w-full object-contain" /> : <span className="text-[10px] font-bold text-black/50">LOGO</span>}
+                {pic ? <img src={pic} alt="" className="max-h-full max-w-full object-contain" /> : <span className="text-[10px] font-bold text-[#E0E0E0]/40">LOGO</span>}
                 <span aria-hidden="true" className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-black/70 py-1 text-[10px] font-bold text-[#E0E0E0] opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 20h9" />

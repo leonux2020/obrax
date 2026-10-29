@@ -41,6 +41,9 @@ describe('Ajustes: three cards', () => {
     expect(q('settings-region')).not.toBeNull();
     expect(q('settings-logo').getAttribute('aria-label')).toBeTruthy();
     expect(q('settings-logo').textContent).toContain('Cambiar');
+    expect(q('settings-logo').className).toContain('bg-transparent');
+    expect(q('settings-logo').className).not.toMatch(/\bborder\b/);
+    expect(q('settings-logo').className).not.toContain('bg-white');
     expect(q('settings-edit-profile')).toBeNull();
     expect(q('settings-company-phone').getAttribute('type')).toBe('tel');
     expect(q('settings-company-tax')).not.toBeNull();
