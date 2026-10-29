@@ -49,6 +49,23 @@ export function sanitizeText(raw, maxLen = 80) {
     .slice(0, maxLen);
 }
 
+/** Live typing for free-text fields: strips dangerous chars but KEEPS a trailing space so "Nombre Apellido" can be typed.
+ *  Do NOT use for persistence — call sanitizeText(...).trim() (or normalizeCompany) only on blur / autosave. */
+export function sanitizeTextInput(raw, maxLen = 80) {
+  const src = String(raw ?? '');
+  const keepTrail = /\s$/.test(src); // the user just typed a space (or more): keep one so the next word can follow
+  let s = src
+    .normalize('NFKC')
+    .replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u2028-\u202E\u2066-\u2069\uFEFF]/g, ' ')
+    .replace(/[<>`\\{}[\]$|^~]/g, '')
+    .replace(/\s+/g, ' ')
+    .trimStart();
+  if (keepTrail && s && !s.endsWith(' ')) s += ' ';
+  return s.slice(0, maxLen);
+}
+
+
+
 export function sanitizeEmail(raw) {
   const s = String(raw ?? '').normalize('NFKC').trim().toLowerCase().slice(0, 120);
   return /^[a-z0-9._%+-]{1,64}@[a-z0-9.-]{1,63}\.[a-z]{2,24}$/.test(s) ? s : '';

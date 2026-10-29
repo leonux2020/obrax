@@ -67,4 +67,20 @@ describe('Ajustes: three cards', () => {
     expect(q('contractor-sign-sheet')).not.toBeNull();
     expect(q('settings-profile')).toBeNull(); // only the signature canvas, not the old profile modal
   });
+
+  it('a trailing space in "Profesional a cargo" survives typing and the autosave round-trip (no caret jump)', async () => {
+    h = createHost(App);
+    await h.mount();
+    await click(h.tab('Ajustes'));
+    const pro = q('settings-pro-name');
+    await typeInto(pro, 'Ana ');
+    expect(pro.value).toBe('Ana '); // space still there right after onChange
+    await flush(400); // autosave would previously trim via company sync and eat the space
+    expect(q('settings-pro-name').value).toBe('Ana '); // local input untouched
+    expect(loadCompany().proName).toBe('Ana'); // storage is trimmed
+    await typeInto(q('settings-pro-name'), 'Ana Ruiz');
+    await flush(400);
+    expect(loadCompany().proName).toBe('Ana Ruiz');
+    expect(q('settings-saved').textContent).toContain('Guardado');
+  });
 });

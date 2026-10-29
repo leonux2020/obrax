@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
-import { sanitizeEmail, sanitizeEmailInput, sanitizePhone, sanitizeTaxId, sanitizeText } from '../lib/sanitize.js';
-import { EMPTY_COMPANY } from '../lib/draft.js';
+import { sanitizeEmail, sanitizeEmailInput, sanitizePhone, sanitizeTaxId, sanitizeText, sanitizeTextInput } from '../lib/sanitize.js';
+import { EMPTY_COMPANY, normalizeCompany } from '../lib/draft.js';
 import { googleConfigured } from '../lib/auth.js';
 import { BACKUP_FOLDER } from '../lib/drive.js';
 import { backupAge } from '../lib/driveSync.js';
@@ -72,8 +72,9 @@ export default function SettingsSheet({
   // keep the card in sync when Ajustes re-opens with a newer profile (e.g. after ProfileSheet)
   const baseline = useRef('');
   useEffect(() => {
+    if (dirty.current) return; // typing / pending autosave: never rewrite the inputs (would eat the trailing space and jump the caret)
     const key = JSON.stringify({ company, logo: logo || '' });
-    if (key === baseline.current) return; // our own save: the card already has these values
+    if (key === baseline.current) return; // our own save already matches what is on screen
     baseline.current = key;
     const next = { ...EMPTY_COMPANY, ...company };
     formRef.current = next;
@@ -139,7 +140,7 @@ export default function SettingsSheet({
     setNote(!r.ok ? t('backup.restore.err') : r.restored ? t('backup.restore.done') : t('backup.restore.none'));
   };
 
-  // persist company + logo (email / phone included) without leaving Ajustes; signature and tax IDs stay as they are
+  // persist: trim free-text ONLY here (never while typing). The local inputs keep trailing spaces so "Nombre Apellido" works.
   const persist = async (nextForm, nextLogo) => {
     if (!onSaveProfile) return;
     const email = String(nextForm.email || '').trim();
@@ -148,10 +149,18 @@ export default function SettingsSheet({
       return;
     }
     setEmailError(false);
-    const payload = { ...nextForm, email, logo: nextLogo, drive };
+    const cleaned = {
+      ...nextForm,
+      name: sanitizeText(nextForm.name, 80).trim(),
+      proName: sanitizeText(nextForm.proName, 60).trim(),
+      city: sanitizeText(nextForm.city || '', 60).trim(),
+      email,
+    };
+    const payload = { ...cleaned, logo: nextLogo, drive };
+    const stored = normalizeCompany(cleaned); // same shape App will put in state / localStorage
     const job = Promise.resolve(onSaveProfile(payload))
       .then(() => {
-        baseline.current = JSON.stringify({ company: { ...EMPTY_COMPANY, ...nextForm, email }, logo: nextLogo || '' });
+        baseline.current = JSON.stringify({ company: stored, logo: nextLogo || '' });
         setSavedFlash(true);
       })
       .catch(() => setLogoError(t('company.logo.err.store')));
@@ -166,15 +175,24 @@ export default function SettingsSheet({
     setForm(next);
     if (key === 'email') setEmailError(false);
   };
-  const commitField = () => persist(formRef.current, picRef.current);
+  const commitField = () => {
+    const cur = formRef.current;
+    const trimmed = {
+      ...cur,
+      name: sanitizeText(cur.name, 80).trim(),
+      proName: sanitizeText(cur.proName, 60).trim(),
+      city: sanitizeText(cur.city || '', 60).trim(),
+    };
+    formRef.current = trimmed;
+    setForm(trimmed);
+    return persist(trimmed, picRef.current);
+  };
   useEffect(() => {
     if (!dirty.current || !onSaveProfile) return undefined;
     const id = setTimeout(() => {
-      dirty.current = false;
-      // mark baseline so the sync-from-props effect does not treat our own write as an external change
-      const payload = { ...formRef.current, logo: picRef.current, drive };
-      persist(formRef.current, picRef.current).then(() => {
-        baseline.current = JSON.stringify({ company: { ...EMPTY_COMPANY, ...formRef.current }, logo: picRef.current || '' });
+      // leave dirty=true until the write settles: otherwise a trimmed company coming back from App rewrites the input and eats the space
+      persist(formRef.current, picRef.current).finally(() => {
+        dirty.current = false;
       });
     }, 250);
     return () => clearTimeout(id);
@@ -281,8 +299,8 @@ export default function SettingsSheet({
             </div>
 
             <div className="min-w-0 flex-1 space-y-3">
-              <TextField label={t('company.name')} value={form.name} onChange={setField('name')} onBlur={commitField} testId="settings-company-name" sanitize={(v) => sanitizeText(v, 80)} placeholder={t('company.name.ph')} />
-              <TextField label={t('setup.pro.name')} value={form.proName} onChange={setField('proName')} onBlur={commitField} testId="settings-pro-name" maxLength={60} sanitize={(v) => sanitizeText(v, 60)} placeholder={t('setup.pro.namePh')} />
+              <TextField label={t('company.name')} value={form.name} onChange={setField('name')} onBlur={commitField} testId="settings-company-name" sanitize={(v) => sanitizeTextInput(v, 80)} placeholder={t('company.name.ph')} />
+              <TextField label={t('setup.pro.name')} value={form.proName} onChange={setField('proName')} onBlur={commitField} testId="settings-pro-name" maxLength={60} sanitize={(v) => sanitizeTextInput(v, 60)} placeholder={t('setup.pro.namePh')} />
             </div>
           </div>
 
@@ -322,7 +340,7 @@ export default function SettingsSheet({
               sanitize={sanitizeTaxId}
               placeholder={t(`company.taxId.ph.${region?.code || 'CL'}`)}
             />
-            <TextField label={t('company.city')} value={form.city} onChange={setField('city')} onBlur={commitField} testId="settings-company-city" maxLength={60} optional={t('common.optional')} sanitize={(v) => sanitizeText(v, 60)} placeholder={t('company.city.ph')} />
+            <TextField label={t('company.city')} value={form.city} onChange={setField('city')} onBlur={commitField} testId="settings-company-city" maxLength={60} optional={t('common.optional')} sanitize={(v) => sanitizeTextInput(v, 60)} placeholder={t('company.city.ph')} />
           </div>
 
           <button

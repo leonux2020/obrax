@@ -5,6 +5,7 @@ import {
   parseDecimal,
   coerceNumber,
   sanitizeText,
+  sanitizeTextInput,
   sanitizeEmail,
   sanitizeAvatarUrl,
   sanitizeTaxId,
@@ -50,6 +51,13 @@ describe('sanitization', () => {
     expect(sanitizeText('<img src=x onerror=alert(1)> Casa')).not.toMatch(/[<>]/);
     expect(sanitizeText('a\u0000b\n\tc')).toBe('a b c');
     expect(sanitizeText('x'.repeat(500), 80).length).toBe(80);
+  });
+  it('sanitizeTextInput keeps a trailing space so a name and surname can be typed; trim only for storage', () => {
+    expect(sanitizeTextInput('Ana')).toBe('Ana');
+    expect(sanitizeTextInput('Ana ')).toBe('Ana '); // the space after the first name must survive onChange
+    expect(sanitizeTextInput('Ana  ')).toBe('Ana '); // collapse, but keep one trailing space
+    expect(sanitizeTextInput(' Ana Ruiz')).toBe('Ana Ruiz'); // leading spaces still dropped
+    expect(sanitizeText('Ana ').trim()).toBe('Ana'); // persistence path
   });
   it('validates email and avatar', () => {
     expect(sanitizeEmail('Foo@Bar.com')).toBe('foo@bar.com');
