@@ -205,6 +205,8 @@ export const P8 = {
     'settings.cloud': "Google Drive y Respaldo",
     'settings.logo.edit': "Cambiar",
     'settings.saved': "Guardado ✅",
+    'project.city': "Ciudad o Región de la Obra",
+    'project.city.ph': "Ej.: Valparaíso, Región Metropolitana",
     'settings.sign': "Configurar Firma Digital",
   },
   en: {
@@ -411,6 +413,8 @@ export const P8 = {
     'settings.cloud': "Google Drive and Backup",
     'settings.logo.edit': "Change",
     'settings.saved': "Saved ✅",
+    'project.city': "Job site city or region",
+    'project.city.ph': "E.g. Austin, Texas",
     'settings.sign': "Set up digital signature",
   },
   pt: {
@@ -617,6 +621,8 @@ export const P8 = {
     'settings.cloud': "Google Drive e Backup",
     'settings.logo.edit': "Trocar",
     'settings.saved': "Salvo ✅",
+    'project.city': "Cidade ou região da obra",
+    'project.city.ph': "Ex.: Curitiba, Paraná",
     'settings.sign': "Configurar assinatura digital",
   },
   fr: {
@@ -823,6 +829,8 @@ export const P8 = {
     'settings.cloud': "Google Drive et Sauvegarde",
     'settings.logo.edit': "Changer",
     'settings.saved': "Enregistré ✅",
+    'project.city': "Ville ou région du chantier",
+    'project.city.ph': "Ex. : Lyon, Auvergne-Rhône-Alpes",
     'settings.sign': "Configurer la signature numérique",
   },
   it: {
@@ -1029,6 +1037,8 @@ export const P8 = {
     'settings.cloud': "Google Drive e Backup",
     'settings.logo.edit': "Cambia",
     'settings.saved': "Salvato ✅",
+    'project.city': "Città o regione del cantiere",
+    'project.city.ph': "Es.: Bologna, Emilia-Romagna",
     'settings.sign': "Configura firma digitale",
   },
   de: {
@@ -1235,6 +1245,8 @@ export const P8 = {
     'settings.cloud': "Google Drive und Sicherung",
     'settings.logo.edit': "Ändern",
     'settings.saved': "Gespeichert ✅",
+    'project.city': "Stadt oder Region der Baustelle",
+    'project.city.ph': "Z. B. München, Bayern",
     'settings.sign': "Digitale Unterschrift einrichten",
   },
 };

@@ -9,7 +9,7 @@ import { hasIndexedDb } from './lib/db.js';
 import { I18nProvider, makeI18n } from './lib/i18n.jsx';
 import { getRegion, LANGS } from './lib/regions.js';
 import { wipeLocalData } from './lib/session.js';
-import { adoptCompany, documentCompany, isClosed, newExtension, newProject, projectTitle, toDayString } from './lib/projects.js';
+import { adoptCompany, cleanCityOrRegion, documentCompany, isClosed, newExtension, newProject, projectTitle, toDayString } from './lib/projects.js';
 import { normalizeLocation } from './lib/ledger.js';
 import { computeAll } from './lib/engine.js';
 import { planningTimeline, pricingTime } from './lib/signature.js';
@@ -456,6 +456,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
       startDate: fields.startDate,
       endDate: fields.endDate,
       location: normalizeLocation(fields.location),
+      cityOrRegion: cleanCityOrRegion(fields.cityOrRegion),
       closedAt: fields.closed ? project.closedAt || Date.now() : 0, // finished jobs live in the Historial tab
       updatedAt: Date.now(),
       draft: {

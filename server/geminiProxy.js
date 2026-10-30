@@ -397,7 +397,7 @@ export function createInvoiceHandler({
         });
       } catch (err) {
         last = err?.name === 'AbortError' ? fail(504, 'timeout') : fail(502, 'upstream');
-        note(`${mdl}: ${err?.name === 'AbortError' ? 'timeout' : 'network error'}`);
+        note(`${mdl}: ${err?.name === 'AbortError' ? 'timeout' : `network error (${String(err?.cause?.code || err?.message || err).slice(0, 120)})`}`);
         continue;
       } finally {
         clearTimeout(timer);

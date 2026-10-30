@@ -6,6 +6,12 @@ import { toNodeHandler } from '../server/node.js';
 
 let handle = null;
 export default function extractInvoice(req, res) {
-  handle ??= toNodeHandler(createInvoiceHandler(readGeminiConfig(process.env)), { trustProxy: true });
+  if (!handle) {
+    const cfg = readGeminiConfig(process.env);
+    // Production never sends an exception to the browser; it is always written to the function log (Vercel > Logs).
+    // Outside production (vercel dev, local runs) the real error also travels in the 500 payload as `detail`.
+    const dev = process.env.NODE_ENV !== 'production' && !process.env.VERCEL;
+    handle = toNodeHandler(createInvoiceHandler({ ...cfg, log: (line) => console.error(`[extract-invoice] ${line}`) }), { trustProxy: true, devErrors: dev, secrets: [cfg.apiKey] });
+  }
   return handle(req, res);
 }

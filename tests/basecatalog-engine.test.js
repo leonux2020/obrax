@@ -1,8 +1,8 @@
 // The simulated reference price of the quote engine is read FROM the bundled base-catalog JSON (layer 3 of the price chain).
 import { describe, it, expect, vi } from 'vitest';
-import raw from '../src/data/baseCatalog.json';
+import raw from '../src/data/baseCatalog.js';
 
-vi.mock('../src/data/baseCatalog.json', async (orig) => {
+vi.mock('../src/data/baseCatalog.js', async (orig) => {
   const real = (await orig()).default;
   const items = Object.fromEntries(Object.entries(real.items).map(([id, it]) => [id, { ...it, usd: it.usd * (id === 'cement_bag' ? 2 : 1) }]));
   return { default: { ...real, items } };

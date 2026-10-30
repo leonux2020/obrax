@@ -2,7 +2,7 @@ import { useId, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { currentPosition } from '../lib/geo.js';
 import { locationLabel, normalizeLocation } from '../lib/ledger.js';
-import { isClosed, parseDay, toDayString } from '../lib/projects.js';
+import { cleanCityOrRegion, isClosed, parseDay, toDayString } from '../lib/projects.js';
 import { sanitizeText } from '../lib/sanitize.js';
 import { Button, DateInput, Switch, TextField } from './ui.jsx';
 import BottomSheet from './BottomSheet.jsx';
@@ -50,6 +50,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
     startDate: project ? project.startDate : toDayString(new Date()),
     endDate: project?.endDate ?? '',
     location: project?.location ?? null,
+    cityOrRegion: project?.cityOrRegion ?? '',
     closed: project ? isClosed(project) : false,
     unfreeze: false,
   }));
@@ -84,6 +85,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
       startDate: start ? form.startDate : '',
       endDate: end ? form.endDate : '',
       location: form.location,
+      cityOrRegion: cleanCityOrRegion(form.cityOrRegion),
       closed: form.closed,
       unfreeze: form.unfreeze,
     });
@@ -133,6 +135,8 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
             {t('proj.endBeforeStart')}
           </p>
         )}
+
+        <TextField label={t('project.city')} placeholder={t('project.city.ph')} value={form.cityOrRegion} maxLength={80} testId="project-city" sanitize={(v) => sanitizeText(v, 80)} onChange={set('cityOrRegion')} />
 
         <div>
           {editing && <SectionTitle>{t('loc.title')}</SectionTitle>}

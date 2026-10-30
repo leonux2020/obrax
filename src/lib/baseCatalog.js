@@ -1,4 +1,4 @@
-// BASE CATALOG: the offline price floor. A tiny JSON (src/data/baseCatalog.json, ~2 KB) bundled INSIDE the app, so it is
+// BASE CATALOG: the offline price floor. A tiny data module (src/data/baseCatalog.js, ~2 KB) bundled INSIDE the app, so it is
 // there with no network, no IndexedDB and no first-run download. Price priority for a material, strictly:
 //
 //   1. USER      the price typed by the user (this project's override or the saved "Libro Maestro" value)
@@ -8,7 +8,7 @@
 //
 // Layers 1-2 are resolved by pricing.js / priceBook.js; this module is layer 3 and the combined lookup used by the UI.
 
-import raw from '../data/baseCatalog.json';
+import raw from '../data/baseCatalog.js'; // a .js module on purpose: native Node ESM (Vercel functions) rejects JSON imports without an attribute
 import { CATALOG } from './catalog.js';
 import { getRegion } from './regions.js';
 import { liveMaterial, savedMaterial } from './priceBook.js';

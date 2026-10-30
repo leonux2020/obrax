@@ -205,6 +205,8 @@ describe('New project sheet: agile form, no money', () => {
     const text = [...doc.querySelectorAll('[role="dialog"] input[type="text"]')];
     await type(text[0], 'Casa Lo Barnechea');
     await type(text[1], 'María');
+    expect(text).toHaveLength(3); // name, client, "Ciudad o Región de la Obra"
+    await type(doc.querySelector('[data-testid="project-city"]'), 'Valparaíso');
     await click(doc.querySelector('[data-testid="mode-project"]'));
     expect(doc.querySelector('[data-testid="mode-project"]').getAttribute('aria-checked')).toBe('true');
     await click(doc.querySelector('[data-testid="project-locate"]'));
@@ -212,7 +214,7 @@ describe('New project sheet: agile form, no money', () => {
     expect(doc.querySelector('[data-testid="project-location"]').textContent).toContain('-33.4489');
     await click(doc.querySelector('[data-testid="project-save"]'));
     expect(saved).toHaveLength(1);
-    expect(saved[0]).toMatchObject({ name: 'Casa Lo Barnechea', client: 'María', mode: 'project', location: { lat: -33.4489, lng: -70.6693 } });
+    expect(saved[0]).toMatchObject({ name: 'Casa Lo Barnechea', client: 'María', mode: 'project', cityOrRegion: 'Valparaíso', location: { lat: -33.4489, lng: -70.6693 } });
   });
 
   it('a refused location is a small message, not a blocker; editing shows the closed / unfreeze switches', async () => {
@@ -242,7 +244,7 @@ describe('Edit modal (the pencil)', () => {
     expect(dialog.className).toContain('h-[100dvh]');
     const headings = [...dialog.querySelectorAll('h3')].map((h) => h.textContent);
     expect(headings).toEqual(['Datos de la obra', 'Fechas', 'Ubicación', 'Estado de la obra']);
-    expect(dialog.querySelectorAll('input[type="text"]')).toHaveLength(2); // name + client
+    expect(dialog.querySelectorAll('input[type="text"]')).toHaveLength(3); // name + client + city/region
     expect(dialog.querySelectorAll('input[type="date"]')).toHaveLength(2);
     expect(document.querySelector('[data-testid="project-location"]').textContent).toContain('-33.4489');
     await click(document.querySelector('[data-testid="project-locate"]'));

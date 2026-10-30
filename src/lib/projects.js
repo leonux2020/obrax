@@ -129,7 +129,10 @@ export function adoptCompany(project, company, logo = '') {
 }
 
 // ---- project model --------------------------------------------------------------------------------------
-export function newProject({ regionCode, mode = 'quick', company = null, logo = '', name = '', client = '', startDate = '', endDate = '', location = null, parentId = '', now = Date.now() }) {
+/** "Ciudad o Región de la Obra": free text (max 80), geographic context of the job for the Radar de Mercado. Never money. */
+export const cleanCityOrRegion = (v) => sanitizeText(v, 80).trim();
+
+export function newProject({ regionCode, mode = 'quick', company = null, logo = '', name = '', client = '', startDate = '', endDate = '', location = null, cityOrRegion = '', parentId = '', now = Date.now() }) {
   const draft = newDraft(regionCode, mode);
   draft.project = { name: sanitizeText(name, 60).trim(), client: sanitizeText(client, 60).trim() };
   const start = parseDay(startDate) ? startDate : '';
@@ -142,6 +145,7 @@ export function newProject({ regionCode, mode = 'quick', company = null, logo = 
     endDate: end,
     company: snapshotCompany(company, logo),
     location: normalizeLocation(location),
+    cityOrRegion: cleanCityOrRegion(cityOrRegion),
     closedAt: 0,
     ...(parentId && ID_RE.test(parentId) ? { parentId } : {}),
     payments: [],
@@ -177,6 +181,7 @@ export function newExtension(parent, projects = [], { label = 'Extensión', comp
     client: projectClient(parent),
     startDate: toDayString(new Date(now)),
     location: parent.location,
+    cityOrRegion: parent.cityOrRegion,
     parentId: root,
     now,
   });
@@ -200,6 +205,7 @@ export function normalizeProject(obj) {
     endDate: endOk ? obj.endDate : '',
     company: snapshotCompany(obj.company, obj.company?.logo),
     location: normalizeLocation(obj.location),
+    cityOrRegion: cleanCityOrRegion(obj.cityOrRegion), // older records have none: ''
     closedAt: Number.isFinite(Number(obj.closedAt)) && Number(obj.closedAt) > 0 ? Number(obj.closedAt) : 0,
     ...(typeof obj.parentId === 'string' && ID_RE.test(obj.parentId) ? { parentId: obj.parentId } : {}), // the job this one extends (older records have none)
     payments: normalizePayments(obj.payments),

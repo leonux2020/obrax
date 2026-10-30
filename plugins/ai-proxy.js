@@ -18,7 +18,12 @@ export default function aiProxy(options = {}) {
   const build = (mode, root, logger) => {
     const env = options.env ?? loadEnv(mode, root, ''); // '' prefix: also non-VITE_ vars, but only on the server
     const cfg = readGeminiConfig(env);
-    handler = toNodeHandler(createInvoiceHandler({ ...cfg, ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}), ...(options.limits ?? {}), log: (line) => logger?.info(`  [ai-proxy] ${line}`) }));
+    // dev server / preview: the real error (stack) of an unexpected failure goes to the terminal AND into the 500 payload (`detail`)
+    handler = toNodeHandler(createInvoiceHandler({ ...cfg, ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}), ...(options.limits ?? {}), log: (line) => logger?.info(`  [ai-proxy] ${line}`) }), {
+      devErrors: options.devErrors ?? true,
+      secrets: [cfg.apiKey],
+      log: (line) => (logger?.error ?? logger?.info)?.call(logger, `  [ai-proxy] ${line}`),
+    });
     return cfg.apiKey ? 'ready' : 'missing-key';
   };
   const mount = (server) => {

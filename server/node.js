@@ -37,9 +37,13 @@ export const clientIp = (req, trustProxy = false) => {
 /**
  * @param handler  createInvoiceHandler(...)
  * @param opts     { trustProxy } trust X-Forwarded-For only behind a platform that sets it (Vercel)
+ *                 { devErrors } DEVELOPMENT ONLY: add the real error (message + stack) to the 500 payload as `detail`
+ *                 { secrets }   strings (the API key) scrubbed from anything logged or returned
+ *                 { log }       (line) => void, defaults to console.error: the server-side log always gets the real error
  * @returns (req, res) => Promise<void>
  */
-export function toNodeHandler(handler, { trustProxy = false } = {}) {
+export function toNodeHandler(handler, { trustProxy = false, devErrors = false, secrets = [], log = (line) => console.error(line) } = {}) {
+  const scrub = (s) => secrets.filter(Boolean).reduce((out, secret) => out.split(secret).join('***'), String(s));
   return async (req, res) => {
     let status;
     let body;
@@ -51,9 +55,16 @@ export function toNodeHandler(handler, { trustProxy = false } = {}) {
       } else {
         ({ status, body } = await handler({ method: req.method, headers: req.headers, ip: clientIp(req, trustProxy), bodyText: text }));
       }
-    } catch {
+    } catch (err) {
       status = 500;
-      body = { ok: false, error: 'upstream' }; // never leak the exception
+      body = { ok: false, error: 'upstream' }; // production never leaks the exception to the browser...
+      const real = scrub(err?.stack || err?.message || err);
+      try {
+        log(`[extract-invoice] unhandled error: ${real}`); // ...but the host's function log (Vercel logs / dev terminal) always has it
+      } catch {
+        /* logging must never break a response */
+      }
+      if (devErrors) body.detail = real.slice(0, 4000);
     }
     res.statusCode = status;
     res.setHeader('content-type', 'application/json; charset=utf-8');

@@ -56,7 +56,7 @@ describe('Blob media', () => {
 
 describe('Base catalog (offline price floor)', () => {
   it('is tiny, covers EVERY material and agrees with the in-code catalog', () => {
-    const file = fs.statSync(new URL('../src/data/baseCatalog.json', import.meta.url)).size;
+    const file = fs.statSync(new URL('../src/data/baseCatalog.js', import.meta.url)).size;
     expect(file).toBeLessThan(8_000);
     expect(Object.keys(BASE_CATALOG).sort()).toEqual(Object.keys(CATALOG).sort());
     for (const [id, m] of Object.entries(CATALOG)) expect(BASE_CATALOG[id].usd, id).toBe(m.usd);
