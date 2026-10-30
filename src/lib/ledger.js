@@ -107,10 +107,29 @@ export const normalizeExpenses = (raw) =>
       ...(oneOfOrEmpty(p.paymentMethod, PAYMENT_METHODS) ? { paymentMethod: oneOfOrEmpty(p.paymentMethod, PAYMENT_METHODS) } : {}),
       ...(amount0(p.netAmount) !== null ? { netAmount: amount0(p.netAmount) } : {}),
       ...(amount0(p.taxAmount) !== null ? { taxAmount: amount0(p.taxAmount) } : {}),
+      // context: the project this expense belongs to (never orphan), where the job is, and which receipt document the line came from
+      ...(typeof p.projectId === 'string' && ID_RE.test(p.projectId) ? { projectId: p.projectId } : {}),
+      ...(sanitizeText(p.place, 80).trim() ? { place: sanitizeText(p.place, 80).trim() } : {}),
+      ...(typeof p.docId === 'string' && ID_RE.test(p.docId) ? { docId: p.docId } : {}),
       // the photo of the receipt these lines came from (a Blob in IndexedDB, see receiptPhotos.js); several lines can share one
       ...(typeof p.receiptId === 'string' && RECEIPT_ID_RE.test(p.receiptId) ? { receiptId: p.receiptId } : {}),
     };
   });
+
+/**
+ * Every expense of a batch inherits the context of the project it is saved into: its `projectId` (always the project's own id,
+ * whatever the line said), the project's currency when the receipt printed none, and the place of the job. No expense is ever orphan.
+ */
+export function withProjectContext(project, expenses) {
+  const currency = getRegion(project?.draft?.regionCode)?.currency || '';
+  const place = sanitizeText(project?.cityOrRegion || project?.location?.label || '', 80).trim();
+  return (Array.isArray(expenses) ? expenses : []).map((e) => ({
+    ...e,
+    projectId: project.id,
+    ...(e.currency || !currency ? {} : { currency }),
+    ...(place ? { place } : {}),
+  }));
+}
 
 export const normalizeLogbook = (raw) =>
   listOf(raw, LEDGER_LIMITS.logbook, (p, used) => {

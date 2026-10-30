@@ -206,7 +206,7 @@ describe('receipt sync: nothing is read offline, everything is read when the net
     expect(a.calls).toHaveLength(0);
     const [row] = await q.list();
     expect(row.status).toBe('review');
-    expect(row.result.items).toHaveLength(2);
+    expect(row.result.receipts[0].items).toHaveLength(2);
   });
 
   it('the project was deleted meanwhile: the picture is dropped, no expense is written', async () => {

@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { InvoiceError } from '../lib/invoice.js';
 import { EXPENSE_CATEGORIES, RENTAL_CATEGORIES } from '../lib/ledger.js';
 import { PhotoError, compressInvoiceImage } from '../lib/photos.js';
+import { pushToast } from '../lib/notify.js';
 import { expensesFromRows, receiptMeta, requestReceipt } from '../lib/receipt.js';
 import { Button, DateInput, NumberField } from './ui.jsx';
 import BottomSheet from './BottomSheet.jsx';
@@ -20,7 +21,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, prepareImage = 
   const { t, region, lang, money } = useI18n();
   const [phase, setPhase] = useState('pick'); // 'pick' | 'reading' | 'review'
   const [error, setError] = useState('');
-  const [receipt, setReceipt] = useState(null);
+  const [receipts, setReceipts] = useState([]); // ONE photo can hold several receipts: each is an independent record
   const [image, setImage] = useState(null); // the compressed photo that was read: it stays with the expenses (Comprobantes)
   const [rows, setRows] = useState([]);
   const cameraRef = useRef(null);
@@ -48,9 +49,9 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, prepareImage = 
         if (alive.current) setPhase('queued');
         return;
       }
-      let r;
+      let batch;
       try {
-        r = await requestReceipt(img.dataUrl, { currency: region.currency, lang, signal: ctl.signal, ...(fetchImpl ? { fetchImpl } : {}) });
+        batch = await requestReceipt(img.dataUrl, { currency: region.currency, lang, signal: ctl.signal, ...(fetchImpl ? { fetchImpl } : {}) });
       } catch (err) {
         if (onQueue && err instanceof InvoiceError && (err.code === 'network' || err.code === 'timeout')) {
           await onQueue(img.dataUrl); // the line died while reading: keep the photo for later
@@ -60,9 +61,11 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, prepareImage = 
         throw err;
       }
       if (!alive.current) return;
-      setReceipt(r);
+      let n = 0;
+      setReceipts(batch.receipts);
       setImage(img);
-      setRows(r.items.map((it, i) => ({ ...it, key: `r${i}`, selected: true })));
+      // every line remembers the receipt (`doc`) it was printed on; keys stay sequential across the whole photo
+      setRows(batch.receipts.flatMap((r, doc) => r.items.map((it) => ({ ...it, doc, key: `r${n++}`, selected: true }))));
       setPhase('review');
     } catch (err) {
       if (!alive.current) return;
@@ -85,7 +88,17 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, prepareImage = 
   const chosen = rows.filter((r) => r.selected && r.amount > 0);
   const total = chosen.reduce((s, r) => s + r.amount, 0);
 
-  const save = () => onSave(expensesFromRows(rows, { ...receiptMeta(receipt), now: typeof today === 'function' ? today() : today }), image ? { image } : {});
+  const save = () => {
+    const now = typeof today === 'function' ? today() : today;
+    // one independent group of expenses per receipt (its own fiscal data, folio and net / tax split); the project context (id, currency,
+    // place) is injected by the project that stores them, so none of them can be orphan
+    const groups = receipts.map((r, doc) => ({ r, lines: rows.filter((x) => x.doc === doc) }));
+    const expenses = groups.flatMap(({ r, lines }) => expensesFromRows(lines, { ...receiptMeta(r), now }));
+    const documents = groups.filter(({ lines }) => lines.some((x) => x.selected && x.amount > 0)).length;
+    onSave(expenses, { ...(image ? { image } : {}), receipts: documents });
+    pushToast({ key: documents === 1 ? 'rcpt.toast.one' : 'rcpt.toast.many', params: { n: documents }, tone: 'ok' });
+  };
+  const otherCurrency = receipts.find((r) => r.currency && r.currency !== region.currency)?.currency || '';
 
   return (
     <BottomSheet fullscreen title={t('rcpt.title')} subtitle={t('rcpt.subtitle')} onClose={onClose}>
@@ -133,19 +146,32 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, prepareImage = 
           </div>
         )}
 
-        {phase === 'review' && receipt && (
+        {phase === 'review' && receipts.length > 0 && (
           <div className="space-y-4 pb-32" data-testid="receipt-review">
-            {receipt.supplier && <p className="text-sm text-neutral-300">{t('inv.supplier', { name: receipt.supplier })}</p>}
-            {receipt.currency && receipt.currency !== region.currency && (
+            {receipts.length === 1 && receipts[0].supplier && <p className="text-sm text-neutral-300">{t('inv.supplier', { name: receipts[0].supplier })}</p>}
+            {receipts.length > 1 && (
+              <p role="status" data-testid="receipt-batch" className="text-sm font-bold text-[#e8c35f]">
+                {t('rcpt.batch', { n: receipts.length })}
+              </p>
+            )}
+            {otherCurrency && (
               <p role="alert" data-testid="receipt-currency" className="rounded-xl border border-[#d4af37]/60 px-4 py-3 text-sm font-semibold text-[#e8c35f]">
-                {t('inv.currency', { cur: receipt.currency, proj: region.currency })}
+                {t('inv.currency', { cur: otherCurrency, proj: region.currency })}
               </p>
             )}
             <ul className="divide-y divide-white/10 rounded-2xl border border-white/10">
-              {rows.map((r) => {
+              {rows.map((r, idx) => {
                 const rental = RENTAL_CATEGORIES.includes(r.category);
+                const head = receipts.length > 1 && (idx === 0 || rows[idx - 1].doc !== r.doc) ? receipts[r.doc] : null;
                 return (
-                  <li key={r.key} data-testid={`receipt-row-${r.key}`} className={`space-y-3 p-4 ${r.selected ? '' : 'opacity-50'}`}>
+                  <React.Fragment key={r.key}>
+                    {head && (
+                      <li role="presentation" data-testid={`receipt-doc-${r.doc}`} className="bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-wide text-[#e8c35f]">
+                        {t('rcpt.doc', { i: r.doc + 1, n: receipts.length })}
+                        {[head.supplier, head.documentNumber, head.total ? money(head.total) : ''].filter(Boolean).map((x) => ` · ${x}`).join('')}
+                      </li>
+                    )}
+                  <li data-testid={`receipt-row-${r.key}`} className={`space-y-3 p-4 ${r.selected ? '' : 'opacity-50'}`}>
                     <label className="flex cursor-pointer items-start gap-3">
                       <input type="checkbox" className="mt-1 h-6 w-6 shrink-0 accent-[#d4af37]" checked={r.selected} onChange={() => patch(r.key, { selected: !r.selected })} aria-label={r.description || t(`exp.cat.${r.category}`)} />
                       <span className="min-w-0 flex-1 font-bold leading-snug">{r.description || t(`exp.cat.${r.category}`)}</span>
@@ -181,6 +207,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, prepareImage = 
                       )}
                     </div>
                   </li>
+                  </React.Fragment>
                 );
               })}
             </ul>

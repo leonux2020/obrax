@@ -15,6 +15,7 @@ import {
   MAX_BODY_BYTES,
   KINDS,
   buildReceiptPrompt,
+  RECEIPT_DOC_SCHEMA,
   RECEIPT_SCHEMA,
 } from '../server/geminiProxy.js';
 import { readGeminiConfig } from '../server/env.js';
@@ -386,6 +387,8 @@ describe('proxy: "Escanear Boleta" ({kind:"receipt"}) is a second FIXED prompt b
     ],
     ...over,
   });
+  // the model's answer for a photo: { isReceipt, receipts: [ one entry per document ] }; `vendorName` is its name for the shop
+  const answer = (...docs) => ({ isReceipt: true, receipts: docs.map(({ supplier, isReceipt, ...d }) => ({ vendorName: supplier, ...d })) });
   const receiptRequest = (over = {}) => request({ bodyText: JSON.stringify({ image: IMG, currency: 'CLP', kind: 'receipt', ...over }) });
   const clock = () => new Date(2026, 9, 22, 12, 0, 0).getTime();
 
@@ -410,9 +413,10 @@ describe('proxy: "Escanear Boleta" ({kind:"receipt"}) is a second FIXED prompt b
   });
 
   it('returns tabulated lines: printed amounts win, rentals keep the return day, and the key never appears', async () => {
-    const res = await make({ fetchImpl: okFetch(receipt()), clock })(receiptRequest());
-    expect(res.body).toMatchObject({ ok: true, currency: 'CLP', supplier: 'Arriendos Sur', date: '2026-10-20' });
-    expect(res.body.items).toEqual([
+    const res = await make({ fetchImpl: okFetch(answer(receipt())), clock })(receiptRequest());
+    expect(res.body.receipts).toHaveLength(1);
+    expect(res.body.receipts[0]).toMatchObject({ currency: 'CLP', supplier: 'Arriendos Sur', date: '2026-10-20' });
+    expect(res.body.receipts[0].items).toEqual([
       expect.objectContaining({ amount: 12000, category: 'tool_rental', returnDate: '2026-10-22' }),
       expect.objectContaining({ amount: 9980, category: 'material', returnDate: '' }),
     ]);
@@ -426,13 +430,13 @@ describe('proxy: "Escanear Boleta" ({kind:"receipt"}) is a second FIXED prompt b
     expect(text).toMatch(/ACCEPT any legible commercial document/);
     expect(text).toMatch(/NEVER reject a document because it is not a construction-material store/);
     expect(text).toMatch(/ONLY when the image is not a purchase document at all/);
-    for (const field of ['supplier', 'receiptDate', 'currency', 'totalText', 'purchaseType', 'unitPriceText', 'quantity', 'amountText']) expect(text).toContain(`"${field}"`);
+    for (const field of ['receipts', 'vendorName', 'receiptDate', 'currency', 'totalText', 'purchaseType', 'unitPriceText', 'quantity', 'amountText']) expect(text).toContain(`"${field}"`);
     for (const c of ['material', 'food', 'transport', 'other']) expect(text).toContain(c);
     // the schema lets the model answer with the general type, the total and the unit price, and food is a category
-    expect(RECEIPT_SCHEMA.properties.purchaseType.enum).toContain('food');
-    expect(RECEIPT_SCHEMA.properties.items.items.properties.category.enum).toContain('food');
-    expect(Object.keys(RECEIPT_SCHEMA.properties)).toEqual(expect.arrayContaining(['totalText', 'total', 'purchaseType']));
-    expect(Object.keys(RECEIPT_SCHEMA.properties.items.items.properties)).toEqual(expect.arrayContaining(['unitPriceText', 'unitPrice']));
+    expect(RECEIPT_DOC_SCHEMA.properties.purchaseType.enum).toContain('food');
+    expect(RECEIPT_DOC_SCHEMA.properties.items.items.properties.category.enum).toContain('food');
+    expect(Object.keys(RECEIPT_DOC_SCHEMA.properties)).toEqual(expect.arrayContaining(['totalText', 'total', 'purchaseType']));
+    expect(Object.keys(RECEIPT_DOC_SCHEMA.properties.items.items.properties)).toEqual(expect.arrayContaining(['unitPriceText', 'unitPrice']));
   });
 
   it('the receipt prompt and schema ask for the fiscal metadata (null when the paper does not show it)', () => {
@@ -440,36 +444,78 @@ describe('proxy: "Escanear Boleta" ({kind:"receipt"}) is a second FIXED prompt b
     for (const f of ['vendorTaxId', 'documentType', 'documentNumber', 'paymentMethod', 'netAmount', 'taxAmount']) expect(text).toContain(`"${f}"`);
     expect(text).toMatch(/use null for every field that does not appear/);
     expect(text).toMatch(/RUT.*NIT.*Partita IVA/s);
-    const props = RECEIPT_SCHEMA.properties;
+    const props = RECEIPT_DOC_SCHEMA.properties;
     for (const f of ['vendorTaxId', 'documentType', 'documentNumber', 'paymentMethod', 'netAmount', 'taxAmount', 'netAmountText', 'taxAmountText']) expect(props[f].nullable, f).toBe(true);
     expect(props.documentType.enum).toEqual(['invoice', 'receipt', 'ticket', 'other']);
     expect(props.paymentMethod.enum).toEqual(['cash', 'card', 'transfer', 'other']);
-    expect(RECEIPT_SCHEMA.required).toEqual(['isReceipt', 'items']); // the fiscal fields never make a receipt fail
+    expect(RECEIPT_DOC_SCHEMA.required).toEqual(['vendorName', 'items']); // the fiscal fields never make a receipt fail
   });
 
   it('fiscal fields travel through the proxy, cleaned', async () => {
-    const res = await make({ fetchImpl: okFetch(receipt({ vendorTaxId: '76.123.456-7', documentType: 'receipt', documentNumber: '000987', paymentMethod: 'cash', netAmount: 8403.36, taxAmount: 1596.64, totalText: '10.000' })), clock })(receiptRequest());
-    expect(res.body).toMatchObject({ ok: true, vendorTaxId: '76.123.456-7', documentType: 'receipt', documentNumber: '000987', paymentMethod: 'cash', netAmount: 8403.36, taxAmount: 1596.64 });
-    const bare = await make({ fetchImpl: okFetch(receipt({ vendorTaxId: null, documentType: null, paymentMethod: null })), clock })(receiptRequest());
-    expect(bare.body).toMatchObject({ ok: true, vendorTaxId: null, documentType: null, documentNumber: null, paymentMethod: null, netAmount: null, taxAmount: null });
+    const res = await make({ fetchImpl: okFetch(answer(receipt({ vendorTaxId: '76.123.456-7', documentType: 'receipt', documentNumber: '000987', paymentMethod: 'cash', netAmount: 8403.36, taxAmount: 1596.64, totalText: '10.000' }))), clock })(receiptRequest());
+    expect(res.body.receipts[0]).toMatchObject({ vendorTaxId: '76.123.456-7', documentType: 'receipt', documentNumber: '000987', paymentMethod: 'cash', netAmount: 8403.36, taxAmount: 1596.64 });
+    const bare = await make({ fetchImpl: okFetch(answer(receipt({ vendorTaxId: null, documentType: null, paymentMethod: null }))), clock })(receiptRequest());
+    expect(bare.body.receipts[0]).toMatchObject({ vendorTaxId: null, documentType: null, documentNumber: null, paymentMethod: null, netAmount: null, taxAmount: null });
   });
 
   it('a supermarket receipt goes through end to end with its food lines and general type', async () => {
     const res = await make({
-      fetchImpl: okFetch(receipt({ supplier: 'Jumbo', purchaseType: 'food', totalText: '12.500', items: [{ description: 'Pan', quantity: 5, unitPriceText: '1.000', amountText: '5.000', category: 'food' }, { description: 'Bencina', amountText: '7.500', category: 'transport' }] })),
+      fetchImpl: okFetch(answer(receipt({ supplier: 'Jumbo', purchaseType: 'food', totalText: '12.500', items: [{ description: 'Pan', quantity: 5, unitPriceText: '1.000', amountText: '5.000', category: 'food' }, { description: 'Bencina', amountText: '7.500', category: 'transport' }] }))),
       clock,
     })(receiptRequest());
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ ok: true, supplier: 'Jumbo', purchaseType: 'food', total: 12500 });
-    expect(res.body.items.map((i) => i.category)).toEqual(['food', 'transport']);
-    expect(res.body.items[0]).toMatchObject({ quantity: 5, unitPrice: 1000, amount: 5000 });
+    expect(res.body.receipts[0]).toMatchObject({ supplier: 'Jumbo', purchaseType: 'food', total: 12500 });
+    expect(res.body.receipts[0].items.map((i) => i.category)).toEqual(['food', 'transport']);
+    expect(res.body.receipts[0].items[0]).toMatchObject({ quantity: 5, unitPrice: 1000, amount: 5000 });
+  });
+
+  it('BATCH MODE: the prompt says one photo may hold several receipts, each independent, and the schema returns a `receipts` array', () => {
+    const text = buildReceiptPrompt({ currency: 'CLP' });
+    expect(text).toMatch(/ONE OR SEVERAL distinct receipts, invoices or tickets/);
+    expect(text).toMatch(/EVERY separate document/);
+    expect(text).toMatch(/"receipts" array/);
+    expect(text).toMatch(/NEVER merge two documents/);
+    expect(text).toMatch(/OWN vendorName/);
+    expect(RECEIPT_SCHEMA.properties.receipts.type).toBe('ARRAY');
+    expect(RECEIPT_SCHEMA.properties.receipts.items).toBe(RECEIPT_DOC_SCHEMA);
+    expect(RECEIPT_SCHEMA.required).toEqual(['isReceipt', 'receipts']);
+    expect(RECEIPT_DOC_SCHEMA.properties).toHaveProperty('vendorName');
+  });
+
+  it('a photo with THREE receipts returns three independent records, each with its own fiscal data and lines', async () => {
+    const photo = answer(
+      receipt({ supplier: 'Sodimac', vendorTaxId: '96.792.430-K', documentType: 'invoice', documentNumber: '1001', paymentMethod: 'card', totalText: '11.900', netAmountText: '10.000', taxAmountText: '1.900', items: [{ description: 'Cemento', amountText: '11.900', category: 'material' }] }),
+      receipt({ supplier: 'Copec', vendorTaxId: '99.520.000-7', documentType: 'ticket', documentNumber: '77', paymentMethod: 'cash', purchaseType: 'transport', items: [{ description: 'Diésel', amountText: '30.000', category: 'transport' }] }),
+      receipt({ supplier: 'Jumbo', purchaseType: 'food', items: [{ description: 'Almuerzo cuadrilla', amountText: '18.500', category: 'food' }] })
+    );
+    const f = okFetch(photo);
+    const res = await make({ fetchImpl: f, clock })(receiptRequest());
+    expect(res.status).toBe(200);
+    expect(res.body.receipts.map((r) => r.supplier)).toEqual(['Sodimac', 'Copec', 'Jumbo']);
+    expect(res.body.receipts[0]).toMatchObject({ vendorTaxId: '96.792.430-K', documentType: 'invoice', documentNumber: '1001', paymentMethod: 'card', netAmount: 10000, taxAmount: 1900 });
+    expect(res.body.receipts[1]).toMatchObject({ vendorTaxId: '99.520.000-7', documentType: 'ticket', paymentMethod: 'cash', netAmount: null, taxAmount: null });
+    expect(res.body.receipts[2]).toMatchObject({ vendorTaxId: null, documentNumber: null }); // nothing leaks from one document to the next
+    expect(res.body.receipts.map((r) => r.items.map((i) => i.amount))).toEqual([[11900], [30000], [18500]]);
+    // one request, one prompt, a bigger answer budget for the batch
+    expect(f).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(f.mock.calls[0][1].body).generationConfig.maxOutputTokens).toBeGreaterThanOrEqual(16384);
+  });
+
+  it('in a batch, a document without readable lines is dropped but the rest are kept; a photo with no receipt at all is not_invoice', async () => {
+    const mixed = { isReceipt: true, receipts: [{ vendorName: 'Vacío', items: [] }, { vendorName: 'Easy', items: [{ description: 'Taladro', amountText: '25.000', category: 'tool_rental' }] }] };
+    const res = await make({ fetchImpl: okFetch(mixed), clock })(receiptRequest());
+    expect(res.body.receipts.map((r) => r.supplier)).toEqual(['Easy']);
+    expect((await make({ fetchImpl: okFetch({ isReceipt: false, receipts: [] }), clock })(receiptRequest())).body).toEqual({ ok: false, error: 'not_invoice' });
+    expect((await make({ fetchImpl: okFetch({ isReceipt: true, receipts: [{ vendorName: 'X', items: [] }] }), clock })(receiptRequest())).body).toEqual({ ok: false, error: 'unreadable' });
+    const many = { isReceipt: true, receipts: Array.from({ length: 30 }, (_, i) => ({ vendorName: `T${i}`, items: [{ description: 'x', amountText: '1', category: 'other' }] })) };
+    expect((await make({ fetchImpl: okFetch(many), clock })(receiptRequest())).body.receipts).toHaveLength(10); // bounded
   });
 
   it('hostile output is neutralised and non-receipts / empty readings map to fixed error codes', async () => {
     const evil = receipt({ supplier: '<script>x</script>', items: [{ description: '<img onerror=1>', amountText: '1', category: 'drugs' }, { description: 'huge', amountText: '9'.repeat(40), category: 'material' }] });
-    const res = await make({ fetchImpl: okFetch(evil), clock })(receiptRequest());
+    const res = await make({ fetchImpl: okFetch(answer(evil)), clock })(receiptRequest());
     expect(JSON.stringify(res.body)).not.toMatch(/[<>]/);
-    expect(res.body.items.every((i) => ['material', 'other'].includes(i.category))).toBe(true);
+    expect(res.body.receipts[0].items.every((i) => ['material', 'other'].includes(i.category))).toBe(true);
     expect((await make({ fetchImpl: okFetch(receipt({ isReceipt: false })) })(receiptRequest())).body).toEqual({ ok: false, error: 'not_invoice' });
     expect((await make({ fetchImpl: okFetch(receipt({ items: [] })) })(receiptRequest())).body).toEqual({ ok: false, error: 'unreadable' });
   });

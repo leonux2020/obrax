@@ -128,4 +128,26 @@ describe('App with the workspace (default)', () => {
     const saved = (await projectStore.load())[0];
     expect(saved.expenses.map((e) => e.description)).toEqual(['Taladro']);
   });
+
+  it('ONE parked photo with three receipts lands as three documents in ITS project: every saved expense carries the project id', async () => {
+    await mount();
+    await newProjectIntoWorkspace();
+    const [project] = await projectStore.load();
+    await act(async () => {
+      await receiptQueue.enqueue({ projectId: project.id, image: JPEG, regionCode: 'CL', currency: 'CLP', lang: 'es' });
+    });
+    const doc = (supplier, description, amountText) => ({ supplier, currency: 'CLP', items: [{ description, amountText, category: 'material' }] });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => ({ ok: true, json: async () => ({ ok: true, isReceipt: true, receipts: [doc('Easy', 'Taladro', '$25.000'), doc('Sodimac', 'Cemento', '$9.980'), doc('Copec', 'Diésel', '$30.000')] }) }));
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+      await new Promise((r) => setTimeout(r, 150));
+    });
+    expect(q('toast')?.textContent).toMatch(/Boletas leídas: 1 · gastos añadidos: 3/);
+    await wait(300);
+    const saved = (await projectStore.load())[0];
+    expect(saved.expenses.map((e) => e.description).sort()).toEqual(['Cemento', 'Diésel', 'Taladro']);
+    expect(saved.expenses.every((e) => e.projectId === project.id)).toBe(true);
+    expect(saved.expenses.every((e) => e.currency === 'CLP')).toBe(true);
+    expect(new Set(saved.expenses.map((e) => e.docId)).size).toBe(3);
+  });
 });

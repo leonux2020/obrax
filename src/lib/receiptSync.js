@@ -8,8 +8,8 @@
 // add silently a receipt printed in ANOTHER currency ('review'); never run twice at once (in this tab, nor across tabs
 // when the Web Locks API exists); never send anything while offline.
 
-import { LEDGER_LIMITS } from './ledger.js';
-import { expensesFromRows, receiptMeta, requestReceipt } from './receipt.js';
+import { LEDGER_LIMITS, withProjectContext } from './ledger.js';
+import { asReceipts, batchExpenses, requestReceipt } from './receipt.js';
 import { QUEUE_LIMITS, receiptQueue } from './receiptQueue.js';
 
 export const SYNC_TAG = 'cubrax-receipts';
@@ -28,11 +28,9 @@ export const isOnline = () => typeof navigator === 'undefined' || navigator.onLi
 /** Pure: the project with the new expenses on top (bounded like every other write). */
 export const addExpenses = (project, expenses, now = Date.now()) => ({
   ...project,
-  expenses: [...expenses, ...project.expenses].slice(0, LEDGER_LIMITS.expenses),
+  expenses: [...withProjectContext(project, expenses), ...project.expenses].slice(0, LEDGER_LIMITS.expenses), // every line inherits the project's id / currency / place
   updatedAt: now,
 });
-
-const toRows = (receipt) => receipt.items.map((it, i) => ({ ...it, key: `q${i}`, selected: true }));
 
 let running = null;
 
@@ -69,14 +67,15 @@ export function drainReceiptQueue({ queue = receiptQueue, apply, request = reque
       await queue.update(row.id, { status: 'sending' });
       try {
         const image = await queue.imageOf(row);
-        const receipt = await request(image, { currency: row.currency, lang: row.lang, ...(fetchImpl ? { fetchImpl } : {}) });
-        if (receipt.currency && row.currency && receipt.currency !== row.currency) {
+        const answer = await request(image, { currency: row.currency, lang: row.lang, ...(fetchImpl ? { fetchImpl } : {}) });
+        const receipts = asReceipts(answer); // one photo can hold several receipts: each one becomes its own group of expenses
+        if (receipts.some((r) => r.currency && row.currency && r.currency !== row.currency)) {
           // printed in another currency: do not tabulate behind the user's back
-          await queue.update(row.id, { status: 'review', result: receipt, lastError: 'currency' });
+          await queue.update(row.id, { status: 'review', result: { receipts }, lastError: 'currency' });
           result.review.push(row);
           continue;
         }
-        const expenses = expensesFromRows(toRows(receipt), { ...receiptMeta(receipt), now: now() });
+        const expenses = batchExpenses(receipts, { now: now() });
         const applied = await apply(row.projectId, expenses, row);
         await queue.remove(row.id); // applied, or the project is gone: either way the picture is no longer needed
         if (applied) result.done.push({ row, count: expenses.length });
@@ -107,12 +106,12 @@ export function drainReceiptQueue({ queue = receiptQueue, apply, request = reque
 
 /** Accept a 'review' row as it is (the user confirmed the other currency): its expenses go into the project. */
 export async function acceptReviewed(row, { queue = receiptQueue, apply, now = Date.now } = {}) {
-  const receipt = row.result;
-  if (!receipt?.items?.length) {
+  const receipts = asReceipts(row.result).filter((r) => r?.items?.length);
+  if (!receipts.length) {
     await queue.remove(row.id);
     return 0;
   }
-  const expenses = expensesFromRows(toRows(receipt), { ...receiptMeta(receipt), now: now() });
+  const expenses = batchExpenses(receipts, { now: now() });
   const applied = await apply(row.projectId, expenses, row);
   await queue.remove(row.id);
   return applied ? expenses.length : 0;

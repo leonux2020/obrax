@@ -252,7 +252,7 @@ export default function GlobalAccounting({ projects }) {
               </p>
             )}
             {note === 'downloaded' && (
-              <p role="status" data-testid="acc-note" className="mb-2 rounded-lg bg-black px-1 text-sm text-neutral-300">
+              <p role="status" data-testid="acc-note" className="mb-2 rounded-lg bg-black px-1 text-sm font-semibold text-brand">
                 {t('share.downloaded')}
               </p>
             )}

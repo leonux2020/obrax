@@ -210,7 +210,7 @@ export function normalizeProject(obj) {
     ...(typeof obj.parentId === 'string' && ID_RE.test(obj.parentId) ? { parentId: obj.parentId } : {}), // the job this one extends (older records have none)
     payments: normalizePayments(obj.payments),
     advances: normalizeAdvances(obj.advances),
-    expenses: normalizeExpenses(obj.expenses),
+    expenses: normalizeExpenses(obj.expenses).map((e) => ({ ...e, projectId: obj.id })), // an expense always knows its project (old records get it here)
     logbook: normalizeLogbook(obj.logbook),
     draft: normalizeDraft(obj.draft, regionCode),
   };

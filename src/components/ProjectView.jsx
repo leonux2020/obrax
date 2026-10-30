@@ -4,7 +4,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { computeAll } from '../lib/engine.js';
 import { pricingTime, planningTimeline } from '../lib/signature.js';
 import { FINANCE_LIMITS } from '../lib/draft.js';
-import { LEDGER_LIMITS, cashSummary, dayOf, laborPool, locationLabel, newEntryId, rentalsDue, RENTAL_CATEGORIES } from '../lib/ledger.js';
+import { LEDGER_LIMITS, cashSummary, dayOf, laborPool, locationLabel, newEntryId, rentalsDue, withProjectContext, RENTAL_CATEGORIES } from '../lib/ledger.js';
 import { isClosed, parseDay, projectClient, projectLevel, projectTitle, toDayString } from '../lib/projects.js';
 import { runExport } from '../lib/exportActions.js';
 import { warmPdfEngine } from '../lib/reportPdf.js';
@@ -265,7 +265,7 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
   };
 
   const saveExpenses = (list) => {
-    setProject((p) => ({ ...p, expenses: [...list, ...p.expenses].slice(0, LEDGER_LIMITS.expenses) }));
+    setProject((p) => ({ ...p, expenses: [...withProjectContext(p, list), ...p.expenses].slice(0, LEDGER_LIMITS.expenses) })); // each line inherits this project's id / currency / place
     setScanOpen(false);
   };
   const toggleReturned = (id) => setList('expenses')(project.expenses.map((e) => (e.id === id ? { ...e, returned: !e.returned } : e)));
@@ -480,7 +480,7 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
         </p>
       )}
       {note === 'downloaded' && (
-        <p role="status" data-testid="share-note" className="mt-2 text-sm text-neutral-300">
+        <p role="status" data-testid="share-note" className="mt-2 text-sm font-semibold text-brand">
           {t('share.downloaded')}
         </p>
       )}

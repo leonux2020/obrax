@@ -3,7 +3,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { useMarketClock } from '../lib/marketClock.js';
 import { computeAll } from '../lib/engine.js';
 import { freezeSignature, pricingTime, planningTimeline } from '../lib/signature.js';
-import { LEDGER_LIMITS, cashSummary, liquidity, newEntryId } from '../lib/ledger.js';
+import { LEDGER_LIMITS, cashSummary, liquidity, newEntryId, withProjectContext } from '../lib/ledger.js';
 import { MAX_PARTIDAS, newPartida } from '../lib/draft.js';
 import { TASKS, defaultDims } from '../lib/tasks.js';
 import { projectClient, projectTitle } from '../lib/projects.js';
@@ -201,7 +201,7 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
         /* a photo that cannot be kept never blocks the expenses */
       }
     }
-    setProject((p) => ({ ...p, expenses: [...lines, ...p.expenses].slice(0, LEDGER_LIMITS.expenses) }));
+    setProject((p) => ({ ...p, expenses: [...withProjectContext(p, lines), ...p.expenses].slice(0, LEDGER_LIMITS.expenses) })); // each line inherits this project's id / currency / place
     closeSheet();
   };
   const park = (image) => enqueueReceipt({ projectId: project.id, image, regionCode, currency: region.currency, lang: i18n.lang });
