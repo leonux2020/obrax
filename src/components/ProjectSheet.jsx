@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { currentPosition, detectCurrentRegion } from '../lib/geo.js';
 import { REGIONS } from '../lib/regions.js';
+import { quoteLock } from '../lib/workspaceModel.js';
 import { locationLabel, normalizeLocation } from '../lib/ledger.js';
 import { cleanCityOrRegion, isClosed, parseDay, toDayString } from '../lib/projects.js';
 import { sanitizeText } from '../lib/sanitize.js';
@@ -61,6 +62,8 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
   const [geo, setGeo] = useState('idle'); // idle | asking | unsupported | denied | unavailable | timeout
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }));
 
+  const marketLocked = editing && Boolean(quoteLock(project.draft)); // a signed / frozen quote keeps its market
+  const marketChanged = editing && Boolean(form.regionCode) && form.regionCode !== project.draft.regionCode;
   const start = parseDay(form.startDate);
   const end = parseDay(form.endDate);
   const badRange = Boolean(start && end && end < start);
@@ -90,7 +93,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
       endDate: end ? form.endDate : '',
       location: form.location,
       cityOrRegion: cleanCityOrRegion(form.cityOrRegion),
-      ...(editing || !form.regionCode ? {} : { regionCode: form.regionCode }),
+      ...(form.regionCode ? { regionCode: form.regionCode } : {}),
       closed: form.closed,
       unfreeze: form.unfreeze,
     });
@@ -141,16 +144,26 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
           </p>
         )}
 
-        {!editing && (
-          <div data-testid="project-market">
+        {/* the market (flag + currency + tax) of the job: picked for a new one, changeable later unless the quote is signed / frozen */}
+        <div data-testid="project-market">
+          {marketLocked ? (
+            <p className="text-sm text-neutral-300" data-testid="project-market-locked">
+              {t('newp.market')}: {REGIONS[form.regionCode]?.flag} {REGIONS[form.regionCode]?.currency} · {t('ws.locked')}
+            </p>
+          ) : (
             <RegionCombobox label={t('newp.market')} value={form.regionCode} onChange={set('regionCode')} />
-            {REGIONS[form.regionCode] && (
-              <p className="mt-1.5 text-sm text-neutral-300" data-testid="project-market-hint">
-                {REGIONS[form.regionCode].flag} {REGIONS[form.regionCode].currency}
-              </p>
-            )}
-          </div>
-        )}
+          )}
+          {!marketLocked && REGIONS[form.regionCode] && (
+            <p className="mt-1.5 text-sm text-neutral-300" data-testid="project-market-hint">
+              {REGIONS[form.regionCode].flag} {REGIONS[form.regionCode].currency}
+            </p>
+          )}
+          {editing && marketChanged && (
+            <p role="status" className="mt-1.5 text-sm font-semibold text-[#e8c35f]" data-testid="project-market-warn">
+              {t('ws.market.warn')}
+            </p>
+          )}
+        </div>
 
         <TextField label={t('project.city')} placeholder={t('project.city.ph')} value={form.cityOrRegion} maxLength={80} testId="project-city" sanitize={(v) => sanitizeText(v, 80)} onChange={set('cityOrRegion')} />
 

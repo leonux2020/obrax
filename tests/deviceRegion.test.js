@@ -126,7 +126,7 @@ describe('ProjectSheet: the market of a new project starts where the device is',
     expect(saved.at(-1).regionCode).toBe('DE');
   });
 
-  it('a device with no hint and no stored default sends no market (the app keeps its own); editing a project has no market field', async () => {
+  it('a device with no hint and no stored default sends no market (the app keeps its own); editing a project shows ITS market (changeable)', async () => {
     setDevice({ timeZone: 'Etc/UTC', languages: ['en'] });
     const saved = [];
     await open({ onSave: (f) => saved.push(f) });
@@ -135,7 +135,7 @@ describe('ProjectSheet: the market of a new project starts where the device is',
     act(() => root.unmount());
     root = createRoot(host);
     await open({ project: newProject({ regionCode: 'CL', name: 'Obra' }), onDelete: () => {} });
-    expect(qs('project-market')).toBeNull();
+    expect(qs('project-market').querySelector('input[role="combobox"]').value).toBe('🇨🇱 Chile');
   });
 });
 

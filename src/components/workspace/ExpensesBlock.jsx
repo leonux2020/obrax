@@ -10,7 +10,7 @@ import QueueList from './QueueList.jsx';
  * for rented tools, the return date with its one-tap "returned" switch and the hourglass when it falls due.
  */
 export default function ExpensesBlock({ expenses, queued, receipts, onChange, open, onToggle }) {
-  const { t, money } = useI18n();
+  const { t, moneyIn } = useI18n();
   const due = rentalsDue(expenses, Date.now());
   const toggleReturned = (id) => onChange(expenses.map((e) => (e.id === id ? { ...e, returned: !e.returned } : e)));
 
@@ -29,7 +29,7 @@ export default function ExpensesBlock({ expenses, queued, receipts, onChange, op
                 <div className="flex items-center gap-3">
                   <ExpenseHead e={e} subClass="text-xs text-[#E0E0E0]/60" />
                   {isDue && <Hourglass label={t('rental.dueToday')} size={18} />}
-                  <span className="text-sm font-extrabold tabular-nums">{money(e.amount)}</span>
+                  <span className="text-sm font-extrabold tabular-nums">{moneyIn(e.amount, e.currency)}</span>
                   <button type="button" onClick={() => onChange(expenses.filter((x) => x.id !== e.id))} aria-label={`${t('common.delete')}: ${expenseTitle(e, t)}`} className="flex h-10 w-10 items-center justify-center text-lg text-[#E0E0E0]/50 hover:text-red-400">
                     ×
                   </button>

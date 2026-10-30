@@ -50,6 +50,7 @@ import PostMortem from './components/PostMortem.jsx';
 import { useHistoryBack } from './lib/useHistoryBack.js';
 import ToastHost from './components/workspace/ToastHost.jsx';
 import { workspaceEnabled } from './lib/flags.js';
+import { withMarket, quoteLock } from './lib/workspaceModel.js';
 import { askNotifyPermission, pushToast, systemNotify, updateToast } from './lib/notify.js';
 import { collectDossierImages, syncDossier } from './lib/driveExport.js';
 import { receiptQueue } from './lib/receiptQueue.js';
@@ -60,6 +61,7 @@ import { projectTotals } from './lib/projectTotals.js';
 import { addExpenses, registerBackgroundSync } from './lib/receiptSync.js';
 import { useReceiptSync } from './lib/useReceiptSync.js';
 import GlobalAccounting from './components/GlobalAccounting.jsx';
+import AppShell from './components/AppShell.jsx';
 import ProjectFinancialDashboard from './components/ProjectFinancialDashboard.jsx';
 import Dashboard from './components/Dashboard.jsx';
 import BottomNav from './components/BottomNav.jsx';
@@ -444,7 +446,12 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   const createProject = (fields) => {
     // The company profile is COPIED into the new project: later profile changes never rewrite it.
     // the market of a new job is the one picked in the form (it starts with where the device is NOW), never blindly the stored one
-    const created = newProject({ company, logo, ...fields, regionCode: REGIONS[fields.regionCode] ? fields.regionCode : settings.region });
+    // Market of the job, in this order: the one picked in the form (it starts at the country the device is in NOW) -> the device's country
+    // read again here -> the stored one. Flag, currency and tax all come from this single code; the stored default never wins over the device.
+    const regionCode = [fields.regionCode, detectCurrentRegion(), settings.region].find((c) => REGIONS[c]);
+    const created = newProject({ company, logo, ...fields, regionCode });
+    // the stored default country follows where the user really works (a "Chile" saved on a past trip must not come back on the next job)
+    if (regionCode !== settings.region) setSettings((s) => ({ ...s, region: regionCode }));
     const project = { ...created, draft: { ...created.draft, step: created.draft.mode === 'project' ? 1 : 0 } };
     commit(project);
     setSheet(null);
@@ -477,11 +484,13 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
       closedAt: fields.closed ? project.closedAt || Date.now() : 0, // finished jobs live in the Historial tab
       updatedAt: Date.now(),
       draft: {
-        ...project.draft,
+        // the market of the job (flag, currency, tax, prices) follows the country picked in its settings; the app language does not move
+        ...(REGIONS[fields.regionCode] ? withMarket(project.draft, fields.regionCode) : project.draft),
         frozen: fields.unfreeze ? null : project.draft.frozen,
         project: { name: sanitizeText(fields.name, 60).trim(), client: sanitizeText(fields.client, 60).trim() },
       },
     });
+    if (REGIONS[fields.regionCode] && fields.regionCode !== project.draft.regionCode && !quoteLock(project.draft)) pushToast({ key: 'ws.market.done', tone: 'ok' });
     setSheet(null);
   };
 
@@ -824,7 +833,12 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
         <>
           <Header bare={!(active && editor)} subtitle={active ? projectTitle(active) || user.name : user.name} pwa={pwa} />
 
-          {projects === null ? null : active ? (
+          {projects === null ? (
+            <>
+              <AppShell />
+              <BottomNav active={navActive} onProjects={() => setTab('projects')} onAccounting={() => setTab('accounting')} onSettings={() => setSheet({ type: 'settings' })} />
+            </>
+          ) : active ? (
             wsOn ? (
               isClosed(active) ? (
                 <PostMortem

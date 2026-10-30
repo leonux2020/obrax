@@ -10,6 +10,12 @@ export function effectiveLocale(lang, region) {
 
 const I18nContext = createContext(null);
 
+/**
+ * Money is a property of the MARKET (the project's regionCode), never of the interface language: an Italian job (IT) is always
+ * "1.234,50 €" and a Chilean one (CL) "$1.234", whatever language the UI speaks. Text, dates and plain numbers follow the language.
+ */
+export const moneyLocale = (region, locale) => region?.locale || locale;
+
 export function makeI18n(lang, regionCode) {
   const region = getRegion(regionCode);
   const dict = DICT[lang] || DICT.es;
@@ -22,12 +28,30 @@ export function makeI18n(lang, regionCode) {
     return s;
   };
 
-  const moneyFmt = new Intl.NumberFormat(locale, {
+  const mLocale = moneyLocale(region, locale);
+  const moneyFmt = new Intl.NumberFormat(mLocale, {
     style: 'currency',
     currency: region ? region.currency : 'USD',
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
+  // an amount in ANOTHER currency (a receipt printed in EUR inside a CLP job): its own code / symbol and decimals, never the project's
+  const foreign = {};
+  const moneyIn = (n, currency) => {
+    const code = typeof currency === 'string' && /^[A-Za-z]{3}$/.test(currency) ? currency.toUpperCase() : '';
+    if (!code || code === (region ? region.currency : 'USD')) return moneyFmt.format(n);
+    try {
+      if (!foreign[code]) {
+        // its own symbol ("€"), unless that symbol is the project's too ("$" of a USD receipt in a CLP job): then the ISO code tells them apart
+        const symbolOf = (f) => f.formatToParts(0).find((x) => x.type === 'currency')?.value;
+        const narrow = new Intl.NumberFormat(mLocale, { style: 'currency', currency: code, currencyDisplay: 'narrowSymbol' });
+        foreign[code] = symbolOf(narrow) === symbolOf(moneyFmt) ? new Intl.NumberFormat(mLocale, { style: 'currency', currency: code, currencyDisplay: 'code' }) : narrow;
+      }
+      return foreign[code].format(n);
+    } catch {
+      return `${num(n)} ${code}`;
+    }
+  };
   const numFmts = {};
   const num = (n, maxDigits = 2) => {
     numFmts[maxDigits] ??= new Intl.NumberFormat(locale, { maximumFractionDigits: maxDigits });
@@ -39,7 +63,9 @@ export function makeI18n(lang, regionCode) {
     lang,
     region,
     locale,
+    moneyLocale: mLocale,
     money: (n) => moneyFmt.format(n),
+    moneyIn,
     num,
     date: (d = new Date()) => new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(d),
     time: (d = new Date()) => new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(d),

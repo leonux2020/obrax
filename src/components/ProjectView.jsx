@@ -193,7 +193,7 @@ function LocationBlock({ location }) {
  */
 export default function ProjectView({ project, setProject, setDraft, photos, setPhotos, company, onBack, onEdit, onEditor, onPro, prepareReceipt, fetchImpl }) {
   const i18n = useI18n();
-  const { t, money, num, unit, region, locale } = i18n;
+  const { t, money, moneyIn, num, unit, region, locale } = i18n;
   const pro = useAiAccess(); // 'pro' | 'dev' (localhost bypass) | null
   const { now } = useMarketClock();
   const draft = project.draft;
@@ -436,7 +436,7 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
                   <div className="flex items-start gap-3">
                     <ExpenseHead e={e} titleClass="" />
                     {isDue && <Hourglass label={t('rental.dueToday')} />}
-                    <span className="font-bold tabular-nums">{money(e.amount)}</span>
+                    <span className="font-bold tabular-nums">{moneyIn(e.amount, e.currency)}</span>
                     <button
                       type="button"
                       onClick={() => setList('expenses')(project.expenses.filter((x) => x.id !== e.id))}

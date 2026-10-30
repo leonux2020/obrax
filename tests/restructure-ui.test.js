@@ -244,7 +244,7 @@ describe('Edit modal (the pencil)', () => {
     expect(dialog.className).toContain('h-[100dvh]');
     const headings = [...dialog.querySelectorAll('h3')].map((h) => h.textContent);
     expect(headings).toEqual(['Datos de la obra', 'Fechas', 'Ubicación', 'Estado de la obra']);
-    expect(dialog.querySelectorAll('input[type="text"]')).toHaveLength(3); // name + client + city/region
+    expect(dialog.querySelectorAll('input[type="text"]')).toHaveLength(4); // name + client + the market combobox + city/region
     expect(dialog.querySelectorAll('input[type="date"]')).toHaveLength(2);
     expect(document.querySelector('[data-testid="project-location"]').textContent).toContain('-33.4489');
     await click(document.querySelector('[data-testid="project-locate"]'));

@@ -7,7 +7,7 @@ export default function Header({ subtitle, pwa, bare = false }) {
   return (
     <>
       {!pwa.online && (
-        <div role="status" className="no-print bg-white px-4 py-1.5 text-center text-sm font-bold text-black">
+        <div role="status" className="no-print border-b border-[#e8c35f]/40 bg-black px-4 py-1.5 text-center text-sm font-bold text-[#e8c35f]">
           {t('pwa.offline')}
         </div>
       )}

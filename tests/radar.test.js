@@ -505,7 +505,7 @@ describe('workspace UI', () => {
       expect(q('ws-market').dataset.region).toBe('BR');
       expect(q('ws-title').textContent).toBe('Casa Pérez');
       expect(q('market-list')).toBeNull();
-      expect(q('ws-total').textContent).toContain('BRL'); // Brazilian currency, labels still Spanish
+      expect(q('ws-total').textContent).toContain('R$'); // Brazilian real in its own market format (never the UI language's) currency, labels still Spanish
       expect(q('dock-export').textContent.length).toBeGreaterThan(0);
       await flush(20);
       expect(calls.some((c) => c.countryCode === 'BR' && c.region === 'BR')).toBe(true);

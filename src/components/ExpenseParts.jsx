@@ -9,7 +9,7 @@ export const expenseTitle = (e, t) => e.supplier || e.description || t('exp.fall
  * no visible scrollbar). Renders nothing when there are no expenses.
  */
 export function SupplierTotals({ expenses }) {
-  const { t, money, num, region } = useI18n();
+  const { t, moneyIn } = useI18n();
   const groups = supplierTotals(expenses);
   if (groups.length === 0) return null;
   return (
@@ -25,7 +25,7 @@ export function SupplierTotals({ expenses }) {
             {g.name || t('exp.noSupplier')}
           </span>
           <span className="font-extrabold tabular-nums text-brand" data-testid="supplier-total-amount">
-            {g.currency && g.currency !== region?.currency ? `${num(g.total)} ${g.currency}` : money(g.total)}
+            {moneyIn(g.total, g.currency)}
           </span>
         </li>
       ))}

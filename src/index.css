@@ -20,9 +20,6 @@
     color: #fff;
     min-height: 100%;
   }
-  html {
-    min-height: 100dvh;
-  }
   body {
     font-family: theme('fontFamily.sans');
     -webkit-tap-highlight-color: transparent;
