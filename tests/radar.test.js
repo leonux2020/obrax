@@ -184,7 +184,7 @@ describe('price book: supplierName per price (backward compatible)', () => {
 // ---- migration ---------------------------------------------------------------------------------------------------------
 describe('IndexedDB v4 -> v5 keeps every row', () => {
   it('a v4 database with projects and prices opens as v5, gains supplier_prices and loses nothing', async () => {
-    expect(DB_VERSION).toBe(5);
+    expect(DB_VERSION).toBe(6);
     expect(STORE_SUPPLIERS).toBe('supplier_prices');
     const factory = new IDBFactory();
     await new Promise((resolve, reject) => {

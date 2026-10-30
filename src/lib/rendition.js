@@ -1,7 +1,7 @@
 // Rendición de cuentas (accounting statement) as spreadsheet sheets: one project, or several consolidated.
 // Pure: it receives the already-computed budget total of each project, so no pricing runs here.
 
-import { cashSummary, expensesTotal, laborPool, locationLabel } from './ledger.js';
+import { cashSummary, expensesByCategory, expensesTotal, laborPool, locationLabel, supplierTotals } from './ledger.js';
 import { projectClient, projectTitle } from './projects.js';
 import { getRegion } from './regions.js';
 import { buildXlsx, fileStem, xlsxToFile } from './xlsx.js';
@@ -55,6 +55,23 @@ export function buildRenditionSheets(projects, totals, { t, locale = 'es', curre
       [t('xl.advances'), money(b.advanced)],
       [bold(t('xl.balance')), money(b.balance, true)]
     );
+    // Hoja 1, financial summary of the rendición: the fund handed to the site (adelantos / caja chica) against what was spent, the balance
+    // still to account for, and where the money went (by category and by shop). The detail of every receipt line is Hoja 2.
+    const fund = cashSummary(0, p.payments).paid;
+    summary.push(
+      [],
+      [head(t('xl.fundVs')), head(t('xl.amount'))],
+      [t('xl.fund'), money(fund)],
+      [t('xl.spentTotal'), money(b.spent)],
+      [bold(t('xl.toRender')), money(Math.round((fund - b.spent) * 100) / 100, true)],
+      [],
+      [head(t('xl.byCategory')), head(t('xl.amount')), head(t('xl.share'))]
+    );
+    const pct = (v) => (b.spent > 0 ? new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 }).format(v / b.spent) : '');
+    for (const g of expensesByCategory(p.expenses)) summary.push([t(`exp.cat.${g.category}`), money(g.total), pct(g.total)]);
+    summary.push([bold(t('xl.total')), money(b.spent, true), b.spent > 0 ? pct(b.spent) : ''], [], [head(t('xl.bySupplier')), head(t('xl.amount')), head(t('xl.lines'))]);
+    for (const g of supplierTotals(p.expenses)) summary.push([g.name || t('exp.noSupplier'), money(g.total), g.count]);
+    summary.push([bold(t('xl.total')), money(b.spent, true), p.expenses.length]);
   } else {
     summary.push(
       [{ v: t('xl.titleGlobal'), title: true }],
@@ -114,12 +131,17 @@ export function buildRenditionSheets(projects, totals, { t, locale = 'es', curre
   }
 
   return [
-    { name: t('xl.sheet.summary'), rows: summary, widths: single ? [22, 28] : [28, 22, 10, 16, 16, 16, 16, 16, 16] },
+    { name: t('xl.sheet.summary'), rows: summary, widths: single ? [34, 28, 14] : [28, 22, 10, 16, 16, 16, 16, 16, 16] },
     { name: t('xl.sheet.expenses'), rows: expenses, widths: widthsWith([14, 16, 14, 24, 18, 36, 20, 10, 14, 14, 14, 14, 9, 16, 14, 10]) },
     { name: t('xl.sheet.payments'), rows: payments, widths: widthsWith([14, 36, 14]) },
     { name: t('xl.sheet.advances'), rows: advances, widths: widthsWith([14, 26, 14]) },
     { name: t('xl.sheet.logbook'), rows: logbook, widths: widthsWith([14, 80]) },
   ];
+}
+
+/** The .xlsx of the rendición for these projects as raw bytes (Uint8Array): what goes to Drive / the offline queue. */
+export function buildRenditionBytes(projects, totals, ctx) {
+  return buildXlsx(buildRenditionSheets(projects, totals, ctx), { digits: ctx.digits ?? 2 });
 }
 
 /** The .xlsx File of the rendición for these projects. */

@@ -16,9 +16,13 @@
 //                                                          of every store stay exactly as they were (their prices simply have
 //                                                          no supplier / place until the user saves them again).
 //   (project_photos rows now hold the picture as a Blob; rows written by older versions keep their data URL and still read)
+// v6 adds:
+//   export_queue    keyPath `id`                           Excel rendiciones that could not go up to Drive yet (Blob + status),
+//                                                          uploaded in the background when the connection is back (exportQueue.js).
+//                                                          Purely additive: no other store is touched.
 
 export const DB_NAME = 'obrax';
-export const DB_VERSION = 5;
+export const DB_VERSION = 6;
 export const STORE_LEGACY_PHOTOS = 'photos';
 export const STORE_PHOTOS = 'project_photos';
 export const STORE_PROJECTS = 'projects';
@@ -26,6 +30,7 @@ export const STORE_COMPANY = 'company';
 export const STORE_PRICES = 'prices';
 export const STORE_RECEIPTS = 'receipt_queue';
 export const STORE_SUPPLIERS = 'supplier_prices';
+export const STORE_EXPORTS = 'export_queue';
 
 export function openDb(factory) {
   return new Promise((resolve, reject) => {
@@ -39,6 +44,7 @@ export function openDb(factory) {
       if (!has(STORE_PRICES)) db.createObjectStore(STORE_PRICES, { keyPath: 'region' });
       if (!has(STORE_RECEIPTS)) db.createObjectStore(STORE_RECEIPTS, { keyPath: 'id' });
       if (!has(STORE_SUPPLIERS)) db.createObjectStore(STORE_SUPPLIERS, { keyPath: 'id' });
+      if (!has(STORE_EXPORTS)) db.createObjectStore(STORE_EXPORTS, { keyPath: 'id' });
     };
     req.onsuccess = () => {
       const db = req.result;

@@ -345,7 +345,7 @@ describe('newExtension + parentId (pure)', () => {
   });
 
   it('IndexedDB: the field is stored and read back; the schema version does not need to change; older rows load', async () => {
-    expect(DB_VERSION).toBe(5);
+    expect(DB_VERSION).toBe(6);
     const factory = new IDBFactory();
     const store = createProjectStore(idbProjectBackend(factory));
     const parent = finished();

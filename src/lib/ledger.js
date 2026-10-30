@@ -211,6 +211,29 @@ export function supplierTotals(expenses = []) {
   return [...groups.values()].sort((a, b) => (a.name === '') - (b.name === '') || b.total - a.total || a.name.localeCompare(b.name));
 }
 
+/** Expenses grouped by category: [{ category, total, count }], biggest first (the total of every line, any currency as the project's own). */
+export function expensesByCategory(expenses = []) {
+  const groups = new Map();
+  for (const e of Array.isArray(expenses) ? expenses : []) {
+    const category = EXPENSE_CATEGORIES.includes(e?.category) ? e.category : 'other';
+    const g = groups.get(category) || { category, total: 0, count: 0 };
+    g.total = Math.round((g.total + (Number(e?.amount) || 0)) * 100) / 100;
+    g.count += 1;
+    groups.set(category, g);
+  }
+  return [...groups.values()].sort((a, b) => b.total - a.total || EXPENSE_CATEGORIES.indexOf(a.category) - EXPENSE_CATEGORIES.indexOf(b.category));
+}
+
+/**
+ * A fund entry ("Adelanto / Caja chica": money handed to the site for expenses) as a stored payment, or null when the amount is not
+ * a positive number. `date` is the 'YYYY-MM-DD' day the user picked (read at local noon so no time zone moves it); today when empty / odd.
+ * It is a record of `project.payments` (same list the cash bar uses), so it is saved with the project in IndexedDB like everything else.
+ */
+export function newFundEntry({ amount: value, date = '', note = '' } = {}, now = Date.now()) {
+  const when = DAY_RE.test(String(date)) ? new Date(`${date}T12:00:00`).getTime() : now;
+  return normalizePayments([{ id: newEntryId(), amount: value, at: Number.isFinite(when) ? when : now, note }])[0] ?? null;
+}
+
 /** "29 oct 2026" for a printed receipt day ('YYYY-MM-DD'); '' when there is none / it is odd. Never throws. */
 export function expenseDayLabel(value, locale = 'es') {
   if (typeof value !== 'string' || !DAY_RE.test(value)) return '';

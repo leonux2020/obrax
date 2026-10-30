@@ -48,7 +48,7 @@ describe('Blob media', () => {
   });
 
   it('the database has the receipt queue store (v4)', async () => {
-    expect(DB_VERSION).toBe(5);
+    expect(DB_VERSION).toBe(6);
     const factory = new IDBFactory();
     await createRunner(factory)(STORE_RECEIPTS, 'readonly', (s) => s.count());
   });

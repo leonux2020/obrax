@@ -162,7 +162,7 @@ describe('note photo store (Blob only, IndexedDB)', () => {
     expect(rows[0].dataUrl).toBeUndefined();
     expect(JSON.stringify(Object.keys(rows[0]))).not.toContain('dataUrl');
     expect(rows[0].key).toBe('proyecto1:note:nota001');
-    expect(DB_VERSION).toBe(5); // same schema as the Cámara de Obra: no new store, no upgrade
+    expect(DB_VERSION).toBe(6); // no store of its own for the note photos (v6 only added the export queue)
     expect(await other.get('nota001')).toBeNull(); // another project never sees it
     // the Cámara de Obra of the same project does not load note photos
     const camera = createPhotoStore(idbBackend(factory, 'proyecto1'));

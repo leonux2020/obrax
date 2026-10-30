@@ -231,8 +231,8 @@ describe('Desglose global (funciones puras)', () => {
 });
 
 describe('No hay migración de esquema', () => {
-  it('IndexedDB sigue en v5', () => {
-    expect(DB_VERSION).toBe(5);
+  it('IndexedDB v6: solo añade la cola de exportación, sin migrar datos', () => {
+    expect(DB_VERSION).toBe(6);
   });
 });
 

@@ -63,7 +63,7 @@ function HudColumn({ id, label, lines, fmtOf, warn = false, flag = null }) {
   );
 }
 
-export default function GlobalAccounting({ projects }) {
+export default function GlobalAccounting({ projects, onOpenProject = null }) {
   const { t, lang, locale } = useI18n();
   const { now } = useMarketClock();
   const [selected, setSelected] = useState([]);
@@ -203,39 +203,50 @@ export default function GlobalAccounting({ projects }) {
               const late = collectionDelay(p, totals.get(p.id), now);
               return (
                 <li key={p.id}>
-                  <label
+                  {/* two separate gestures: the CHECKBOX alone picks the project for the consolidated Excel; the body of the card opens its financial command center */}
+                  <div
                     data-testid={`acc-row-${p.id}`}
                     data-overdrawn={overdrawn ? 'true' : undefined}
-                    className={`flex min-h-[72px] cursor-pointer items-center gap-3 rounded-2xl border border-l-2 bg-black px-4 py-3 transition ${on ? 'border-brand' : 'border-white/10'} ${overdrawn ? 'border-l-[#e8c35f]' : ''}`}
+                    className={`flex min-h-[72px] items-stretch rounded-2xl border border-l-2 bg-black transition ${on ? 'border-brand' : 'border-white/10'} ${overdrawn ? 'border-l-[#e8c35f]' : ''}`}
                   >
-                    <input
-                      type="checkbox"
-                      className="h-6 w-6 shrink-0 accent-[#22c55e]"
-                      checked={on}
-                      onChange={() => toggle(p.id)}
-                      aria-label={projectTitle(p) || t('proj.untitled')}
-                      data-testid={`acc-check-${p.id}`}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-bold">{projectTitle(p) || t('proj.untitled')}</span>
-                      <span className="block truncate text-xs text-neutral-400">{projectClient(p) || t('proj.noClient')}</span>
-                      <span data-testid={`acc-timeline-${p.id}`} className="mt-0.5 block truncate text-xs text-[#E0E0E0]/50">
-                        {[datesOf(p), pulseOf(p)].filter(Boolean).join(' · ')}
-                      </span>
-                      {late > 0 && (
-                        <span
-                          data-testid={`acc-late-${p.id}`}
-                          className="mt-1 inline-block max-w-full truncate rounded-full border border-orange-400/50 px-1.5 text-[10px] font-semibold text-orange-400"
-                        >
-                          {t('acc.card.late', { n: late })}
+                    <label className="flex w-14 shrink-0 cursor-pointer items-center justify-center rounded-l-2xl" data-testid={`acc-select-${p.id}`}>
+                      <input
+                        type="checkbox"
+                        className="h-6 w-6 shrink-0 accent-[#22c55e]"
+                        checked={on}
+                        onChange={() => toggle(p.id)}
+                        aria-label={projectTitle(p) || t('proj.untitled')}
+                        data-testid={`acc-check-${p.id}`}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => onOpenProject?.(p.id)}
+                      aria-label={t('fin.open', { name: projectTitle(p) || t('proj.untitled') })}
+                      data-testid={`acc-open-${p.id}`}
+                      className="flex min-w-0 flex-1 items-center gap-3 rounded-r-2xl py-3 pr-4 text-left active:opacity-80"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-bold">{projectTitle(p) || t('proj.untitled')}</span>
+                        <span className="block truncate text-xs text-neutral-400">{projectClient(p) || t('proj.noClient')}</span>
+                        <span data-testid={`acc-timeline-${p.id}`} className="mt-0.5 block truncate text-xs text-[#E0E0E0]/50">
+                          {[datesOf(p), pulseOf(p)].filter(Boolean).join(' · ')}
                         </span>
-                      )}
-                    </span>
-                    <span className="shrink-0 text-right">
-                      <span className={`block font-extrabold tabular-nums ${b.balance < 0 ? 'text-red-400' : 'text-brand'}`}>{fmt(b.balance)}</span>
-                      <span className="block text-[11px] text-neutral-400">{t('xl.balance')}</span>
-                    </span>
-                  </label>
+                        {late > 0 && (
+                          <span
+                            data-testid={`acc-late-${p.id}`}
+                            className="mt-1 inline-block max-w-full truncate rounded-full border border-orange-400/50 px-1.5 text-[10px] font-semibold text-orange-400"
+                          >
+                            {t('acc.card.late', { n: late })}
+                          </span>
+                        )}
+                      </span>
+                      <span className="shrink-0 text-right">
+                        <span className={`block font-extrabold tabular-nums ${b.balance < 0 ? 'text-red-400' : 'text-brand'}`}>{fmt(b.balance)}</span>
+                        <span className="block text-[11px] text-neutral-400">{t('xl.balance')}</span>
+                      </span>
+                    </button>
+                  </div>
                 </li>
               );
             })}

@@ -53,9 +53,14 @@ import { workspaceEnabled } from './lib/flags.js';
 import { askNotifyPermission, pushToast, systemNotify, updateToast } from './lib/notify.js';
 import { collectDossierImages, syncDossier } from './lib/driveExport.js';
 import { receiptQueue } from './lib/receiptQueue.js';
+import { exportQueue } from './lib/exportQueue.js';
+import { closeRendition, uploadRendition } from './lib/exportSync.js';
+import { useExportSync } from './lib/useExportSync.js';
+import { projectTotals } from './lib/projectTotals.js';
 import { addExpenses, registerBackgroundSync } from './lib/receiptSync.js';
 import { useReceiptSync } from './lib/useReceiptSync.js';
 import GlobalAccounting from './components/GlobalAccounting.jsx';
+import ProjectFinancialDashboard from './components/ProjectFinancialDashboard.jsx';
 import Dashboard from './components/Dashboard.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import ProjectSheet from './components/ProjectSheet.jsx';
@@ -486,6 +491,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     notePhotosFor(id).clear().catch(() => {}); // the photos of its logbook notes go with it
     receiptPhotosFor(id).clear().catch(() => {}); // and the pictures of its receipts
     receiptQueue.removeProject(id).catch(() => {});
+    exportQueue.removeProject(id).catch(() => {});
     setProjects((list) => list.filter((p) => p.id !== id));
     if (activeRef.current?.id === id) {
       setActiveId(null);
@@ -614,6 +620,61 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     [driveClient, settings.lang, settings.region]
   );
 
+  // ---- Contabilidad: the financial command center of ONE project + "Cerrar Rendición" -----------------------------------------
+  // The card of Contabilidad opens a full-screen view (its checkbox only picks the project for the consolidated Excel). "Cerrar Rendición"
+  // builds the Excel and sends it straight to Drive with the app's own Drive client / token; with no connection (or when Drive fails) the file is
+  // parked in IndexedDB (exportQueue) and uploaded by the background sync below. Nothing is ever downloaded to the phone.
+  const [financeId, setFinanceId] = useState(null);
+  const financeProject = financeId ? projects?.find((p) => p.id === financeId) ?? null : null;
+  useHistoryBack(financeProject ? financeId : null, () => setFinanceId(null), 'cubraxFinance');
+  const changeFinance = useCallback(
+    (patch) => {
+      const target = projectsRef.current.find((p) => p.id === financeId);
+      if (!target) return;
+      const next = { ...target, ...patch, updatedAt: Date.now() };
+      projectsRef.current = projectsRef.current.map((p) => (p.id === next.id ? next : p));
+      commit(next);
+    },
+    [financeId, commit]
+  );
+  const renditionUpload = useCallback(({ title, fileName, bytes }) => uploadRendition({ client: driveClient, title, fileName, bytes }), [driveClient]);
+  const renditionRef = useRef(false);
+  const submitRendition = useCallback(async () => {
+    const project = projectsRef.current.find((p) => p.id === financeId);
+    if (!project || renditionRef.current) return null;
+    renditionRef.current = true;
+    try {
+      const i18n = makeI18n(settings.lang, project.draft.regionCode);
+      const out = await closeRendition({
+        project,
+        totals: projectTotals([project], Date.now()),
+        i18n,
+        upload: renditionUpload,
+        ensureToken: () => ensureDriveToken({ interactive: true, hint: userRef.current?.email || '' }).catch(() => null), // a tap: the consent may open
+        configured: googleConfigured,
+      });
+      if (out.status === 'uploaded') {
+        setLinkedNow(true);
+        pushToast({ key: 'rend.done', tone: 'ok', ms: 6000 });
+      } else if (out.status === 'queued') pushToast({ key: out.reason === 'offline' ? 'rend.queued.offline' : 'rend.queued', tone: 'amber', ms: 8000 });
+      else if (out.status === 'not_configured') pushToast({ key: 'setup.drive.err.not_configured', tone: 'warn', ms: 6000 });
+      else pushToast({ key: out.reason === 'queue_full' ? 'rend.queueFull' : 'rend.error', tone: 'warn', ms: 7000 });
+      return out;
+    } catch {
+      pushToast({ key: 'rend.error', tone: 'warn', ms: 7000 });
+      return null;
+    } finally {
+      renditionRef.current = false;
+    }
+  }, [financeId, settings.lang, renditionUpload]);
+  // the background half: the parked rendiciones go up when the network is back (silent token only: no Google screen from the background)
+  const exportSync = useExportSync({
+    upload: renditionUpload,
+    ensureToken: async () => getDriveToken() ?? (googleConfigured && isDriveLinked() ? ensureDriveToken({ interactive: false, hint: userRef.current?.email || '' }).catch(() => null) : null),
+    notify: notifyUser,
+    enabled: stage === 'app' && projects !== null && googleConfigured,
+  });
+
   // ---- restore from Drive --------------------------------------------------------------------------------------
   // Reads the newest backup of the CUBRAX folder and merges it into the device (projects: newest wins; profile and
   // settings only fill an empty device), writes IndexedDB and then updates the screen state.
@@ -725,7 +786,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   const navActive = sheet?.type === 'settings' ? 'settings' : tab;
 
   return (
-    <I18nProvider lang={settings.lang} regionCode={active ? active.draft.regionCode : settings.region}>
+    <I18nProvider lang={settings.lang} regionCode={active ? active.draft.regionCode : financeProject ? financeProject.draft.regionCode : settings.region}>
       {stage === 'splash' ? (
         <SplashScreen onStart={start} auto={Boolean(user) || returning || Boolean(oauth)} timing={splash} pwa={pwa} />
       ) : stage === 'setup' ? (
@@ -820,7 +881,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
           ) : (
             <>
               {tab === 'accounting' ? (
-                <GlobalAccounting projects={projects} />
+                <GlobalAccounting projects={projects} onOpenProject={setFinanceId} />
               ) : (
                 <Dashboard projects={projects} tab={dashTab} onTab={setDashTab} onNew={requestNewProject} onOpen={openProject} onPro={() => openPaywall('promo')} />
               )}
@@ -839,6 +900,9 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
             </>
           )}
 
+          {financeProject && !active && (
+            <ProjectFinancialDashboard project={financeProject} onChange={changeFinance} onBack={() => setFinanceId(null)} onCloseRendition={submitRendition} onRetryQueue={exportSync.retry} />
+          )}
           {sheet?.type === 'new' && <ProjectSheet defaultRegion={settings.region} onSave={createProject} onClose={() => setSheet(null)} />}
           {editing && (
             <ProjectSheet project={editing} onSave={(f) => editProject(editing, f)} onDelete={() => deleteProject(editing.id)} onClose={() => setSheet(null)} />
