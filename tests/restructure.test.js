@@ -218,6 +218,29 @@ describe('receipt reading: the model output is data, never trusted', () => {
     expect(r.items.map((i) => i.returnDate)).toEqual(['2026-10-22', '', '', '']);
   });
 
+  it('supermarket / fuel / restaurant receipts are valid expenses: new categories, purchaseType fallback, total-only slips', () => {
+    const super_ = normalizeReceipt({
+      isReceipt: true,
+      supplier: 'Lider',
+      receiptDate: '2026-10-29',
+      purchaseType: 'food',
+      totalText: '$ 18.540',
+      items: [
+        { description: 'Pan', quantity: 2, unitPriceText: '1.200', amountText: '2.400', category: 'food' },
+        { description: 'Detergente', quantity: 1, unitPrice: 3990, amountText: '3.990', category: 'other' },
+        { description: 'Bebida', amountText: '2.100', category: 'beverages' }, // a category the app does not know: falls back to the purchase type
+      ],
+    });
+    expect(super_).toMatchObject({ isReceipt: true, supplier: 'Lider', date: '2026-10-29', purchaseType: 'food', total: 18540 });
+    expect(super_.items.map((i) => i.category)).toEqual(['food', 'other', 'food']);
+    expect(super_.items.map((i) => i.unitPrice)).toEqual([1200, 3990, null]);
+    const fuel = normalizeReceipt({ isReceipt: true, supplier: 'Copec', purchaseType: 'transport', totalText: '35.000', items: [] });
+    expect(fuel.items).toEqual([{ description: '', quantity: null, unitPrice: null, amount: 35000, category: 'transport', returnDate: '' }]); // a slip with only a total is ONE expense
+    expect(normalizeReceipt({ isReceipt: true, purchaseType: 'invented', items: [{ amountText: '10', category: 'x' }] }).items[0].category).toBe('other');
+    expect(normalizeReceipt({ isReceipt: false, totalText: '10', items: [] }).items).toEqual([]); // a photo that is not a receipt never invents a line
+    expect(normalizeReceipt({ isReceipt: true, date: '2026-01-02', items: [] }).date).toBe('2026-01-02'); // the already-normalised proxy answer keeps its date
+  });
+
   it('garbage in -> empty receipt; isReceipt false is preserved', () => {
     expect(normalizeReceipt(null).items).toEqual([]);
     expect(normalizeReceipt({ isReceipt: false, items: [] }).isReceipt).toBe(false);

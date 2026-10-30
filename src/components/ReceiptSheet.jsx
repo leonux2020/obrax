@@ -97,7 +97,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, prepareImage = 
           <div className="space-y-3 pb-24">
             {error && (
               <p role="alert" data-testid="receipt-error" data-code={error} className="rounded-xl border border-red-500/60 px-4 py-3 text-sm font-semibold text-red-400">
-                {t(`inv.err.${error}`)}
+                {t(error === 'not_invoice' ? 'inv.err.not_receipt' : `inv.err.${error}`)}
               </p>
             )}
             <Button className="w-full" onClick={() => cameraRef.current?.click()} data-testid="receipt-camera">

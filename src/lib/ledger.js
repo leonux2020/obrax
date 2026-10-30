@@ -11,7 +11,8 @@ import { getRegion, taxRateFor } from './regions.js';
 
 export const LEDGER_LIMITS = Object.freeze({ payments: 200, advances: 200, expenses: 500, logbook: 500, maxAmount: 1e12, noteChars: 80, logChars: 2000 });
 
-export const EXPENSE_CATEGORIES = Object.freeze(['material', 'tool_rental', 'machinery_rental', 'labor', 'transport', 'other']);
+export const EXPENSE_CATEGORIES = Object.freeze(['material', 'tool_rental', 'machinery_rental', 'labor', 'transport', 'food', 'other']);
+// A job site has indirect costs too: `food` = food / per-diem for the crew (supermarket, restaurant), `transport` = fuel, tolls, freight.
 export const RENTAL_CATEGORIES = Object.freeze(['tool_rental', 'machinery_rental']);
 
 const ID_RE = /^[a-z0-9]{4,24}$/;

@@ -17,12 +17,21 @@ const day = (v) => (typeof v === 'string' && DAY_RE.test(v.trim()) && !Number.is
 
 /**
  * Clean an untrusted receipt extraction:
- *   { isReceipt, currency, supplier, date, items: [{ description, quantity|null, amount, category, returnDate }] }
+ *   { isReceipt, currency, supplier, date, purchaseType, total|null, items: [{ description, quantity|null, unitPrice|null, amount, category, returnDate }] }
+ * `category` / `purchaseType` are whitelisted (EXPENSE_CATEGORIES): anything unknown becomes the purchase's type or 'other'.
  * `amount` is the LINE TOTAL actually paid (the printed text wins over the model's own number); lines without a
  * positive amount are dropped. Only rented tools / machinery keep a `returnDate`.
  */
 export function normalizeReceipt(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
+  // the kind of purchase as a whole: the fallback category of a line whose own category is missing or unknown (a new / foreign value never breaks the parser)
+  const purchaseType = EXPENSE_CATEGORIES.includes(src.purchaseType) ? src.purchaseType : '';
+  const total = (() => {
+    const printed = parseAmount(src.totalText);
+    const n = printed ?? (typeof src.total === 'number' && Number.isFinite(src.total) && src.total > 0 ? src.total : null);
+    return n !== null && n <= MAX_PRICE * 100 ? Math.round(n * 100) / 100 : null;
+  })();
+  const supplier = text(src.supplier, 60);
   const items = [];
   for (const it of Array.isArray(src.items) ? src.items.slice(0, RECEIPT_LIMITS.maxItems * 2) : []) {
     if (!it || typeof it !== 'object') continue;
@@ -30,19 +39,24 @@ export function normalizeReceipt(raw) {
     const fallback = typeof it.amount === 'number' && Number.isFinite(it.amount) && it.amount > 0 ? it.amount : null;
     const amount = printed ?? fallback;
     if (amount === null || amount > MAX_PRICE * 100) continue;
-    const category = EXPENSE_CATEGORIES.includes(it.category) ? it.category : 'other';
+    const category = EXPENSE_CATEGORIES.includes(it.category) ? it.category : purchaseType || 'other';
     const quantity = Number(it.quantity);
+    const unit = parseAmount(it.unitPriceText) ?? (typeof it.unitPrice === 'number' && Number.isFinite(it.unitPrice) && it.unitPrice > 0 ? it.unitPrice : null);
     items.push({
       description: text(it.description),
       quantity: Number.isFinite(quantity) && quantity > 0 && quantity <= INVOICE_LIMITS.maxQty ? quantity : null,
+      unitPrice: unit !== null && unit <= MAX_PRICE * 100 ? Math.round(unit * 100) / 100 : null,
       amount: Math.round(amount * 100) / 100,
       category,
       returnDate: RENTAL_CATEGORIES.includes(category) ? day(it.returnDate) : '',
     });
     if (items.length >= RECEIPT_LIMITS.maxItems) break;
   }
+  const isReceipt = src.isReceipt !== false;
+  // a slip with only a grand total (restaurant, fuel ticket) is still one valid expense
+  if (isReceipt && !items.length && total !== null) items.push({ description: '', quantity: null, unitPrice: null, amount: total, category: purchaseType || 'other', returnDate: '' });
   const currency = typeof src.currency === 'string' && /^[A-Za-z]{3}$/.test(src.currency.trim()) ? src.currency.trim().toUpperCase() : '';
-  return { isReceipt: src.isReceipt !== false, currency, supplier: text(src.supplier, 60), date: day(src.receiptDate), items };
+  return { isReceipt, currency, supplier, date: day(src.receiptDate) || day(src.date), purchaseType, total, items };
 }
 
 /** Review rows -> expense records ready to store in the project (the user may have edited / unticked rows). */

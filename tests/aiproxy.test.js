@@ -419,6 +419,33 @@ describe('proxy: "Escanear Boleta" ({kind:"receipt"}) is a second FIXED prompt b
     expect(JSON.stringify(res)).not.toContain(KEY);
   });
 
+  it('the receipt prompt accepts ANY legible commercial receipt (food, fuel, supermarket) and asks for the full breakdown', () => {
+    const text = buildReceiptPrompt({ currency: 'CLP', today: '2026-10-22' });
+    expect(text).toMatch(/supermarket/i);
+    expect(text).toMatch(/FUEL/);
+    expect(text).toMatch(/ACCEPT any legible commercial document/);
+    expect(text).toMatch(/NEVER reject a document because it is not a construction-material store/);
+    expect(text).toMatch(/ONLY when the image is not a purchase document at all/);
+    for (const field of ['supplier', 'receiptDate', 'currency', 'totalText', 'purchaseType', 'unitPriceText', 'quantity', 'amountText']) expect(text).toContain(`"${field}"`);
+    for (const c of ['material', 'food', 'transport', 'other']) expect(text).toContain(c);
+    // the schema lets the model answer with the general type, the total and the unit price, and food is a category
+    expect(RECEIPT_SCHEMA.properties.purchaseType.enum).toContain('food');
+    expect(RECEIPT_SCHEMA.properties.items.items.properties.category.enum).toContain('food');
+    expect(Object.keys(RECEIPT_SCHEMA.properties)).toEqual(expect.arrayContaining(['totalText', 'total', 'purchaseType']));
+    expect(Object.keys(RECEIPT_SCHEMA.properties.items.items.properties)).toEqual(expect.arrayContaining(['unitPriceText', 'unitPrice']));
+  });
+
+  it('a supermarket receipt goes through end to end with its food lines and general type', async () => {
+    const res = await make({
+      fetchImpl: okFetch(receipt({ supplier: 'Jumbo', purchaseType: 'food', totalText: '12.500', items: [{ description: 'Pan', quantity: 5, unitPriceText: '1.000', amountText: '5.000', category: 'food' }, { description: 'Bencina', amountText: '7.500', category: 'transport' }] })),
+      clock,
+    })(receiptRequest());
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ ok: true, supplier: 'Jumbo', purchaseType: 'food', total: 12500 });
+    expect(res.body.items.map((i) => i.category)).toEqual(['food', 'transport']);
+    expect(res.body.items[0]).toMatchObject({ quantity: 5, unitPrice: 1000, amount: 5000 });
+  });
+
   it('hostile output is neutralised and non-receipts / empty readings map to fixed error codes', async () => {
     const evil = receipt({ supplier: '<script>x</script>', items: [{ description: '<img onerror=1>', amountText: '1', category: 'drugs' }, { description: 'huge', amountText: '9'.repeat(40), category: 'material' }] });
     const res = await make({ fetchImpl: okFetch(evil), clock })(receiptRequest());
