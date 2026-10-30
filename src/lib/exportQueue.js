@@ -6,7 +6,10 @@
 //           'sending'  a drain run has it in flight (reset to 'pending' if the page dies: see recover())
 //           'failed'   gave up after too many attempts: kept (the user's work is never thrown away) so it can be retried
 //
-// One row = one rendición file for one project and day (a second close of the same project the same day REPLACES the waiting row, exactly as the
+// `kind`: 'project' (Proyectos / <name> / Rendicion_<date>.xlsx) or 'global' (Rendiciones_Globales / Rendicion_Global_<date>.xlsx, the consolidated
+// Excel of several projects: it belongs to no project, `projectId` is '').
+//
+// One row = one rendición file for one project (or the global one) and day (a second close of the same project the same day REPLACES the waiting row, exactly as the
 // Drive file of that name is replaced). Rows hold the spreadsheet only.
 
 import { STORE_EXPORTS, createRunner, hasIndexedDb } from './db.js';
@@ -15,6 +18,7 @@ import { newEntryId } from './ledger.js';
 
 export const EXPORT_QUEUE_LIMITS = Object.freeze({ maxItems: 20, maxBlobBytes: 8_000_000, maxAttempts: 10 });
 export const EXPORT_STATUSES = Object.freeze(['pending', 'sending', 'failed']);
+export const EXPORT_KINDS = Object.freeze(['project', 'global']);
 
 const ID_RE = /^[a-z0-9]{4,24}$/;
 const PROJECT_RE = /^[a-z0-9]{6,24}$/;
@@ -25,12 +29,14 @@ const num = (v, fb = 0) => (Number.isFinite(Number(v)) ? Number(v) : fb);
 export function normalizeExportRow(obj) {
   if (!obj || typeof obj !== 'object') return null;
   if (typeof obj.id !== 'string' || !ID_RE.test(obj.id)) return null;
-  if (typeof obj.projectId !== 'string' || !PROJECT_RE.test(obj.projectId)) return null;
+  const kind = obj.kind === 'global' ? 'global' : 'project';
+  if (kind === 'project' && (typeof obj.projectId !== 'string' || !PROJECT_RE.test(obj.projectId))) return null;
   if (typeof obj.fileName !== 'string' || !FILE_RE.test(obj.fileName)) return null;
   if (!isBlob(obj.blob) || obj.blob.size <= 0 || obj.blob.size > EXPORT_QUEUE_LIMITS.maxBlobBytes) return null;
   return {
     id: obj.id,
-    projectId: obj.projectId,
+    kind,
+    projectId: kind === 'global' ? '' : obj.projectId,
     title: typeof obj.title === 'string' ? obj.title.slice(0, 80) : '', // the project's name = its Drive folder
     fileName: obj.fileName,
     blob: obj.blob,
@@ -115,11 +121,11 @@ export function createExportQueue(primary = null) {
      * Park a finished rendición. `blob` is the .xlsx. A waiting row of the same project and file name is replaced (the newest figures win).
      * @returns the stored row; throws 'bad_file' / 'queue_full' so the caller can tell the user.
      */
-    async enqueue({ projectId, title = '', fileName, blob, now = Date.now() }) {
-      const row = normalizeExportRow({ id: newEntryId(), projectId, title, fileName, blob, status: 'pending', createdAt: now, attempts: 0, nextAt: 0 });
+    async enqueue({ kind = 'project', projectId = '', title = '', fileName, blob, now = Date.now() }) {
+      const row = normalizeExportRow({ id: newEntryId(), kind, projectId, title, fileName, blob, status: 'pending', createdAt: now, attempts: 0, nextAt: 0 });
       if (!row) throw new Error('bad_file');
       const current = await this.list();
-      const same = current.filter((r) => r.projectId === row.projectId && r.fileName === row.fileName && r.status !== 'sending');
+      const same = current.filter((r) => r.kind === row.kind && r.projectId === row.projectId && r.fileName === row.fileName && r.status !== 'sending');
       if (current.length - same.length >= EXPORT_QUEUE_LIMITS.maxItems) throw new Error('queue_full');
       for (const r of same) await guard('remove', r.id);
       await guard('put', row);
@@ -130,7 +136,7 @@ export function createExportQueue(primary = null) {
     async update(id, patch) {
       const row = (await this.list()).find((r) => r.id === id);
       if (!row) return null;
-      const next = normalizeExportRow({ ...row, ...patch, id: row.id, projectId: row.projectId, fileName: row.fileName, blob: row.blob });
+      const next = normalizeExportRow({ ...row, ...patch, id: row.id, kind: row.kind, projectId: row.projectId, fileName: row.fileName, blob: row.blob });
       if (!next) return null;
       await guard('put', next);
       await reload();
@@ -142,7 +148,7 @@ export function createExportQueue(primary = null) {
     },
     /** Remove every row of a project (the project was deleted). */
     async removeProject(projectId) {
-      for (const r of (await this.list()).filter((x) => x.projectId === projectId)) await guard('remove', r.id);
+      for (const r of (await this.list()).filter((x) => x.kind === 'project' && x.projectId === projectId)) await guard('remove', r.id);
       await reload();
     },
     /** The page died mid-send: rows left in 'sending' go back to 'pending'. Call once at start-up. */

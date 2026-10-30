@@ -11,12 +11,17 @@
     /* no pull-to-refresh / elastic bounce on the page itself: the PWA is one solid block (inner lists keep their own scroll) */
     overscroll-behavior-y: none;
   }
+  /* Anti-flicker OLED: the three base layers are solid #000000 (the canvas never shows through white during a heavy render, a
+     navigation or an overscroll). The CSP forbids inline styles, so this stylesheet (render-blocking in <head>) is the one source. */
   html,
   body,
   #root {
-    background: #000;
+    background-color: #000000;
     color: #fff;
     min-height: 100%;
+  }
+  html {
+    min-height: 100dvh;
   }
   body {
     font-family: theme('fontFamily.sans');

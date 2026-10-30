@@ -144,6 +144,16 @@ export function buildRenditionBytes(projects, totals, ctx) {
   return buildXlsx(buildRenditionSheets(projects, totals, ctx), { digits: ctx.digits ?? 2 });
 }
 
+/**
+ * The consolidated Excel of several projects as raw bytes (what goes to Drive / the offline queue; it is never downloaded).
+ * One grand total only when every project shares the currency; the money format follows the first project's market.
+ */
+export function buildGlobalRenditionBytes(projects, totals, { t, locale = 'es' }) {
+  const currencies = new Set(projects.map((p) => getRegion(p.draft.regionCode)?.currency));
+  const first = getRegion(projects[0]?.draft.regionCode);
+  return buildRenditionBytes(projects, totals, { t, locale, currency: currencies.size === 1 ? first?.currency ?? '' : '', digits: first?.digits ?? 2 });
+}
+
 /** The .xlsx File of the rendición for these projects. */
 export function buildRenditionFile(projects, totals, ctx) {
   const sheets = buildRenditionSheets(projects, totals, ctx);

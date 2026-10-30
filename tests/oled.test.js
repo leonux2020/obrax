@@ -21,7 +21,7 @@ describe('strict OLED theme', () => {
 
   it('no hard-coded grey/white page backgrounds in CSS or inline styles', () => {
     const css = fs.readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
-    expect(css).toMatch(/html,\s*body,\s*#root\s*\{[^}]*background:\s*#000/);
+    expect(css).toMatch(/html,\s*body,\s*#root\s*\{[^}]*background(-color)?:\s*#000/);
     const bad = [];
     for (const f of files) {
       const text = fs.readFileSync(f, 'utf8');

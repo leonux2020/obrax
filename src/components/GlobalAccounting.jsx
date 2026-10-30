@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useI18n, makeI18n } from '../lib/i18n.jsx';
 import { useMarketClock } from '../lib/marketClock.js';
-import { getRegion } from '../lib/regions.js';
-import { buildRenditionFile, projectBalance } from '../lib/rendition.js';
+import { projectBalance } from '../lib/rendition.js';
+import { UI_WATCHDOG_MS, settleWithin } from '../lib/exportSync.js';
 import {
   collectionDelay,
   daysAgo,
@@ -18,12 +18,11 @@ import GlobalBreakdownSheet from './GlobalBreakdownSheet.jsx';
 import { projectClient, projectTitle } from '../lib/projects.js';
 import { projectTotals } from '../lib/projectTotals.js';
 import { usePriceVersion } from '../lib/usePrices.js';
-import { shareOrDownload } from '../lib/shareFile.js';
 import { Button, Logo } from './ui.jsx';
 
 /**
  * "Contabilidad Global": every project with its cash balance (collected - expenses - advances). Tick several and
- * one tap shares a single consolidated Excel through the native share sheet (a download where it cannot).
+ * one tap sends a single consolidated Excel to Drive (Rendiciones_Globales) or, offline, to the export queue; it is never downloaded.
  *
  * Above the list a minimal HUD (net cash, tax shield, receivables) over the ACTIVE projects, one line per currency; each card
  * shows its dates and last-activity pulse, the list is ordered by last movement, and an overdrawn project gets an amber edge.
@@ -63,7 +62,7 @@ function HudColumn({ id, label, lines, fmtOf, warn = false, flag = null }) {
   );
 }
 
-export default function GlobalAccounting({ projects, onOpenProject = null }) {
+export default function GlobalAccounting({ projects, onOpenProject = null, onExportGlobal = null, watchdogMs = UI_WATCHDOG_MS }) {
   const { t, lang, locale } = useI18n();
   const { now } = useMarketClock();
   const [selected, setSelected] = useState([]);
@@ -111,24 +110,15 @@ export default function GlobalAccounting({ projects, onOpenProject = null }) {
   const all = projects.length > 0 && selected.length === projects.length;
   const toggle = (id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
+  // The consolidated Excel goes to Drive (CUBRAX - Respaldos Obra / Rendiciones_Globales) or, offline, to the export queue: it is never downloaded.
+  // The parent decides the outcome and shows its toast; here the button is ALWAYS released (finally), even if the delivery throws or hangs.
   const exportGlobal = async () => {
-    const chosen = projects.filter((p) => selected.includes(p.id));
-    if (!chosen.length || busy) return;
+    const ids = projects.filter((p) => selected.includes(p.id)).map((p) => p.id);
+    if (!ids.length || busy || !onExportGlobal) return;
     setBusy(true);
     setNote('');
     try {
-      const regions = new Set(chosen.map((p) => getRegion(p.draft.regionCode)?.currency));
-      const first = getRegion(chosen[0].draft.regionCode);
-      const file = buildRenditionFile(chosen, totals, {
-        t,
-        locale,
-        currency: regions.size === 1 ? first.currency : '',
-        digits: first.digits,
-      });
-      const outcome = await shareOrDownload(file, {
-        title: t('xl.shareTitleGlobal'),
-      });
-      setNote(outcome === 'downloaded' ? 'downloaded' : '');
+      await settleWithin(onExportGlobal(ids), watchdogMs);
     } catch {
       setNote('error');
     } finally {
@@ -260,11 +250,6 @@ export default function GlobalAccounting({ projects, onOpenProject = null }) {
             {note === 'error' && (
               <p role="alert" className="mb-2 rounded-lg bg-black px-1 text-sm font-semibold text-red-400">
                 {t('xl.error')}
-              </p>
-            )}
-            {note === 'downloaded' && (
-              <p role="status" data-testid="acc-note" className="mb-2 rounded-lg bg-black px-1 text-sm font-semibold text-brand">
-                {t('share.downloaded')}
               </p>
             )}
             <Button className="w-full" disabled={selected.length === 0 || busy} onClick={exportGlobal} data-testid="acc-export">

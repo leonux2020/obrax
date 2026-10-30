@@ -54,7 +54,7 @@ import { askNotifyPermission, pushToast, systemNotify, updateToast } from './lib
 import { collectDossierImages, syncDossier } from './lib/driveExport.js';
 import { receiptQueue } from './lib/receiptQueue.js';
 import { exportQueue } from './lib/exportQueue.js';
-import { closeRendition, uploadRendition } from './lib/exportSync.js';
+import { closeGlobalRendition, closeRendition, uploadRendition } from './lib/exportSync.js';
 import { useExportSync } from './lib/useExportSync.js';
 import { projectTotals } from './lib/projectTotals.js';
 import { addExpenses, registerBackgroundSync } from './lib/receiptSync.js';
@@ -637,18 +637,15 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     },
     [financeId, commit]
   );
-  const renditionUpload = useCallback(({ title, fileName, bytes }) => uploadRendition({ client: driveClient, title, fileName, bytes }), [driveClient]);
+  const renditionUpload = useCallback(({ kind, title, fileName, bytes }) => uploadRendition({ client: driveClient, kind, title, fileName, bytes }), [driveClient]);
   const renditionRef = useRef(false);
-  const submitRendition = useCallback(async () => {
-    const project = projectsRef.current.find((p) => p.id === financeId);
-    if (!project || renditionRef.current) return null;
+  // The one way a rendición (of a project or the global one) leaves the app: Drive or the offline queue, never a download. `run` builds + delivers;
+  // whatever happens (offline, hanging network, throw), this settles, the guard is released and the user gets a toast.
+  const sendRendition = useCallback(async (run) => {
+    if (renditionRef.current) return null;
     renditionRef.current = true;
     try {
-      const i18n = makeI18n(settings.lang, project.draft.regionCode);
-      const out = await closeRendition({
-        project,
-        totals: projectTotals([project], Date.now()),
-        i18n,
+      const out = await run({
         upload: renditionUpload,
         ensureToken: () => ensureDriveToken({ interactive: true, hint: userRef.current?.email || '' }).catch(() => null), // a tap: the consent may open
         configured: googleConfigured,
@@ -666,7 +663,21 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     } finally {
       renditionRef.current = false;
     }
-  }, [financeId, settings.lang, renditionUpload]);
+  }, [renditionUpload]);
+  const submitRendition = useCallback(async () => {
+    const project = projectsRef.current.find((p) => p.id === financeId);
+    if (!project) return null;
+    return sendRendition((deps) => closeRendition({ project, totals: projectTotals([project], Date.now()), i18n: makeI18n(settings.lang, project.draft.regionCode), ...deps }));
+  }, [financeId, settings.lang, sendRendition]);
+  // the consolidated Excel of the chosen projects -> CUBRAX - Respaldos Obra / Rendiciones_Globales (or the same offline queue)
+  const submitGlobalRendition = useCallback(
+    async (ids) => {
+      const chosen = projectsRef.current.filter((p) => ids.includes(p.id));
+      if (!chosen.length) return null;
+      return sendRendition((deps) => closeGlobalRendition({ projects: chosen, totals: projectTotals(chosen, Date.now()), i18n: makeI18n(settings.lang, chosen[0].draft.regionCode), ...deps }));
+    },
+    [settings.lang, sendRendition]
+  );
   // the background half: the parked rendiciones go up when the network is back (silent token only: no Google screen from the background)
   const exportSync = useExportSync({
     upload: renditionUpload,
@@ -881,7 +892,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
           ) : (
             <>
               {tab === 'accounting' ? (
-                <GlobalAccounting projects={projects} onOpenProject={setFinanceId} />
+                <GlobalAccounting projects={projects} onOpenProject={setFinanceId} onExportGlobal={submitGlobalRendition} />
               ) : (
                 <Dashboard projects={projects} tab={dashTab} onTab={setDashTab} onNew={requestNewProject} onOpen={openProject} onPro={() => openPaywall('promo')} />
               )}

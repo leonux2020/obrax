@@ -3,6 +3,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { cashSummary, expensesTotal, newFundEntry } from '../lib/ledger.js';
 import { projectClient, projectTitle, toDayString } from '../lib/projects.js';
 import { sanitizeText } from '../lib/sanitize.js';
+import { UI_WATCHDOG_MS, settleWithin } from '../lib/exportSync.js';
 import { useExportQueue } from '../lib/useExportSync.js';
 import { Button, DateInput, NumberField, TextField } from './ui.jsx';
 import { SupplierTotals } from './ExpenseParts.jsx';
@@ -30,7 +31,7 @@ function Stat({ id, label, value, tone = '' }) {
  *
  * `onChange(patch)` saves a change of the project ({ payments }); `onClose()` goes back; `onCloseRendition()` resolves when it is done.
  */
-export default function ProjectFinancialDashboard({ project, onChange, onBack, onCloseRendition, onRetryQueue = null, queue }) {
+export default function ProjectFinancialDashboard({ project, onChange, onBack, onCloseRendition, onRetryQueue = null, queue, watchdogMs = UI_WATCHDOG_MS }) {
   const { t, money, locale } = useI18n();
   const [date, setDate] = useState(() => toDayString(new Date()));
   const [amount, setAmount] = useState(null);
@@ -59,7 +60,10 @@ export default function ProjectFinancialDashboard({ project, onChange, onBack, o
     if (busy) return;
     setBusy(true);
     try {
-      await onCloseRendition();
+      // the parent reads the connection synchronously (offline = parked in IndexedDB at once) and shows the toast; whatever happens the button is freed
+      await settleWithin(onCloseRendition(), watchdogMs);
+    } catch {
+      /* the parent already told the user; nothing may leave the screen frozen */
     } finally {
       setBusy(false);
     }

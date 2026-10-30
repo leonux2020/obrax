@@ -14,6 +14,7 @@
 import { dataUrlToBlob } from './blobs.js';
 
 export const PROJECTS_FOLDER = 'Proyectos';
+export const GLOBAL_RENDITIONS_FOLDER = 'Rendiciones_Globales'; // CUBRAX - Respaldos Obra / Rendiciones_Globales / Rendicion_Global_<date>.xlsx
 export const PHOTOS_FOLDER = 'Fotos Obra';
 export const RECEIPTS_FOLDER = 'Comprobantes';
 export const EXPORT_CONCURRENCY = 3;

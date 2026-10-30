@@ -465,24 +465,26 @@ describe('Project interior', () => {
   });
 });
 
-describe('Contabilidad Global: pick several projects, one consolidated Excel through navigator.share', () => {
-  it('exports only the ticked projects, with the file passed to navigator.share', async () => {
+describe('Contabilidad Global: pick several projects, one consolidated Excel that goes to Drive (never downloaded)', () => {
+  it('hands only the ticked projects to the Drive delivery; navigator.share and downloads are not used', async () => {
     const shared = [];
     Object.defineProperty(navigator, 'share', { value: async (data) => shared.push(data), configurable: true });
     Object.defineProperty(navigator, 'canShare', { value: () => true, configurable: true });
     const a = sized(mk('Uno', -1, 10));
     const b = sized(mk('Dos', -1, 10));
     const c = sized(mk('Tres', -1, 10));
-    await render(React.createElement(GlobalAccounting, { projects: [a, b, c] }));
+    const onExportGlobal = vi.fn(async () => ({ status: 'uploaded' }));
+    await render(React.createElement(GlobalAccounting, { projects: [a, b, c], onExportGlobal }));
     expect(q('acc-export').disabled).toBe(true);
     await click(q(`acc-check-${a.id}`));
     await click(q(`acc-check-${c.id}`));
     expect(q('acc-export').textContent).toContain('2');
     await click(q('acc-export'));
     await flush(30);
-    expect(shared).toHaveLength(1);
-    expect(shared[0].files).toHaveLength(1);
-    expect(shared[0].files[0].name).toMatch(/\.xlsx$/);
+    expect(onExportGlobal).toHaveBeenCalledTimes(1);
+    expect(onExportGlobal.mock.calls[0][0]).toEqual([a.id, c.id]);
+    expect(shared).toHaveLength(0);
+    expect(q('acc-export').disabled).toBe(false); // released
     await click(q('acc-all'));
     expect(q('acc-export').textContent).toContain('3');
     delete navigator.share;

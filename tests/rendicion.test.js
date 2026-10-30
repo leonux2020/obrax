@@ -200,7 +200,7 @@ describe('deliverRendition / closeRendition: Drive or the queue, never a downloa
     const upload = vi.fn(async () => {});
     const out = await deliverRendition({ file, project: proj, upload, ensureToken: async () => 'tok', queue, online: () => true });
     expect(out).toEqual({ status: 'uploaded' });
-    expect(upload).toHaveBeenCalledWith({ title: 'Casa Soto', fileName: 'Rendicion_2026-10-30.xlsx', bytes: file.bytes });
+    expect(upload).toHaveBeenCalledWith({ kind: 'project', title: 'Casa Soto', fileName: 'Rendicion_2026-10-30.xlsx', bytes: file.bytes });
     expect(await queue.list()).toHaveLength(0);
     expect(download).not.toHaveBeenCalled();
   });
