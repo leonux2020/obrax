@@ -192,6 +192,38 @@ export function rentalsDue(expenses = [], now = Date.now()) {
 
 export const hasRentalDue = (project, now = Date.now()) => rentalsDue(project?.expenses, now).length > 0;
 
+/**
+ * Money spent per shop: [{ key, name, currency, total, count }], biggest first; the expenses with no supplier go together in ONE group
+ * at the end (`name: ''`, the caller labels it). Shops are matched ignoring case / extra spaces ("sodimac " = "Sodimac"); a shop paid
+ * in two currencies gives two groups (money of different currencies is never added). `currency: ''` = the project's own.
+ */
+export function supplierTotals(expenses = []) {
+  const groups = new Map();
+  for (const e of Array.isArray(expenses) ? expenses : []) {
+    const name = typeof e?.supplier === 'string' ? e.supplier.trim().replace(/\s+/g, ' ') : '';
+    const currency = typeof e?.currency === 'string' ? e.currency.toUpperCase() : '';
+    const key = `${name.toLowerCase()}|${currency}`;
+    const g = groups.get(key) || { key, name, currency, total: 0, count: 0 };
+    g.total = Math.round((g.total + (Number(e?.amount) || 0)) * 100) / 100;
+    g.count += 1;
+    groups.set(key, g);
+  }
+  return [...groups.values()].sort((a, b) => (a.name === '') - (b.name === '') || b.total - a.total || a.name.localeCompare(b.name));
+}
+
+/** "29 oct 2026" for a printed receipt day ('YYYY-MM-DD'); '' when there is none / it is odd. Never throws. */
+export function expenseDayLabel(value, locale = 'es') {
+  if (typeof value !== 'string' || !DAY_RE.test(value)) return '';
+  const [y, m, d] = value.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return '';
+  try {
+    return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+  } catch {
+    return new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+  }
+}
+
 // ---- Contabilidad Global: pure aggregation over the projects already stored (no new data, no schema change) -------------------------
 // Money of different currencies is NEVER added together: every aggregate is a list [{ currency, regionCode, amount }] with one
 // line per currency (sorted by currency code), formatted by the caller with the money of that market.

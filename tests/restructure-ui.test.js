@@ -390,6 +390,11 @@ describe('Project interior', () => {
     expect(q('receipt-sheet')).toBeNull();
     const rows = q('expense-list').querySelectorAll('li');
     expect(rows).toHaveLength(2);
+    // shop totals strip above the list; the card headline is the shop, the purchased line is the detail
+    expect(qa('supplier-total-name').map((n) => n.textContent)).toEqual(['Arriendos Sur']);
+    expect(q('supplier-total-amount').textContent).toContain('24.980');
+    expect([...rows].map((r) => r.querySelector('[data-testid="expense-title"]').textContent)).toEqual(['Arriendos Sur', 'Arriendos Sur']);
+    expect([...rows].map((r) => r.querySelector('[data-testid="expense-detail"]').textContent).sort()).toEqual(['Cemento', 'Rotomartillo']);
     const rented = [...rows].find((r) => r.textContent.includes('Rotomartillo'));
     expect(rented.getAttribute('data-due')).toBe('true');
     expect(rented.querySelector('[data-testid="hourglass"]')).not.toBeNull();

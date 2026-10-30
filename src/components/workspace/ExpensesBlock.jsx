@@ -1,6 +1,7 @@
 import { useI18n } from '../../lib/i18n.jsx';
 import { RENTAL_CATEGORIES, dayOf, rentalsDue } from '../../lib/ledger.js';
 import Hourglass from '../Hourglass.jsx';
+import { ExpenseHead, SupplierTotals, expenseTitle } from '../ExpenseParts.jsx';
 import Block from './Block.jsx';
 import QueueList from './QueueList.jsx';
 
@@ -17,6 +18,7 @@ export default function ExpensesBlock({ expenses, queued, receipts, onChange, op
     <Block id="expenses" title={t('ws.expenses')} open={open} onToggle={onToggle} testId="ws-expenses">
       <QueueList rows={queued} onRetry={receipts?.retry} onDiscard={receipts?.discard} onAccept={receipts?.accept} />
       {expenses.length === 0 && queued.length === 0 && <p className="text-sm text-[#E0E0E0]/60">{t('ws.noExpenses')}</p>}
+      {expenses.length > 0 && <SupplierTotals expenses={expenses} />}
       {expenses.length > 0 && (
         <ul className="space-y-2" data-testid="expense-list">
           {expenses.map((e) => {
@@ -25,13 +27,10 @@ export default function ExpensesBlock({ expenses, queued, receipts, onChange, op
             return (
               <li key={e.id} data-testid={`expense-${e.id}`} data-due={isDue ? 'true' : undefined} className="rounded-xl border border-l-2 border-white/10 px-3 py-2" style={isDue ? { borderLeftColor: '#d4af37' } : undefined}>
                 <div className="flex items-center gap-3">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-bold">{e.description || t(`exp.cat.${e.category}`)}</span>
-                    <span className="block truncate text-xs text-[#E0E0E0]/60">{[t(`exp.cat.${e.category}`), e.supplier].filter(Boolean).join(' · ')}</span>
-                  </span>
+                  <ExpenseHead e={e} subClass="text-xs text-[#E0E0E0]/60" />
                   {isDue && <Hourglass label={t('rental.dueToday')} size={18} />}
                   <span className="text-sm font-extrabold tabular-nums">{money(e.amount)}</span>
-                  <button type="button" onClick={() => onChange(expenses.filter((x) => x.id !== e.id))} aria-label={`${t('common.delete')}: ${e.description || t(`exp.cat.${e.category}`)}`} className="flex h-10 w-10 items-center justify-center text-lg text-[#E0E0E0]/50 hover:text-red-400">
+                  <button type="button" onClick={() => onChange(expenses.filter((x) => x.id !== e.id))} aria-label={`${t('common.delete')}: ${expenseTitle(e, t)}`} className="flex h-10 w-10 items-center justify-center text-lg text-[#E0E0E0]/50 hover:text-red-400">
                     ×
                   </button>
                 </div>

@@ -18,6 +18,7 @@ import CashSheet from './CashSheet.jsx';
 import ReceiptSheet from './ReceiptSheet.jsx';
 import SnapGrid from './SnapGrid.jsx';
 import Hourglass from './Hourglass.jsx';
+import { ExpenseHead, SupplierTotals, expenseTitle } from './ExpenseParts.jsx';
 import Logbook from './Logbook.jsx';
 
 // the logbook lives in its own file (the workspace uses it too); this re-export keeps the old import path working
@@ -416,7 +417,12 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
         {items.length === 0 && project.expenses.length === 0 && <p className="rounded-2xl border border-white/10 px-4 py-4 text-sm text-neutral-400">{t('sup.empty')}</p>}
 
         {project.expenses.length > 0 && (
-          <ul className="mt-3 space-y-2" data-testid="expense-list">
+          <div className="mt-3">
+            <SupplierTotals expenses={project.expenses} />
+          </div>
+        )}
+        {project.expenses.length > 0 && (
+          <ul className="space-y-2" data-testid="expense-list">
             {project.expenses.map((e) => {
               const rental = RENTAL_CATEGORIES.includes(e.category);
               const isDue = due.some((d) => d.id === e.id);
@@ -428,16 +434,13 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
                   className={`rounded-2xl border bg-black px-4 py-3 ${isDue ? 'border-[#d4af37]' : 'border-white/10'}`}
                 >
                   <div className="flex items-start gap-3">
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-bold">{e.description || t(`exp.cat.${e.category}`)}</span>
-                      <span className="block truncate text-xs text-neutral-400">{[t(`exp.cat.${e.category}`), e.supplier].filter(Boolean).join(' · ')}</span>
-                    </span>
+                    <ExpenseHead e={e} titleClass="" />
                     {isDue && <Hourglass label={t('rental.dueToday')} />}
                     <span className="font-bold tabular-nums">{money(e.amount)}</span>
                     <button
                       type="button"
                       onClick={() => setList('expenses')(project.expenses.filter((x) => x.id !== e.id))}
-                      aria-label={`${t('common.delete')}: ${e.description || t(`exp.cat.${e.category}`)}`}
+                      aria-label={`${t('common.delete')}: ${expenseTitle(e, t)}`}
                       className="-mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-lg text-neutral-500 hover:text-red-400"
                     >
                       ×
