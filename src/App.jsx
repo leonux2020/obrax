@@ -13,7 +13,7 @@ import { adoptCompany, cleanCityOrRegion, documentCompany, isClosed, newExtensio
 import { normalizeLocation } from './lib/ledger.js';
 import { computeAll } from './lib/engine.js';
 import { planningTimeline, pricingTime } from './lib/signature.js';
-import { detectCurrentRegion, detectLang, languageFor } from './lib/geo.js';
+import { detectCurrentRegion, languageFor } from './lib/geo.js';
 import { sanitizeText } from './lib/sanitize.js';
 import {
   loadSettings,
@@ -446,12 +446,11 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   const createProject = (fields) => {
     // The company profile is COPIED into the new project: later profile changes never rewrite it.
     // the market of a new job is the one picked in the form (it starts with where the device is NOW), never blindly the stored one
-    // Market of the job, in this order: the one picked in the form (it starts at the country the device is in NOW) -> the device's country
-    // read again here -> the stored one. Flag, currency and tax all come from this single code; the stored default never wins over the device.
+    // Market of THIS job, in this order: the one picked in the form (it starts at the country the device is in NOW) -> the device's sensor read
+    // again here -> the profile's country. It is the job's own state: it never writes back to the settings (a Chilean job created from Italy
+    // must not make the next job Chilean) and it never moves the interface language.
     const regionCode = [fields.regionCode, detectCurrentRegion(), settings.region].find((c) => REGIONS[c]);
     const created = newProject({ company, logo, ...fields, regionCode });
-    // the stored default country follows where the user really works (a "Chile" saved on a past trip must not come back on the next job)
-    if (regionCode !== settings.region) setSettings((s) => ({ ...s, region: regionCode }));
     const project = { ...created, draft: { ...created.draft, step: created.draft.mode === 'project' ? 1 : 0 } };
     commit(project);
     setSheet(null);
@@ -534,12 +533,12 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
 
   const confirmRegion = useCallback(
     (code) => {
-      const r = getRegion(code);
-      const changed = code !== settings.region;
-      setSettings((s) => ({ ...s, region: code, lang: changed && !s.langLocked ? r.lang : s.lang }));
+      // the profile's country (default when the device cannot tell). The interface language is NOT derived from it: it follows the phone
+      if (!REGIONS[code]) return;
+      setSettings((s) => ({ ...s, region: code }));
       setPickingRegion(false);
     },
-    [settings.region]
+    []
   );
 
   // an explicit choice of language LOCKS it: from then on the device's language no longer overrides it
@@ -798,7 +797,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     if (user || returning) return setStage('app');
     if (!settings.region) {
       const code = detectCurrentRegion();
-      if (code) setSettings((s) => ({ ...s, region: code, lang: s.langLocked ? s.lang : detectLang(getRegion(code).lang) }));
+      if (code) setSettings((s) => ({ ...s, region: code })); // the language already follows the phone (languageFor), never the country
     }
     return setStage('setup');
   };

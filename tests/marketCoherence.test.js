@@ -130,7 +130,7 @@ describe('App: Italy end to end (flag, currency and money agree) and a stale Chi
     localStorage.clear();
   });
 
-  it('a new job in Italy is IT / EUR with the Italian UI, overwrites the stored Chile and shows 🇮🇹 and € (no $)', async () => {
+  it('a new job in Italy is IT / EUR (the sensor beats the stored Chile, which stays as it was) and shows 🇮🇹, no $', async () => {
     seed({ region: 'CL', lang: 'es' });
     setDevice({ timeZone: 'Europe/Rome', languages: ['it-IT', 'it'] });
     h = createHost(App);
@@ -141,7 +141,7 @@ describe('App: Italy end to end (flag, currency and money agree) and a stale Chi
     await flush(400);
     const [project] = await projectStore.load();
     expect(project.draft.regionCode).toBe('IT');
-    expect(JSON.parse(localStorage.getItem('cp.settings.v1')).region).toBe('IT'); // the stored default follows the device
+    expect(JSON.parse(localStorage.getItem('cp.settings.v1')).region).toBe('CL'); // creating a job never rewrites the stored profile country
     expect(document.body.textContent).toContain('🇮🇹');
     expect(document.body.textContent).not.toContain('🇨🇱');
     expect(nb(document.body.textContent)).not.toMatch(/\$\s?\d/);
@@ -223,5 +223,99 @@ describe('No blink: the shell never disappears while IndexedDB is read, the offl
     expect(head.indexOf('name="theme-color"')).toBeLessThan(head.indexOf('<title>'));
     const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8');
     expect(css).toMatch(/html,\s*body,\s*#root\s*\{[^}]*background-color:\s*#000000/);
+  });
+});
+
+describe('Sensor vs state: a job\'s market is its own; the device sensor decides the next one; the UI follows the phone', () => {
+  let h;
+  const seed = (settings) => {
+    localStorage.clear();
+    localStorage.setItem('cp.settings.v1', JSON.stringify(settings));
+    localStorage.setItem('cp.user.v1', JSON.stringify({ provider: 'local', name: 'Ana' }));
+    localStorage.setItem('cp.company.v1', JSON.stringify({ name: 'Aurora' }));
+    localStorage.setItem('cp.profile.v1', JSON.stringify({ onboarded: true, drive: false }));
+  };
+  const settingsNow = () => JSON.parse(localStorage.getItem('cp.settings.v1'));
+  beforeEach(async () => {
+    for (const p of await projectStore.load()) await projectStore.remove(p.id);
+  });
+  afterEach(() => {
+    h?.unmount();
+    localStorage.clear();
+  });
+  const marketValue = () => document.querySelector('[data-testid="project-market"] input[role="combobox"]').value;
+
+  it('a Chilean job created from Italy does not stick: the next new job starts IT / EUR again and the settings are untouched', async () => {
+    seed({ region: 'IT', lang: 'it' });
+    setDevice({ timeZone: 'Europe/Rome', languages: ['it-IT', 'it'] });
+    h = createHost(App);
+    await h.mount();
+    // job 1: the user picks Chile by hand
+    await click(q('fab-new'));
+    await typeInto(document.querySelector('[role="dialog"] input'), 'Obra Santiago');
+    const market = () => document.querySelector('[data-testid="project-market"] input[role="combobox"]');
+    expect(marketValue()).toContain('Italia');
+    await click(market());
+    await click(document.querySelector('[role="option"][id$="-opt-CL"]'));
+    expect(marketValue()).toContain('Cile');
+    await click(q('project-save'));
+    await flush(400);
+    expect((await projectStore.load()).find((p) => p.draft.project.name === 'Obra Santiago').draft.regionCode).toBe('CL');
+    expect(settingsNow()).toEqual({ region: 'IT', lang: 'it' }); // nothing global moved
+    // back to the dashboard, job 2: the sensor says Rome -> IT again
+    await act(async () => window.history.back());
+    await flush(100);
+    if (!q('fab-new')) await click(q('nav-projects'));
+    await click(q('fab-new'));
+    expect(marketValue()).toContain('Italia');
+    expect(q('project-market-hint').textContent).toContain('EUR');
+    expect(document.documentElement.lang).toBe('it'); // the interface never left Italian
+  });
+
+  it('with a stale stored Chile the sensor still wins; the stored country is only the fallback when the device cannot tell', async () => {
+    seed({ region: 'CL', lang: 'es' });
+    setDevice({ timeZone: 'Europe/Rome', languages: ['it-IT'] });
+    h = createHost(App);
+    await h.mount();
+    await click(q('fab-new'));
+    expect(marketValue()).toContain('Italia');
+    h.unmount();
+    seed({ region: 'PE', lang: 'es' });
+    setDevice({ timeZone: 'Etc/UTC', languages: ['en'] });
+    h = createHost(App);
+    await h.mount();
+    await click(q('fab-new'));
+    expect(marketValue()).toMatch(/Per[uú]/);
+  });
+
+  it('the language of the interface is independent of the project market (a CLP job in an Italian UI)', () => {
+    const it = makeI18n('it', 'CL');
+    expect(it.t('nav.accounting')).toBe(makeI18n('it', 'IT').t('nav.accounting'));
+    expect(it.t('nav.accounting')).not.toBe(makeI18n('es', 'CL').t('nav.accounting'));
+    expect(it.lang).toBe('it');
+    expect(it.region.currency).toBe('CLP');
+  });
+
+  it('picking the profile country never switches the interface language', async () => {
+    seed({ region: 'IT', lang: 'it' });
+    setDevice({ timeZone: 'Europe/Rome', languages: ['it-IT'] });
+    h = createHost(App);
+    await h.mount();
+    expect(document.documentElement.lang).toBe('it');
+    expect(settingsNow().lang).toBe('it');
+  });
+});
+
+describe('CSP + critical CSS', () => {
+  it('style-src allows inline styles (and only styles); vercel.json mirrors the policy; the critical <style> is in index.html', () => {
+    const vercel = JSON.parse(readFileSync(resolve(process.cwd(), 'vercel.json'), 'utf8'));
+    const csp = vercel.headers[0].headers.find((x) => x.key === 'Content-Security-Policy').value;
+    expect(csp).toMatch(/style-src [^;]*'unsafe-inline'/);
+    expect(csp).not.toMatch(/script-src [^;]*'unsafe-inline'/);
+    const html = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8');
+    expect(html).toMatch(/<style>[\s\S]*html,\s*body,\s*#root\s*\{[^}]*background-color:\s*#000000\s*!important/);
+    // it must not break the app: no fixed 100vw/100vh box (it would cut the sticky header) and no body padding reset (safe-area insets)
+    const style = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
+    expect(style).not.toMatch(/100vw|height:\s*100vh|padding:\s*0/);
   });
 });

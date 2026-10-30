@@ -6,7 +6,8 @@
 export const CSP_DIRECTIVES = {
   'default-src': ["'self'"],
   'script-src': ["'self'", 'https://accounts.google.com/gsi/client'],
-  'style-src': ["'self'", 'https://accounts.google.com/gsi/style'],
+  // 'unsafe-inline' (styles only, never scripts): the critical <style> of index.html paints the pure-black canvas before the Vite stylesheet is applied
+  'style-src': ["'self'", "'unsafe-inline'", 'https://accounts.google.com/gsi/style'],
   'img-src': ["'self'", 'data:', 'blob:', 'https://*.googleusercontent.com'],
   'font-src': ["'self'"],
   // Drive backup: ONLY the Drive v3 REST paths (metadata + upload); the browser still never talks to Google AI.

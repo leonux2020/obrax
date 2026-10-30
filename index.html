@@ -6,6 +6,20 @@
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#000000" />
     <meta name="msapplication-TileColor" content="#000000" />
+    <!-- critical CSS: the page is solid black from the very first paint (it joins the splash screen with React; no white / grey flash while the stylesheet loads) -->
+    <style>
+      html,
+      body,
+      #root {
+        background-color: #000000 !important;
+        color: #ffffff;
+        margin: 0;
+      }
+      html,
+      body {
+        min-height: 100%;
+      }
+    </style>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>CUBRAX - Cubicación &amp; Presupuestos de Obra</title>
     <meta
