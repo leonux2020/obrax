@@ -435,6 +435,25 @@ describe('proxy: "Escanear Boleta" ({kind:"receipt"}) is a second FIXED prompt b
     expect(Object.keys(RECEIPT_SCHEMA.properties.items.items.properties)).toEqual(expect.arrayContaining(['unitPriceText', 'unitPrice']));
   });
 
+  it('the receipt prompt and schema ask for the fiscal metadata (null when the paper does not show it)', () => {
+    const text = buildReceiptPrompt({ currency: 'CLP' });
+    for (const f of ['vendorTaxId', 'documentType', 'documentNumber', 'paymentMethod', 'netAmount', 'taxAmount']) expect(text).toContain(`"${f}"`);
+    expect(text).toMatch(/use null for every field that does not appear/);
+    expect(text).toMatch(/RUT.*NIT.*Partita IVA/s);
+    const props = RECEIPT_SCHEMA.properties;
+    for (const f of ['vendorTaxId', 'documentType', 'documentNumber', 'paymentMethod', 'netAmount', 'taxAmount', 'netAmountText', 'taxAmountText']) expect(props[f].nullable, f).toBe(true);
+    expect(props.documentType.enum).toEqual(['invoice', 'receipt', 'ticket', 'other']);
+    expect(props.paymentMethod.enum).toEqual(['cash', 'card', 'transfer', 'other']);
+    expect(RECEIPT_SCHEMA.required).toEqual(['isReceipt', 'items']); // the fiscal fields never make a receipt fail
+  });
+
+  it('fiscal fields travel through the proxy, cleaned', async () => {
+    const res = await make({ fetchImpl: okFetch(receipt({ vendorTaxId: '76.123.456-7', documentType: 'receipt', documentNumber: '000987', paymentMethod: 'cash', netAmount: 8403.36, taxAmount: 1596.64, totalText: '10.000' })), clock })(receiptRequest());
+    expect(res.body).toMatchObject({ ok: true, vendorTaxId: '76.123.456-7', documentType: 'receipt', documentNumber: '000987', paymentMethod: 'cash', netAmount: 8403.36, taxAmount: 1596.64 });
+    const bare = await make({ fetchImpl: okFetch(receipt({ vendorTaxId: null, documentType: null, paymentMethod: null })), clock })(receiptRequest());
+    expect(bare.body).toMatchObject({ ok: true, vendorTaxId: null, documentType: null, documentNumber: null, paymentMethod: null, netAmount: null, taxAmount: null });
+  });
+
   it('a supermarket receipt goes through end to end with its food lines and general type', async () => {
     const res = await make({
       fetchImpl: okFetch(receipt({ supplier: 'Jumbo', purchaseType: 'food', totalText: '12.500', items: [{ description: 'Pan', quantity: 5, unitPriceText: '1.000', amountText: '5.000', category: 'food' }, { description: 'Bencina', amountText: '7.500', category: 'transport' }] })),

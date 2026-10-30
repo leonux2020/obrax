@@ -16,7 +16,7 @@ import { CATALOG } from '../src/lib/catalog.js';
 import { DICT } from '../src/lib/dict.js';
 import { normalizeExtraction } from '../src/lib/invoice.js';
 import { normalizeReceipt } from '../src/lib/receipt.js';
-import { EXPENSE_CATEGORIES } from '../src/lib/ledger.js';
+import { DOCUMENT_TYPES, EXPENSE_CATEGORIES, PAYMENT_METHODS } from '../src/lib/ledger.js';
 import { MACHINE_IDS } from '../src/lib/machines.js';
 import { getRegion } from '../src/lib/regions.js';
 import { normalizeBook } from '../src/lib/priceBook.js';
@@ -195,6 +195,7 @@ export function buildReceiptPrompt({ currency = '', today = '' } = {}) {
     'HEADER (rigorous, from the document): "supplier" = the name of the shop / business exactly as printed; "receiptDate" (YYYY-MM-DD); "currency"; "totalText" = the GRAND TOTAL paid, copied character by character as printed, and "total" = your numeric reading of it; "purchaseType" = the kind of purchase as a whole.',
     `Both "purchaseType" and each line's "category" are one of: ${EXPENSE_CATEGORIES.join(', ')}. Meaning: "material" = construction materials; "food" = food, drinks, restaurants, supermarket groceries, crew meals and per-diem (Alimentación / Viáticos); "transport" = fuel (petrol, diesel, gas), tolls, parking, freight, taxi, vehicle costs (Combustible / Transporte); "labor" = wages and paid labour; "tool_rental" = rented hand or power tools (drill, breaker hammer, scaffolding...); "machinery_rental" = rented machines (mixer, compactor, excavator, vibrator, generator...); "other" = anything else (cleaning, stationery, safety gear, services). A rental is recognised by words such as arriendo, alquiler, renta, locação, location, noleggio, Miete, rental, hire, "por día", "per day".`,
     'LINES: one entry per product / service line, with "description" (the product name as printed), "quantity" (a plain number, null when absent), "unitPriceText" (the price of ONE unit as printed, empty when not printed) with "unitPrice" (numeric), and "amountText": the TOTAL PAID for that line COPIED CHARACTER BY CHARACTER as printed, keeping every dot, comma and space (for example "4.990" or "1.234,56"; never convert or round it, no currency symbol). Also give "amount" as your best numeric reading of the same figure.',
+    `FISCAL METADATA (corporate accounting / audit; copy it from the paper, NEVER invent it, and use null for every field that does not appear): "vendorTaxId" = the tax id of the shop exactly as printed (RUT in Chile, NIT in Colombia, RFC in Mexico, CUIT in Argentina, CNPJ in Brazil, Partita IVA / P.IVA in Italy, NIF / CIF in Spain, USt-IdNr / VAT number in Germany, SIRET / TVA in France...); "documentType" = one of: ${DOCUMENT_TYPES.join(', ')} ("invoice" = factura / fattura / Rechnung / facture; "receipt" = boleta / scontrino / recibo / cupom / reçu / Beleg; "ticket" = a plain till or fuel ticket; "other" = anything else); "documentNumber" = the folio / invoice or receipt number / N° / numero scontrino exactly as printed; "paymentMethod" = one of: ${PAYMENT_METHODS.join(', ')} (cash = efectivo / contanti / dinheiro; card = debit or credit card / tarjeta / carta / cartão; transfer = bank transfer / transferencia / bonifico); "netAmountText" and "netAmount" = the amount BEFORE taxes (neto / imponibile / Nettobetrag / subtotal without VAT); "taxAmountText" and "taxAmount" = the tax charged (IVA / VAT / MwSt / TVA / ICMS), copied character by character as printed like the other amounts, never calculated by you.`,
     'Classify each line by what it is (a supermarket receipt can mix "food" and "other" lines; fuel is "transport"). When a document has no itemised lines but shows a total (a restaurant slip, a fuel ticket), return ONE line: "description" = what was bought in a few words, "amountText" / "amount" = the total, "category" = its type.',
     day
       ? `"returnDate" (YYYY-MM-DD) ONLY for rental lines: the day the item must be given back. Use the date printed on the document when there is one; otherwise compute it from the rental start date (the receipt date, or ${day} when the receipt shows none) plus the rental period printed on the line (for example "2 días" starts today and returns after 2 days). Use an empty string when it cannot be known. Today is ${day}.`
@@ -213,6 +214,15 @@ export const RECEIPT_SCHEMA = Object.freeze({
     purchaseType: S({ enum: [...EXPENSE_CATEGORIES] }),
     totalText: S({ nullable: true }),
     total: N({ nullable: true }),
+    // fiscal metadata for audit: null when the paper does not show it
+    vendorTaxId: S({ nullable: true }),
+    documentType: S({ enum: [...DOCUMENT_TYPES], nullable: true }),
+    documentNumber: S({ nullable: true }),
+    paymentMethod: S({ enum: [...PAYMENT_METHODS], nullable: true }),
+    netAmountText: S({ nullable: true }),
+    netAmount: N({ nullable: true }),
+    taxAmountText: S({ nullable: true }),
+    taxAmount: N({ nullable: true }),
     items: {
       type: 'ARRAY',
       items: {

@@ -15,6 +15,15 @@ export const EXPENSE_CATEGORIES = Object.freeze(['material', 'tool_rental', 'mac
 // A job site has indirect costs too: `food` = food / per-diem for the crew (supermarket, restaurant), `transport` = fuel, tolls, freight.
 export const RENTAL_CATEGORIES = Object.freeze(['tool_rental', 'machinery_rental']);
 
+// Fiscal metadata of a receipt (corporate accounting / audit): closed vocabularies, translated by exp.doc.* / exp.pay.* keys.
+export const DOCUMENT_TYPES = Object.freeze(['invoice', 'receipt', 'ticket', 'other']); // Factura, Boleta / Scontrino / Recibo, Ticket
+export const PAYMENT_METHODS = Object.freeze(['cash', 'card', 'transfer', 'other']); // Efectivo, Tarjeta, Transferencia
+// the tax id of the shop (RUT, NIT, Partita IVA, CNPJ...) and the folio: short codes, never free prose
+// eslint-disable-next-line no-control-regex
+const CODE_JUNK = /[\u0000-\u001f\u007f-\u009f<>`\\{}[\]$|^~]/g;
+export const cleanFiscalCode = (v, max = 32) => (typeof v === 'string' || typeof v === 'number' ? String(v).replace(CODE_JUNK, '').replace(/\s+/g, ' ').trim().slice(0, max) : '');
+export const oneOfOrEmpty = (v, list) => (typeof v === 'string' && list.includes(v.trim().toLowerCase()) ? v.trim().toLowerCase() : '');
+
 const ID_RE = /^[a-z0-9]{4,24}$/;
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -23,6 +32,12 @@ export const newEntryId = () => Math.random().toString(36).slice(2, 8) + Date.no
 const amount = (v) => {
   const n = typeof v === 'string' ? Number(v.replace(',', '.')) : Number(v);
   return Number.isFinite(n) && n > 0 && n <= LEDGER_LIMITS.maxAmount ? Math.round(n * 100) / 100 : null;
+};
+// like `amount` but 0 is a real value (an exempt document has tax 0)
+const amount0 = (v) => {
+  if (v === null || v === undefined || v === '') return null;
+  const n = typeof v === 'string' ? Number(v.replace(',', '.')) : Number(v);
+  return Number.isFinite(n) && n >= 0 && n <= LEDGER_LIMITS.maxAmount ? Math.round(n * 100) / 100 : null;
 };
 const stamp = (v, fallback = 0) => {
   const n = Number(v);
@@ -84,6 +99,14 @@ export const normalizeExpenses = (raw) =>
       ...(typeof p.currency === 'string' && /^[A-Za-z]{3}$/.test(p.currency.trim()) ? { currency: p.currency.trim().toUpperCase() } : {}),
       ...(amount(p.quantity) !== null ? { quantity: amount(p.quantity) } : {}),
       ...(amount(p.unitPrice) !== null ? { unitPrice: amount(p.unitPrice) } : {}),
+      // fiscal metadata for audit (each present only when the receipt showed it): shop tax id, document type + folio, how it was paid,
+      // and the NET / TAX share of THIS line (the document's net and tax prorated over its lines)
+      ...(cleanFiscalCode(p.vendorTaxId, 24) ? { vendorTaxId: cleanFiscalCode(p.vendorTaxId, 24) } : {}),
+      ...(oneOfOrEmpty(p.documentType, DOCUMENT_TYPES) ? { documentType: oneOfOrEmpty(p.documentType, DOCUMENT_TYPES) } : {}),
+      ...(cleanFiscalCode(p.documentNumber, 32) ? { documentNumber: cleanFiscalCode(p.documentNumber, 32) } : {}),
+      ...(oneOfOrEmpty(p.paymentMethod, PAYMENT_METHODS) ? { paymentMethod: oneOfOrEmpty(p.paymentMethod, PAYMENT_METHODS) } : {}),
+      ...(amount0(p.netAmount) !== null ? { netAmount: amount0(p.netAmount) } : {}),
+      ...(amount0(p.taxAmount) !== null ? { taxAmount: amount0(p.taxAmount) } : {}),
       // the photo of the receipt these lines came from (a Blob in IndexedDB, see receiptPhotos.js); several lines can share one
       ...(typeof p.receiptId === 'string' && RECEIPT_ID_RE.test(p.receiptId) ? { receiptId: p.receiptId } : {}),
     };

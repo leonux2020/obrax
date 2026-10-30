@@ -21,7 +21,7 @@ import { newProject, normalizeProject, projectLevel, isClosed } from '../src/lib
 import { newDraft, normalizeDraft } from '../src/lib/draft.js';
 import { computeAll } from '../src/lib/engine.js';
 import { freezeQuote, pricingTime, planningTimeline, normalizeFrozen } from '../src/lib/signature.js';
-import { normalizeReceipt, expensesFromRows } from '../src/lib/receipt.js';
+import { normalizeReceipt, expensesFromRows, receiptMeta } from '../src/lib/receipt.js';
 import { buildXlsx, columnName, sheetNames, fileStem } from '../src/lib/xlsx.js';
 import { buildRenditionSheets, buildRenditionFile, projectBalance } from '../src/lib/rendition.js';
 import { shareOrDownload } from '../src/lib/shareFile.js';
@@ -292,6 +292,8 @@ describe('xlsx writer', () => {
   });
 });
 
+const EXCEL_HEAD = (t) => ['xl.date', 'xl.docType', 'xl.docNumber', 'xl.supplier', 'xl.taxId', 'xl.description', 'xl.category', 'xl.quantity', 'xl.unitPrice', 'xl.net', 'xl.tax', 'xl.grossTotal', 'xl.currency', 'xl.payment', 'xl.returnDate', 'xl.returned'].map((k) => t(k));
+
 describe('rendición (individual and consolidated Excel)', () => {
   const { t } = makeI18n('es', 'CL');
   const project = (name, regionCode = 'CL') => {
@@ -312,7 +314,7 @@ describe('rendición (individual and consolidated Excel)', () => {
     const p = project('Casa');
     const sheets = buildRenditionSheets([p], new Map([[p.id, null]]), { t, locale: 'es', currency: 'CLP' });
     expect(sheets).toHaveLength(5);
-    expect(sheets[1].rows[0]).toHaveLength(10);
+    expect(sheets[1].rows[0]).toHaveLength(16);
     expect(sheets[1].rows).toHaveLength(2);
     expect(sheets[0].rows.flat().some((c) => c && c.v === 'Casa' || c === 'Casa')).toBe(true);
   });
@@ -322,7 +324,7 @@ describe('rendición (individual and consolidated Excel)', () => {
     const b = project('Dos');
     const totals = new Map([[a.id, 1000], [b.id, 2000]]);
     const same = buildRenditionSheets([a, b], totals, { t, locale: 'es', currency: '' });
-    expect(same[1].rows[0]).toHaveLength(11);
+    expect(same[1].rows[0]).toHaveLength(17);
     const last = same[0].rows.at(-1);
     expect(last[0].v).toBe(t('xl.total'));
     expect(last[3].v).toBe(3000);
@@ -344,31 +346,90 @@ describe('rendición (individual and consolidated Excel)', () => {
         { description: 'Bencina', amountText: '7.500', category: 'transport' },
       ],
     });
-    const stored = normalizeExpenses(expensesFromRows(receipt.items.map((it, i) => ({ ...it, key: `r${i}`, selected: true })), { supplier: receipt.supplier, date: receipt.date, currency: receipt.currency, now: NOW }));
+    const stored = normalizeExpenses(expensesFromRows(receipt.items.map((it, i) => ({ ...it, key: `r${i}`, selected: true })), { ...receiptMeta(receipt), now: NOW }));
     expect(stored[0]).toMatchObject({ supplier: 'Lider', date: '2026-10-29', currency: 'CLP', quantity: 5, unitPrice: 1000, amount: 5000, category: 'food' });
     expect(stored[1]).toMatchObject({ date: '2026-10-29', currency: 'CLP', amount: 7500, category: 'transport' });
     expect(stored[1]).not.toHaveProperty('quantity');
+    for (const e of stored) for (const k of ['vendorTaxId', 'documentType', 'documentNumber', 'paymentMethod', 'netAmount', 'taxAmount']) expect(e).not.toHaveProperty(k); // nothing invented when the paper shows none
 
     const p = project('Casa');
     p.expenses = stored;
     const sheet = buildRenditionSheets([p], new Map([[p.id, 1000]]), { t, locale: 'es', currency: 'CLP' })[1];
-    expect(sheet.rows[0].map((c) => c.v)).toEqual([t('xl.date'), t('xl.supplier'), t('xl.description'), t('xl.category'), t('xl.quantity'), t('xl.unitPrice'), t('xl.amount'), t('xl.currency'), t('xl.returnDate'), t('xl.returned')]);
+    expect(sheet.rows[0].map((c) => c.v)).toEqual(EXCEL_HEAD(t));
     const row = sheet.rows[1];
     expect(row[0]).toMatch(/29/); // the date printed on the receipt, not the day it was scanned
     expect(row[0]).toMatch(/2026/);
-    expect(row.slice(1, 5)).toEqual(['Lider', 'Pan', t('exp.cat.food'), 5]);
-    expect(row[5]).toMatchObject({ v: 1000, money: true });
-    expect(row[6]).toMatchObject({ v: 5000, money: true });
-    expect(row[7]).toBe('CLP');
-    expect(sheet.rows[2].slice(4, 6)).toEqual(['', '']); // no quantity / unit price printed: empty cells, not zeros
-    expect(sheet.widths).toHaveLength(10);
+    expect([row[3], row[5], row[6], row[7]]).toEqual(['Lider', 'Pan', t('exp.cat.food'), 5]);
+    expect(row[8]).toMatchObject({ v: 1000, money: true });
+    expect(row[11]).toMatchObject({ v: 5000, money: true });
+    expect(row[12]).toBe('CLP');
+    expect([row[1], row[2], row[4], row[9], row[10], row[13]]).toEqual(['', '', '', '', '', '']); // no fiscal data on the paper: empty cells
+    expect(sheet.rows[2].slice(7, 9)).toEqual(['', '']); // no quantity / unit price printed: empty cells, not zeros
+    expect(sheet.widths).toHaveLength(16);
   });
 
-  it('older expenses (no date / currency) still export: saved day and the project currency', () => {
+  it('fiscal metadata: tax id, document type + folio, payment method, net and tax (prorated per line) reach the stored expense and the Excel', () => {
+    const receipt = normalizeReceipt({
+      isReceipt: true,
+      currency: 'CLP',
+      supplier: 'Ferretería Sur',
+      receiptDate: '2026-10-28',
+      purchaseType: 'material',
+      totalText: '11.900',
+      vendorTaxId: '76.123.456-7',
+      documentType: 'invoice',
+      documentNumber: 'F-000123',
+      paymentMethod: 'card',
+      netAmountText: '10.000',
+      taxAmountText: '1.900',
+      items: [
+        { description: 'Cemento', quantity: 2, unitPriceText: '4.760', amountText: '9.520', category: 'material' },
+        { description: 'Arena', quantity: 1, amountText: '2.380', category: 'material' },
+      ],
+    });
+    expect(receipt).toMatchObject({ vendorTaxId: '76.123.456-7', documentType: 'invoice', documentNumber: 'F-000123', paymentMethod: 'card', netAmount: 10000, taxAmount: 1900, total: 11900 });
+    const stored = normalizeExpenses(expensesFromRows(receipt.items.map((it, i) => ({ ...it, key: `r${i}`, selected: true })), { ...receiptMeta(receipt), now: NOW }));
+    expect(stored[0]).toMatchObject({ vendorTaxId: '76.123.456-7', documentType: 'invoice', documentNumber: 'F-000123', paymentMethod: 'card', netAmount: 8000, taxAmount: 1520, amount: 9520 });
+    expect(stored[1]).toMatchObject({ netAmount: 2000, taxAmount: 380, amount: 2380 });
+    expect(stored.reduce((x, e) => x + e.netAmount, 0)).toBe(10000); // the columns add up to the document
+    expect(stored.reduce((x, e) => x + e.taxAmount, 0)).toBe(1900);
+
+    const p = project('Casa');
+    p.expenses = stored;
+    const row = buildRenditionSheets([p], new Map([[p.id, 1000]]), { t, locale: 'es', currency: 'CLP' })[1].rows[1];
+    expect(row[1]).toBe(t('exp.doc.invoice'));
+    expect(row.slice(2, 6)).toEqual(['F-000123', 'Ferretería Sur', '76.123.456-7', 'Cemento']);
+    expect(row[9]).toMatchObject({ v: 8000, money: true });
+    expect(row[10]).toMatchObject({ v: 1520, money: true });
+    expect(row[11]).toMatchObject({ v: 9520, money: true });
+    expect(row[13]).toBe(t('exp.pay.card'));
+  });
+
+  it('fiscal parsing is defensive: null when absent, unknown enums dropped, missing net/tax derived from the total, absurd values rejected', () => {
+    const none = normalizeReceipt({ isReceipt: true, items: [{ amountText: '100', category: 'other' }] });
+    expect(none).toMatchObject({ vendorTaxId: null, documentType: null, documentNumber: null, paymentMethod: null, netAmount: null, taxAmount: null });
+    const odd = normalizeReceipt({ isReceipt: true, documentType: 'invoice-xl', paymentMethod: 'bitcoin', vendorTaxId: '<script>76.1</script>', totalText: '1.190', taxAmountText: '190', items: [{ amountText: '1.190', category: 'other' }] });
+    expect(odd).toMatchObject({ documentType: null, paymentMethod: null, netAmount: 1000, taxAmount: 190 }); // net derived = total - tax
+    expect(odd.vendorTaxId).not.toMatch(/[<>]/);
+    const tax2 = normalizeReceipt({ isReceipt: true, totalText: '1.190', netAmountText: '1.000', items: [{ amountText: '1.190', category: 'other' }] });
+    expect(tax2).toMatchObject({ netAmount: 1000, taxAmount: 190 }); // tax derived = total - net
+    const bad = normalizeReceipt({ isReceipt: true, totalText: '1.000', netAmountText: '5.000', taxAmountText: '9.999', items: [{ amountText: '1.000', category: 'other' }] });
+    expect(bad).toMatchObject({ netAmount: null, taxAmount: null }); // bigger than the total: a misread, dropped
+    expect(normalizeReceipt({ isReceipt: true, taxAmount: 0, netAmount: 500, totalText: '500', items: [{ amountText: '500', category: 'other' }] })).toMatchObject({ taxAmount: 0, netAmount: 500 }); // exempt document: tax 0 is a real value
+    // old expenses and untrusted stored values
+    const [old] = normalizeExpenses([{ amount: 5, vendorTaxId: 12345, documentType: 'Factura', paymentMethod: 'card', netAmount: -3, taxAmount: 'x' }]);
+    expect(old).toMatchObject({ vendorTaxId: '12345', paymentMethod: 'card' });
+    expect(old).not.toHaveProperty('documentType');
+    expect(old).not.toHaveProperty('netAmount');
+    expect(old).not.toHaveProperty('taxAmount');
+  });
+
+  it('older expenses (no date / currency / fiscal data) still export: saved day and the project currency', () => {
     const p = project('Casa');
     const row = buildRenditionSheets([p], new Map([[p.id, 1000]]), { t, locale: 'es', currency: 'CLP' })[1].rows[1];
-    expect(row[7]).toBe('CLP');
-    expect(row[4]).toBe('');
+    expect(row[12]).toBe('CLP');
+    expect(row[7]).toBe('');
+    expect(row[1]).toBe('');
   });
 
   it('buildRenditionFile returns a real .xlsx File with a safe name', async () => {

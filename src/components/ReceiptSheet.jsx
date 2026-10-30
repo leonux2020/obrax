@@ -3,7 +3,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { InvoiceError } from '../lib/invoice.js';
 import { EXPENSE_CATEGORIES, RENTAL_CATEGORIES } from '../lib/ledger.js';
 import { PhotoError, compressInvoiceImage } from '../lib/photos.js';
-import { expensesFromRows, requestReceipt } from '../lib/receipt.js';
+import { expensesFromRows, receiptMeta, requestReceipt } from '../lib/receipt.js';
 import { Button, DateInput, NumberField } from './ui.jsx';
 import BottomSheet from './BottomSheet.jsx';
 import Hourglass from './Hourglass.jsx';
@@ -85,7 +85,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, prepareImage = 
   const chosen = rows.filter((r) => r.selected && r.amount > 0);
   const total = chosen.reduce((s, r) => s + r.amount, 0);
 
-  const save = () => onSave(expensesFromRows(rows, { supplier: receipt?.supplier ?? '', date: receipt?.date ?? '', currency: receipt?.currency ?? '', now: typeof today === 'function' ? today() : today }), image ? { image } : {});
+  const save = () => onSave(expensesFromRows(rows, { ...receiptMeta(receipt), now: typeof today === 'function' ? today() : today }), image ? { image } : {});
 
   return (
     <BottomSheet fullscreen title={t('rcpt.title')} subtitle={t('rcpt.subtitle')} onClose={onClose}>

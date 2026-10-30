@@ -75,15 +75,38 @@ export function buildRenditionSheets(projects, totals, { t, locale = 'es', curre
   }
 
   // ---- detail sheets ---------------------------------------------------------------------------------------
-  const expenses = [[...projCol, head(t('xl.date')), head(t('xl.supplier')), head(t('xl.description')), head(t('xl.category')), head(t('xl.quantity')), head(t('xl.unitPrice')), head(t('xl.amount')), head(t('xl.currency')), head(t('xl.returnDate')), head(t('xl.returned'))]];
+  const expenses = [[...projCol, head(t('xl.date')), head(t('xl.docType')), head(t('xl.docNumber')), head(t('xl.supplier')), head(t('xl.taxId')), head(t('xl.description')), head(t('xl.category')), head(t('xl.quantity')), head(t('xl.unitPrice')), head(t('xl.net')), head(t('xl.tax')), head(t('xl.grossTotal')), head(t('xl.currency')), head(t('xl.payment')), head(t('xl.returnDate')), head(t('xl.returned'))]];
   const payments = [[...projCol, head(t('xl.date')), head(t('xl.note')), head(t('xl.amount'))]];
   const advances = [[...projCol, head(t('xl.date')), head(t('xl.worker')), head(t('xl.amount'))]];
   const logbook = [[...projCol, head(t('xl.date')), head(t('xl.entry'))]];
   for (const p of projects) {
     for (const e of p.expenses) {
-      // one row per receipt line: printed date (else the day it was saved), shop, product, type, quantity, unit price, line total, currency
+      // one row per receipt line, in the order of a financial statement: date, document type + folio, shop + tax id, product, category,
+      // quantity, unit price, net, tax, total paid, currency, payment method (+ rental return). Net / tax are this line's share of the document's.
       const cur = e.currency || getRegion(p.draft.regionCode)?.currency || currency;
-      expenses.push(withProject([whenDay(e.date, locale) || when(e.at, locale), e.supplier, e.description, t(`exp.cat.${e.category}`), e.quantity ?? '', e.unitPrice ? money(e.unitPrice) : '', money(e.amount), cur, e.returnDate, e.returnDate ? t(e.returned ? 'common.yes' : 'common.no') : ''], p));
+      expenses.push(
+        withProject(
+          [
+            whenDay(e.date, locale) || when(e.at, locale),
+            e.documentType ? t(`exp.doc.${e.documentType}`) : '',
+            e.documentNumber ?? '',
+            e.supplier,
+            e.vendorTaxId ?? '',
+            e.description,
+            t(`exp.cat.${e.category}`),
+            e.quantity ?? '',
+            e.unitPrice ? money(e.unitPrice) : '',
+            e.netAmount !== undefined ? money(e.netAmount) : '',
+            e.taxAmount !== undefined ? money(e.taxAmount) : '',
+            money(e.amount),
+            cur,
+            e.paymentMethod ? t(`exp.pay.${e.paymentMethod}`) : '',
+            e.returnDate,
+            e.returnDate ? t(e.returned ? 'common.yes' : 'common.no') : '',
+          ],
+          p
+        )
+      );
     }
     for (const x of p.payments) payments.push(withProject([when(x.at, locale), x.note, money(x.amount)], p));
     for (const x of p.advances) advances.push(withProject([when(x.at, locale), x.worker, money(x.amount)], p));
@@ -92,7 +115,7 @@ export function buildRenditionSheets(projects, totals, { t, locale = 'es', curre
 
   return [
     { name: t('xl.sheet.summary'), rows: summary, widths: single ? [22, 28] : [28, 22, 10, 16, 16, 16, 16, 16, 16] },
-    { name: t('xl.sheet.expenses'), rows: expenses, widths: widthsWith([14, 24, 36, 22, 10, 14, 14, 9, 14, 10]) },
+    { name: t('xl.sheet.expenses'), rows: expenses, widths: widthsWith([14, 16, 14, 24, 18, 36, 20, 10, 14, 14, 14, 14, 9, 16, 14, 10]) },
     { name: t('xl.sheet.payments'), rows: payments, widths: widthsWith([14, 36, 14]) },
     { name: t('xl.sheet.advances'), rows: advances, widths: widthsWith([14, 26, 14]) },
     { name: t('xl.sheet.logbook'), rows: logbook, widths: widthsWith([14, 80]) },
