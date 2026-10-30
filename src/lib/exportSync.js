@@ -90,7 +90,7 @@ export async function uploadRendition({ client, kind = 'project', title, fileNam
  * @param file       { fileName, bytes: Uint8Array }
  * @param project    { id, title, kind? }  the destination: a project (kind 'project', the default) or the global folder (kind 'global')
  * @param upload     async ({ kind, title, fileName, bytes }) => void   (uploadRendition bound to the app's Drive client)
- * @param ensureToken async () => token|null                           a Google session (the consent may open: this is a tap)
+ * @param ensureToken async ({ interactive: true }) => token|null        a Google session; asked as a TAP of the user, so Google's window may open
  * @returns {Promise<{ status: 'uploaded' | 'queued' | 'not_configured' | 'failed', reason?: string }>}
  *   'queued' + reason 'offline' | 'auth' | 'quota' | 'error' (parked in IndexedDB, uploaded later); 'failed' + 'queue_full' | 'bad_file'
  *   (could not even be parked). Nothing is ever downloaded. Always settles: the network steps are time-limited.
@@ -109,7 +109,7 @@ export async function deliverRendition({ file, project, upload, ensureToken, que
   };
   if (offline) return park('offline');
   try {
-    const token = await withTimeout(ensureToken(), timeouts.token);
+    const token = await withTimeout(ensureToken({ interactive: true }), timeouts.token); // the tap of the user: Google may show its window
     if (!token) throw Object.assign(new Error('auth'), { code: 'auth' });
     await withTimeout(upload({ kind, title: project.title, fileName: file.fileName, bytes: file.bytes }), timeouts.upload);
     return { status: 'uploaded' };
@@ -159,7 +159,7 @@ async function exclusive(fn) {
 /**
  * Upload every due parked rendición once.
  * @param upload       async ({ title, fileName, bytes, row }) => void
- * @param ensureToken  async () => token|null      SILENT (no screen): null = this device has no Google session now, the rows keep waiting
+ * @param ensureToken  async ({ interactive: false }) => token|null   SILENT OR ABORT (prompt 'none', never a window): null = this device has no Google session now, the rows keep waiting
  * @returns {Promise<{done: object[], failed: object[], deferred: number, skipped: boolean}|null>}
  */
 export function drainExportQueue({ queue = exportQueue, upload, ensureToken = async () => 'token', online = isOnline, now = Date.now, force = false, timeouts = TIMEOUTS } = {}) {
@@ -174,7 +174,7 @@ export function drainExportQueue({ queue = exportQueue, upload, ensureToken = as
       }
       await queue.update(row.id, { status: 'sending' });
       try {
-        if (!(await withTimeout(ensureToken(), timeouts.token))) throw Object.assign(new Error('auth'), { code: 'auth' });
+        if (!(await withTimeout(ensureToken({ interactive: false }), timeouts.token))) throw Object.assign(new Error('auth'), { code: 'auth' });
         await withTimeout(upload({ kind: row.kind, title: row.title, fileName: row.fileName, bytes: await queue.bytesOf(row), row }), timeouts.upload);
         await queue.remove(row.id); // it is in Drive: the parked copy is no longer needed
         result.done.push(row);

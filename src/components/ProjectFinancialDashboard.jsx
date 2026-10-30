@@ -31,12 +31,13 @@ function Stat({ id, label, value, tone = '' }) {
  *
  * `onChange(patch)` saves a change of the project ({ payments }); `onClose()` goes back; `onCloseRendition()` resolves when it is done.
  */
-export default function ProjectFinancialDashboard({ project, onChange, onBack, onCloseRendition, onRetryQueue = null, queue, watchdogMs = UI_WATCHDOG_MS }) {
+export default function ProjectFinancialDashboard({ project, onChange, onBack, onCloseRendition, onRetryQueue = null, onReconnect = null, needsReconnect = false, queue, watchdogMs = UI_WATCHDOG_MS }) {
   const { t, money, locale } = useI18n();
   const [date, setDate] = useState(() => toDayString(new Date()));
   const [amount, setAmount] = useState(null);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
+  const [connecting, setConnecting] = useState(false); // the user asked for the Google window: the button says so until Google answers
   const rows = useExportQueue(queue).filter((r) => r.projectId === project.id);
   const waiting = rows.filter((r) => r.status !== 'failed').length;
   const failed = rows.filter((r) => r.status === 'failed').length;
@@ -54,6 +55,19 @@ export default function ProjectFinancialDashboard({ project, onChange, onBack, o
     onChange({ payments: [entry, ...project.payments] });
     setAmount(null);
     setNote('');
+  };
+
+  // "Reconectar Drive": the ONLY place besides "Enviar a Drive" where the Google window may open, and only by this tap
+  const reconnect = async () => {
+    if (connecting || !onReconnect) return;
+    setConnecting(true);
+    try {
+      await settleWithin(onReconnect(), watchdogMs);
+    } catch {
+      /* the parent already told the user */
+    } finally {
+      setConnecting(false);
+    }
   };
 
   const close = async () => {
@@ -166,10 +180,16 @@ export default function ProjectFinancialDashboard({ project, onChange, onBack, o
           {(waiting > 0 || failed > 0) && (
             <p role="status" data-testid="fin-queued" className="flex items-center justify-between gap-2 rounded-lg px-1 text-sm font-semibold text-[#e8c35f]">
               <span>{[waiting > 0 && t('fin.queued', { n: waiting }), failed > 0 && t('fin.queued.failed', { n: failed })].filter(Boolean).join(' · ')}</span>
-              {onRetryQueue && (
-                <button type="button" onClick={onRetryQueue} data-testid="fin-queued-retry" className="min-h-[44px] shrink-0 rounded-lg border border-[#d4af37] px-3 text-[#e8c35f]">
-                  {t('fin.queued.retry')}
+              {needsReconnect && onReconnect ? (
+                <button type="button" onClick={reconnect} disabled={connecting} data-testid="fin-reconnect" className="min-h-[44px] shrink-0 rounded-lg border border-[#d4af37] px-3 text-[#e8c35f] disabled:opacity-50">
+                  {connecting ? t('fin.reconnecting') : t('fin.reconnect')}
                 </button>
+              ) : (
+                onRetryQueue && (
+                  <button type="button" onClick={onRetryQueue} data-testid="fin-queued-retry" className="min-h-[44px] shrink-0 rounded-lg border border-[#d4af37] px-3 text-[#e8c35f]">
+                    {t('fin.queued.retry')}
+                  </button>
+                )
               )}
             </p>
           )}

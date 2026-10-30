@@ -6,7 +6,7 @@
 // in-memory state can write anything back.
 
 import { DB_NAME } from './db.js';
-import { clearDriveToken } from './driveToken.js';
+import { clearDriveToken, resetDriveAuthState } from './driveToken.js';
 
 const attempt = async (fn) => {
   try {
@@ -54,6 +54,7 @@ export async function wipeLocalData({
   const storage = await attempt(() => {
     clearDriveToken({ storage: session }); // the in-memory copy of the Drive token too
     local?.clear();
+    resetDriveAuthState(); // the "needs interaction" flag lived in localStorage
     session?.clear();
   });
   const indexedDb = await attempt(async () => {

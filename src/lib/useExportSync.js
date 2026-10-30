@@ -28,7 +28,7 @@ export function useExportSync({ upload, ensureToken, notify, enabled = true, que
   const run = useCallback(
     async ({ force = false } = {}) => {
       if (!uploadRef.current) return null;
-      const res = await drainExportQueue({ queue, upload: (a) => uploadRef.current(a), ensureToken: () => tokenRef.current?.() ?? null, force });
+      const res = await drainExportQueue({ queue, upload: (a) => uploadRef.current(a), ensureToken: () => tokenRef.current?.({ interactive: false }) ?? null, force });
       if (!res) return null;
       if (res.done.length) notifyRef.current?.({ key: 'rend.queue.done', params: { n: res.done.length }, tone: 'ok' });
       if (res.failed.length) notifyRef.current?.({ key: 'rend.queue.failed', tone: 'warn' });

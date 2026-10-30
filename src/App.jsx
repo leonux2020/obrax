@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { emptySlots } from './lib/photos.js';
 import { migrateLegacyPhotos, photoStoreFor } from './lib/photoStore.js';
 import { notePhotosFor, readNotePhotos } from './lib/notePhotos.js';
@@ -32,7 +32,7 @@ import {
   saveProfileMeta,
 } from './lib/draft.js';
 import { ensureDriveToken, googleConfigured, GOOGLE_CONFIG_STATUS, localUser } from './lib/auth.js';
-import { clearDriveToken, getDriveToken, isDriveLinked } from './lib/driveToken.js';
+import { clearDriveToken, getDriveToken, isDriveLinked, needsDriveInteraction, subscribeDriveAuth } from './lib/driveToken.js';
 import { createDriveClient } from './lib/drive.js';
 import { createDriveSync } from './lib/driveSync.js';
 import { collectBackup, hasNoProjects, parseBackup, restoreBackup } from './lib/backup.js';
@@ -222,7 +222,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     // a backup already in this Google account and nothing on this device: offer to restore it (uploads wait, so it is never overwritten)
     const offer = await offerRef.current?.();
     if (offer?.offered) return { ok: true, offered: true };
-    sync.flush({ force: true, interactive: true }).catch(() => {}); // in the background: the card shows "Sincronizando…" then "Último respaldo"
+    sync.flush({ force: true }).catch(() => {}); // in the background and SILENT (the token was just granted): the card shows "Sincronizando…" then "Último respaldo"
     return { ok: true };
   }, [sync]);
   // The toggle: ON for an account that is not linked yet starts that authorization at once; if Google says no, it goes back to OFF.
@@ -566,7 +566,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     async ({ force = false } = {}) => {
       if (wipingRef.current) return { ok: true };
       if (backupOnRef.current && !force) {
-        const r = await sync.flush({ force: true, interactive: true });
+        const r = await sync.flush({ force: true }); // silent: signing out never opens a Google window; if it cannot upload, the user is told and may leave anyway
         if (!r.ok) return r;
       }
       wipingRef.current = true;
@@ -655,7 +655,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     try {
       const out = await run({
         upload: renditionUpload,
-        ensureToken: () => ensureDriveToken({ interactive: true, hint: userRef.current?.email || '' }).catch(() => null), // a tap: the consent may open
+        ensureToken: ({ interactive = true } = {}) => ensureDriveToken({ interactive, hint: userRef.current?.email || '' }).catch(() => null), // "Enviar a Drive" is a tap: the Google window may open
         configured: googleConfigured,
       });
       if (out.status === 'uploaded') {
@@ -689,10 +689,23 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   // the background half: the parked rendiciones go up when the network is back (silent token only: no Google screen from the background)
   const exportSync = useExportSync({
     upload: renditionUpload,
-    ensureToken: async () => getDriveToken() ?? (googleConfigured && isDriveLinked() ? ensureDriveToken({ interactive: false, hint: userRef.current?.email || '' }).catch(() => null) : null),
+    ensureToken: async () => getDriveToken() ?? (googleConfigured && isDriveLinked() && !needsDriveInteraction() ? ensureDriveToken({ interactive: false, hint: userRef.current?.email || '' }).catch(() => null) : null),
     notify: notifyUser,
     enabled: stage === 'app' && projects !== null && googleConfigured,
   });
+  // Google said (silently) that it needs the user: the screens offer "Reconectar Drive", the only way back besides "Enviar a Drive"
+  const driveNeedsReconnect = useSyncExternalStore(subscribeDriveAuth, needsDriveInteraction, () => false);
+  // "Reconectar Drive" (a tap): the one place where the Google window may open to renew the token; the parked files go up right after
+  const reconnectDrive = useCallback(async () => {
+    const token = await ensureDriveToken({ interactive: true, hint: userRef.current?.email || '' }).catch(() => null);
+    if (!token) {
+      pushToast({ key: 'rend.reconnect.err', tone: 'amber', ms: 7000 });
+      return null;
+    }
+    setLinkedNow(true);
+    await exportSync.retry();
+    return token;
+  }, [exportSync]);
 
   // ---- restore from Drive --------------------------------------------------------------------------------------
   // Reads the newest backup of the CUBRAX folder and merges it into the device (projects: newest wins; profile and
@@ -785,7 +798,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
       setStage('app');
       window.scrollTo({ top: 0 });
       // Google on a new device / after signing out: a light look in Drive (metadata only); a backup found is OFFERED, not forced.
-      if (u.provider === 'google' && googleConfigured) offerRef.current?.({ interactive: true })?.catch(() => null);
+      if (u.provider === 'google' && googleConfigured) offerRef.current?.({ interactive: false })?.catch(() => null); // silent: no second Google window right after the sign-in
     },
     []
   );
@@ -925,7 +938,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
           )}
 
           {financeProject && !active && (
-            <ProjectFinancialDashboard project={financeProject} onChange={changeFinance} onBack={() => setFinanceId(null)} onCloseRendition={submitRendition} onRetryQueue={exportSync.retry} />
+            <ProjectFinancialDashboard project={financeProject} onChange={changeFinance} onBack={() => setFinanceId(null)} onCloseRendition={submitRendition} onRetryQueue={exportSync.retry} onReconnect={reconnectDrive} needsReconnect={driveNeedsReconnect} />
           )}
           {sheet?.type === 'new' && <ProjectSheet defaultRegion={settings.region} onSave={createProject} onClose={() => setSheet(null)} />}
           {editing && (

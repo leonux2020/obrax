@@ -5,7 +5,7 @@
 // (signature, aud, iss, exp) before you trust it for anything beyond showing the user's name.
 
 import { sanitizeText, sanitizeEmail, sanitizeAvatarUrl } from './sanitize.js';
-import { getDriveToken, setDriveToken } from './driveToken.js';
+import { getDriveToken, markDriveNeedsInteraction, needsDriveInteraction, setDriveToken } from './driveToken.js';
 
 const CLIENT_ID_RE = /^[\w-]+\.apps\.googleusercontent\.com$/;
 
@@ -96,7 +96,10 @@ const driveError = (code) => Object.assign(new Error(`drive:${code}`), { code })
  * Resolves { granted: true } only when Google confirms the scope; rejects with an Error whose `code` is
  * 'not_configured' | 'offline' | 'denied' | 'popup' (the pop-up could not open). The access token is kept only while it is valid (driveToken.js): it is what the silent backup uses.
  * `prompt: 'none'` is the SILENT renewal (no screen: it works while Google still remembers the consent, else it rejects 'denied');
- * it gives up after `silentTimeoutMs` ('timeout') so a blocked silent request never leaves the backup waiting. `hint` (the Google
+ * it gives up after `silentTimeoutMs` ('timeout') so a blocked silent request never leaves the backup waiting.
+ * SILENT OR ABORT: with `prompt: 'none'` every way of "Google needs the user" (interaction_required, consent_required, login_required,
+ * access_denied, a pop-up that could not open or was closed) rejects 'interaction_required'. It NEVER becomes 'popup' (which the callers answer
+ * with a full-page redirect) and nothing visible is ever opened as a fallback. `hint` (the Google
  * account e-mail) lets Google pick the right account without asking.
  */
 export async function requestDriveAccess({ clientId = GOOGLE_CLIENT_ID, enabled = googleConfigured, load = loadGsi, prompt = '', hint = '', silentTimeoutMs = 15_000 } = {}) {
@@ -109,8 +112,9 @@ export async function requestDriveAccess({ clientId = GOOGLE_CLIENT_ID, enabled 
   }
   const oauth = google?.accounts?.oauth2;
   if (!oauth?.initTokenClient) throw driveError('offline');
+  const silent = prompt === 'none';
   return new Promise((resolve, reject) => {
-    const timer = prompt === 'none' && silentTimeoutMs > 0 ? setTimeout(() => reject(driveError('timeout')), silentTimeoutMs) : null;
+    const timer = silent && silentTimeoutMs > 0 ? setTimeout(() => reject(driveError('timeout')), silentTimeoutMs) : null;
     const done = (fn) => (v) => {
       clearTimeout(timer);
       fn(v);
@@ -126,10 +130,11 @@ export async function requestDriveAccess({ clientId = GOOGLE_CLIENT_ID, enabled 
         if (ok) {
           setDriveToken(resp.access_token, resp.expires_in); // kept for this session only: it is what the silent backup uses
           resolve({ granted: true });
-        } else reject(driveError('denied'));
+        } else reject(driveError(silent ? 'interaction_required' : 'denied'));
       },
-      // the pop-up could not open (blocked, in-app browser): the caller falls back to a full-page redirect
-      error_callback: (e) => reject(driveError(e?.type === 'popup_failed_to_open' ? 'popup' : 'denied')),
+      // interactive: the pop-up could not open (blocked, in-app browser): the caller (a tap) falls back to a full-page redirect.
+      // silent: ANY error means "needs the user": abort, never a window.
+      error_callback: (e) => reject(driveError(silent ? 'interaction_required' : e?.type === 'popup_failed_to_open' ? 'popup' : 'denied')),
     });
     client.requestAccessToken({ prompt });
   });
@@ -137,18 +142,24 @@ export async function requestDriveAccess({ clientId = GOOGLE_CLIENT_ID, enabled 
 
 /**
  * A valid Drive token for the silent backup / restore. Uses the one already held; otherwise asks Google:
- * `interactive: false` never shows a screen (works only while Google still remembers the consent, else resolves
- * null), `interactive: true` may open the consent pop-up (call it from a tap). Never throws.
+ *   `interactive: false` (boot, background worker, 401 renewal): SILENT OR ABORT. One request with `prompt: 'none'`; when Google answers that it
+ *   needs the user (interaction_required, consent_required...) or the request cannot finish, it resolves null, remembers it
+ *   (driveToken "needs interaction") and does NOT ask again by itself: no window of accounts.google.com can open from here, ever.
+ *   `interactive: true` may open the Google window: ONLY from a tap of the user ("Enviar a Drive", "Reconectar Drive", "Respaldar ahora").
+ * Never throws.
  */
 export async function ensureDriveToken({ interactive = false, request = requestDriveAccess, hint = '' } = {}) {
   const held = getDriveToken();
   if (held) return held;
+  if (!interactive && needsDriveInteraction()) return null; // Google already said it needs the user: abort quietly, no request at all
   // ONE request at a time (single flight): a backup round and a 401 renewal asking together share the same answer
   const key = interactive ? 'interactive' : 'silent';
   renewals[key] ??= (async () => {
     try {
       await request({ prompt: interactive ? '' : 'none', ...(hint ? { hint } : {}) });
-    } catch {
+    } catch (err) {
+      // not offline / not configured: Google is there and cannot give a token without the user (or never answered): park until a tap
+      if (!interactive && ['interaction_required', 'denied', 'timeout', 'popup'].includes(err?.code)) markDriveNeedsInteraction();
       return null;
     } finally {
       renewals[key] = null;
