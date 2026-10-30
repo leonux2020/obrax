@@ -60,7 +60,7 @@ export function normalizeReceipt(raw) {
 }
 
 /** Review rows -> expense records ready to store in the project (the user may have edited / unticked rows). */
-export function expensesFromRows(rows, { supplier = '', now = Date.now() } = {}) {
+export function expensesFromRows(rows, { supplier = '', date = '', currency = '', now = Date.now() } = {}) {
   return rows
     .filter((r) => r.selected && r.amount > 0)
     .map((r) => ({
@@ -72,6 +72,11 @@ export function expensesFromRows(rows, { supplier = '', now = Date.now() } = {})
       category: r.category,
       returnDate: RENTAL_CATEGORIES.includes(r.category) ? r.returnDate || '' : '',
       returned: false,
+      // the transcription for the spreadsheet: date printed on the receipt, its currency, and the quantity / unit price of the line
+      ...(DAY_RE.test(date) ? { date } : {}),
+      ...(/^[A-Z]{3}$/.test(currency) ? { currency } : {}),
+      ...(r.quantity > 0 ? { quantity: r.quantity } : {}),
+      ...(r.unitPrice > 0 ? { unitPrice: r.unitPrice } : {}),
     }));
 }
 

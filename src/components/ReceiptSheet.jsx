@@ -85,7 +85,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, prepareImage = 
   const chosen = rows.filter((r) => r.selected && r.amount > 0);
   const total = chosen.reduce((s, r) => s + r.amount, 0);
 
-  const save = () => onSave(expensesFromRows(rows, { supplier: receipt?.supplier ?? '', now: typeof today === 'function' ? today() : today }), image ? { image } : {});
+  const save = () => onSave(expensesFromRows(rows, { supplier: receipt?.supplier ?? '', date: receipt?.date ?? '', currency: receipt?.currency ?? '', now: typeof today === 'function' ? today() : today }), image ? { image } : {});
 
   return (
     <BottomSheet fullscreen title={t('rcpt.title')} subtitle={t('rcpt.subtitle')} onClose={onClose}>

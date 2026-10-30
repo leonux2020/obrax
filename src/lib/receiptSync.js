@@ -76,7 +76,7 @@ export function drainReceiptQueue({ queue = receiptQueue, apply, request = reque
           result.review.push(row);
           continue;
         }
-        const expenses = expensesFromRows(toRows(receipt), { supplier: receipt.supplier, now: now() });
+        const expenses = expensesFromRows(toRows(receipt), { supplier: receipt.supplier, date: receipt.date, currency: receipt.currency, now: now() });
         const applied = await apply(row.projectId, expenses, row);
         await queue.remove(row.id); // applied, or the project is gone: either way the picture is no longer needed
         if (applied) result.done.push({ row, count: expenses.length });
@@ -112,7 +112,7 @@ export async function acceptReviewed(row, { queue = receiptQueue, apply, now = D
     await queue.remove(row.id);
     return 0;
   }
-  const expenses = expensesFromRows(toRows(receipt), { supplier: receipt.supplier || '', now: now() });
+  const expenses = expensesFromRows(toRows(receipt), { supplier: receipt.supplier || '', date: receipt.date || '', currency: receipt.currency || '', now: now() });
   const applied = await apply(row.projectId, expenses, row);
   await queue.remove(row.id);
   return applied ? expenses.length : 0;

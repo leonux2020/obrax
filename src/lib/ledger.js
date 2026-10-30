@@ -79,6 +79,11 @@ export const normalizeExpenses = (raw) =>
       // only rented tools / machinery have a day to give them back
       returnDate: rental ? day(p.returnDate) : '',
       returned: rental && p.returned === true,
+      // transcription of the receipt line (all optional; older records have none): printed date, ISO currency, quantity, unit price
+      ...(day(p.date) ? { date: day(p.date) } : {}),
+      ...(typeof p.currency === 'string' && /^[A-Za-z]{3}$/.test(p.currency.trim()) ? { currency: p.currency.trim().toUpperCase() } : {}),
+      ...(amount(p.quantity) !== null ? { quantity: amount(p.quantity) } : {}),
+      ...(amount(p.unitPrice) !== null ? { unitPrice: amount(p.unitPrice) } : {}),
       // the photo of the receipt these lines came from (a Blob in IndexedDB, see receiptPhotos.js); several lines can share one
       ...(typeof p.receiptId === 'string' && RECEIPT_ID_RE.test(p.receiptId) ? { receiptId: p.receiptId } : {}),
     };

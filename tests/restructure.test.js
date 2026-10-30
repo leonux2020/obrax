@@ -312,7 +312,7 @@ describe('rendición (individual and consolidated Excel)', () => {
     const p = project('Casa');
     const sheets = buildRenditionSheets([p], new Map([[p.id, null]]), { t, locale: 'es', currency: 'CLP' });
     expect(sheets).toHaveLength(5);
-    expect(sheets[1].rows[0]).toHaveLength(7);
+    expect(sheets[1].rows[0]).toHaveLength(10);
     expect(sheets[1].rows).toHaveLength(2);
     expect(sheets[0].rows.flat().some((c) => c && c.v === 'Casa' || c === 'Casa')).toBe(true);
   });
@@ -322,7 +322,7 @@ describe('rendición (individual and consolidated Excel)', () => {
     const b = project('Dos');
     const totals = new Map([[a.id, 1000], [b.id, 2000]]);
     const same = buildRenditionSheets([a, b], totals, { t, locale: 'es', currency: '' });
-    expect(same[1].rows[0]).toHaveLength(8);
+    expect(same[1].rows[0]).toHaveLength(11);
     const last = same[0].rows.at(-1);
     expect(last[0].v).toBe(t('xl.total'));
     expect(last[3].v).toBe(3000);
@@ -330,6 +330,45 @@ describe('rendición (individual and consolidated Excel)', () => {
     const mixed = buildRenditionSheets([a, c], new Map([[a.id, 1], [c.id, 1]]), { t, locale: 'es', currency: '' });
     expect(mixed[0].rows.at(-1)[0]).not.toEqual(expect.objectContaining({ v: t('xl.total') }));
     expect(mixed[0].rows.some((r) => r[2] === 'PEN')).toBe(true);
+  });
+
+  it('Excel line by line: printed date, shop, product, type, quantity, unit price, line total and currency', () => {
+    const receipt = normalizeReceipt({
+      isReceipt: true,
+      currency: 'clp',
+      supplier: 'Lider',
+      receiptDate: '2026-10-29',
+      purchaseType: 'food',
+      items: [
+        { description: 'Pan', quantity: 5, unitPriceText: '1.000', amountText: '5.000', category: 'food' },
+        { description: 'Bencina', amountText: '7.500', category: 'transport' },
+      ],
+    });
+    const stored = normalizeExpenses(expensesFromRows(receipt.items.map((it, i) => ({ ...it, key: `r${i}`, selected: true })), { supplier: receipt.supplier, date: receipt.date, currency: receipt.currency, now: NOW }));
+    expect(stored[0]).toMatchObject({ supplier: 'Lider', date: '2026-10-29', currency: 'CLP', quantity: 5, unitPrice: 1000, amount: 5000, category: 'food' });
+    expect(stored[1]).toMatchObject({ date: '2026-10-29', currency: 'CLP', amount: 7500, category: 'transport' });
+    expect(stored[1]).not.toHaveProperty('quantity');
+
+    const p = project('Casa');
+    p.expenses = stored;
+    const sheet = buildRenditionSheets([p], new Map([[p.id, 1000]]), { t, locale: 'es', currency: 'CLP' })[1];
+    expect(sheet.rows[0].map((c) => c.v)).toEqual([t('xl.date'), t('xl.supplier'), t('xl.description'), t('xl.category'), t('xl.quantity'), t('xl.unitPrice'), t('xl.amount'), t('xl.currency'), t('xl.returnDate'), t('xl.returned')]);
+    const row = sheet.rows[1];
+    expect(row[0]).toMatch(/29/); // the date printed on the receipt, not the day it was scanned
+    expect(row[0]).toMatch(/2026/);
+    expect(row.slice(1, 5)).toEqual(['Lider', 'Pan', t('exp.cat.food'), 5]);
+    expect(row[5]).toMatchObject({ v: 1000, money: true });
+    expect(row[6]).toMatchObject({ v: 5000, money: true });
+    expect(row[7]).toBe('CLP');
+    expect(sheet.rows[2].slice(4, 6)).toEqual(['', '']); // no quantity / unit price printed: empty cells, not zeros
+    expect(sheet.widths).toHaveLength(10);
+  });
+
+  it('older expenses (no date / currency) still export: saved day and the project currency', () => {
+    const p = project('Casa');
+    const row = buildRenditionSheets([p], new Map([[p.id, 1000]]), { t, locale: 'es', currency: 'CLP' })[1].rows[1];
+    expect(row[7]).toBe('CLP');
+    expect(row[4]).toBe('');
   });
 
   it('buildRenditionFile returns a real .xlsx File with a safe name', async () => {

@@ -11,6 +11,8 @@ const money = (v, bold = false) => ({ v, money: true, bold });
 const bold = (v) => ({ v, bold: true });
 
 const when = (ms, locale) => (ms ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(ms)) : '');
+// the date PRINTED on a receipt ('YYYY-MM-DD', no time zone: read at noon so no zone can move the day)
+const whenDay = (iso, locale) => (/^\d{4}-\d{2}-\d{2}$/.test(iso || '') ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(`${iso}T12:00:00`)) : '');
 
 /** Cash balance of one project: collected - expenses - advances to workers. */
 export function projectBalance(project, budget) {
@@ -73,13 +75,15 @@ export function buildRenditionSheets(projects, totals, { t, locale = 'es', curre
   }
 
   // ---- detail sheets ---------------------------------------------------------------------------------------
-  const expenses = [[...projCol, head(t('xl.date')), head(t('xl.supplier')), head(t('xl.description')), head(t('xl.category')), head(t('xl.amount')), head(t('xl.returnDate')), head(t('xl.returned'))]];
+  const expenses = [[...projCol, head(t('xl.date')), head(t('xl.supplier')), head(t('xl.description')), head(t('xl.category')), head(t('xl.quantity')), head(t('xl.unitPrice')), head(t('xl.amount')), head(t('xl.currency')), head(t('xl.returnDate')), head(t('xl.returned'))]];
   const payments = [[...projCol, head(t('xl.date')), head(t('xl.note')), head(t('xl.amount'))]];
   const advances = [[...projCol, head(t('xl.date')), head(t('xl.worker')), head(t('xl.amount'))]];
   const logbook = [[...projCol, head(t('xl.date')), head(t('xl.entry'))]];
   for (const p of projects) {
     for (const e of p.expenses) {
-      expenses.push(withProject([when(e.at, locale), e.supplier, e.description, t(`exp.cat.${e.category}`), money(e.amount), e.returnDate, e.returnDate ? t(e.returned ? 'common.yes' : 'common.no') : ''], p));
+      // one row per receipt line: printed date (else the day it was saved), shop, product, type, quantity, unit price, line total, currency
+      const cur = e.currency || getRegion(p.draft.regionCode)?.currency || currency;
+      expenses.push(withProject([whenDay(e.date, locale) || when(e.at, locale), e.supplier, e.description, t(`exp.cat.${e.category}`), e.quantity ?? '', e.unitPrice ? money(e.unitPrice) : '', money(e.amount), cur, e.returnDate, e.returnDate ? t(e.returned ? 'common.yes' : 'common.no') : ''], p));
     }
     for (const x of p.payments) payments.push(withProject([when(x.at, locale), x.note, money(x.amount)], p));
     for (const x of p.advances) advances.push(withProject([when(x.at, locale), x.worker, money(x.amount)], p));
@@ -88,7 +92,7 @@ export function buildRenditionSheets(projects, totals, { t, locale = 'es', curre
 
   return [
     { name: t('xl.sheet.summary'), rows: summary, widths: single ? [22, 28] : [28, 22, 10, 16, 16, 16, 16, 16, 16] },
-    { name: t('xl.sheet.expenses'), rows: expenses, widths: widthsWith([14, 20, 36, 18, 14, 14, 10]) },
+    { name: t('xl.sheet.expenses'), rows: expenses, widths: widthsWith([14, 24, 36, 22, 10, 14, 14, 9, 14, 10]) },
     { name: t('xl.sheet.payments'), rows: payments, widths: widthsWith([14, 36, 14]) },
     { name: t('xl.sheet.advances'), rows: advances, widths: widthsWith([14, 26, 14]) },
     { name: t('xl.sheet.logbook'), rows: logbook, widths: widthsWith([14, 80]) },
