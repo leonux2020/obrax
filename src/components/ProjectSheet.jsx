@@ -1,11 +1,13 @@
 import { useId, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
-import { currentPosition } from '../lib/geo.js';
+import { currentPosition, detectCurrentRegion } from '../lib/geo.js';
+import { REGIONS } from '../lib/regions.js';
 import { locationLabel, normalizeLocation } from '../lib/ledger.js';
 import { cleanCityOrRegion, isClosed, parseDay, toDayString } from '../lib/projects.js';
 import { sanitizeText } from '../lib/sanitize.js';
 import { Button, DateInput, Switch, TextField } from './ui.jsx';
 import BottomSheet from './BottomSheet.jsx';
+import RegionCombobox from './RegionCombobox.jsx';
 
 function DateField({ label, value, onChange, invalid }) {
   const id = useId();
@@ -40,7 +42,7 @@ const ModeIcon = ({ mode }) => (
  * New job: the agile form (name, client, Partida Única / Proyecto Completo, dates, "ubicación actual"), no money.
  * Edit job (the pencil inside the project): the same fields + finished / frozen switches + delete.
  */
-export default function ProjectSheet({ project, onSave, onDelete, onClose, locate = currentPosition }) {
+export default function ProjectSheet({ project, onSave, onDelete, onClose, locate = currentPosition, detectRegion = detectCurrentRegion, defaultRegion = null }) {
   const { t } = useI18n();
   const editing = Boolean(project);
   const [form, setForm] = useState(() => ({
@@ -51,6 +53,8 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
     endDate: project?.endDate ?? '',
     location: project?.location ?? null,
     cityOrRegion: project?.cityOrRegion ?? '',
+    // market of a NEW job: where the device is right now (time zone / language), only then the stored default
+    regionCode: project ? project.draft.regionCode : [detectRegion(), defaultRegion].find((c) => REGIONS[c]) ?? null,
     closed: project ? isClosed(project) : false,
     unfreeze: false,
   }));
@@ -86,6 +90,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
       endDate: end ? form.endDate : '',
       location: form.location,
       cityOrRegion: cleanCityOrRegion(form.cityOrRegion),
+      ...(editing || !form.regionCode ? {} : { regionCode: form.regionCode }),
       closed: form.closed,
       unfreeze: form.unfreeze,
     });
@@ -134,6 +139,17 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
           <p role="alert" className="text-sm font-semibold text-red-400">
             {t('proj.endBeforeStart')}
           </p>
+        )}
+
+        {!editing && (
+          <div data-testid="project-market">
+            <RegionCombobox label={t('newp.market')} value={form.regionCode} onChange={set('regionCode')} />
+            {REGIONS[form.regionCode] && (
+              <p className="mt-1.5 text-sm text-neutral-300" data-testid="project-market-hint">
+                {REGIONS[form.regionCode].flag} {REGIONS[form.regionCode].currency}
+              </p>
+            )}
+          </div>
         )}
 
         <TextField label={t('project.city')} placeholder={t('project.city.ph')} value={form.cityOrRegion} maxLength={80} testId="project-city" sanitize={(v) => sanitizeText(v, 80)} onChange={set('cityOrRegion')} />

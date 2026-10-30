@@ -8,7 +8,7 @@ const pct = (rate) => `${Math.round(rate * 1000) / 10}%`;
  * Compact, searchable country combobox (WAI-ARIA 1.2 pattern). One line when closed; the list opens
  * as an overlay, so it takes no vertical space. Filters by country (es/en), ISO code, currency or chain.
  */
-export default function RegionCombobox({ value, onChange, hideLabel = false }) {
+export default function RegionCombobox({ value, onChange, hideLabel = false, label }) {
   const { t, lang } = useI18n();
   const id = useId();
   const listId = `${id}-list`;
@@ -78,7 +78,7 @@ export default function RegionCombobox({ value, onChange, hideLabel = false }) {
   return (
     <div className="relative">
       <label htmlFor={`${id}-input`} className={hideLabel ? 'sr-only' : 'label'}>
-        {t('region.title')}
+        {label || t('region.title')}
       </label>
       <div className="relative">
         <input

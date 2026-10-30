@@ -53,7 +53,8 @@ function write(key, value) {
 export function normalizeSettings(obj) {
   const region = obj && typeof obj.region === 'string' && REGIONS[obj.region] ? obj.region : null;
   const fallbackLang = region ? REGIONS[region].lang : 'es';
-  return { region, lang: oneOf(obj?.lang, LANGS, fallbackLang) };
+  // `langLocked`: the user CHOSE the language (it then stops following the device's); only stored when true
+  return { region, lang: oneOf(obj?.lang, LANGS, fallbackLang), ...(obj?.langLocked === true ? { langLocked: true } : {}) };
 }
 export const loadSettings = () => normalizeSettings(read(KEYS.settings));
 export const saveSettings = (s) => write(KEYS.settings, s);

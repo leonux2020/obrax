@@ -7,13 +7,13 @@ import { projectStore } from './lib/projectStore.js';
 import { logoStore } from './lib/companyStore.js';
 import { hasIndexedDb } from './lib/db.js';
 import { I18nProvider, makeI18n } from './lib/i18n.jsx';
-import { getRegion, LANGS } from './lib/regions.js';
+import { getRegion, LANGS, REGIONS } from './lib/regions.js';
 import { wipeLocalData } from './lib/session.js';
 import { adoptCompany, cleanCityOrRegion, documentCompany, isClosed, newExtension, newProject, projectTitle, toDayString } from './lib/projects.js';
 import { normalizeLocation } from './lib/ledger.js';
 import { computeAll } from './lib/engine.js';
 import { planningTimeline, pricingTime } from './lib/signature.js';
-import { detectLang, detectRegionCode } from './lib/geo.js';
+import { detectCurrentRegion, detectLang, languageFor } from './lib/geo.js';
 import { sanitizeText } from './lib/sanitize.js';
 import {
   loadSettings,
@@ -119,7 +119,12 @@ const projectCompany = (project, company) => documentCompany(project.company, co
 export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart }) {
   const pwa = usePWA();
   const pro = usePro();
-  const [settings, setSettings] = useState(loadSettings);
+  // The interface follows the device's language (an Italian phone gets Italian) unless the user locked a language in the settings.
+  const [settings, setSettings] = useState(() => {
+    const stored = loadSettings();
+    const lang = languageFor(stored);
+    return lang === stored.lang ? stored : { ...stored, lang };
+  });
   const [user, setUser] = useState(loadUser);
   const [company, setCompany] = useState(loadCompany); // global profile (text); the logo lives in IndexedDB
   const [logo, setLogo] = useState('');
@@ -282,6 +287,12 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   useEffect(() => {
     document.documentElement.lang = settings.lang;
   }, [settings.lang]);
+  // the phone's language changed while the app was open (and the user never locked one): follow it
+  useEffect(() => {
+    const follow = () => setSettings((s) => (languageFor(s) === s.lang ? s : { ...s, lang: languageFor(s) }));
+    window.addEventListener('languagechange', follow);
+    return () => window.removeEventListener('languagechange', follow);
+  }, []);
 
   // ---- boot: logo + projects (+ one-off migration of the pre-dashboard single draft) ----------------
   useEffect(() => {
@@ -427,7 +438,8 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   // "Proyecto completo" starts with "+ Agregar partida". (Legacy flow, ?workspace=0: the wizard opens first, then ProjectView.)
   const createProject = (fields) => {
     // The company profile is COPIED into the new project: later profile changes never rewrite it.
-    const created = newProject({ regionCode: settings.region, company, logo, ...fields });
+    // the market of a new job is the one picked in the form (it starts with where the device is NOW), never blindly the stored one
+    const created = newProject({ company, logo, ...fields, regionCode: REGIONS[fields.regionCode] ? fields.regionCode : settings.region });
     const project = { ...created, draft: { ...created.draft, step: created.draft.mode === 'project' ? 1 : 0 } };
     commit(project);
     setSheet(null);
@@ -509,13 +521,14 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     (code) => {
       const r = getRegion(code);
       const changed = code !== settings.region;
-      setSettings({ region: code, lang: changed ? r.lang : settings.lang });
+      setSettings((s) => ({ ...s, region: code, lang: changed && !s.langLocked ? r.lang : s.lang }));
       setPickingRegion(false);
     },
-    [settings]
+    [settings.region]
   );
 
-  const changeLang = useCallback((lang) => LANGS.includes(lang) && setSettings((s) => ({ ...s, lang })), []);
+  // an explicit choice of language LOCKS it: from then on the device's language no longer overrides it
+  const changeLang = useCallback((lang) => LANGS.includes(lang) && setSettings((s) => ({ ...s, lang, langLocked: true })), []);
   // Freemium gate for new projects: past the free limit the PRO screen opens instead of the form.
   const requestNewProject = useCallback(() => {
     if (projectLimitReached(projects?.length ?? 0, pro)) {
@@ -703,8 +716,8 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   const start = () => {
     if (user || returning) return setStage('app');
     if (!settings.region) {
-      const code = detectRegionCode();
-      if (code) setSettings({ region: code, lang: detectLang(getRegion(code).lang) });
+      const code = detectCurrentRegion();
+      if (code) setSettings((s) => ({ ...s, region: code, lang: s.langLocked ? s.lang : detectLang(getRegion(code).lang) }));
     }
     return setStage('setup');
   };
@@ -826,7 +839,7 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
             </>
           )}
 
-          {sheet?.type === 'new' && <ProjectSheet onSave={createProject} onClose={() => setSheet(null)} />}
+          {sheet?.type === 'new' && <ProjectSheet defaultRegion={settings.region} onSave={createProject} onClose={() => setSheet(null)} />}
           {editing && (
             <ProjectSheet project={editing} onSave={(f) => editProject(editing, f)} onDelete={() => deleteProject(editing.id)} onClose={() => setSheet(null)} />
           )}
