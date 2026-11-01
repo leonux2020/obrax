@@ -16,6 +16,7 @@ T = {
  'setup.continue': ['Continuar', 'Continue', 'Continuar', 'Continuer', 'Continua', 'Weiter'],
  # nav / dashboard
  'nav.accounting': ['Contabilidad Global', 'Global Accounting', 'Contabilidade Global', 'Comptabilité globale', 'Contabilità globale', 'Gesamtbuchhaltung'],
+ 'nav.accountingShort': ['Contabilidad', 'Accounting', 'Contabilidade', 'Comptabilité', 'Contabilità', 'Buchhaltung'],  # bottom navigation label (the page title stays nav.accounting)
  'dash.tab.active': ['Activos', 'Active', 'Ativos', 'Actifs', 'Attivi', 'Aktiv'],
  'dash.tab.history': ['Historial', 'History', 'Histórico', 'Historique', 'Storico', 'Verlauf'],
  'dash.empty.active': ['Toca + para crear tu primera obra.', 'Tap + to create your first job.', 'Toque em + para criar sua primeira obra.', 'Touchez + pour créer votre premier chantier.', 'Tocca + per creare il tuo primo cantiere.', 'Tippen Sie auf +, um Ihre erste Baustelle anzulegen.'],

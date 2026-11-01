@@ -6,7 +6,6 @@ import { Logo, Wordmark } from './ui.jsx';
 import HelmetIcon from './HelmetIcon.jsx';
 import { LEVEL_COLOR } from './levelStyle.js';
 import ProjectCard from './ProjectCard.jsx';
-import ProQaTag from './ProQaTag.jsx';
 
 /** Re-render once a minute (and when the tab becomes visible) so the traffic lights never go stale. */
 function useNow(intervalMs = 60_000) {
@@ -62,7 +61,7 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro }
 
   return (
     <main className="mx-auto w-full max-w-3xl px-3 pb-44 pt-3 sm:px-4">
-      <header className="mb-2 flex items-center gap-3">
+      <header className="mb-3 flex items-center gap-3">
         {/* isotype (32 px tall) + name, aligned on one line */}
         <Logo size={32} />
         <span className="sr-only">{t('app.name')}</span>
@@ -84,10 +83,8 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro }
           <span className="text-[11px] font-extrabold leading-none tracking-widest">PRO</span>
         </button>
       </header>
-      <h1 className="mb-1 truncate text-2xl font-extrabold tracking-tight">{t('nav.projects')}</h1>
-      <p className="mb-3 min-h-[12px]">
-        <ProQaTag />
-      </p>
+      {/* no visible title and no "MODO PRO (Prueba)" tag: top bar (logo + PRO) and, right below, the four triangles. The heading stays for screen readers. */}
+      <h1 className="sr-only">{t('nav.projects')}</h1>
 
       {active.length > 0 && (
         <ul className="mb-3 flex items-center justify-around" data-testid="dash-pills" aria-label={t('light.label')}>
@@ -125,9 +122,13 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro }
             aria-selected={tab === id}
             data-testid={`tab-${id}`}
             onClick={() => onTab(id)}
-            className={`min-h-[48px] border-b-2 text-base font-bold transition ${tab === id ? 'border-brand text-white' : 'border-transparent text-neutral-400 hover:text-white'}`}
+            className={`min-h-[48px] border-b-2 text-base font-bold transition ${
+              tab === id
+                ? `text-white ${id === 'history' ? 'border-neutral-500' : 'border-brand'}` // Activos: green; Historial: cement grey (closed work is not "go")
+                : 'border-transparent text-neutral-500 hover:text-neutral-300' // the section you are NOT in is dimmed
+            }`}
           >
-            {t(key)} <span className="text-sm font-semibold text-neutral-400">{n}</span>
+            {t(key)} <span className={`text-sm font-semibold ${tab === id ? 'text-neutral-400' : 'text-neutral-600'}`}>{n}</span>
           </button>
         ))}
       </div>

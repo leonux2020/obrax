@@ -173,11 +173,11 @@ describe('after onboarding, the profile lives only in Ajustes', () => {
   }
   const tab = (name) => [...host.querySelectorAll('nav button')].find((b) => b.textContent.includes(name));
 
-  it('the bottom nav has Proyectos / Contabilidad Global / Ajustes: no "Empresa" shortcut and no "Nuevo" (that is the FAB)', async () => {
+  it('the bottom nav has Proyectos / Contabilidad / Ajustes: no "Empresa" shortcut and no "Nuevo" (that is the FAB)', async () => {
     await onboarded();
     expect(q('splash')).toBeNull();
     const labels = [...host.querySelectorAll('nav button')].map((b) => b.textContent.trim());
-    expect(labels).toEqual(['Proyectos', 'Contabilidad Global', 'Ajustes']);
+    expect(labels).toEqual(['Proyectos', 'Contabilidad', 'Ajustes']);
     expect(q('fab-new')).not.toBeNull();
     expect(read('components/BottomNav.jsx')).not.toContain('onCompany');
   });

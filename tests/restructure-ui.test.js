@@ -78,7 +78,16 @@ describe('Dashboard: counters instead of sentences, tabs, full-width clickable c
   it('shows red / orange / green / blue counters for ACTIVE projects only, with no status sentence', async () => {
     await render(React.createElement(Harness, { onOpen: () => {}, onNew: () => {} }));
     expect(['red', 'orange', 'green', 'future'].map((l) => q(`pill-${l}`).getAttribute('data-count'))).toEqual(['1', '1', '2', '1']);
+    // no big visible title: the heading survives only for screen readers
     expect(host.querySelector('h1').textContent).toBe('Proyectos');
+    expect(host.querySelector('h1').className).toContain('sr-only');
+    expect(host.querySelector('h1').className).not.toMatch(/text-2xl/);
+    // top bar (logo + PRO) and, right below, the triangles
+    const main = host.querySelector('main');
+    const kids = [...main.children];
+    expect(kids[0].tagName).toBe('HEADER');
+    expect(kids.find((k) => k.getAttribute?.('data-testid') === 'dash-pills')).toBeTruthy();
+    expect(kids.filter((k) => k.tagName !== 'H1').indexOf(kids.find((k) => k.getAttribute?.('data-testid') === 'dash-pills'))).toBe(1);
     expect(host.querySelector('header img, header svg')).not.toBeNull();
     expect(host.textContent).not.toMatch(/proyectos? activos?|tienes \d/i);
   });
@@ -150,6 +159,37 @@ describe('Dashboard: counters instead of sentences, tabs, full-width clickable c
     expect(qa('project-card')[0].getAttribute('data-level')).toBe('closed');
     await click(q('tab-active'));
     expect(qa('project-card')).toHaveLength(5);
+  });
+
+  it('tabs: Activos keeps the green underline, Historial gets a cement-grey one, the inactive tab is dimmed', async () => {
+    await render(React.createElement(Harness, { onOpen: () => {}, onNew: () => {} }));
+    const cls = (id) => q(id).className;
+    expect(cls('tab-active')).toContain('border-brand');
+    expect(cls('tab-active')).toContain('text-white');
+    expect(cls('tab-history')).toContain('border-transparent');
+    expect(cls('tab-history')).toContain('text-neutral-500'); // inactive: dimmed
+    await click(q('tab-history'));
+    expect(cls('tab-history')).toContain('border-neutral-500'); // NOT green
+    expect(cls('tab-history')).not.toContain('border-brand');
+    expect(cls('tab-history')).toContain('text-white');
+    expect(cls('tab-active')).toContain('border-transparent');
+    expect(cls('tab-active')).toContain('text-neutral-500');
+    expect(cls('tab-active')).not.toContain('border-brand');
+    await click(q('tab-active'));
+    expect(cls('tab-active')).toContain('border-brand');
+  });
+
+  it('bottom navigation: the middle label is the short "Contabilidad" (the page keeps its full title), in every language', async () => {
+    const { makeI18n } = await import('../src/lib/i18n.jsx');
+    const short = { es: 'Contabilidad', en: 'Accounting', pt: 'Contabilidade', fr: 'Comptabilité', it: 'Contabilità', de: 'Buchhaltung' };
+    for (const [lang, label] of Object.entries(short)) {
+      expect(makeI18n(lang, 'IT').t('nav.accountingShort')).toBe(label);
+      expect(makeI18n(lang, 'IT').t('nav.accounting')).not.toBe(label); // the title of the screen is unchanged
+    }
+    const fs = await import('node:fs');
+    const src = fs.readFileSync('src/components/BottomNav.jsx', 'utf8');
+    expect(src).toContain("t('nav.accountingShort')");
+    expect(src).toMatch(/text-center/);
   });
 
   it('cards: the whole card is the only button, thick LEFT stripe in the state colour (nothing on the bottom), flag and late days', async () => {

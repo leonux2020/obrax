@@ -46,15 +46,15 @@ describe('PRO paywall open for quality control', () => {
     expect(projectLimitReached(10_000, isPro())).toBe(false);
   });
 
-  it('the Dashboard shows the PRO button as active plus the discreet "MODO PRO (Prueba)" tag', async () => {
+  it('the Dashboard shows the PRO button as active and NO "MODO PRO (Prueba)" text any more (zero-stress header)', async () => {
     vi.stubEnv('MODE', 'production');
     vi.stubEnv('DEV', false);
     await mount(React.createElement(Dashboard, { projects: [], tab: 'active', onTab: () => {}, onNew: () => {}, onOpen: () => {}, onPro: () => {} }));
     expect(q('pro-active')).not.toBeNull();
     expect(q('pro-scan')).toBeNull();
-    expect(q('qa-pro-tag').textContent).toBe(PRO_QA_LABEL);
-    expect(PRO_QA_LABEL).toBe('MODO PRO (Prueba)');
-    expect(q('qa-pro-tag').className).toMatch(/text-\[10px\]/); // very discreet
+    expect(q('qa-pro-tag')).toBeNull();
+    expect(host.textContent).not.toMatch(/MODO PRO/i);
+    expect(PRO_QA_LABEL).toBe('MODO PRO (Prueba)'); // still the reminder of Ajustes
   });
 
   it('Ajustes carries the same reminder', async () => {

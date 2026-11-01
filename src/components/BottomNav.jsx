@@ -41,7 +41,7 @@ export default function BottomNav({ active, onProjects, onAccounting, onSettings
             <rect x="14" y="14" width="7" height="7" rx="1.5" />
           </Icon>
         ))}
-        {item('accounting', t('nav.accounting'), onAccounting, (
+        {item('accounting', t('nav.accountingShort'), onAccounting, (
           <Icon>
             <path d="M4 20V10M10 20V4M16 20v-8M22 20H2" />
           </Icon>
