@@ -140,6 +140,16 @@ input[type='range'].slider-min:focus-visible {
   border-radius: 9999px;
 }
 
+/* Opening screen: only its TEXTS fade in (the logo is static, it continues the system splash) */
+@keyframes splash-text-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* Bottom sheet that slides up (swipeToClose sheets) */
 @keyframes sheet-up {
   from {
