@@ -13,14 +13,16 @@ export const SPLASH_TIMING = Object.freeze({ hold: 900, fade: 250 });
 export const TEXT_FADE_MS = 500;
 
 /**
- * Logo height (px) whose WIDTH is ~155 px: the size at which Android Chrome draws the manifest icon on its own splash (w-36 ... w-40).
- * The hard hat of the system splash and this one must be the same size in the same place, so the handoff is invisible.
+ * Side (px) of the square box the logo lives in: exactly 128 px (Tailwind `w-32 h-32`), the size at which Android Chrome draws the
+ * manifest icon on its own splash. The logo fits inside it like `object-fit: contain` (its height fills the box, its width follows its
+ * own ratio, nothing is stretched), with no padding or margin around it, so its optical centre is the centre of the box.
  */
-export const SPLASH_LOGO_SIZE = 176;
+export const SPLASH_LOGO_BOX = 128;
+export const SPLASH_LOGO_SIZE = SPLASH_LOGO_BOX;
 
 /**
  * Opening screen. ALWAYS shown when the app opens (installed or not), designed as the continuation of the system splash (Seamless Handoff):
- *  - the hard-hat logo sits at the exact centre of the screen, at the size of the system icon, STATIC (no entrance animation): the eye
+ *  - the hard-hat logo sits at the exact centre of the screen, in a 128 px box (the system icon size), STATIC (no entrance animation): the eye
  *    keeps seeing the same hat the OS drew;
  *  - only the texts fade in around it (opacity 0 -> 1 in ~500 ms): the CUBRAX lettering (green X) under the logo, and "Un producto Japadigital".
  *  - `auto` (the user already has a profile or a session): it holds for `hold` ms, fades out and calls `onStart`,
@@ -56,16 +58,16 @@ export default function SplashScreen({ onStart, auto = false, timing = SPLASH_TI
 
   return (
     <main
-      className={`relative min-h-[100dvh] w-full transition-opacity ease-out ${leaving ? 'opacity-0' : 'opacity-100'}`}
+      className={`relative flex h-[100dvh] w-screen items-center justify-center overflow-hidden transition-opacity ease-out ${leaving ? 'opacity-0' : 'opacity-100'}`}
       style={{ transitionDuration: `${timing.fade}ms` }}
       data-testid="splash"
       data-leaving={leaving ? 'true' : undefined}
     >
-      {/* absolute centre of the screen: nothing else takes part in its position */}
-      <div className="absolute inset-0 flex items-center justify-center" data-testid="splash-logo">
+      {/* the 128 px box is the ONLY in-flow child: the flex centring of the real viewport (100dvh x screen width) puts it at the exact centre */}
+      <div className="flex h-32 w-32 shrink-0 items-center justify-center" style={{ width: SPLASH_LOGO_BOX, height: SPLASH_LOGO_BOX }} data-testid="splash-logo">
         <Logo size={SPLASH_LOGO_SIZE} />
       </div>
-      {/* the lettering hangs under the centred logo without moving it */}
+      {/* the texts are position:absolute, out of the flow: they hang under the logo and can never push its centre */}
       <h1 data-testid="splash-name" className="absolute inset-x-0 top-1/2 flex justify-center text-center" style={{ marginTop: `${Math.round(SPLASH_LOGO_SIZE / 2) + 28}px`, ...fadeIn }}>
         <span className="sr-only">{t('app.name')}</span>
         <Wordmark height={32} />

@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
-// The opening screen: ALWAYS shown (installed PWA or browser), the continuation of the system splash: static centred logo at the system icon size,
+// The opening screen: ALWAYS shown (installed PWA or browser), the continuation of the system splash: static logo in a 128 px box at the exact centre,
 // only the texts fade in, ~1.15 s in total, then a fade-out into the app (even with a session).
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from '../src/App.jsx';
-import SplashScreen, { SPLASH_TIMING, SPLASH_LOGO_SIZE, TEXT_FADE_MS } from '../src/components/SplashScreen.jsx';
+import SplashScreen, { SPLASH_TIMING, SPLASH_LOGO_SIZE, SPLASH_LOGO_BOX, TEXT_FADE_MS } from '../src/components/SplashScreen.jsx';
 import { I18nProvider } from '../src/lib/i18n.jsx';
 
 let host;
@@ -129,21 +129,28 @@ describe('seamless handoff with the system splash', () => {
     expect(TEXT_FADE_MS).toBeLessThan(SPLASH_TIMING.hold);
   });
 
-  it('the logo is ~144-160 px wide, at the absolute centre, and STATIC (no animation anywhere on it)', async () => {
+  it('the logo lives in an exact 128 px box, at the absolute centre of a 100dvh x screen-width viewport, and is STATIC', async () => {
     seed();
     await mount(React.createElement(App));
-    const wrap = q('splash-logo');
-    expect(wrap.className).toMatch(/absolute/);
-    expect(wrap.className).toMatch(/inset-0/);
-    expect(wrap.className).toMatch(/items-center/);
-    expect(wrap.className).toMatch(/justify-center/);
-    const svgs = [...wrap.querySelectorAll('svg')];
-    expect(svgs.length).toBeGreaterThan(0);
-    const width = Number(svgs[0].getAttribute('width'));
-    expect(width).toBeGreaterThanOrEqual(144);
-    expect(width).toBeLessThanOrEqual(160);
-    expect(SPLASH_LOGO_SIZE).toBeLessThan(216); // it used to be 216 px high (~190 wide): the jump
-    for (const el of [wrap, ...wrap.querySelectorAll('*')]) {
+    const root = q('splash');
+    for (const c of ['h-[100dvh]', 'w-screen', 'flex', 'items-center', 'justify-center', 'relative', 'overflow-hidden']) expect(root.className.split(/\s+/)).toContain(c);
+    const box = q('splash-logo');
+    expect(SPLASH_LOGO_BOX).toBe(128);
+    expect(box.className.split(/\s+/)).toEqual(expect.arrayContaining(['w-32', 'h-32', 'flex', 'items-center', 'justify-center']));
+    expect(box.style.width).toBe('128px');
+    expect(box.style.height).toBe('128px');
+    expect(box.parentElement).toBe(root); // in-flow child of the centring flex container
+    expect(box.className).not.toMatch(/\b(p|m|px|py|pt|pb|mt|mb|ml|mr|absolute)-?/);
+    // the logo fits the box (contain): never taller or wider than 128, nothing offsets it
+    const logo = box.querySelector('[data-testid="logo"]');
+    expect(SPLASH_LOGO_SIZE).toBe(128);
+    expect(parseFloat(logo.style.height)).toBeLessThanOrEqual(128);
+    expect(parseFloat(logo.style.width)).toBeLessThanOrEqual(128);
+    expect(logo.className).not.toMatch(/\b(p|m|px|py|pt|pb|mt|mb|ml|mr)-/);
+    expect(logo.style.margin || '').toBe('');
+    expect(logo.style.padding || '').toBe('');
+    expect(box.querySelector('[data-testid="logo-helmet"]').style.objectFit).toBe('contain');
+    for (const el of [box, ...box.querySelectorAll('*')]) {
       expect(el.style.animation || '').toBe('');
       expect(el.className?.baseVal ?? el.className).not.toMatch(/animate|transition/);
     }
@@ -158,7 +165,8 @@ describe('seamless handoff with the system splash', () => {
     }
     expect(q('splash-logo').style.animation).toBe('');
     // the lettering hangs under the logo without taking part in its position
-    expect(q('splash-name').className).toContain('absolute');
+    for (const id of ['splash-name']) expect(q(id).className.split(/\s+/)).toContain('absolute');
+    expect(q('splash-logo').className).not.toContain('absolute'); // the logo is the only in-flow child: the texts cannot push it
   });
 
   it('without timing (tests) nothing animates at all', async () => {
