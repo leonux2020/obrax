@@ -16,7 +16,7 @@ import { flushUserPrices } from '../src/lib/priceFeed.js';
 import { resetToasts } from '../src/lib/notify.js';
 import { freezeQuote } from '../src/lib/signature.js';
 import { runExport } from '../src/lib/exportActions.js';
-import { crewModel, rentRows, toggleMachine, withCrew, withCrewAuto, withDeadlineDays, withMachinery } from '../src/lib/workspaceModel.js';
+import { crewModel, partidaMachines, rentRows, setMachineOn, toggleMachine, withCrew, withCrewAuto, withDeadlineDays, withMachinery } from '../src/lib/workspaceModel.js';
 import { MACHINE_IDS } from '../src/lib/machinery.js';
 import { DICT } from '../src/lib/dict.js';
 
@@ -214,34 +214,78 @@ describe('Cuadrilla y cronograma (numpad, no OS keyboard)', () => {
   });
 });
 
-// The module has no button any more (its flow will be absorbed by another one): MachineryBlock stays in the repo, these come back with it.
-describe.skip('Maquinaria y arriendos (numpad + real time)', () => {
+describe('Maquinaria en uso, inside the task (numpad + real time)', () => {
+  it('the task lists its machines (icon, name, qty x days, rate, state); the module is gone from the main list', async () => {
+    await mount(mk());
+    expect(q('ws-machinery')).toBeNull(); // no module of its own...
+    const box = q('partida-machinery-0'); // ...it lives inside the task
+    expect(box.closest('[data-testid="partida-0"]')).not.toBeNull();
+    expect(box.textContent).toContain('Maquinaria en uso');
+    const row = q('partida-machine-0-mixer');
+    expect(row.dataset.included).toBe('true');
+    expect(row.querySelector('svg[data-outline-icon="true"]').getAttribute('stroke')).toBe('currentColor');
+    expect(row.textContent).toContain('Trompo hormigonero');
+    expect(row.textContent).toContain('En uso');
+    expect(row.textContent).toMatch(/1 × \d+ d × /); // quantity x days x rate
+    expect(q('partida-machine-rate-0-mixer').textContent).toMatch(/\d/);
+    expect(box.className).not.toMatch(/bg-/); // black background, no boxes
+    expect(row.className).not.toMatch(/font-(bold|extrabold|black|semibold)/); // regular weights
+    for (const el of box.querySelectorAll('*')) expect(String(el.className?.baseVal ?? el.className)).not.toMatch(/font-(bold|extrabold|black|semibold)/);
+  });
+
   it('the daily rate is typed on the pad: the quote recalculates at once and it is saved as the user rate', async () => {
     await mount(mk());
-    expect(q('ws-machinery').tagName).toBe('DETAILS');
-    expect(q('rent-mixer')).not.toBeNull();
     const total0 = q('ws-total').textContent;
-    await click(q('rent-rate-mixer'));
+    await click(q('partida-machine-rate-0-mixer'));
     expect(q('rent-pad')).not.toBeNull();
     await keys('99999');
     expect(q('ws-total').textContent).not.toBe(total0);
     expect(currentBook('CL')?.user?.rent?.mixer).toBe(99999);
-    expect(q('rent-rate-mixer').dataset.source).toBe('saved');
+    expect(q('partida-machine-rate-0-mixer').dataset.source).toBe('saved');
     await click(q('pad-reset'));
     expect(currentBook('CL')?.user?.rent?.mixer).toBeUndefined();
     await click(q('pad-done'));
     await flushUserPrices();
   });
 
-  it('master and per-machine switches change the quote', async () => {
+  it('removing / adding a machine from the task changes the quote; adding it back after "all off" re-enables only that one', async () => {
     await mount(mk());
     const total0 = q('ws-total').textContent;
-    await click(q('machinery-mixer'));
+    await click(q('partida-machine-toggle-0-mixer'));
     expect(spy.project.draft.machinery.excluded).toContain('mixer');
+    expect(q('partida-machine-0-mixer').dataset.included).toBe('false');
+    expect(q('partida-machine-0-mixer').textContent).toContain('Excluida');
     expect(q('ws-total').textContent).not.toBe(total0);
-    await click(q('machinery-master'));
-    expect(spy.project.draft.machinery.include).toBe(false);
-    expect(q('rent-mixer')).toBeNull();
+    await click(q('partida-machine-toggle-0-mixer')); // back in
+    expect(spy.project.draft.machinery.excluded).not.toContain('mixer');
+    expect(q('ws-total').textContent).toBe(total0);
+  });
+
+  it('model: setMachineOn with the master switch off turns machinery on with ONLY that machine', () => {
+    const d = { ...mk().draft, machinery: { include: false, excluded: [] } };
+    const next = setMachineOn(d, 'mixer', true);
+    expect(next.machinery.include).toBe(true);
+    expect(next.machinery.excluded).toEqual(MACHINE_IDS.filter((x) => x !== 'mixer'));
+    const off = setMachineOn(mk().draft, 'mixer', false);
+    expect(off.machinery.excluded).toEqual(['mixer']);
+    const frozen = freezeQuote(mk().draft, { pricedAt: 1000, total: 5, live: {} });
+    expect(setMachineOn(frozen, 'mixer', false)).toBe(frozen); // locked: read-only
+  });
+
+  it('the section title and states exist in six languages ("Macchinari in uso" in Italian)', () => {
+    for (const l of ['es', 'en', 'pt', 'fr', 'it', 'de']) for (const k of ['ws.mach.inUse', 'ws.mach.on', 'ws.mach.off']) expect(DICT[l][k], `${l} ${k}`).toBeTruthy();
+    expect(DICT.it['ws.mach.inUse']).toBe('Macchinari in uso');
+    expect(DICT.es['ws.mach.inUse']).toBe('Maquinaria en uso');
+  });
+
+  it('each task lists only ITS machines (index based), with their rate rows', () => {
+    const p = mk();
+    const r = computeAll(p.draft, Date.now());
+    const mine = partidaMachines(r, 0, 'CL');
+    expect(mine.length).toBeGreaterThan(0);
+    expect(mine.every((m) => m.partida === 0)).toBe(true);
+    expect(mine.every((m) => m.row?.id === m.id)).toBe(true);
+    expect(partidaMachines(r, 7, 'CL')).toEqual([]);
   });
 });
 
@@ -271,10 +315,11 @@ describe('read-only while locked', () => {
 
   it('every editor of the quote is a disabled fieldset with a shield: a tap answers "Precios bloqueados" and nothing changes', async () => {
     await mount(lockedProject());
-    expect(qa('locked-shield').length).toBeGreaterThanOrEqual(3); // partida, crew, finance (machinery has no module any more)
+    expect(qa('locked-shield').length).toBeGreaterThanOrEqual(3); // partida, crew, finance
     expect(q('crew-plus').closest('fieldset').disabled).toBe(true);
     expect(q('slider-profit-input').closest('fieldset').disabled).toBe(true);
     expect(q('partida-0').querySelector('fieldset').disabled).toBe(true);
+    expect(q('partida-machine-rate-0-mixer').closest('fieldset').disabled).toBe(true); // the machines of the task too
     const before = spy.project.draft;
     await click(q('crew-minus')); // disabled: nothing happens
     await click(qa('locked-shield')[1]);

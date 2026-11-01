@@ -8,15 +8,17 @@ import { priceCaption } from '../../lib/workspaceModel.js';
 import { TextField } from '../ui.jsx';
 import PercentSlider from '../PercentSlider.jsx';
 import LockedZone from './LockedZone.jsx';
+import PartidaMachinery from './PartidaMachinery.jsx';
 import TaskPicker, { TaskIcon } from '../TaskPicker.jsx';
 import DimsForm from '../DimsForm.jsx';
 
 /**
  * ZONE B, the living list: one native <details>/<summary> per partida. Open it and the measures, the materials and
  * their prices are right there: tapping a price opens the on-screen numpad (the parent decides what that means, or
- * answers "Precios bloqueados" while the quote is frozen). Nothing here owns data: it reads `groups` and calls back.
+ * answers "Precios bloqueados" while the quote is frozen). Below the materials, "Maquinaria en uso" lists the machines of that task.
+ * Nothing here owns data: it reads `groups` / `result` and calls back.
  */
-export default function PartidaList({ draft, groups, open, locked, onBlocked, onToggle, onUpdate, onTask, onAdd, onRemove, onPrice, showErrors }) {
+export default function PartidaList({ draft, groups, open, locked, onBlocked, onToggle, onUpdate, onTask, onAdd, onRemove, onPrice, showErrors, result = null, setDraft = null, projectLocation = null }) {
   const { t, money, num, unit } = useI18n();
   const project = draft.mode === 'project';
   return (
@@ -116,6 +118,9 @@ export default function PartidaList({ draft, groups, open, locked, onBlocked, on
                   </ul>
                 </div>
               )}
+
+              {/* the machinery this task uses (it used to be a module of its own) */}
+              {result && setDraft && <PartidaMachinery draft={draft} result={result} index={i} regionCode={draft.regionCode} projectLocation={projectLocation} locked={locked} onBlocked={onBlocked} setDraft={setDraft} />}
             </div>
           </details>
         );

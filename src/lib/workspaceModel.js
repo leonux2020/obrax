@@ -101,6 +101,25 @@ export const toggleMachine = (excluded = [], id, on) => {
   return MACHINE_IDS.filter((x) => ex.has(x));
 };
 
+/**
+ * One machine switched on / off from the task that uses it. The switch-off list is per machine TYPE (like its daily rate), so it
+ * applies to every task that needs that machine. Switching a machine ON while the master switch is off turns machinery back on
+ * with ONLY that machine active (everything else stays off, exactly as it was). Locked quote: the same draft.
+ */
+export function setMachineOn(draft, id, on) {
+  const config = draft.machinery ?? DEFAULT_MACHINERY;
+  if (on && config.include === false) return withMachinery(draft, { include: true, excluded: MACHINE_IDS.filter((x) => x !== id) });
+  return withMachinery(draft, { excluded: toggleMachine(config.excluded, id, on) });
+}
+
+/** The machines the engine assigned to ONE partida (by index), each with its rate row (rate, source, supplier). */
+export function partidaMachines(result, index, regionCode = null) {
+  const rows = rentRows(result, regionCode);
+  return (result?.machinery?.items ?? [])
+    .filter((i) => i.partida === index)
+    .map((i) => ({ ...i, row: rows.find((r) => r.id === i.id) ?? null }));
+}
+
 export const DEADLINE_MAX_DAYS = 3650;
 
 /**

@@ -203,13 +203,13 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
       <HeaderZone project={project} model={model} title={title} client={projectClient(project)} region={region} offline={!online} onEdit={onEdit} onCash={openCash} onUnlock={() => dispatch({ type: 'sheet', name: 'unlock' })} />
 
       <div className="space-y-3 px-3 pt-3">
-        <PartidaList draft={draft} groups={groups} open={ui.open} locked={Boolean(locked)} onBlocked={blocked} showErrors onToggle={toggle} onUpdate={updatePartida} onTask={changeTask} onAdd={addPartida} onRemove={removePartida} onPrice={openPrice} />
+        <PartidaList draft={draft} groups={groups} open={ui.open} locked={Boolean(locked)} onBlocked={blocked} showErrors onToggle={toggle} onUpdate={updatePartida} onTask={changeTask} onAdd={addPartida} onRemove={removePartida} onPrice={openPrice} result={result} setDraft={setDraft} projectLocation={location} />
         <CrewBlock project={project} result={result} locked={Boolean(locked)} onBlocked={blocked} setDraft={setDraft} setProject={setProject} open={ui.open.crew} onToggle={toggle} />
         <FinanceBlock draft={draft} locked={Boolean(locked)} onBlocked={blocked} setDraft={edit} open={ui.open.finance} onToggle={toggle} />
         <CashBlock total={total} payments={project.payments} onChange={setList('payments')} open={ui.open.cash} onToggle={toggle} />
         <LogBlock entries={project.logbook} onChange={setList('logbook')} open={ui.open.log} onToggle={toggle} projectId={project.id} />
         <ExpensesBlock expenses={project.expenses} queued={queued} receipts={receipts} onChange={setList('expenses')} open={ui.open.expenses} onToggle={toggle} />
-        {/* machinery rentals no longer have a module of their own (their flow will be absorbed by another one); exceptions surface in the tray */}
+        {/* machinery has no module of its own: each task lists the machines it uses; exceptions surface in the tray */}
         <AlertTray />
       </div>
 

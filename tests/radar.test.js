@@ -474,16 +474,15 @@ describe('workspace UI', () => {
     expect(q('supplier-cement_bag').textContent).toBe('');
   });
 
-  // the machinery module is not rendered any more (its flow will be absorbed by another one); this comes back with it
-  it.skip('machinery rates get the same supplier bar and caption', async () => {
+  it('machinery rates (now inside the task) get the same supplier bar and caption', async () => {
     await mount(mk());
-    await click(q('rent-rate-mixer'));
+    await click(q('partida-machine-rate-0-mixer'));
     expect(q('rent-pad').querySelector('[data-testid="supplier-bar"]')).not.toBeNull();
     await click(qa('supplier-chip')[0]);
     await keys('45000');
     expect(currentSuppliers('CL').find((e) => e.kind === 'rent' && e.itemId === 'mixer').price).toBe(45000);
     await click(q('pad-done'));
-    expect(q('rent-supplier-mixer').textContent).toContain('km');
+    expect(q('partida-machine-supplier-0-mixer').textContent).toContain('km');
   });
 
   it('the header carries no globe: the market shows as the flag and data-region, and is changed from the project edit sheet', async () => {

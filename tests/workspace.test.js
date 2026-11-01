@@ -377,6 +377,7 @@ describe('no way out to the old editor + queue list', () => {
     expect(['ws-crew', 'ws-finance', 'ws-cash', 'ws-log', 'ws-expenses'].map((k) => !!q(k))).toEqual([true, true, true, true, true]);
     expect(q('ws-machinery')).toBeNull();
     expect(q('project-workspace').textContent).not.toMatch(/maquinaria y arriendos/i);
+    expect(q('partida-machinery-0')).not.toBeNull(); // it lives inside the task now
   });
 
   it('Zone B: every module carries a thin outline icon (currentColor) left of its title, and the titles stay UPPERCASE', async () => {
