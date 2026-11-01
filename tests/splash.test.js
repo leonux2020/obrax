@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
-// The opening screen: ALWAYS shown (installed PWA or browser), the continuation of the system splash: static logo in a 128 px box at the exact centre,
+// The opening screen: ALWAYS shown (installed PWA or browser), the continuation of the system splash: the OS draws the logo, React only the credit,
 // only the texts fade in, ~1.15 s in total, then a fade-out into the app (even with a session).
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from '../src/App.jsx';
-import SplashScreen, { SPLASH_TIMING, SPLASH_LOGO_SIZE, SPLASH_LOGO_BOX, TEXT_FADE_MS } from '../src/components/SplashScreen.jsx';
+import SplashScreen, { SPLASH_TIMING, TEXT_FADE_MS } from '../src/components/SplashScreen.jsx';
 import { I18nProvider } from '../src/lib/i18n.jsx';
 
 let host;
@@ -47,7 +47,7 @@ describe('opening screen', () => {
     seed();
     await mount(React.createElement(App));
     expect(q('splash')).not.toBeNull();
-    expect(q('splash').textContent).toContain('Un producto Japadigital');
+    expect(q('splash-credit').textContent).toBe('Un producto Japadigital');
     expect(q('splash-start')).toBeNull(); // nothing to press: it leaves by itself
     expect(q('dash-empty')).toBeNull();
     await advance(hold - 50);
@@ -102,6 +102,7 @@ describe('opening screen', () => {
 });
 
 describe('seamless handoff with the system splash', () => {
+  const root = () => q('splash');
   const asInstalledPwa = () => {
     window.matchMedia = (query) => ({ matches: query.includes('standalone'), media: query, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} });
   };
@@ -114,9 +115,8 @@ describe('seamless handoff with the system splash', () => {
     seed();
     await mount(React.createElement(App));
     expect(q('splash')).not.toBeNull();
-    expect(q('splash').textContent).toContain('Un producto Japadigital');
-    expect(q('splash-name')).not.toBeNull();
-    await advance(SPLASH_TIMING.hold + SPLASH_TIMING.fade + 50);
+    expect(q('splash-credit').textContent).toBe('Un producto Japadigital');
+        await advance(SPLASH_TIMING.hold + SPLASH_TIMING.fade + 50);
     expect(q('splash')).toBeNull();
     expect(q('dash-empty')).not.toBeNull();
   });
@@ -129,44 +129,32 @@ describe('seamless handoff with the system splash', () => {
     expect(TEXT_FADE_MS).toBeLessThan(SPLASH_TIMING.hold);
   });
 
-  it('the logo lives in an exact 128 px box, at the absolute centre of a 100dvh x screen-width viewport, and is STATIC', async () => {
+  it('Single-Render Splash: the centre is EMPTY black (no hat, no lettering, no image), the OS logo stays untouched', async () => {
     seed();
     await mount(React.createElement(App));
     const root = q('splash');
-    for (const c of ['h-[100dvh]', 'w-screen', 'flex', 'items-center', 'justify-center', 'relative', 'overflow-hidden']) expect(root.className.split(/\s+/)).toContain(c);
-    const box = q('splash-logo');
-    expect(SPLASH_LOGO_BOX).toBe(128);
-    expect(box.className.split(/\s+/)).toEqual(expect.arrayContaining(['w-32', 'h-32', 'flex', 'items-center', 'justify-center']));
-    expect(box.style.width).toBe('128px');
-    expect(box.style.height).toBe('128px');
-    expect(box.parentElement).toBe(root); // in-flow child of the centring flex container
-    expect(box.className).not.toMatch(/\b(p|m|px|py|pt|pb|mt|mb|ml|mr|absolute)-?/);
-    // the logo fits the box (contain): never taller or wider than 128, nothing offsets it
-    const logo = box.querySelector('[data-testid="logo"]');
-    expect(SPLASH_LOGO_SIZE).toBe(128);
-    expect(parseFloat(logo.style.height)).toBeLessThanOrEqual(128);
-    expect(parseFloat(logo.style.width)).toBeLessThanOrEqual(128);
-    expect(logo.className).not.toMatch(/\b(p|m|px|py|pt|pb|mt|mb|ml|mr)-/);
-    expect(logo.style.margin || '').toBe('');
-    expect(logo.style.padding || '').toBe('');
-    expect(box.querySelector('[data-testid="logo-helmet"]').style.objectFit).toBe('contain');
-    for (const el of [box, ...box.querySelectorAll('*')]) {
-      expect(el.style.animation || '').toBe('');
-      expect(el.className?.baseVal ?? el.className).not.toMatch(/animate|transition/);
-    }
+    for (const c of ['h-[100dvh]', 'w-screen', 'relative', 'overflow-hidden', 'bg-black']) expect(root.className.split(/\s+/)).toContain(c);
+    expect(root.querySelector('img')).toBeNull();
+    expect(root.querySelector('[data-testid="logo"]')).toBeNull();
+    expect(root.querySelector('[data-testid="wordmark"]')).toBeNull();
+    expect(q('splash-logo')).toBeNull();
+    // the name survives only as a visually hidden heading
+    expect(q('splash-name').className).toContain('sr-only');
+    expect(q('splash-name').textContent).toBe('CUBRAX');
   });
 
-  it('ONLY the texts fade in (opacity 0 -> 1, 500 ms): CUBRAX and the credit', async () => {
+  it('ONLY the credit "Un producto Japadigital" is visible: absolute at the bottom and fading in (opacity 0 -> 1, 500 ms)', async () => {
     seed();
     await mount(React.createElement(App));
-    for (const id of ['splash-name', 'splash-credit']) {
-      expect(q(id).style.animation).toContain('splash-text-in');
-      expect(q(id).style.animation).toContain('500ms');
-    }
-    expect(q('splash-logo').style.animation).toBe('');
-    // the lettering hangs under the logo without taking part in its position
-    for (const id of ['splash-name']) expect(q(id).className.split(/\s+/)).toContain('absolute');
-    expect(q('splash-logo').className).not.toContain('absolute'); // the logo is the only in-flow child: the texts cannot push it
+    const credit = q('splash-credit');
+    expect(credit.textContent).toBe('Un producto Japadigital');
+    expect(credit.style.animation).toContain('splash-text-in');
+    expect(credit.style.animation).toContain('500ms');
+    const bottom = credit.closest('.absolute');
+    expect(bottom).not.toBeNull();
+    expect(bottom.className.split(/\s+/)).toEqual(expect.arrayContaining(['absolute', 'bottom-0', 'inset-x-0']));
+    // nothing else in the splash animates
+    for (const el of root().querySelectorAll('*')) if (el !== credit) expect(el.style.animation || '').toBe('');
   });
 
   it('without timing (tests) nothing animates at all', async () => {

@@ -1,32 +1,23 @@
 import { useEffect, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
-import { Button, Logo, Wordmark } from './ui.jsx';
+import { Button } from './ui.jsx';
 import InstallButton from './InstallButton.jsx';
 
 /**
  * How long the opening screen is held and how long its fade-out lasts (ms): ~1.15 s in total, quick enough not to punish the way into
- * the app, long enough for the texts to fade in (TEXT_FADE_MS) and be read.
+ * the app, long enough for the credit to fade in (TEXT_FADE_MS) and be read.
  */
 export const SPLASH_TIMING = Object.freeze({ hold: 900, fade: 250 });
 
-/** The texts (CUBRAX, credit) fade in over this long; the logo never animates. */
+/** The credit fades in over this long. */
 export const TEXT_FADE_MS = 500;
 
 /**
- * Side (px) of the square box the logo lives in: exactly 128 px (Tailwind `w-32 h-32`), the size at which Android Chrome draws the
- * manifest icon on its own splash. The logo fits inside it like `object-fit: contain` (its height fills the box, its width follows its
- * own ratio, nothing is stretched), with no padding or margin around it, so its optical centre is the centre of the box.
- */
-export const SPLASH_LOGO_BOX = 128;
-export const SPLASH_LOGO_SIZE = SPLASH_LOGO_BOX;
-
-/**
- * Opening screen. ALWAYS shown when the app opens (installed or not), designed as the continuation of the system splash (Seamless Handoff):
- *  - the hard-hat logo sits at the exact centre of the screen, in a 128 px box (the system icon size), STATIC (no entrance animation): the eye
- *    keeps seeing the same hat the OS drew;
- *  - only the texts fade in around it (opacity 0 -> 1 in ~500 ms): the CUBRAX lettering (green X) under the logo, and "Un producto Japadigital".
- *  - `auto` (the user already has a profile or a session): it holds for `hold` ms, fades out and calls `onStart`,
- *    so the Dashboard (or the sign-in screen) appears by itself.
+ * Opening screen, "Single-Render Splash": the logo (hard hat + CUBRAX) is drawn by the OS from the manifest icon, so this component draws
+ * NEITHER the hat NOR the lettering: the centre is plain black (the page's own #000 background) and the user keeps seeing what the OS drew.
+ *  - the only visible text is "Un producto Japadigital", position:absolute at the bottom, fading in (opacity 0 -> 1, ~500 ms);
+ *  - the name stays in the DOM only as a visually hidden <h1> (screen readers, document outline);
+ *  - `auto` (the user already has a profile or a session): it holds for `hold` ms, fades out and calls `onStart`;
  *  - otherwise (first run): the one "Iniciar" button (bottom third, thumb reach) starts the setup.
  * `timing` {hold:0, fade:0} skips the wait (tests).
  */
@@ -53,27 +44,21 @@ export default function SplashScreen({ onStart, auto = false, timing = SPLASH_TI
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auto]);
 
-  // texts only: the first paint is the bare logo on black, exactly like the system splash
+  // the first paint is bare black, exactly what the OS left on screen; only the credit fades in
   const fadeIn = timing.hold || timing.fade ? { animation: `splash-text-in ${TEXT_FADE_MS}ms ease-out both` } : undefined;
 
   return (
     <main
-      className={`relative flex h-[100dvh] w-screen items-center justify-center overflow-hidden transition-opacity ease-out ${leaving ? 'opacity-0' : 'opacity-100'}`}
+      className={`relative h-[100dvh] w-screen overflow-hidden bg-black transition-opacity ease-out ${leaving ? 'opacity-0' : 'opacity-100'}`}
       style={{ transitionDuration: `${timing.fade}ms` }}
       data-testid="splash"
       data-leaving={leaving ? 'true' : undefined}
     >
-      {/* the 128 px box is the ONLY in-flow child: the flex centring of the real viewport (100dvh x screen width) puts it at the exact centre */}
-      <div className="flex h-32 w-32 shrink-0 items-center justify-center" style={{ width: SPLASH_LOGO_BOX, height: SPLASH_LOGO_BOX }} data-testid="splash-logo">
-        <Logo size={SPLASH_LOGO_SIZE} />
-      </div>
-      {/* the texts are position:absolute, out of the flow: they hang under the logo and can never push its centre */}
-      <h1 data-testid="splash-name" className="absolute inset-x-0 top-1/2 flex justify-center text-center" style={{ marginTop: `${Math.round(SPLASH_LOGO_SIZE / 2) + 28}px`, ...fadeIn }}>
-        <span className="sr-only">{t('app.name')}</span>
-        <Wordmark height={32} />
+      <h1 className="sr-only" data-testid="splash-name">
+        {t('app.name')}
       </h1>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 px-6 [padding-bottom:max(1.5rem,env(safe-area-inset-bottom))]">
+      <div className="absolute inset-x-0 bottom-0 z-40 px-6 [padding-bottom:max(2rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto w-full max-w-md">
           {!auto && (
             <Button className="w-full" onClick={onStart} data-testid="splash-start">

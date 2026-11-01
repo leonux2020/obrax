@@ -38,7 +38,7 @@ const NEVER_PRECACHE = /(^sw\.js$|^_headers$|\.map$|^robots\.txt$|^vercel\.json$
 
 /**
  * Brand + PWA plugin.
- *  - serves manifest/icons in dev (generated from src/brand/icon.js)
+ *  - serves manifest/icons in dev (generated from src/brand/icon.js, unless public/icons/<file>.png is supplied: then that file wins)
  *  - injects <link> tags (manifest, favicon, apple-touch-icon), theme color and CSP (build only)
  *  - at build end writes manifest.json, icon.svg, PNG icons, _headers and a versioned sw.js
  */
@@ -49,6 +49,12 @@ export default function pwaBrand() {
 
   const getPng = async (def) => {
     if (!pngCache.has(def.file)) {
+      // A designer-supplied PNG in public/icons/<same file name> replaces the generated one (e.g. the composite hat + CUBRAX icon).
+      const supplied = path.join(root, 'public', 'icons', def.file);
+      if (fs.existsSync(supplied)) {
+        pngCache.set(def.file, fs.readFileSync(supplied));
+        return pngCache.get(def.file);
+      }
       const helmetHref = await helmetUri(root);
       pngCache.set(def.file, await renderPng(buildIconSvg({ maskable: def.maskable, helmetHref }), def.size));
     }

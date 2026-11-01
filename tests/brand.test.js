@@ -137,12 +137,13 @@ describe('lettering', () => {
 });
 
 describe('splash + dashboard', () => {
-  it('the opening screen: hat, lettering (named CUBRAX for screen readers) and the centred credit at the bottom', async () => {
+  it('the opening screen draws neither hat nor lettering (the OS icon does): hidden name + the credit at the bottom', async () => {
     await render(React.createElement(SplashScreen, { onStart: () => {}, auto: false }));
     const h1 = host.querySelector('h1');
     expect(h1.textContent).toBe('CUBRAX');
-    expect(h1.querySelector('svg[data-testid="wordmark"]')).not.toBeNull();
-    expect(host.querySelector('img')).not.toBeNull();
+    expect(h1.className).toContain('sr-only');
+    expect(host.querySelector('svg')).toBeNull();
+    expect(host.querySelector('img')).toBeNull();
     const credit = host.querySelector('[data-testid="splash-credit"]');
     expect(credit.textContent).toBe('Un producto Japadigital');
     expect(credit.className).toContain('text-center');

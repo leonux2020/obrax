@@ -55,21 +55,20 @@ afterEach(() => {
 });
 
 describe('first run: splash -> setup -> dashboard', () => {
-  it('a brand-new install shows ONLY the logo, one "Iniciar" button and "Un producto Japadigital"', async () => {
+  it('a brand-new install shows an empty black centre (the OS draws the logo), one "Iniciar" button and "Un producto Japadigital"', async () => {
     await mountApp();
     expect(q('splash')).not.toBeNull();
-    expect(host.querySelector('img')).not.toBeNull();
+    expect(host.querySelector('img')).toBeNull(); // neither hat nor lettering: the manifest icon is the logo
     // "Iniciar" + the "Instalar App" button (hidden once installed), both in the bottom third (thumb zone)
     const buttons = [...host.querySelectorAll('button')].filter((b) => b.dataset.testid !== 'install-app');
     expect(buttons).toHaveLength(1);
     expect(buttons[0].textContent).toBe('Iniciar');
-    expect(buttons[0].closest('.fixed').className).toContain('bottom-0');
-    expect(q('install-app').closest('.fixed').className).toContain('bottom-0');
+    expect(buttons[0].closest('.absolute').className).toContain('bottom-0');
+    expect(q('install-app').closest('.absolute').className).toContain('bottom-0');
     expect(q('splash-credit').textContent).toBe('Un producto Japadigital');
     const name = host.querySelector('h1');
-    expect(name.textContent).toBe('CUBRAX'); // the name sits centred right under the logo
-    expect(name.className).toContain('text-center');
-    expect(host.querySelector('img').compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(name.textContent).toBe('CUBRAX'); // only for screen readers: the visible lettering is in the OS icon
+    expect(name.className).toContain('sr-only');
     expect(host.querySelectorAll('p')).toHaveLength(1); // no tagline, no extra text
     expect(host.querySelector('header')).toBeNull(); // no app chrome around the splash
   });
