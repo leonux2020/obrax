@@ -104,18 +104,50 @@ export function buildLockupSvg({ helmetHref } = {}) {
 }
 
 /**
- * App icon: the isotype centred on an OLED-black rounded tile.
+ * The icon artwork: hard-hat isotype with the CUBRAX lettering (white, green X) centred right under it, as ONE lockup that is centred, as a
+ * whole, on the canvas. The OS draws this very image as the splash of the installed app, so it carries the app's name too.
+ * Units are the isotype's own (the isotype is W = 360 wide); the lettering is a little wider than the hat so it stays legible at small sizes.
+ */
+const WORD_W = 400; // lettering width
+const WORD_SCALE = WORD_W / WORD_BOX.w;
+const WORD_H = Math.round(WORD_BOX.h * WORD_SCALE); // ~57
+const WORD_GAP = 44; // clean air between the ruler and the lettering
+export const ICON_LAYOUT = Object.freeze({
+  w: Math.max(W, WORD_W),
+  h: MARK_LAYOUT.h + WORD_GAP + WORD_H,
+  markX: (Math.max(W, WORD_W) - W) / 2,
+  wordTop: MARK_LAYOUT.h + WORD_GAP,
+  wordW: WORD_W,
+  wordH: WORD_H,
+});
+/** Share of the canvas HEIGHT the lockup fills: 70 % on the "any" icon, less on the maskable ones (everything inside the 80 % safe circle). */
+export const ICON_FILL = 0.7;
+const SAFE_RADIUS = 0.4; // the maskable safe zone is a circle of 80 % of the icon
+const halfDiagonal = Math.hypot(ICON_LAYOUT.w / 2, ICON_LAYOUT.h / 2);
+/** Scale of the lockup on the 512 canvas. */
+export const iconScale = (maskable) => {
+  const any = (ICON_FILL * 512) / ICON_LAYOUT.h;
+  return maskable ? Math.min(any, (0.97 * SAFE_RADIUS * 512) / halfDiagonal) : any;
+};
+
+/** Hat + CUBRAX centred on a 512 x 512 canvas at scale k (the bounding box of the whole lockup is centred, both ways). */
+const iconArt = (k, helmetHref) => {
+  const left = 256 - (ICON_LAYOUT.w * k) / 2;
+  const top = 256 - (ICON_LAYOUT.h * k) / 2;
+  const word = `<g transform="translate(0 ${ICON_LAYOUT.wordTop - WORD_BOX.y * WORD_SCALE}) scale(${WORD_SCALE})">${wordmarkInner()}</g>`;
+  const mark = `<svg x="${ICON_LAYOUT.markX}" y="0" width="${W}" height="${MARK_LAYOUT.h}" viewBox="0 0 ${W} ${MARK_LAYOUT.h}">${DIM_ART}${helmetImage(helmetHref)}${RULER_ART}</svg>`;
+  return `<g transform="translate(${left} ${top}) scale(${k})">${mark}${word}</g>`;
+};
+
+/**
+ * App icon: hat + CUBRAX centred on a solid #000000 tile (OLED black, same as the manifest background).
  * @param {{maskable?: boolean, helmetHref?: string}} opts maskable => full-bleed background, content scaled into the safe zone.
  */
 export function buildIconSvg({ maskable = false, helmetHref } = {}) {
-  const k = maskable ? 0.74 : 0.9;
-  const art = nestedMark(256, 256 - (MARK_LAYOUT.h * k) / 2, k, helmetHref);
+  const art = iconArt(iconScale(maskable), helmetHref);
   return (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="CUBRAX">' +
     `<rect width="512" height="512" rx="${maskable ? 0 : 112}" fill="#000000"/>` +
-    '<rect x="6" y="6" width="500" height="500" rx="106" fill="none" stroke="#22c55e" stroke-width="4" stroke-opacity=".45"' +
-    (maskable ? ' display="none"' : '') +
-    '/>' +
     art +
     '</svg>'
   );

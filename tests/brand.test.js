@@ -7,7 +7,7 @@ import { I18nProvider } from '../src/lib/i18n.jsx';
 import SplashScreen from '../src/components/SplashScreen.jsx';
 import { Logo, Wordmark } from '../src/components/ui.jsx';
 import fs from 'node:fs';
-import { BRAND, MARK_LAYOUT, DIM_ART, RULER_ART, HELMET_FILE, HELMET_RATIO, LETTER_PATHS, WORD, WORD_BOX, buildMarkSvg, buildLockupSvg, buildIconSvg, buildManifest, LOGO_FILE } from '../src/brand/icon.js';
+import { BRAND, MARK_LAYOUT, DIM_ART, RULER_ART, HELMET_FILE, HELMET_RATIO, LETTER_PATHS, WORD, WORD_BOX, buildMarkSvg, buildLockupSvg, buildIconSvg, buildManifest, LOGO_FILE, PNG_ICONS, ICON_LAYOUT, ICON_FILL, iconScale } from '../src/brand/icon.js';
 import { WORD_WEIGHT } from '../src/brand/wordArt.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -156,4 +156,57 @@ describe('splash + dashboard', () => {
     expect(fs.readFileSync('src/components/Header.jsx', 'utf8')).toContain('<Logo size={32}');
     expect(fs.readFileSync('src/components/Header.jsx', 'utf8')).toContain('<Wordmark');
   });
+});
+
+describe('app icons: hat + CUBRAX as one centred lockup (the OS draws it as the splash)', () => {
+  it('every icon SVG embeds the lettering (6 glyph paths, green X) below the ruler, on solid #000000', () => {
+    for (const maskable of [false, true]) {
+      const svg = buildIconSvg({ maskable });
+      expect(svg).toContain('fill="#000000"');
+      for (const c of WORD) expect(svg).toContain(`d="${LETTER_PATHS[c]}"`);
+      expect(svg).toContain(`fill="${BRAND.green}"`);
+      expect(svg).toContain(RULER_ART);
+      // the lettering starts under the ruler (its translate Y is below the isotype's height)
+      expect(ICON_LAYOUT.wordTop).toBeGreaterThan(MARK_LAYOUT.h);
+    }
+    expect(ICON_FILL).toBeGreaterThanOrEqual(0.6);
+    expect(ICON_FILL).toBeLessThanOrEqual(0.7);
+  });
+
+  it('the generated PNGs (192, 512, maskable 512, apple 180): lockup centred, filling 60-70 % of the height; maskable inside the safe circle', async () => {
+    const sharp = (await import('sharp')).default;
+    const fs = await import('node:fs');
+    const helmet = `data:image/png;base64,${fs.readFileSync('public/helmet.png').toString('base64')}`;
+    for (const def of PNG_ICONS) {
+      const svg = buildIconSvg({ maskable: def.maskable, helmetHref: helmet });
+      const { data, info } = await sharp(Buffer.from(svg), { density: 384 }).resize(def.size, def.size).flatten({ background: '#000000' }).raw().toBuffer({ resolveWithObject: true });
+      expect(info.width).toBe(def.size);
+      expect(info.height).toBe(def.size);
+      let minX = info.width, maxX = -1, minY = info.height, maxY = -1;
+      let corner = 0;
+      for (let y = 0; y < info.height; y += 1) {
+        for (let x = 0; x < info.width; x += 1) {
+          const i = (y * info.width + x) * info.channels;
+          const lit = data[i] + data[i + 1] + data[i + 2] > 60;
+          if (lit) {
+            minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+          }
+        }
+      }
+      corner = data[0] + data[1] + data[2];
+      const s = def.size;
+      expect(corner).toBe(0); // solid black background, corners included
+      expect(Math.abs((minX + maxX) / 2 - s / 2)).toBeLessThanOrEqual(s * 0.02); // centred horizontally
+      expect(Math.abs((minY + maxY) / 2 - s / 2)).toBeLessThanOrEqual(s * 0.02); // and vertically
+      const heightShare = (maxY - minY + 1) / s;
+      expect(heightShare).toBeGreaterThanOrEqual(0.58);
+      expect(heightShare).toBeLessThanOrEqual(0.72);
+      if (def.maskable) {
+        // every lit pixel is inside the 80 % safe circle
+        const r = 0.4 * s;
+        for (const [x, y] of [[minX, minY], [maxX, minY], [minX, maxY], [maxX, maxY]]) expect(Math.hypot(x - s / 2, y - s / 2)).toBeLessThanOrEqual(r + 1);
+      }
+    }
+    expect(iconScale(true)).toBeLessThanOrEqual(iconScale(false));
+  }, 60000);
 });
