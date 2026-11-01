@@ -8,6 +8,7 @@ import Block from './Block.jsx';
 import LockedZone from './LockedZone.jsx';
 import AdvancesPanel from './AdvancesPanel.jsx';
 import NumberPad from './NumberPad.jsx';
+import { UsersIcon } from './icons.jsx';
 
 function Stat({ label, value, unit, tone }) {
   return (
@@ -51,7 +52,7 @@ export default function CrewBlock({ project, result, locked, onBlocked, setDraft
   const deadlineMsg = !plan || plan.fits === null ? null : plan.fits ? { ok: true, text: t('sched.deadline.ok', { days: plan.spareDays }) } : { ok: false, text: plan.auto ? t('sched.deadline.impossible') : t('sched.deadline.over', { days: -plan.spareDays }) };
 
   return (
-    <Block id="crew" title={t('ws.crew.title')} meta={model ? t('ws.crew.summary', { n: model.crew, days: days(model.totals.totalDays) }) : ''} open={open} onToggle={onToggle} testId="ws-crew">
+    <Block icon={<UsersIcon />} id="crew" title={t('ws.crew.title')} meta={model ? t('ws.crew.summary', { n: model.crew, days: days(model.totals.totalDays) }) : ''} open={open} onToggle={onToggle} testId="ws-crew">
       {!model ? (
         <p className="mb-4 text-sm text-[#E0E0E0]/60" data-testid="crew-empty">
           {t('sched.empty')}

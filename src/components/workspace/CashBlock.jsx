@@ -5,6 +5,7 @@ import { sanitizeText } from '../../lib/sanitize.js';
 import { TextField } from '../ui.jsx';
 import Block from './Block.jsx';
 import NumberPad from './NumberPad.jsx';
+import { BanknoteIcon } from './icons.jsx';
 
 const QUICK = [
   ['25 %', 0.25],
@@ -42,7 +43,7 @@ export default function CashBlock({ total, payments, onChange, open, onToggle })
   };
 
   return (
-    <Block id="cash" title={t('ws.cash.title')} meta={total > 0 ? pctText(summary.pct) : ''} open={open} onToggle={onToggle} testId="ws-cash">
+    <Block icon={<BanknoteIcon />} id="cash" title={t('ws.cash.title')} meta={total > 0 ? pctText(summary.pct) : ''} open={open} onToggle={onToggle} testId="ws-cash">
       <div className="space-y-3" data-testid="cash-panel" data-paid={summary.paid} data-pct={Math.round(summary.pct)}>
         <dl className="grid grid-cols-3 gap-2 text-center">
           {[

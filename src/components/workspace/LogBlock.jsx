@@ -7,6 +7,7 @@ import { notePhotosFor, prepareNotePhoto } from '../../lib/notePhotos.js';
 import { useDictation } from '../../lib/useDictation.js';
 import Block from './Block.jsx';
 import { NoteThumb, PhotoLightbox, useNotePhoto } from './NotePhoto.jsx';
+import { BookOpenIcon } from './icons.jsx';
 
 const Icon = ({ children }) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -235,7 +236,7 @@ export default function LogBlock({ entries, onChange, open, onToggle, projectId 
   };
 
   return (
-    <Block id="log" title={t('ws.log.title')} meta={entries.length ? String(entries.length) : ''} open={open} onToggle={onToggle} testId="ws-log">
+    <Block icon={<BookOpenIcon />} id="log" title={t('ws.log.title')} meta={entries.length ? String(entries.length) : ''} open={open} onToggle={onToggle} testId="ws-log">
       {list.length === 0 ? (
         <p className="text-sm text-[#E0E0E0]/60" data-testid="wlog-empty">
           {t('ws.log.empty')}

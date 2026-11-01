@@ -4,6 +4,7 @@ import Hourglass from '../Hourglass.jsx';
 import { ExpenseHead, SupplierTotals, expenseTitle } from '../ExpenseParts.jsx';
 import Block from './Block.jsx';
 import QueueList from './QueueList.jsx';
+import { ReceiptIcon } from './icons.jsx';
 
 /**
  * ZONE B, "Gastos y boletas": the receipts already tabulated, the ones still waiting for a connection (deferred queue) and,
@@ -15,7 +16,7 @@ export default function ExpensesBlock({ expenses, queued, receipts, onChange, op
   const toggleReturned = (id) => onChange(expenses.map((e) => (e.id === id ? { ...e, returned: !e.returned } : e)));
 
   return (
-    <Block id="expenses" title={t('ws.expenses')} open={open} onToggle={onToggle} testId="ws-expenses">
+    <Block icon={<ReceiptIcon />} id="expenses" title={t('ws.expenses')} open={open} onToggle={onToggle} testId="ws-expenses">
       <QueueList rows={queued} onRetry={receipts?.retry} onDiscard={receipts?.discard} onAccept={receipts?.accept} />
       {expenses.length === 0 && queued.length === 0 && <p className="text-sm text-[#E0E0E0]/60">{t('ws.noExpenses')}</p>}
       {expenses.length > 0 && <SupplierTotals expenses={expenses} />}

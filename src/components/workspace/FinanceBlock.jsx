@@ -5,6 +5,7 @@ import PercentSlider from '../PercentSlider.jsx';
 import Block from './Block.jsx';
 import LockedZone from './LockedZone.jsx';
 import NumberPad from './NumberPad.jsx';
+import { CalculatorIcon } from './icons.jsx';
 
 const KEYS = ['labor', 'transport', 'contingency', 'profit'];
 
@@ -19,7 +20,7 @@ export default function FinanceBlock({ draft, locked, onBlocked, setDraft, open,
   const official = num(region.taxRate * 100);
 
   return (
-    <Block id="finance" title={t('pv.selectors')} open={open} onToggle={onToggle} testId="ws-finance">
+    <Block icon={<CalculatorIcon />} id="finance" title={t('pv.selectors')} open={open} onToggle={onToggle} testId="ws-finance">
       <LockedZone locked={locked} onBlocked={onBlocked} className="space-y-4">
         {KEYS.map((k) => (
           <PercentSlider key={k} label={t(`fin.${k}`)} testId={`slider-${k}`} value={draft.finance[k]} min={FINANCE_LIMITS[k].min} max={FINANCE_LIMITS[k].max} step={FINANCE_LIMITS[k].step} onChange={set(k)} />

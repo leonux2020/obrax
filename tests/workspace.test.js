@@ -371,10 +371,48 @@ describe('frozen quote', () => {
 });
 
 describe('no way out to the old editor + queue list', () => {
-  it('there is no "Editor avanzado": crew, machinery, finance and expenses all live in the screen', async () => {
+  it('there is no "Editor avanzado": crew, finance, cash, log and expenses live in the screen; machinery has no module of its own any more', async () => {
     await mount({ initial: mk() });
     expect(q('ws-advanced')).toBeNull();
-    expect(['ws-crew', 'ws-machinery', 'ws-finance', 'ws-expenses'].map((k) => !!q(k))).toEqual([true, true, true, true]);
+    expect(['ws-crew', 'ws-finance', 'ws-cash', 'ws-log', 'ws-expenses'].map((k) => !!q(k))).toEqual([true, true, true, true, true]);
+    expect(q('ws-machinery')).toBeNull();
+    expect(q('project-workspace').textContent).not.toMatch(/maquinaria y arriendos/i);
+  });
+
+  it('Zone B: every module carries a thin outline icon (currentColor) left of its title, and the titles stay UPPERCASE', async () => {
+    await mount({ initial: mk() });
+    for (const id of ['ws-crew', 'ws-finance', 'ws-cash', 'ws-log', 'ws-expenses']) {
+      const summary = q(id).querySelector('summary');
+      const icon = summary.querySelector('svg[data-outline-icon="true"]');
+      expect(icon, id).not.toBeNull();
+      expect(icon.getAttribute('stroke')).toBe('currentColor'); // inherits the text colour
+      expect(icon.getAttribute('fill')).toBe('none');
+      expect(Number(icon.getAttribute('stroke-width'))).toBeLessThanOrEqual(1.75);
+      expect(icon.getAttribute('aria-hidden')).toBe('true');
+      // icon first, then the title
+      expect(icon.compareDocumentPosition(summary.querySelector('span.truncate')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(summary.className).toContain('uppercase'); // the casing is untouched
+    }
+    // the partidas keep their task icon, same size family
+    expect(q('partida-summary-0').querySelector('svg')).not.toBeNull();
+    // the modules appear in this order
+    const order = [...document.querySelectorAll('[data-testid="ws-zone-b"], [data-testid="ws-crew"], [data-testid="ws-finance"], [data-testid="ws-cash"], [data-testid="ws-log"], [data-testid="ws-expenses"], [data-testid="ws-alerts"]')].map((n) => n.dataset.testid);
+    expect(order).toEqual(['ws-zone-b', 'ws-crew', 'ws-finance', 'ws-cash', 'ws-log', 'ws-expenses', 'ws-alerts']);
+  });
+
+  it('the alert tray closes the list: one amber mock alert with a warning icon, on black with a subtle border', async () => {
+    await mount({ initial: mk() });
+    const tray = q('ws-alerts');
+    expect(tray).not.toBeNull();
+    expect(tray.previousElementSibling.dataset.testid).toBe('ws-expenses'); // directly under the last module
+    expect(tray.nextElementSibling).toBeNull(); // and last in the list
+    const alert = q('ws-alert');
+    expect(alert.textContent).toBe('RESTITUZIONE MACCHINARIO: ESCAVATORE (SCADE OGGI)');
+    expect(alert.className).toContain('text-amber-500');
+    expect(alert.className).toMatch(/border-amber-500\/30/);
+    expect(alert.className).toContain('bg-black');
+    expect(alert.querySelector('svg[data-outline-icon="true"]')).not.toBeNull(); // the warning triangle
+    expect(alert.querySelector('svg').getAttribute('stroke')).toBe('currentColor');
   });
 
   it('receipts waiting for a connection are listed with their state, badge on the dock, and can be discarded / retried', async () => {

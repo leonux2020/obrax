@@ -36,7 +36,7 @@ export default function PartidaList({ draft, groups, open, locked, onBlocked, on
           >
             <summary className="flex min-h-[60px] cursor-pointer list-none items-center gap-3 px-3 [&::-webkit-details-marker]:hidden" data-testid={`partida-summary-${i}`}>
               <span className="text-[#E0E0E0]/70" aria-hidden="true">
-                <TaskIcon id={p.task} size={28} />
+                <TaskIcon id={p.task} size={24} />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-base font-bold">{partidaTitle(p, t)}</span>

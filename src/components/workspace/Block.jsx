@@ -1,8 +1,9 @@
 /**
- * A titled accordion (<details>/<summary>) for the secondary blocks of Zone B: crew, machinery, finance, expenses. Same
+ * A titled accordion (<details>/<summary>) for the secondary blocks of Zone B: crew, finance, cash, logbook, expenses. `icon` = a thin outline icon
+ * drawn with currentColor, to the left of the (UPPERCASE) title. Same
  * language as the partidas: a 2 px left border and quiet lettering, no solid fills. `meta` is the short figure on the right.
  */
-export default function Block({ id, title, meta = '', open, onToggle, children, testId }) {
+export default function Block({ id, title, icon = null, meta = '', open, onToggle, children, testId }) {
   return (
     <details
       open={Boolean(open)}
@@ -11,6 +12,7 @@ export default function Block({ id, title, meta = '', open, onToggle, children, 
       data-testid={testId}
     >
       <summary className="flex min-h-[56px] cursor-pointer list-none items-center gap-3 px-3 text-sm font-bold uppercase tracking-wider text-[#E0E0E0]/80 [&::-webkit-details-marker]:hidden">
+        {icon}
         <span className="min-w-0 flex-1 truncate">{title}</span>
         {meta && <span className="shrink-0 text-xs font-semibold normal-case tracking-normal tabular-nums text-[#E0E0E0]/70">{meta}</span>}
         <span aria-hidden="true" className="text-lg text-[#E0E0E0]/50 transition-transform group-open:rotate-90">

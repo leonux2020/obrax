@@ -214,7 +214,8 @@ describe('Cuadrilla y cronograma (numpad, no OS keyboard)', () => {
   });
 });
 
-describe('Maquinaria y arriendos (numpad + real time)', () => {
+// The module has no button any more (its flow will be absorbed by another one): MachineryBlock stays in the repo, these come back with it.
+describe.skip('Maquinaria y arriendos (numpad + real time)', () => {
   it('the daily rate is typed on the pad: the quote recalculates at once and it is saved as the user rate', async () => {
     await mount(mk());
     expect(q('ws-machinery').tagName).toBe('DETAILS');
@@ -270,9 +271,8 @@ describe('read-only while locked', () => {
 
   it('every editor of the quote is a disabled fieldset with a shield: a tap answers "Precios bloqueados" and nothing changes', async () => {
     await mount(lockedProject());
-    expect(qa('locked-shield').length).toBeGreaterThanOrEqual(4); // partida, crew, machinery, finance
+    expect(qa('locked-shield').length).toBeGreaterThanOrEqual(3); // partida, crew, finance (machinery has no module any more)
     expect(q('crew-plus').closest('fieldset').disabled).toBe(true);
-    expect(q('rent-rate-mixer').closest('fieldset').disabled).toBe(true);
     expect(q('slider-profit-input').closest('fieldset').disabled).toBe(true);
     expect(q('partida-0').querySelector('fieldset').disabled).toBe(true);
     const before = spy.project.draft;

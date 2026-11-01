@@ -33,7 +33,7 @@ import ExportSheet from './workspace/ExportSheet.jsx';
 import FinanceBlock from './workspace/FinanceBlock.jsx';
 import LogBlock from './workspace/LogBlock.jsx';
 import HeaderZone from './workspace/HeaderZone.jsx';
-import MachineryBlock from './workspace/MachineryBlock.jsx';
+import AlertTray from './workspace/AlertTray.jsx';
 import SupplierPad from './workspace/SupplierPad.jsx';
 import PartidaList from './workspace/PartidaList.jsx';
 
@@ -205,11 +205,12 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
       <div className="space-y-3 px-3 pt-3">
         <PartidaList draft={draft} groups={groups} open={ui.open} locked={Boolean(locked)} onBlocked={blocked} showErrors onToggle={toggle} onUpdate={updatePartida} onTask={changeTask} onAdd={addPartida} onRemove={removePartida} onPrice={openPrice} />
         <CrewBlock project={project} result={result} locked={Boolean(locked)} onBlocked={blocked} setDraft={setDraft} setProject={setProject} open={ui.open.crew} onToggle={toggle} />
-        <MachineryBlock draft={draft} result={result} regionCode={regionCode} projectLocation={location} locked={Boolean(locked)} onBlocked={blocked} setDraft={setDraft} open={ui.open.machinery} onToggle={toggle} />
         <FinanceBlock draft={draft} locked={Boolean(locked)} onBlocked={blocked} setDraft={edit} open={ui.open.finance} onToggle={toggle} />
         <CashBlock total={total} payments={project.payments} onChange={setList('payments')} open={ui.open.cash} onToggle={toggle} />
         <LogBlock entries={project.logbook} onChange={setList('logbook')} open={ui.open.log} onToggle={toggle} projectId={project.id} />
         <ExpensesBlock expenses={project.expenses} queued={queued} receipts={receipts} onChange={setList('expenses')} open={ui.open.expenses} onToggle={toggle} />
+        {/* machinery rentals no longer have a module of their own (their flow will be absorbed by another one); exceptions surface in the tray */}
+        <AlertTray />
       </div>
 
       <Dock onOpen={openDock} queued={queued.filter((r) => r.status === 'pending' || r.status === 'sending').length} />

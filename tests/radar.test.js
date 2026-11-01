@@ -474,7 +474,8 @@ describe('workspace UI', () => {
     expect(q('supplier-cement_bag').textContent).toBe('');
   });
 
-  it('machinery rates get the same supplier bar and caption', async () => {
+  // the machinery module is not rendered any more (its flow will be absorbed by another one); this comes back with it
+  it.skip('machinery rates get the same supplier bar and caption', async () => {
     await mount(mk());
     await click(q('rent-rate-mixer'));
     expect(q('rent-pad').querySelector('[data-testid="supplier-bar"]')).not.toBeNull();
