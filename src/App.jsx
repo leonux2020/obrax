@@ -49,6 +49,7 @@ import ProjectWorkspace from './components/ProjectWorkspace.jsx';
 import PostMortem from './components/PostMortem.jsx';
 import { useHistoryBack } from './lib/useHistoryBack.js';
 import ToastHost from './components/workspace/ToastHost.jsx';
+import { isStandalone } from './pwa/installPrompt.js';
 import { workspaceEnabled } from './lib/flags.js';
 import { withMarket, quoteLock } from './lib/workspaceModel.js';
 import { askNotifyPermission, pushToast, systemNotify, updateToast } from './lib/notify.js';
@@ -68,7 +69,7 @@ import BottomNav from './components/BottomNav.jsx';
 import ProjectSheet from './components/ProjectSheet.jsx';
 import SettingsSheet from './components/SettingsSheet.jsx';
 import { clearOAuthResult, connectDrive, peekOAuthResult } from './lib/oauthCallback.js';
-import SplashScreen, { SPLASH_TIMING } from './components/SplashScreen.jsx';
+import SplashScreen from './components/SplashScreen.jsx';
 import ProfileSetup from './components/ProfileSetup.jsx';
 import ProPaywall from './components/ProPaywall.jsx';
 import RestorePrompt from './components/RestorePrompt.jsx';
@@ -121,16 +122,25 @@ export const resetBoot = () => {
 /** Back to the opening screen with a clean page load (the app lives at the site root). */
 const goToStart = () => window.location.replace(import.meta.env?.BASE_URL || '/');
 
+/** A visitor with no session, no onboarding mark and an empty company profile: the only one who needs a welcome / setup. */
+const isNewProfile = (user, meta, company) => !user && !meta.onboarded && isCompanyEmpty(company);
+
 const projectCompany = (project, company) => documentCompany(project.company, company);
 
-export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart }) {
+export default function App({ onSignedOut = goToStart, installed = isStandalone() }) {
   const pwa = usePWA();
   const pro = usePro();
   // The interface follows the device's language (an Italian phone gets Italian) unless the user locked a language in the settings.
   const [settings, setSettings] = useState(() => {
     const stored = loadSettings();
     const lang = languageFor(stored);
-    return lang === stored.lang ? stored : { ...stored, lang };
+    const base = lang === stored.lang ? stored : { ...stored, lang };
+    // An installed app of a brand-new profile goes straight to the setup (no welcome screen to run `start()` for it): the country comes from the device here.
+    if (installed && !base.region && isNewProfile(loadUser(), loadProfileMeta(), loadCompany())) {
+      const code = detectCurrentRegion();
+      if (code) return { ...base, region: code };
+    }
+    return base;
   });
   const [user, setUser] = useState(loadUser);
   const [company, setCompany] = useState(loadCompany); // global profile (text); the logo lives in IndexedDB
@@ -143,12 +153,13 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
     const m = loadProfileMeta(); // { onboarded, drive }
     return oauth?.granted && m.onboarded ? { ...m, drive: true } : m;
   });
-  // The welcome screen ('splash') is ALWAYS the first view of a new or signed-out user (nobody authenticated);
-  // a stored user goes straight to the app. 'setup' is the registration (first run), 'app' shows Login when
-  // there is no user.
-  // The opening screen is ALWAYS the first thing shown, installed or not: it carries the brand (CUBRAX, "Un producto Japadigital") and is drawn
-  // as the continuation of the system splash (same logo size, same centre, only the texts fade in), so the handoff is not a jump.
-  const [stage, setStage] = useState('splash');
+  // Zero-latency boot, no timers, no fade: anybody who already has a profile or a session (installed app or browser tab) starts in the main
+  // view: the black shell, then the projects as soon as IndexedDB answers. The OS already drew the logo (manifest icon) while the app loaded.
+  // An INSTALLED app of a brand-new profile goes straight to the setup. Only a first visit in a browser tab meets the minimal welcome screen
+  // ('splash': one "Iniciar" button), which is never part of an installed app's life.
+  const [stage, setStage] = useState(() =>
+    !isNewProfile(user, meta, company) ? 'app' : installed ? 'setup' : 'splash'
+  );
   const [sheet, setSheet] = useState(null); // { type: 'new' | 'edit' | 'settings', id? }
   const [tab, setTab] = useState('projects'); // bottom navigation: 'projects' | 'accounting' (Ajustes is a sheet)
   const [dashTab, setDashTab] = useState('active'); // dashboard tabs: 'active' | 'history'
@@ -822,14 +833,14 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   return (
     <I18nProvider lang={settings.lang} regionCode={active ? active.draft.regionCode : financeProject ? financeProject.draft.regionCode : settings.region}>
       {stage === 'splash' ? (
-        <SplashScreen onStart={start} auto={Boolean(user) || returning || Boolean(oauth)} timing={splash} pwa={pwa} />
+        <SplashScreen onStart={start} auto={Boolean(oauth)} pwa={pwa} />
       ) : stage === 'setup' ? (
         !region || pickingRegion ? (
           <RegionSelect
             initial={settings.region}
             onConfirm={confirmRegion}
             onChangeLang={changeLang}
-            onCancel={region ? () => setPickingRegion(false) : () => setStage('splash')}
+            onCancel={region ? () => setPickingRegion(false) : installed ? undefined : () => setStage('splash')}
           />
         ) : (
           <ProfileSetup onSave={finishSetup} onChangeRegion={() => setPickingRegion(true)} returned={oauth} onDriveConnected={onDriveConnected} />

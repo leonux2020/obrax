@@ -137,16 +137,15 @@ describe('lettering', () => {
 });
 
 describe('splash + dashboard', () => {
-  it('the opening screen draws neither hat nor lettering (the OS icon does): hidden name + the credit at the bottom', async () => {
+  it('the welcome screen (first browser visit) draws neither hat, lettering nor credit: hidden name + the button only', async () => {
     await render(React.createElement(SplashScreen, { onStart: () => {}, auto: false }));
     const h1 = host.querySelector('h1');
     expect(h1.textContent).toBe('CUBRAX');
     expect(h1.className).toContain('sr-only');
     expect(host.querySelector('svg')).toBeNull();
     expect(host.querySelector('img')).toBeNull();
-    const credit = host.querySelector('[data-testid="splash-credit"]');
-    expect(credit.textContent).toBe('Un producto Japadigital');
-    expect(credit.className).toContain('text-center');
+    expect(host.querySelector('[data-testid="splash-credit"]')).toBeNull();
+    expect(host.querySelector('[data-testid="splash-start"]')).not.toBeNull();
   });
 
   it('the dashboard and the top bar carry the isotype at 32 px tall next to the CUBRAX lettering', async () => {

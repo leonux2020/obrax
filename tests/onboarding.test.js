@@ -55,7 +55,7 @@ afterEach(() => {
 });
 
 describe('first run: splash -> setup -> dashboard', () => {
-  it('a brand-new install shows an empty black centre (the OS draws the logo), one "Iniciar" button and "Un producto Japadigital"', async () => {
+  it('a brand-new install shows an empty black centre (the OS draws the logo), and one "Iniciar" button', async () => {
     await mountApp();
     expect(q('splash')).not.toBeNull();
     expect(host.querySelector('img')).toBeNull(); // neither hat nor lettering: the manifest icon is the logo
@@ -65,11 +65,11 @@ describe('first run: splash -> setup -> dashboard', () => {
     expect(buttons[0].textContent).toBe('Iniciar');
     expect(buttons[0].closest('.absolute').className).toContain('bottom-0');
     expect(q('install-app').closest('.absolute').className).toContain('bottom-0');
-    expect(q('splash-credit').textContent).toBe('Un producto Japadigital');
+    expect(q('splash-credit')).toBeNull(); // the credit left the welcome screen
     const name = host.querySelector('h1');
     expect(name.textContent).toBe('CUBRAX'); // only for screen readers: the visible lettering is in the OS icon
     expect(name.className).toContain('sr-only');
-    expect(host.querySelectorAll('p')).toHaveLength(1); // no tagline, no extra text
+    expect(host.querySelectorAll('p')).toHaveLength(0); // no tagline, no credit, no text at all
     expect(host.querySelector('header')).toBeNull(); // no app chrome around the splash
   });
 
