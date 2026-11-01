@@ -114,7 +114,7 @@ describe('Dashboard: counters instead of sentences, tabs, full-width clickable c
     }
     const cards = qa('project-card');
     expect(cards.map((c) => c.getAttribute('data-level')).sort()).toEqual(['green', 'red']);
-    for (const c of cards) expect(c.style.borderBottomColor).toMatch(/^(#|rgb)/);
+    for (const c of cards) expect(c.style.borderLeftColor).toMatch(/^(#|rgb)/);
     expect(Object.values(LEVEL_COLOR).slice(0, 4)).toEqual(Object.values(colors));
   });
 
@@ -152,26 +152,32 @@ describe('Dashboard: counters instead of sentences, tabs, full-width clickable c
     expect(qa('project-card')).toHaveLength(5);
   });
 
-  it('cards: the whole card is the only button, thick bottom border in the state colour, flag and late days', async () => {
+  it('cards: the whole card is the only button, thick LEFT stripe in the state colour (nothing on the bottom), flag and late days', async () => {
     const opened = [];
     await render(React.createElement(Harness, { onOpen: (id) => opened.push(id), onNew: () => {} }));
     const cards = qa('project-card');
     for (const c of cards) {
       expect(c.tagName).toBe('BUTTON');
       expect(c.className).toContain('w-full');
-      expect(c.className).toContain('border-b-[3px]'); // slightly thicker bottom edge...
+      expect(c.className).toContain('border-l-[6px]'); // thick left stripe...
+      expect(c.className).not.toMatch(/border-b-\[|border-b-\d/); // ...and no coloured/thick bottom edge any more
+      expect(c.style.borderBottomColor).toBe('');
       expect(c.className).toMatch(/\bborder\b/); // ...on a 1px perimeter
+      expect(c.className).toMatch(/\bpl-4\b/); // the text breathes next to the stripe
       expect(c.className).toContain('border-white/10'); // hairline, neutral
       expect(c.className).toContain('bg-transparent'); // no solid fill
       expect(c.className).not.toMatch(/bg-(black|gradient)|from-|border-2|border-b-\[8px\]/);
-      expect(c.style.borderColor).toBe(''); // the state colour is ONLY on the bottom edge
-      expect(c.style.borderBottomColor).not.toBe('');
+      expect(c.style.borderColor).toBe(''); // the state colour is ONLY on the left edge
+      const probe = document.createElement('div');
+      probe.style.borderLeftColor = LEVEL_COLOR[c.getAttribute('data-level')];
+      expect(c.style.borderLeftColor).not.toBe('');
+      expect(c.style.borderLeftColor).toBe(probe.style.borderLeftColor); // same colour logic as before, per state
       expect(c.querySelector('[data-testid="card-detail"]').style.color).toBe(''); // detail text is neutral too
       expect(c.querySelectorAll('button')).toHaveLength(0); // no Abrir / Editar inside
       expect(c.querySelector('[data-testid="card-flag"]').textContent).toBe('🇨🇱');
     }
     const late = cards.find((c) => c.getAttribute('data-level') === 'red');
-    expect(late.style.borderBottomColor).not.toBe('');
+    expect(late.style.borderLeftColor).not.toBe('');
     expect(late.querySelector('[data-testid="card-detail"]').textContent).toContain('4');
     expect(LEVEL_COLOR.red).toBe('#ff2b2b');
     expect(cards.find((c) => c.getAttribute('data-level') === 'future')).toBeTruthy();

@@ -12,7 +12,7 @@ import Hourglass from './Hourglass.jsx';
 
 /**
  * One client job, full width. The WHOLE card is the button (no Open / Edit buttons): a hairline neutral outline and a
- * slightly thicker bottom border that is the ONLY thing carrying the state colour, plus the country flag, the days
+ * thick LEFT stripe that is the ONLY thing carrying the state colour, plus the country flag, the days
  * that matter and an hourglass when a rented tool is due back today.
  */
 export default function ProjectCard({ project, now, onOpen }) {
@@ -46,8 +46,8 @@ export default function ProjectCard({ project, now, onOpen }) {
         data-testid="project-card"
         data-level={level}
         aria-label={[title, client, detail].filter(Boolean).join(', ')}
-        style={{ borderBottomColor: LEVEL_COLOR[level] }}
-        className="block w-full rounded-2xl border border-b-[3px] border-white/10 bg-transparent p-4 text-left transition active:bg-white/[0.04]"
+        style={{ borderLeftColor: LEVEL_COLOR[level] }}
+        className="block w-full rounded-xl border border-l-[6px] border-white/10 bg-transparent p-4 pl-4 text-left transition active:bg-white/[0.04]"
       >
         <span className="flex items-start gap-3">
           <span className="min-w-0 flex-1">

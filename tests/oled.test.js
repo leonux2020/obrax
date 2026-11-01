@@ -60,8 +60,17 @@ describe('one-hand ergonomics', () => {
 
   it('touch targets are at least 44 px', () => {
     expect(read('components/BottomNav.jsx')).toMatch(/min-h-\[56px\]/);
-    // the whole card is one big button (no tiny Open / Edit buttons) and the FAB is 64 px
+    // the whole card is one big button (no tiny Open / Edit buttons) and the FAB is 52 px (still above the 44 px minimum)
     expect(read('components/ProjectCard.jsx')).toMatch(/block w-full[^"]*p-4/);
-    expect(read('components/Dashboard.jsx')).toMatch(/h-16 w-16/);
+    const dash = read('components/Dashboard.jsx');
+    expect(dash).toMatch(/h-\[52px\] w-\[52px\]/);
+    expect(dash).not.toMatch(/h-16 w-16/);
+    expect(dash).toContain('<svg width="24" height="24"'); // the + shrank with the button
+    // calmer on OLED: a tone darker than the brand green and a soft, low-alpha shadow instead of the 24 px / .35 glow
+    const fab = dash.slice(dash.indexOf('data-testid="fab-new"'));
+    expect(fab).toContain('bg-brand-dark');
+    expect(fab).toContain('shadow-[0_2px_10px_rgba(22,163,74,0.22)]');
+    expect(fab).not.toContain('0_0_24px');
+    expect(dash).toMatch(/pb-44/); // the last card scrolls fully above the button
   });
 });

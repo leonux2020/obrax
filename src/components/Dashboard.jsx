@@ -149,9 +149,9 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro }
         onClick={onNew}
         data-testid="fab-new"
         aria-label={t('dash.new')}
-        className="no-print fixed right-4 z-30 flex h-16 w-16 items-center justify-center rounded-full bg-brand text-black shadow-[0_0_24px_rgba(34,197,94,0.35)] transition active:scale-95 [bottom:calc(5.5rem+env(safe-area-inset-bottom))]"
+        className="no-print fixed right-3 z-30 flex h-[52px] w-[52px] items-center justify-center rounded-full bg-brand-dark text-black shadow-[0_2px_10px_rgba(22,163,74,0.22)] transition active:scale-95 [bottom:calc(5.25rem+env(safe-area-inset-bottom))]"
       >
-        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
           <path d="M12 5v14M5 12h14" />
         </svg>
       </button>
