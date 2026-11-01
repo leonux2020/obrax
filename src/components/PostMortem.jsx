@@ -33,9 +33,9 @@ const Section = ({ title, children, testId }) => (
  * "Dashboard Post-Mortem": what a FINISHED project (closedAt > 0) shows instead of the living list. Read-only on purpose: no
  * input, no slider, no numpad. Balance (budgeted vs collected vs real profit), time (estimated vs real days per the
  * logbook), the quote's items and the logbook notes. At the end, "Crear extensión" starts a new phase of the same job.
- * The only actions are buttons: back, export, reopen and create extension.
+ * The only actions are buttons: export, reopen and create extension (no back arrow: the device's back leaves it, as in an active project).
  */
-export default function PostMortem({ project, parent = null, company, photos, setDraft, onBack, onReopen, onExtend }) {
+export default function PostMortem({ project, parent = null, company, photos, setDraft, onReopen, onExtend }) {
   const i18n = useI18n();
   const { t, money, num, unit, locale, region } = i18n;
   const draft = project.draft;
@@ -69,9 +69,6 @@ export default function PostMortem({ project, parent = null, company, photos, se
     <main className="mx-auto min-h-[100dvh] w-full max-w-3xl bg-black pb-16 text-[#E0E0E0]" data-testid="project-postmortem">
       <header data-testid="ws-zone-a" className="sticky top-0 z-20 border-b border-white/10 bg-black px-3 pb-3 pt-2">
         <div className="flex items-center gap-2">
-          <button type="button" onClick={onBack} aria-label={t('common.back')} data-testid="ws-back" className="-ml-1 flex h-11 w-11 shrink-0 items-center justify-center text-3xl font-light leading-none text-[#E0E0E0] active:opacity-50">
-            <span aria-hidden="true">←</span>
-          </button>
           <div className="min-w-0 flex-1">
             <h1 data-testid="ws-title" className="truncate text-xl font-extrabold leading-tight">
               {title}

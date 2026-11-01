@@ -873,7 +873,6 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
                   company={projectCompany(active, company)}
                   photos={photos}
                   setDraft={setDraft}
-                  onBack={closeProject}
                   onReopen={() => commit({ ...active, closedAt: 0, updatedAt: Date.now() })}
                   onExtend={() => createExtension(active)}
                 />

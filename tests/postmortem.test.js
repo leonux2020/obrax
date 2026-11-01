@@ -273,7 +273,20 @@ describe('Post-Mortem screen', () => {
     expect(notes[1].textContent).toContain('Inicio de obra');
   });
 
-  it('only buttons: back, export, reopen and create extension; reopening brings the living list back', async () => {
+  it('the closed-project screen has no back arrow either: the device back leaves it, like an active project', async () => {
+    await seed([finished()]);
+    await mountApp();
+    await openHistory();
+    await click(q('project-card'));
+    expect(q('project-postmortem')).not.toBeNull();
+    expect(q('ws-back')).toBeNull();
+    expect(q('project-postmortem').textContent).not.toContain('←');
+    await deviceBack();
+    expect(q('project-postmortem')).toBeNull();
+    expect(q('project-card')).not.toBeNull();
+  });
+
+  it('only buttons: export, reopen and create extension (no back arrow); reopening brings the living list back', async () => {
     await seed([finished()]);
     await mountApp();
     await openHistory();

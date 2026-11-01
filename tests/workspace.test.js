@@ -231,6 +231,33 @@ describe('ProjectWorkspace: three zones', () => {
     expect(q('ws-total').querySelector('span').className).not.toContain('font-black');
   });
 
+  it('meters: Plazo and Caja sit in a two-column grid, each with label on top, value below on the right and the bar on its own line; quiet grey', async () => {
+    await mount({ initial: mk({}, -5, 5) });
+    const grid = q('ws-meters');
+    expect(grid.className).toMatch(/\bgrid\b/);
+    expect(grid.className).toContain('grid-cols-2');
+    expect(grid.className).toContain('gap-4');
+    expect(grid.className).toContain('w-full');
+    expect(grid.className).toContain('mt-4');
+    expect(grid.className).toContain('mb-2');
+    expect([...grid.children].map((c) => c.dataset.testid)).toEqual(['bar-time', 'bar-cash']);
+    for (const id of ['time', 'cash']) {
+      const col = q(`bar-${id}`);
+      const [label, value, bar] = col.children;
+      expect(label.tagName).toBe('P'); // label on its own line, on top
+      expect(label.className).toContain('text-neutral-400');
+      expect(value.dataset.testid).toBe(`bar-${id}-value`); // value on the next line...
+      expect(value.className).toContain('text-right'); // ...to the right
+      expect(value.className).toContain('text-neutral-400');
+      expect(bar.getAttribute('role')).toBe('progressbar'); // the bar, last, on its own line
+      expect(label.textContent).not.toBe('');
+    }
+    expect(q('bar-time-value').textContent).toBe('5/10 d');
+    // the meters are quieter than the total
+    expect(q('ws-total').querySelector('span').className).toContain('text-3xl');
+    expect(q('bar-time-value').className).toContain('text-sm');
+  });
+
   it('a job that is not late keeps its state word with the days, and a NAMED place is still shown', async () => {
     await mount({ initial: mk({}, -5, 60) });
     expect(q('ws-status').textContent).toMatch(/A tiempo.*\d/);

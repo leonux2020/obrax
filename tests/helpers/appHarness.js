@@ -28,8 +28,7 @@ export const deviceBack = async () => {
 // (?workspace=0) it opens in the editor instead: leave it (wizard back -> project view -> back).
 export async function backToDashboard() {
   for (let i = 0; i < 8; i += 1) {
-    if (q('ws-back')) return click(q('ws-back')); // the Post-Mortem still has its arrow
-    if (q('project-workspace')) return deviceBack();
+    if (q('project-workspace') || q('project-postmortem')) return deviceBack(); // neither has a back arrow
     if (q('pv-back')) return click(q('pv-back'));
     if (q('wizard-back')) await click(q('wizard-back'));
     else return;

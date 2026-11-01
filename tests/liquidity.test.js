@@ -137,7 +137,7 @@ describe('Zone A: "Caja 25 % · $ 1.500"', () => {
     await open(job());
     const liquid = q('cash-liquid');
     expect(liquid.className).toContain('text-sm');
-    expect(liquid.className).toContain('text-[#E0E0E0]/60');
+    expect(liquid.className).toContain('text-neutral-400');
     expect(liquid.className).not.toMatch(/bg-/);
     expect(q('ws-zone-a').className).toContain('bg-black');
   });

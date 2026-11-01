@@ -8,21 +8,23 @@ const Pencil = () => (
   </svg>
 );
 
-/** One thin progress bar. The only colour is the fill (a progress indicator, not a state background). */
-function Bar({ id, label, pct, tone, text, sub = null }) {
+/**
+ * One meter, stacked so nothing is crammed: label on top, value below it on the right, the thin bar on its own line.
+ * The only colour is the bar's fill (a progress indicator, not a state background); the texts are quiet neutral grey so they never
+ * compete with the total.
+ */
+function Bar({ id, label, pct, tone, text, sub = null, className = '' }) {
   const drawn = pct !== null && pct !== undefined;
   if (!drawn && !sub) return null;
   return (
-    <div data-testid={`bar-${id}`} data-pct={drawn ? Math.round(pct) : undefined} className="min-w-0">
-      <div className="flex items-baseline justify-between gap-2 text-[11px] font-semibold text-[#E0E0E0]/70">
-        <span>{label}</span>
-        <span className="min-w-0 truncate text-right tabular-nums">
-          {drawn && text}
-          {sub}
-        </span>
-      </div>
+    <div data-testid={`bar-${id}`} data-pct={drawn ? Math.round(pct) : undefined} className={`min-w-0 ${className}`}>
+      <p className="text-sm text-neutral-400">{label}</p>
+      <p data-testid={`bar-${id}-value`} className="mt-0.5 text-right text-sm tabular-nums text-neutral-400">
+        {drawn && text}
+        {sub}
+      </p>
       {drawn && (
-        <div className="mt-0.5 h-1 overflow-hidden rounded-full border border-white/15" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}>
+        <div className="mt-1.5 h-1 overflow-hidden rounded-full border border-white/15" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}>
           <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.max(0, pct))}%`, backgroundColor: tone }} />
         </div>
       )}
@@ -86,10 +88,12 @@ export default function HeaderZone({ project, model, title, client, region, offl
         </button>
       </div>
 
-      <div className="mt-2 grid grid-cols-[1fr_1.35fr] gap-3">
+      {(time.pct !== null && time.pct !== undefined) || (cash.pct !== null && cash.pct !== undefined) || cash.liquid !== 0 ? (
+      <div data-testid="ws-meters" className="mb-2 mt-4 grid w-full grid-cols-2 gap-4">
         <Bar id="time" label={t('ws.bar.time')} pct={time.pct} tone={time.tone} text={`${time.elapsed}/${time.of} d`} />
         <Bar
           id="cash"
+          className="col-start-2" // Cassa always sits in the right column, even when there is no schedule
           label={t('ws.bar.cash')}
           pct={cash.pct}
           tone={cash.tone}
@@ -97,7 +101,7 @@ export default function HeaderZone({ project, model, title, client, region, offl
           // the real cash on hand (paid by the client - expenses - worker advances), in the money of THIS project's market
           sub={
             (cash.pct !== null || cash.liquid !== 0) && (
-            <span data-testid="cash-liquid" data-liquid={cash.liquid} data-negative={cash.liquid < 0 ? 'true' : undefined} className={`text-sm font-semibold ${cash.liquid < 0 ? 'text-[#e8c35f]/80' : 'text-[#E0E0E0]/60'}`}>
+            <span data-testid="cash-liquid" data-liquid={cash.liquid} data-negative={cash.liquid < 0 ? 'true' : undefined} className={`text-sm font-medium ${cash.liquid < 0 ? 'text-[#e8c35f]/80' : 'text-neutral-400'}`}>
               {cash.pct !== null && cash.pct !== undefined && <span aria-hidden="true"> · </span>}
               {money(cash.liquid)}
             </span>
@@ -105,6 +109,7 @@ export default function HeaderZone({ project, model, title, client, region, offl
           }
         />
       </div>
+      ) : null}
 
       {model.locked && (
         <button type="button" onClick={onUnlock} data-testid="ws-unlock" className="mt-2 min-h-[40px] w-full rounded-lg border border-[#d4af37]/60 px-3 text-xs font-bold text-[#e8c35f] active:border-[#d4af37]">
