@@ -3,8 +3,11 @@ import { useI18n } from '../lib/i18n.jsx';
 import { Button, Logo, Wordmark } from './ui.jsx';
 import InstallButton from './InstallButton.jsx';
 
-/** How long the opening screen is held and how long its fade-out lasts (ms). */
-export const SPLASH_TIMING = Object.freeze({ hold: 1500, fade: 450 });
+/**
+ * How long the opening screen is held and how long its fade-out lasts (ms). Only a browser tab of a returning user waits here (an
+ * installed app skips this screen, see App): it is a brand blink, not a loading time (the data is ready long before).
+ */
+export const SPLASH_TIMING = Object.freeze({ hold: 400, fade: 200 });
 
 /**
  * Opening screen: ONLY the hard-hat logo, the CUBRAX lettering (green X) right under it and "Un producto Japadigital". It is ALWAYS shown when the app opens.

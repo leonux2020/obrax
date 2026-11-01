@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
-// The opening screen: ALWAYS shown, 1.5 s, then a fade-out into the app (even with a session).
+// The opening screen of a browser tab: shown for a short brand blink (SPLASH_TIMING), then a fade-out into the app (even with a session).
+// An installed app skips it (tests/zeroLatencyLaunch.test.js).
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -41,18 +42,18 @@ afterEach(() => {
 });
 
 describe('opening screen', () => {
-  it('is held 1.5 s, then fades out and the Dashboard appears - even when the user already has a session', async () => {
-    expect(SPLASH_TIMING.hold).toBe(1500);
+  it('is held for the brief SPLASH_TIMING hold, then fades out and the Dashboard appears - even when the user already has a session', async () => {
+    const { hold, fade } = SPLASH_TIMING;
     seed();
-    await mount(React.createElement(App));
+    await mount(React.createElement(App, { installed: false }));
     expect(q('splash')).not.toBeNull();
     expect(q('splash').textContent).toContain('Un producto Japadigital');
     expect(q('splash-start')).toBeNull(); // nothing to press: it leaves by itself
     expect(q('dash-empty')).toBeNull();
-    await advance(1400);
+    await advance(hold - 50);
     expect(q('splash')).not.toBeNull();
     expect(q('splash').getAttribute('data-leaving')).toBeNull();
-    await advance(150); // 1.55 s: the fade-out has started
+    await advance(100); // the hold is over: the fade-out has started
     expect(q('splash')).not.toBeNull();
     expect(q('splash').getAttribute('data-leaving')).toBe('true');
     expect(q('splash').className).toContain('opacity-0');
@@ -64,16 +65,16 @@ describe('opening screen', () => {
 
   it('a signed-out returning user also sees it first, then lands on the access screen', async () => {
     seed({ user: false });
-    await mount(React.createElement(App));
+    await mount(React.createElement(App, { installed: false }));
     expect(q('splash')).not.toBeNull();
-    await advance(1500 + SPLASH_TIMING.fade + 50);
+    await advance(SPLASH_TIMING.hold + SPLASH_TIMING.fade + 50);
     expect(q('splash')).toBeNull();
     expect(q('dash-empty')).toBeNull();
     expect(host.textContent).toMatch(/Google|perfil|Entrar|Acceder/i);
   });
 
   it('first run keeps the single "Iniciar" button and does not leave on its own', async () => {
-    await mount(React.createElement(App));
+    await mount(React.createElement(App, { installed: false }));
     expect(q('splash-start').textContent).toBe('Iniciar');
     await advance(10_000);
     expect(q('splash')).not.toBeNull();
@@ -83,7 +84,7 @@ describe('opening screen', () => {
   it('the component only calls onStart once, after hold + fade, and cleans its timers when unmounted early', async () => {
     const onStart = vi.fn();
     await mount(React.createElement(I18nProvider, { lang: 'es', regionCode: 'CL' }, React.createElement(SplashScreen, { onStart, auto: true })));
-    await advance(1500);
+    await advance(SPLASH_TIMING.hold);
     expect(onStart).not.toHaveBeenCalled();
     await advance(SPLASH_TIMING.fade);
     expect(onStart).toHaveBeenCalledTimes(1);

@@ -51,6 +51,7 @@ import { useHistoryBack } from './lib/useHistoryBack.js';
 import ToastHost from './components/workspace/ToastHost.jsx';
 import { workspaceEnabled } from './lib/flags.js';
 import { withMarket, quoteLock } from './lib/workspaceModel.js';
+import { isStandalone } from './pwa/installPrompt.js';
 import { askNotifyPermission, pushToast, systemNotify, updateToast } from './lib/notify.js';
 import { collectDossierImages, syncDossier } from './lib/driveExport.js';
 import { receiptQueue } from './lib/receiptQueue.js';
@@ -123,7 +124,7 @@ const goToStart = () => window.location.replace(import.meta.env?.BASE_URL || '/'
 
 const projectCompany = (project, company) => documentCompany(project.company, company);
 
-export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart }) {
+export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart, installed = isStandalone() }) {
   const pwa = usePWA();
   const pro = usePro();
   // The interface follows the device's language (an Italian phone gets Italian) unless the user locked a language in the settings.
@@ -146,7 +147,10 @@ export default function App({ splash = SPLASH_TIMING, onSignedOut = goToStart })
   // The welcome screen ('splash') is ALWAYS the first view of a new or signed-out user (nobody authenticated);
   // a stored user goes straight to the app. 'setup' is the registration (first run), 'app' shows Login when
   // there is no user.
-  const [stage, setStage] = useState('splash'); // the opening screen is ALWAYS the first thing shown
+  // Zero-latency launch: an INSTALLED app (standalone / home-screen) already showed the system splash (the hard hat of the manifest) while it
+  // loaded, so a user with a profile goes straight to the main view (the black shell, then the projects as soon as IndexedDB answers):
+  // a second, bigger splash drawn by React would be a visible jump. Browsers and first visits keep the welcome screen.
+  const [stage, setStage] = useState(() => (installed && (user || meta.onboarded || !isCompanyEmpty(company)) ? 'app' : 'splash'));
   const [sheet, setSheet] = useState(null); // { type: 'new' | 'edit' | 'settings', id? }
   const [tab, setTab] = useState('projects'); // bottom navigation: 'projects' | 'accounting' (Ajustes is a sheet)
   const [dashTab, setDashTab] = useState('active'); // dashboard tabs: 'active' | 'history'
