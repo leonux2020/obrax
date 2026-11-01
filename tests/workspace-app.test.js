@@ -15,6 +15,12 @@ const JPEG = `data:image/jpeg;base64,${Buffer.from(Array.from({ length: 300 }, (
 let host;
 let root;
 const q = (id) => document.querySelector(`[data-testid="${id}"]`);
+const deviceBack = async () => {
+  await act(async () => {
+    window.history.back();
+  });
+  await act(async () => new Promise((r) => setTimeout(r, 30)));
+};
 const wait = (ms = 30) => act(async () => new Promise((r) => setTimeout(r, ms)));
 const click = (el) => act(async () => { el.dispatchEvent(new MouseEvent('click', { bubbles: true })); await new Promise((r) => setTimeout(r, 10)); });
 const typeInto = (input, value) =>
@@ -36,7 +42,7 @@ async function newProjectIntoWorkspace() {
   await click(q('fab-new'));
   typeInto(document.querySelector('[role="dialog"] input'), 'Casa Soto');
   await click(q('project-save'));
-  for (let i = 0; i < 8 && !q('ws-back'); i += 1) {
+  for (let i = 0; i < 8 && !q('project-workspace'); i += 1) {
     if (q('wizard-back')) await click(q('wizard-back'));
     else break;
   }
@@ -82,7 +88,7 @@ describe('App with the workspace (default)', () => {
     expect(q('ws-title').textContent).toBe('Casa Soto');
     expect(q('partida-0').open).toBe(true); // the measures are right there
     expect(q('ws-advanced')).toBeNull(); // and there is no door to the old editor
-    await click(q('ws-back'));
+    await deviceBack();
     expect(q('dash-empty') || q('project-card')).not.toBeNull();
     await click(document.querySelector('[data-testid="project-card"]')); // opening an existing project lands in the workspace too
     expect(q('project-workspace')).not.toBeNull();

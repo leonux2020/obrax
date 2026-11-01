@@ -27,6 +27,12 @@ const day = (offset) => {
 let host;
 let root;
 const q = (id) => document.querySelector(`[data-testid="${id}"]`);
+const deviceBack = async () => {
+  await act(async () => {
+    window.history.back();
+  });
+  await act(async () => new Promise((r) => setTimeout(r, 30)));
+};
 const qa = (id) => [...document.querySelectorAll(`[data-testid="${id}"]`)];
 const flush = (ms = 0) => act(async () => new Promise((r) => setTimeout(r, ms)));
 const click = async (el) => {
@@ -186,7 +192,7 @@ describe('device back button inside the real App', () => {
     // the arrow still works and leaves no entry behind
     await click(q('project-card'));
     expect(window.history.state?.cubraxProject).toBeTruthy();
-    await click(q('ws-back'));
+    await deviceBack();
     expect(q('project-workspace')).toBeNull();
     expect(q('project-card')).not.toBeNull();
   });
@@ -282,7 +288,7 @@ describe('Post-Mortem screen', () => {
     expect(isClosed(saved)).toBe(false);
     expect(saved.payments).toHaveLength(1); // nothing else changed
     // and the arrow of the workspace leaves it (the job is active again: it is in the active tab now)
-    await click(q('ws-back'));
+    await deviceBack();
     await click(q('tab-active'));
     expect(q('project-card')).not.toBeNull();
   });
@@ -376,7 +382,7 @@ describe('"Crear extensión" inside the app', () => {
     expect(q('project-postmortem')).toBeNull();
     expect(q('project-workspace')).not.toBeNull(); // the new phase opens in the living list
     expect(q('ws-title').textContent).toBe('Casa Soto - Extensión 1');
-    expect(q('ws-market').dataset.region).toBe('MX'); // the market of the original, not the app's CL
+    expect(q('ws-zone-a').dataset.region).toBe('MX'); // the market of the original, not the app's CL
     expect(q('ws-location').textContent).toBe('CDMX');
     expect(q('partida-0')).toBeNull(); // no items
     await flush(400);

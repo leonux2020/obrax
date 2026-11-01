@@ -219,7 +219,7 @@ export function headerModel({ project, total, valid, cash, liquid = 0, now = Dat
 }
 
 // ---- screen state (what is open) ---------------------------------------------------------------------------------------------
-export const SHEETS = Object.freeze(['log', 'camera', 'scan', 'export', 'cash', 'unlock', 'sign', 'market']);
+export const SHEETS = Object.freeze(['log', 'camera', 'scan', 'export', 'cash', 'unlock', 'sign']);
 
 export const initialWorkspaceState = () => ({ open: {}, pad: null, sheet: null });
 

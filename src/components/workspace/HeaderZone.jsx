@@ -1,14 +1,6 @@
 import { useI18n } from '../../lib/i18n.jsx';
 import { levelDetail } from '../levelStyle.js';
-import { locationLabel } from '../../lib/ledger.js';
 
-const Globe = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="12" cy="12" r="9" />
-    <path d="M3 12h18" />
-    <path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z" />
-  </svg>
-);
 const Pencil = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M12 20h9" />
@@ -39,33 +31,34 @@ function Bar({ id, label, pct, tone, text, sub = null }) {
 }
 
 /**
- * ZONE A: the header that never scrolls away. Name, client, place, traffic light with its days, the live total, the
- * lock and the progress bars. Colour = only a 2 px left border and the lettering of the state line.
+ * ZONE A: the header that never scrolls away. Name, client, place, state with its days, the live total, the lock and the progress
+ * bars. Colour = only a 2 px left border and the lettering of the state line. Quiet by design: no back arrow (the device's back
+ * gesture / button leaves the project), no globe, no coordinates (they stay in the project data, never drawn), a late project
+ * says only "Ritardo di X g", and the three loudest texts (name, late alert, total) are one weight lighter.
  */
-export default function HeaderZone({ project, model, title, client, region, offline, onBack, onEdit, onMarket, onCash, onUnlock }) {
+export default function HeaderZone({ project, model, title, client, region, offline, onEdit, onCash, onUnlock }) {
   const { t, money } = useI18n();
-  const where = locationLabel(project.location);
+  // the place is shown only when it has a NAME; raw coordinates are data, not interface
+  const where = project.location?.label || '';
   const detail = model.closed ? t('proj.closed') : levelDetail(t, model.info) || t(`light.${model.info.level}`);
   const [time, cash] = model.bars;
   return (
-    <header data-testid="ws-zone-a" className="sticky top-0 z-20 border-b border-white/10 bg-black px-3 pb-2 pt-2">
+    <header data-testid="ws-zone-a" data-region={region.code} className="sticky top-0 z-20 border-b border-white/10 bg-black px-3 pb-2 pt-2">
       <div className="flex items-center gap-2">
-        <button type="button" onClick={onBack} aria-label={t('common.back')} data-testid="ws-back" className="-ml-1 flex h-11 w-11 shrink-0 items-center justify-center text-3xl font-light leading-none text-[#E0E0E0] active:opacity-50">
-          <span aria-hidden="true">←</span>
-        </button>
         <div className="min-w-0 flex-1">
-          <h1 data-testid="ws-title" className="truncate text-xl font-extrabold leading-tight">
+          <h1 data-testid="ws-title" className="truncate text-xl font-semibold leading-tight">
             {title}
           </h1>
           <p className="truncate text-sm text-[#E0E0E0]/80">
             <span aria-hidden="true">{region.flag}</span> {client || t('proj.noClient')}
-            <span className="text-[#E0E0E0]/50"> · </span>
-            <span data-testid="ws-location">{where || t('ws.noLocation')}</span>
+            {where && (
+              <>
+                <span className="text-[#E0E0E0]/50"> · </span>
+                <span data-testid="ws-location">{where}</span>
+              </>
+            )}
           </p>
         </div>
-        <button type="button" onClick={onMarket} aria-label={`${t('ws.market.title')}: ${region.code}`} data-testid="ws-market" data-region={region.code} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 active:border-white/40">
-          <Globe />
-        </button>
         <button type="button" onClick={onEdit} aria-label={t('proj.edit')} data-testid="ws-edit" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 active:border-white/40">
           <Pencil />
         </button>
@@ -77,13 +70,14 @@ export default function HeaderZone({ project, model, title, client, region, offl
           data-level={model.level}
           aria-label={`${t('ws.state')}: ${detail}`}
           style={{ borderLeftColor: model.tone, color: model.tone }}
-          className="border-l-2 pl-2 text-sm font-extrabold leading-tight"
+          className={`border-l-2 pl-2 text-sm leading-tight ${model.info.level === 'red' ? 'font-medium' : 'font-extrabold'}`}
         >
-          {t(`light.${model.info.level}`)}
-          <span className="block text-base">{detail}</span>
+          {/* late: ONLY "Ritardo di X g" (the state word "In ritardo" said the same thing twice) */}
+          {model.info.level !== 'red' && t(`light.${model.info.level}`)}
+          <span className={model.info.level === 'red' ? 'text-base' : 'block text-base'}>{detail}</span>
         </p>
         <button type="button" onClick={onCash} aria-label={t('cash.title')} data-testid="ws-total" className="text-right">
-          <span className="block text-3xl font-black tabular-nums leading-none text-brand">{model.total === null ? '—' : money(model.total)}</span>
+          <span className="block text-3xl font-semibold tabular-nums leading-none text-brand">{model.total === null ? '—' : money(model.total)}</span>
           {model.locked && (
             <span data-testid="ws-lock-chip" className="mt-1 block text-[11px] font-bold text-[#e8c35f]">
               🔒 {t(model.locked === 'signed' ? 'ws.lock.signed' : 'ws.lock.frozen')}

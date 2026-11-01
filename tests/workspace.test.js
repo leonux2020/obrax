@@ -208,6 +208,50 @@ describe('ProjectWorkspace: three zones', () => {
     expect(q('materials-0').querySelectorAll('[data-testid^="price-"]').length).toBeGreaterThan(2);
   });
 
+  it('Zone A is quiet: no back arrow, no globe, no coordinates; a late job says ONLY "Atraso de N d"; name / alert / total are lighter', async () => {
+    const p = mk({}, -30, -4);
+    p.location = { lat: -33.4512345, lng: -70.6612345 }; // coordinates, no name
+    await mount({ initial: p });
+    const zone = q('ws-zone-a');
+    expect(q('ws-back')).toBeNull();
+    expect(q('ws-market')).toBeNull();
+    expect(zone.textContent).not.toContain('←');
+    expect(zone.textContent).not.toMatch(/-?33\.45|-?70\.66/); // coordinates stay in the data, never drawn
+    expect(q('ws-location')).toBeNull();
+    expect(p.location.lat).toBe(-33.4512345); // ...and they are still there
+    const st = q('ws-status');
+    expect(st.textContent).toBe('Atraso de 4 d'); // only the days, not "Atrasado" + days
+    expect(st.textContent).not.toMatch(/Atrasado/);
+    // one weight lighter: name semibold (was extrabold), late alert medium (was extrabold), total semibold (was black)
+    expect(q('ws-title').className).toContain('font-semibold');
+    expect(q('ws-title').className).not.toMatch(/font-(extrabold|bold|black)/);
+    expect(st.className).toContain('font-medium');
+    expect(st.className).not.toMatch(/font-(extrabold|bold|black)/);
+    expect(q('ws-total').querySelector('span').className).toContain('font-semibold');
+    expect(q('ws-total').querySelector('span').className).not.toContain('font-black');
+  });
+
+  it('a job that is not late keeps its state word with the days, and a NAMED place is still shown', async () => {
+    await mount({ initial: mk({}, -5, 60) });
+    expect(q('ws-status').textContent).toMatch(/A tiempo.*\d/);
+    expect(q('ws-location').textContent).toBe('Providencia');
+  });
+
+  it('Zone C icons: four thin outline SVGs (no emoji), neutral colour, still labelled', async () => {
+    await mount({ initial: mk() });
+    for (const k of ['log', 'camera', 'scan', 'export']) {
+      const btn = q(`dock-${k}`);
+      const svg = btn.querySelector('svg[data-dock-icon="outline"]');
+      expect(svg, k).not.toBeNull();
+      expect(svg.getAttribute('fill')).toBe('none');
+      expect(svg.getAttribute('stroke')).toBe('currentColor');
+      expect(Number(svg.getAttribute('stroke-width'))).toBeLessThanOrEqual(1.75); // thin line
+      expect(btn.textContent).not.toMatch(/[\u{1F300}-\u{1FAFF}]/u); // no emoji
+      expect(btn.textContent.length).toBeGreaterThan(0); // the label stays
+      expect(btn.className).toContain('text-[#E0E0E0]'); // neutral smoke on black
+    }
+  });
+
   it('Zone C: dock with Bitácora, Cámara, Boleta IA and Exportar', async () => {
     await mount({ initial: mk() });
     expect(['log', 'camera', 'scan', 'export'].map((k) => !!q(`dock-${k}`))).toEqual([true, true, true, true]);

@@ -31,6 +31,12 @@ const day = (offset) => {
 let host;
 let root;
 const q = (id) => document.querySelector(`[data-testid="${id}"]`);
+const deviceBack = async () => {
+  await act(async () => {
+    window.history.back();
+  });
+  await act(async () => new Promise((r) => setTimeout(r, 30)));
+};
 const qa = (id) => [...document.querySelectorAll(`[data-testid="${id}"]`)];
 const flush = (ms = 0) => act(async () => new Promise((r) => setTimeout(r, ms)));
 const click = async (el) => {
@@ -90,25 +96,23 @@ const mount = async (initial, onBack = () => {}) => {
   await flush();
 };
 
-describe('1. back arrow', () => {
-  it('is a quiet "←" in smoke colour #E0E0E0, FIRST in the header (before the title), and leaves the project', async () => {
+describe('1. no back arrow: the device back gesture leaves the project', () => {
+  it('the header has no "←" button (nor a globe), the title comes first and the pencil stays', async () => {
     const onBack = vi.fn();
     await mount(mk(), onBack);
-    const back = q('ws-back');
-    expect(back.textContent).toBe('←');
-    expect(back.className).toContain('text-[#E0E0E0]');
-    expect(back.className).not.toMatch(/border/); // no box around it: no visual noise
-    expect(back.compareDocumentPosition(q('ws-title')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(back.closest('[data-testid="ws-zone-a"]')).not.toBeNull();
-    expect(back.getAttribute('aria-label')).toBeTruthy();
-    await click(back);
-    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(q('ws-back')).toBeNull();
+    expect(q('ws-market')).toBeNull();
+    const zone = q('ws-zone-a');
+    expect(zone.textContent).not.toContain('←');
+    expect(zone.querySelector('h1')).toBe(q('ws-title'));
+    expect(q('ws-edit')).not.toBeNull();
+    expect(zone.querySelector('svg circle + path')).toBeNull(); // the globe drawing is gone
   });
 
-  it('it is still there while the quote is locked and with the sheets open', async () => {
+  it('it is still gone while the quote is locked', async () => {
     const p = mk();
     await mount({ ...p, draft: freezeQuote(p.draft, { pricedAt: Date.now(), total: 1, live: p }) });
-    expect(q('ws-back')).not.toBeNull();
+    expect(q('ws-back')).toBeNull();
   });
 });
 
@@ -253,7 +257,7 @@ describe('3. new project: the closing button', () => {
     await click(q('pad-done'));
     await click(q('cash-add'));
     expect(q('cash-paid').textContent).toMatch(/7\.500/);
-    await click(q('ws-back'));
+    await deviceBack();
     expect(q('project-workspace')).toBeNull();
     expect(q('project-card')).not.toBeNull();
     await flush(400);

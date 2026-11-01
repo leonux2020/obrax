@@ -5,7 +5,7 @@ import 'fake-indexeddb/auto';
 import { Blob as NodeBlob } from 'node:buffer';
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { createFakeDrive } from './helpers/fakeDrive.js';
-import { CLIENT, q, flush, click, installFakeGoogle, createHost } from './helpers/appHarness.js';
+import { CLIENT, q, flush, click, installFakeGoogle, createHost, deviceBack } from './helpers/appHarness.js';
 import { clearDriveToken } from '../src/lib/driveToken.js';
 import { resetToasts } from '../src/lib/notify.js';
 import { projectStore } from '../src/lib/projectStore.js';
@@ -103,7 +103,7 @@ describe('Sincronizar Expediente a Drive', () => {
     expect(toast.dataset.tone).toBe('info');
 
     // the user keeps working: back to the project list while Drive is still busy
-    await click(q('ws-back'));
+    await deviceBack();
     expect(h.host.querySelectorAll('[data-testid="project-card"]')).toHaveLength(1);
     expect(q('toast').textContent).toBe('Sincronizando expediente en Drive...');
 

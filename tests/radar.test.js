@@ -485,43 +485,11 @@ describe('workspace UI', () => {
     expect(q('rent-supplier-mixer').textContent).toContain('km');
   });
 
-  it('globe in the header: the market of THIS project changes, the UI stays in Spanish, the proxy gets the new country', async () => {
-    const calls = [];
-    setPriceFeedEnabled(true);
-    const original = globalThis.fetch;
-    globalThis.fetch = vi.fn(async (_u, init) => {
-      calls.push(JSON.parse(init.body));
-      return { ok: true, status: 200, json: async () => ({ ok: true, book: { region: 'BR', at: NOW, materials: {}, rent: {} } }) };
-    });
-    try {
-      await mount(mk());
-      expect(q('ws-market').dataset.region).toBe('CL');
-      await click(q('ws-market'));
-      expect(q('market-list')).not.toBeNull();
-      await click(q('market-BR'));
-      expect(q('market-warning').textContent).toContain('no se convierten');
-      await click(q('market-confirm'));
-      expect(spy.project.draft.regionCode).toBe('BR');
-      expect(q('ws-market').dataset.region).toBe('BR');
-      expect(q('ws-title').textContent).toBe('Casa Pérez');
-      expect(q('market-list')).toBeNull();
-      expect(q('ws-total').textContent).toContain('R$'); // Brazilian real in its own market format (never the UI language's) currency, labels still Spanish
-      expect(q('dock-export').textContent.length).toBeGreaterThan(0);
-      await flush(20);
-      expect(calls.some((c) => c.countryCode === 'BR' && c.region === 'BR')).toBe(true);
-    } finally {
-      globalThis.fetch = original;
-      setPriceFeedEnabled(false);
-    }
-  });
-
-  it('a locked quote refuses the market change ("Precios bloqueados")', async () => {
-    const p = mk();
-    await mount({ ...p, draft: freezeQuote(p.draft, { pricedAt: Date.now(), total: 1, live: p }) });
-    await click(q('ws-market'));
-    expect(q('market-list')).toBeNull();
-    expect(q('toast').textContent).toBe('Precios bloqueados');
-    expect(spy.project.draft.regionCode).toBe('CL');
+  it('the header carries no globe: the market shows as the flag and data-region, and is changed from the project edit sheet', async () => {
+    await mount(mk());
+    expect(q('ws-market')).toBeNull();
+    expect(q('ws-zone-a').dataset.region).toBe('CL');
+    expect(q('ws-zone-a').textContent).toContain('🇨🇱');
   });
 
   it('the i18n keys of the radar exist in all six languages with the same parameters', () => {

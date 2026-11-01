@@ -124,7 +124,7 @@ describe('universal back stack: sheets inside the real app', () => {
   it('a sheet over a project: Back closes ONLY the sheet, the project stays open', async () => {
     await click(q('project-card'));
     expect(q('ws-title')).not.toBeNull();
-    await click(q('ws-market'));
+    await click(q('dock-export')); // any sheet: the export one
     expect(document.querySelector('[role="dialog"]')).not.toBeNull();
     expect(window.history.state).toMatchObject({ modalOpen: true });
     await deviceBack();

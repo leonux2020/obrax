@@ -15,11 +15,21 @@ export const typeInto = (input, value) =>
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 
+// The project workspace has NO back arrow: the device's back (Android gesture / button, browser arrow) leaves it. history.back() is the
+// real thing: useHistoryBack pushed an entry when the project opened.
+export const deviceBack = async () => {
+  await act(async () => {
+    window.history.back();
+  });
+  await flush(30);
+};
+
 // A NEW project opens in the project workspace (the SPA): its back arrow returns to the list. With the legacy flag
 // (?workspace=0) it opens in the editor instead: leave it (wizard back -> project view -> back).
 export async function backToDashboard() {
   for (let i = 0; i < 8; i += 1) {
-    if (q('ws-back')) return click(q('ws-back'));
+    if (q('ws-back')) return click(q('ws-back')); // the Post-Mortem still has its arrow
+    if (q('project-workspace')) return deviceBack();
     if (q('pv-back')) return click(q('pv-back'));
     if (q('wizard-back')) await click(q('wizard-back'));
     else return;

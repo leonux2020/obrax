@@ -16,7 +16,7 @@ import { useProjectBook, usePriceFeed } from '../lib/usePrices.js';
 import { pushToast } from '../lib/notify.js';
 import { buildDossierDocuments, runExport } from '../lib/exportActions.js';
 import { warmPdfEngine } from '../lib/reportPdf.js';
-import { headerModel, initialWorkspaceState, partidaGroups, quoteLock, unlockQuote, withMarket, withPriceOverride, workspaceReducer } from '../lib/workspaceModel.js';
+import { headerModel, initialWorkspaceState, partidaGroups, quoteLock, unlockQuote, withPriceOverride, workspaceReducer } from '../lib/workspaceModel.js';
 import BottomSheet from './BottomSheet.jsx';
 import Logbook from './Logbook.jsx';
 import { notePhotosFor } from '../lib/notePhotos.js';
@@ -35,7 +35,6 @@ import LogBlock from './workspace/LogBlock.jsx';
 import HeaderZone from './workspace/HeaderZone.jsx';
 import MachineryBlock from './workspace/MachineryBlock.jsx';
 import SupplierPad from './workspace/SupplierPad.jsx';
-import MarketSheet from './workspace/MarketSheet.jsx';
 import PartidaList from './workspace/PartidaList.jsx';
 
 /**
@@ -51,7 +50,7 @@ import PartidaList from './workspace/PartidaList.jsx';
  * Locked (PDF generated or client signature): Zone B is read-only and a tap answers "Precios bloqueados" until the user
  * unlocks it. Offline-first: nothing here needs the network (see the receipt queue, the base catalog and Blob photos).
  */
-export default function ProjectWorkspace({ project, setProject, setDraft, photos, setPhotos, company, receipts, enqueueReceipt, onBack, onEdit, onPro, onSyncDossier = null, dossierBusy = false }) {
+export default function ProjectWorkspace({ project, setProject, setDraft, photos, setPhotos, company, receipts, enqueueReceipt, onEdit, onPro, onSyncDossier = null, dossierBusy = false }) {
   const i18n = useI18n();
   const { t, region } = i18n;
   const draft = project.draft;
@@ -117,14 +116,6 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
       setTimeout(() => document.querySelector('[data-testid="ws-log"]')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' }), 60);
     }
   }, [newestNote, noteCount]);
-
-  // ---- market of THIS project (the app's language stays as it is) --------------------------------------------------------------
-  const openMarket = () => (locked ? blocked() : dispatch({ type: 'sheet', name: 'market' }));
-  const changeMarket = (code) => {
-    setDraft((d) => withMarket(d, code));
-    closeSheet();
-    pushToast({ key: 'ws.market.done', tone: 'ok' });
-  };
 
   // ---- partidas ---------------------------------------------------------------------------------------------------------
   const updatePartida = (id, fn) => edit((d) => ({ ...d, partidas: d.partidas.map((p) => (p.id === id ? fn(p) : p)) }));
@@ -209,7 +200,7 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
 
   return (
     <main className="mx-auto min-h-[100dvh] w-full max-w-3xl bg-black pb-40 text-[#E0E0E0]" data-testid="project-workspace" data-locked={locked || undefined}>
-      <HeaderZone project={project} model={model} title={title} client={projectClient(project)} region={region} offline={!online} onBack={onBack} onEdit={onEdit} onMarket={openMarket} onCash={openCash} onUnlock={() => dispatch({ type: 'sheet', name: 'unlock' })} />
+      <HeaderZone project={project} model={model} title={title} client={projectClient(project)} region={region} offline={!online} onEdit={onEdit} onCash={openCash} onUnlock={() => dispatch({ type: 'sheet', name: 'unlock' })} />
 
       <div className="space-y-3 px-3 pt-3">
         <PartidaList draft={draft} groups={groups} open={ui.open} locked={Boolean(locked)} onBlocked={blocked} showErrors onToggle={toggle} onUpdate={updatePartida} onTask={changeTask} onAdd={addPartida} onRemove={removePartida} onPrice={openPrice} />
@@ -256,7 +247,6 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
           </div>
         </BottomSheet>
       )}
-      {ui.sheet === 'market' && <MarketSheet current={regionCode} onChange={changeMarket} onClose={closeSheet} />}
       {ui.sheet === 'export' && <ExportSheet canPdf={result.valid} onExport={exportDoc} onSync={onSyncDossier ? syncDossier : null} syncing={dossierBusy} onClose={closeSheet} />}
       {ui.sheet === 'sign' && <SignatureSheet total={total} pricedAt={priceTime} onSave={onSign} onSkip={onSkipSign} skipLabel={t('ws.sign.skip')} onClose={closeSheet} />}
       {ui.sheet === 'log' && (
