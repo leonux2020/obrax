@@ -3,6 +3,7 @@ import { emptySlots } from './lib/photos.js';
 import { migrateLegacyPhotos, photoStoreFor } from './lib/photoStore.js';
 import { notePhotosFor, readNotePhotos } from './lib/notePhotos.js';
 import { receiptPhotosFor } from './lib/receiptPhotos.js';
+import { paymentPhotosFor } from './lib/paymentPhotos.js';
 import { projectStore } from './lib/projectStore.js';
 import { logoStore } from './lib/companyStore.js';
 import { hasIndexedDb } from './lib/db.js';
@@ -511,6 +512,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     photoStoreFor(id).clear().catch(() => {});
     notePhotosFor(id).clear().catch(() => {}); // the photos of its logbook notes go with it
     receiptPhotosFor(id).clear().catch(() => {}); // and the pictures of its receipts
+    paymentPhotosFor(id).clear().catch(() => {}); // and the proofs (cheque / transfer slip) of its client payments
     receiptQueue.removeProject(id).catch(() => {});
     exportQueue.removeProject(id).catch(() => {});
     setProjects((list) => list.filter((p) => p.id !== id));

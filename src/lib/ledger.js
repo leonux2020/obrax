@@ -63,10 +63,21 @@ function listOf(raw, max, one) {
   return out;
 }
 
+/** How the client paid (Contanti / Bonifico / Assegno): a closed list, picked with one tap instead of typed. */
+export const CLIENT_PAYMENT_METHODS = Object.freeze(['cash', 'transfer', 'check']);
+
 export const normalizePayments = (raw) =>
   listOf(raw, LEDGER_LIMITS.payments, (p, used) => {
     const a = amount(p.amount);
-    return a === null ? null : { id: idOf(p.id, used), amount: a, at: stamp(p.at), note: sanitizeText(p.note, LEDGER_LIMITS.noteChars).trim() };
+    if (a === null) return null;
+    return {
+      id: idOf(p.id, used),
+      amount: a,
+      at: stamp(p.at),
+      note: sanitizeText(p.note, LEDGER_LIMITS.noteChars).trim(),
+      ...(CLIENT_PAYMENT_METHODS.includes(p.method) ? { method: p.method } : {}), // older payments have none
+      ...(p.photo === true ? { photo: true } : {}), // the cheque / slip photo lives in IndexedDB (paymentPhotos.js)
+    };
   });
 
 export const normalizeAdvances = (raw) =>

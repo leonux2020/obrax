@@ -207,7 +207,7 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
         <PartidaList draft={draft} groups={groups} open={ui.open} locked={Boolean(locked)} onBlocked={blocked} showErrors onToggle={toggle} onUpdate={updatePartida} onTask={changeTask} onAdd={addPartida} onRemove={removePartida} onPrice={openPrice} result={result} setDraft={setDraft} projectLocation={location} />
         <CrewBlock project={project} result={result} locked={Boolean(locked)} onBlocked={blocked} setProject={setProject} open={ui.open.crew} onToggle={toggle} />
         <FinanceBlock draft={draft} locked={Boolean(locked)} onBlocked={blocked} setDraft={edit} open={ui.open.finance} onToggle={toggle} />
-        <CashBlock total={total} payments={project.payments} onChange={setList('payments')} open={ui.open.cash} onToggle={toggle} />
+        <CashBlock projectId={project.id} total={total} payments={project.payments} onChange={setList('payments')} open={ui.open.cash} onToggle={toggle} />
         <LogBlock entries={project.logbook} onChange={setList('logbook')} open={ui.open.log} onToggle={toggle} projectId={project.id} />
         <ExpensesBlock expenses={project.expenses} queued={queued} receipts={receipts} onChange={setList('expenses')} open={ui.open.expenses} onToggle={toggle} />
         {/* machinery has no module of its own: each task lists the machines it uses; exceptions surface in the tray */}

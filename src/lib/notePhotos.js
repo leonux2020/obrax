@@ -9,10 +9,12 @@ import { PHOTO_LIMITS, PhotoError, compressImage } from './photos.js';
 import { STORE_PHOTOS, createRunner, hasIndexedDb } from './db.js';
 import { blobToDataUrl, dataUrlToBlob, hasBlob, isBlob } from './blobs.js';
 
-// `kind`: 'notes' (photos of logbook notes) or 'receipts' (photos of the receipts behind the expenses, see receiptPhotos.js):
-// the same store, each one in its own scope so no screen ever reads the other's rows.
+// `kind`: 'notes' (photos of logbook notes), 'receipts' (photos of the receipts behind the expenses, see receiptPhotos.js) or
+// 'payments' (the cheque / transfer slip behind a client payment, see paymentPhotos.js): the same store, each one in its own scope
+// so no screen ever reads the other's rows.
+const KEY_WORD = { notes: 'note', receipts: 'receipt', payments: 'payment' };
 const scope = (projectId, kind = 'notes') => `${projectId}#${kind}`;
-const keyOf = (projectId, noteId, kind = 'notes') => `${projectId}:${kind === 'notes' ? 'note' : 'receipt'}:${noteId}`;
+const keyOf = (projectId, noteId, kind = 'notes') => `${projectId}:${KEY_WORD[kind] ?? 'note'}:${noteId}`;
 
 /** A clean { blob, width, height, at } or null. Accepts what the compressor returns ({ dataUrl, width, height }) or a Blob row. */
 export function normalizeNotePhoto(input) {
