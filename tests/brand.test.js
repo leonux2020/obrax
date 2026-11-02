@@ -137,7 +137,7 @@ describe('lettering', () => {
 });
 
 describe('splash + dashboard', () => {
-  it('the welcome screen (first browser visit) draws the full imagotype (hard hat + CUBRAX) above the button and no credit', async () => {
+  it('the welcome screen (first browser visit) draws the stacked imagotype (hard hat + CUBRAX under it) above the button and no credit', async () => {
     await render(React.createElement(SplashScreen, { onStart: () => {}, auto: false }));
     const h1 = host.querySelector('h1');
     expect(h1.textContent).toBe('CUBRAX');
@@ -240,5 +240,30 @@ describe('Logo variant="imagotype" (isotype + CUBRAX lettering)', () => {
     await render(React.createElement(Logo, { size: 32 }));
     expect(host.querySelector('[data-testid="logo"]').style.height).toBe('32px');
     expect(host.querySelector('[data-testid="logo-word"]')).toBeNull();
+  });
+});
+
+describe('Logo variant="stacked" (CUBRAX centred under the hat and the ruler)', () => {
+  it('the viewBox is the whole vertical lockup: lettering below the ruler, centred on the same axis as the hat, inside the box', async () => {
+    const { ICON_LAYOUT, MARK_LAYOUT } = await import('../src/brand/icon.js');
+    await render(React.createElement(Logo, { variant: 'stacked', className: 'w-56 h-auto' }));
+    const svg = host.querySelector('[data-testid="logo"]');
+    expect(svg.getAttribute('data-variant')).toBe('stacked');
+    expect(svg.getAttribute('viewBox')).toBe(`0 0 ${ICON_LAYOUT.w} ${ICON_LAYOUT.h}`);
+    expect(ICON_LAYOUT.h / ICON_LAYOUT.w).toBeGreaterThan(1.1); // taller than wide
+    const word = svg.querySelector('[data-testid="logo-word"]');
+    expect(Number(word.getAttribute('y'))).toBeGreaterThanOrEqual(MARK_LAYOUT.h); // under the ruler
+    expect(Number(word.getAttribute('y')) + Number(word.getAttribute('height'))).toBeLessThanOrEqual(ICON_LAYOUT.h);
+    const wordCentre = Number(word.getAttribute('x')) + Number(word.getAttribute('width')) / 2;
+    const hatCentre = ICON_LAYOUT.markX + MARK_LAYOUT.w / 2;
+    expect(Math.abs(wordCentre - hatCentre)).toBeLessThanOrEqual(1); // exactly centred under the hat
+    expect(svg.querySelector('image[data-testid="logo-helmet"]')).not.toBeNull();
+  });
+
+  it('"CUBRA" #e5e5e5 and only the X #22c55e', async () => {
+    await render(React.createElement(Logo, { variant: 'stacked' }));
+    const letters = [...host.querySelectorAll('[data-testid="logo-word"] path')];
+    expect(letters.map((p) => p.getAttribute('data-letter')).join('')).toBe('CUBRAX');
+    for (const p of letters) expect(p.getAttribute('fill')).toBe(p.getAttribute('data-letter') === 'X' ? '#22c55e' : '#e5e5e5');
   });
 });

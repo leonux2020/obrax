@@ -1,27 +1,33 @@
 import { useId, useState } from 'react';
-import { LETTER_PATHS, MARK_LAYOUT, IMAGO_LAYOUT, IMAGO_INK, DIM_ART, RULER_ART, HELMET_FILE, WORD, WORD_BOX, WORD_VIEWBOX, BRAND } from '../brand/icon.js';
+import { LETTER_PATHS, MARK_LAYOUT, IMAGO_LAYOUT, ICON_LAYOUT, IMAGO_INK, DIM_ART, RULER_ART, HELMET_FILE, WORD, WORD_BOX, WORD_VIEWBOX, BRAND } from '../brand/icon.js';
 import NumberPad from './workspace/NumberPad.jsx';
 
 /**
- * The complete CUBRAX imagotype: isotype + lettering in ONE rectangular SVG (viewBox = the whole lockup, nothing is cut or squeezed).
- * "CUBRA" light grey (#e5e5e5), only the "X" brand green (#22c55e). Size it with classes (`h-24 w-auto`).
+ * The complete CUBRAX imagotype: isotype + lettering in ONE SVG (viewBox = the whole lockup, nothing is cut or squeezed).
+ *   stacked    (welcome) the lettering is centred EXACTLY under the hard hat and the ruler (the same lockup as the app icon)
+ *   imagotype  the lettering on the right of the hat (wide rectangle)
+ * "CUBRA" light grey (#e5e5e5), only the "X" brand green (#22c55e). Size it with classes (`w-56 h-auto`).
  */
-function Imagotype({ className = '' }) {
-  const { w, h, word } = IMAGO_LAYOUT;
+function Imagotype({ className = '', stacked = false }) {
   const ink = (art) => art.replaceAll('#ffffff', IMAGO_INK);
+  const box = stacked ? { w: ICON_LAYOUT.w, h: ICON_LAYOUT.h } : IMAGO_LAYOUT;
+  const markX = stacked ? ICON_LAYOUT.markX : 0;
+  const word = stacked ? { x: 0, y: ICON_LAYOUT.wordTop, w: ICON_LAYOUT.wordW, h: ICON_LAYOUT.wordH } : IMAGO_LAYOUT.word;
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label="CUBRAX" focusable="false" className={`block max-w-full select-none ${className}`} data-testid="logo" data-variant="imagotype">
-      <g dangerouslySetInnerHTML={{ __html: ink(DIM_ART) }} />
-      <image
-        href={`${import.meta.env.BASE_URL}${HELMET_FILE}`}
-        data-testid="logo-helmet"
-        x="0"
-        y={MARK_LAYOUT.helmet.y}
-        width={MARK_LAYOUT.w}
-        height={MARK_LAYOUT.helmet.h}
-        preserveAspectRatio="xMidYMid meet"
-      />
-      <g dangerouslySetInnerHTML={{ __html: ink(RULER_ART) }} />
+    <svg viewBox={`0 0 ${box.w} ${box.h}`} role="img" aria-label="CUBRAX" focusable="false" className={`block max-w-full select-none ${className}`} data-testid="logo" data-variant={stacked ? 'stacked' : 'imagotype'}>
+      <g transform={`translate(${markX} 0)`}>
+        <g dangerouslySetInnerHTML={{ __html: ink(DIM_ART) }} />
+        <image
+          href={`${import.meta.env.BASE_URL}${HELMET_FILE}`}
+          data-testid="logo-helmet"
+          x="0"
+          y={MARK_LAYOUT.helmet.y}
+          width={MARK_LAYOUT.w}
+          height={MARK_LAYOUT.helmet.h}
+          preserveAspectRatio="xMidYMid meet"
+        />
+        <g dangerouslySetInnerHTML={{ __html: ink(RULER_ART) }} />
+      </g>
       <svg x={word.x} y={word.y} width={word.w} height={word.h} viewBox={WORD_VIEWBOX} data-testid="logo-word" aria-hidden="true">
         {[...WORD].map((c) => (
           <path key={c} d={LETTER_PATHS[c]} fill={c === 'X' ? BRAND.green : IMAGO_INK} data-letter={c} />
@@ -31,9 +37,9 @@ function Imagotype({ className = '' }) {
   );
 }
 
-/** The CUBRAX isotype (dimension line + 3/4 hard hat + ruler, vector, transparent): `size` is its HEIGHT in px. `variant="imagotype"` = isotype + lettering (sized by classes). */
+/** The CUBRAX isotype (dimension line + 3/4 hard hat + ruler, vector, transparent): `size` is its HEIGHT in px. `variant="stacked"` = isotype with the lettering centred under it, `"imagotype"` = lettering on the right (both sized by classes). */
 export function Logo({ size = 40, className = '', variant = 'mark' }) {
-  if (variant === 'imagotype') return <Imagotype className={className} />;
+  if (variant === 'imagotype' || variant === 'stacked') return <Imagotype className={className} stacked={variant === 'stacked'} />;
   // Hybrid isotype, sized by HEIGHT: static SVG dimension line on top, the supplied photoreal hard hat in the middle
   // (<img>, object-fit: contain, never distorted) and the static SVG ruler below, with transparent air in between.
   const k = size / MARK_LAYOUT.h;

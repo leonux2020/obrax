@@ -113,15 +113,15 @@ describe('browser tab', () => {
     expect(q('splash-start').textContent).toBe('Iniciar');
     expect(q('splash').className).toContain('bg-black');
     expect(q('splash-credit')).toBeNull(); // the credit is gone
-    // the imagotype (hard hat + CUBRAX, one rectangular SVG) is centred right above the buttons, h-24 w-auto, with generous air below
+    // the STACKED imagotype (hat + ruler with CUBRAX centred under them) dominates the screen: w-56 h-auto, big air below it
     const wrap = q('splash-logo');
     expect(wrap.className).toMatch(/mx-auto/);
-    expect(wrap.className).toMatch(/mb-12/);
+    expect(wrap.className).toMatch(/mb-16/);
     const logo = wrap.querySelector('[data-testid="logo"]');
-    expect(logo.getAttribute('data-variant')).toBe('imagotype');
-    expect(logo.getAttribute('class')).toMatch(/h-24/);
-    expect(logo.getAttribute('class')).toMatch(/w-auto/);
-    expect(logo.getAttribute('class')).not.toMatch(/\b(w|h)-\d+\b.*\b(w|h)-\d+\b.*w-\d/); // no rigid square
+    expect(logo.getAttribute('data-variant')).toBe('stacked');
+    expect(logo.getAttribute('class')).toMatch(/(^|\s)w-56(\s|$)/);
+    expect(logo.getAttribute('class')).toMatch(/(^|\s)h-auto(\s|$)/);
+    expect(logo.getAttribute('class')).not.toMatch(/(^|\s)h-24(\s|$)/); // the old height restriction is gone
     expect(logo.hasAttribute('style')).toBe(false); // no fixed pixel size
     expect(logo.querySelector('image[data-testid="logo-helmet"]').getAttribute('href')).toMatch(/helmet\.png$/);
     expect(wrap.compareDocumentPosition(q('splash-start')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // above the button
