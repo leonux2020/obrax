@@ -178,20 +178,16 @@ afterEach(() => {
 });
 
 describe('ProjectWorkspace: three zones', () => {
-  it('Zone A shows name, client, place, traffic light with days, total and bars; colour only as left border / lettering', async () => {
+  it('Zone A shows name, client, place, DA INCASSARE and one progress line; a late job shows no red text', async () => {
     await mount({ initial: mk({}, -30, -4) });
     expect(q('ws-zone-a')).not.toBeNull();
     expect(q('ws-title').textContent).toBe('Casa Pérez');
     expect(q('ws-zone-a').textContent).toContain('Ana');
     expect(q('ws-location').textContent).toBe('Providencia');
-    const st = q('ws-status');
-    expect(st.getAttribute('data-level')).toBe('red');
-    expect(st.textContent).toContain('4');
-    expect(st.style.borderLeftColor).not.toBe('');
-    expect(st.className).toMatch(/border-l-2/);
-    expect(st.className).not.toMatch(/\bbg-/); // zero solid fills for states
+    expect(q('ws-status')).toBeNull(); // a LATE job shows no red delay text: the debt number says it
     expect(q('ws-total').textContent).toMatch(/\d/);
-    expect(q('bar-time').getAttribute('data-pct')).toBe('100');
+    expect(q('ws-due')).not.toBeNull(); // the one big number: what is left to collect
+    expect(q('ws-progress').getAttribute('data-pct')).toBe('0'); // one 2 px line: nothing collected yet
     expect(q('ws-zone-a').className).toMatch(/sticky/);
     expect(q('ws-zone-a').className).toContain('bg-black'); // pure OLED black, the same as the app theme
     expect(q('project-workspace').className).toContain('bg-black');
@@ -208,7 +204,7 @@ describe('ProjectWorkspace: three zones', () => {
     expect(q('materials-0').querySelectorAll('[data-testid^="price-"]').length).toBeGreaterThan(2);
   });
 
-  it('Zone A is quiet: no back arrow, no globe, no coordinates; a late job says ONLY "Atraso de N d"; name / alert / total are lighter', async () => {
+  it('Zone A is quiet: no back arrow, no globe, no coordinates; a late job shows no delay text; name and number are light', async () => {
     const p = mk({}, -30, -4);
     p.location = { lat: -33.4512345, lng: -70.6612345 }; // coordinates, no name
     await mount({ initial: p });
@@ -219,43 +215,28 @@ describe('ProjectWorkspace: three zones', () => {
     expect(zone.textContent).not.toMatch(/-?33\.45|-?70\.66/); // coordinates stay in the data, never drawn
     expect(q('ws-location')).toBeNull();
     expect(p.location.lat).toBe(-33.4512345); // ...and they are still there
-    const st = q('ws-status');
-    expect(st.textContent).toBe('Atraso de 4 d'); // only the days, not "Atrasado" + days
-    expect(st.textContent).not.toMatch(/Atrasado/);
-    // one weight lighter: name semibold (was extrabold), late alert medium (was extrabold), total semibold (was black)
+    expect(q('ws-status')).toBeNull(); // no "Atraso de N d" any more: the old red alert is gone for good
+    expect(zone.textContent).not.toMatch(/Atraso|Atrasado/);
     expect(q('ws-title').className).toMatch(/font-(semibold|medium)/);
     expect(q('ws-title').className).not.toMatch(/font-(extrabold|bold|black)/);
-    expect(st.className).toContain('font-medium');
-    expect(st.className).not.toMatch(/font-(extrabold|bold|black)/);
-    expect(q('ws-total').querySelector('span').className).toMatch(/font-(semibold|medium)/);
-    expect(q('ws-total').querySelector('span').className).not.toContain('font-black');
+    expect(q('ws-due').className).toMatch(/font-medium/);
+    expect(q('ws-due').className).toContain('tracking-tight');
+    expect(q('ws-due').className).not.toMatch(/font-(extrabold|bold|black|semibold)/);
   });
 
-  it('meters: Plazo and Caja sit in a two-column grid, each with label on top, value below on the right and the bar on its own line; quiet grey', async () => {
+  it('hierarchy: DA INCASSARE is the only big number; quote and collected are small grey text under it; ONE 2 px line replaces the two bars', async () => {
     await mount({ initial: mk({}, -5, 5) });
-    const grid = q('ws-meters');
-    expect(grid.className).toMatch(/\bgrid\b/);
-    expect(grid.className).toContain('grid-cols-2');
-    expect(grid.className).toContain('gap-4');
-    expect(grid.className).toContain('w-full');
-    expect(grid.className).toContain('mt-4');
-    expect(grid.className).toContain('mb-2');
-    expect([...grid.children].map((c) => c.dataset.testid)).toEqual(['bar-time', 'bar-cash']);
-    for (const id of ['time', 'cash']) {
-      const col = q(`bar-${id}`);
-      const [label, value, bar] = col.children;
-      expect(label.tagName).toBe('P'); // label on its own line, on top
-      expect(label.className).toContain('text-neutral-400');
-      expect(value.dataset.testid).toBe(`bar-${id}-value`); // value on the next line...
-      expect(value.className).toContain('text-right'); // ...to the right
-      expect(value.className).toContain('text-neutral-400');
-      expect(bar.getAttribute('role')).toBe('progressbar'); // the bar, last, on its own line
-      expect(label.textContent).not.toBe('');
-    }
-    expect(q('bar-time-value').textContent).toBe('5/10 d');
-    // the meters are quieter than the total
-    expect(q('ws-total').querySelector('span').className).toContain('text-3xl');
-    expect(q('bar-time-value').className).toContain('text-sm');
+    expect(q('ws-due').className).toContain('text-3xl');
+    expect(q('ws-due').className).toMatch(/text-(orange-400|amber-500)/); // debt: soft orange, never red
+    expect(q('ws-summary').className).toContain('text-xs');
+    expect(q('ws-summary').className).toContain('text-neutral-400');
+    expect(q('ws-quote').textContent).toMatch(/\d/);
+    expect(q('ws-due-label').textContent).toBe('Por cobrar');
+    expect(q('ws-meters')).toBeNull();
+    expect(q('bar-time')).toBeNull();
+    expect(q('bar-cash')).toBeNull();
+    expect(q('ws-zone-a').querySelectorAll('[role="progressbar"]')).toHaveLength(1);
+    expect(q('ws-progress').className).toContain('h-0.5');
   });
 
   it('a job that is not late keeps its state word with the days, and a NAMED place is still shown', async () => {

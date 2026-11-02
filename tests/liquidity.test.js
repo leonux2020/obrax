@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-// Zone A: the Caja indicator shows the percentage AND the real cash on hand (client payments - expenses - worker advances),
-// in the money of the project's own market.
+// Zone A: DA INCASSARE (what is left to collect) is the only big number; liquidity (client payments - expenses - worker advances) stays
+// a pure model value, in the money of the project's own market.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -119,79 +119,98 @@ describe('liquidity (pure)', () => {
   });
 });
 
-describe('Zone A: "Caja 25 % · $ 1.500"', () => {
-  it('shows the percentage and the cash on hand in the currency of the project (MX, while the app is CL)', async () => {
+describe('Zone A: DA INCASSARE is the one big number', () => {
+  const num = (el) => Number(el.textContent.replace(/[^\d.,-]/g, '').replace(/,/g, ''));
+
+  it('shows what is still to be collected, in the currency of the project (MX), soft orange (never red); quote and collected go small underneath', async () => {
+    await open(job({ payments: [{ id: 'pay001', amount: 1000, at: at(2026, 3, 3), note: '' }] }));
+    const due = q('ws-due');
+    expect(q('ws-due-label').textContent).toBe('Por cobrar');
+    expect(due.textContent).toMatch(/\$\s?[\d,]+\.\d{2}/); // es-MX / MXN with cents, not the Chilean peso
+    expect(due.className).toMatch(/text-orange-400/);
+    expect(due.className).not.toMatch(/text-red|#ff2b2b/);
+    for (const c of ['text-3xl', 'font-medium', 'tracking-tight', 'tabular-nums']) expect(due.className).toContain(c);
+    expect(num(q('ws-quote')) - num(q('ws-collected'))).toBeCloseTo(num(due), 1); // quote - collected = to collect
+    expect(num(q('ws-collected'))).toBe(1000);
+    const small = q('ws-summary');
+    expect(small.className).toMatch(/text-xs/);
+    expect(small.className).toContain('text-neutral-400');
+    expect(small.textContent).toMatch(/Presupuesto.*Cobrado/);
+  });
+
+  it('the late project shows NO red delay text at all (the debt already says it)', async () => {
+    await open(job()); // the dates are in the past: red level
+    expect(q('ws-status')).toBeNull();
+    expect(q('ws-zone-a').textContent).not.toMatch(/Atraso|Atrasado/);
+    expect(q('ws-zone-a').innerHTML).not.toMatch(/#ff2b2b|text-red/);
+  });
+
+  it('ONE 2 px line at the base of the block (neutral-800 track, green fill) with the share collected; the two old meters are gone', async () => {
     await open(job());
-    const bar = q('bar-cash');
-    expect(bar).not.toBeNull();
-    const liquid = q('cash-liquid');
-    expect(liquid.dataset.liquid).toBe('32000');
-    expect(liquid.textContent).toMatch(/\$\s?32,000\.00/); // es-MX / MXN with cents, not the Chilean peso
-    expect(bar.textContent).toContain('Caja');
-    expect(bar.textContent).toMatch(/\d+ %/);
-    expect(bar.textContent.indexOf('%')).toBeLessThan(bar.textContent.indexOf('32,000')); // percentage first, amount after
-    expect(liquid.dataset.negative).toBeUndefined();
+    const line = q('ws-progress');
+    expect(line.className).toContain('h-0.5');
+    expect(line.className).toContain('bg-neutral-800');
+    expect(line.className).toContain('bottom-0');
+    expect(q('ws-progress-fill').className).toContain('bg-brand');
+    expect(q('ws-progress-fill').style.width).toBe(`${line.dataset.pct}%`);
+    expect(Number(line.dataset.pct)).toBeGreaterThan(0);
+    expect(q('ws-zone-a').querySelectorAll('[role="progressbar"]')).toHaveLength(1);
+    expect(q('ws-meters')).toBeNull();
+    expect(q('bar-time')).toBeNull();
+    expect(q('bar-cash')).toBeNull();
   });
 
-  it('the amount is quiet: dim text on the OLED black header, no grey backgrounds', async () => {
-    await open(job());
-    const liquid = q('cash-liquid');
-    expect(liquid.className).toContain('text-sm');
-    expect(liquid.className).toContain('text-neutral-400');
-    expect(liquid.className).not.toMatch(/bg-/);
-    expect(q('ws-zone-a').className).toContain('bg-black');
-  });
-
-  it('expenses and worker advances are subtracted: without them it would read 40,000', async () => {
-    await open(job({ expenses: [], advances: [] }));
-    expect(q('cash-liquid').dataset.liquid).toBe('40000');
-    expect(q('cash-liquid').textContent).toMatch(/40,000\.00/);
-  });
-
-  it('negative (expenses above what the client paid) is shown with its sign, in the amber warning tone', async () => {
-    await open(job({ payments: [], expenses: [{ id: 'exp001', at: 1, supplier: 'HD', description: 'Taladro', amount: 5000, category: 'tool_rental', returnDate: '', returned: true }], advances: [{ id: 'adv001', worker: 'Juan', amount: 3000, at: 1 }] }));
-    const liquid = q('cash-liquid');
-    expect(liquid.dataset.liquid).toBe('-8000');
-    expect(liquid.dataset.negative).toBe('true');
-    expect(liquid.textContent).toMatch(/-\s?\$\s?8,000\.00|\$\s?-8,000\.00|−/);
-    expect(liquid.className).toContain('text-[#e8c35f]/80');
-  });
-
-  it('empty cash (0): shows 0 in the right currency without errors; a brand-new project draws nothing at all', async () => {
+  it('nothing paid yet: all of the quote is to collect and the line is empty', async () => {
     await open(job({ payments: [], expenses: [], advances: [] }));
-    expect(q('cash-liquid').dataset.liquid).toBe('0');
-    expect(q('cash-liquid').textContent).toMatch(/\$\s?0\.00/);
-    expect(q('bar-cash').dataset.pct).toBe('0');
-    expect(q('cash-liquid').textContent).not.toMatch(/NaN|Infinity|undefined/);
+    expect(num(q('ws-due'))).toBe(num(q('ws-quote')));
+    expect(q('ws-collected')).toBeNull();
+    expect(q('ws-progress').dataset.pct).toBe('0');
+    expect(q('ws-due').textContent).not.toMatch(/NaN|Infinity|undefined/);
   });
 
-  it('a project whose quote is not valid yet still shows the cash on hand (no percentage)', async () => {
+  it('paid in full (or over): the number is replaced by "Saldato" with a green check', async () => {
+    await open(job({ payments: [{ id: 'pay001', amount: 9_999_999, at: at(2026, 3, 3), note: '' }] }));
+    expect(q('ws-due')).toBeNull();
+    expect(q('ws-due-label')).toBeNull();
+    const ok = q('ws-settled');
+    expect(ok.textContent).toBe('Saldado');
+    expect(ok.className).toContain('text-brand');
+    expect(ok.querySelector('svg[data-testid="ws-settled-check"]')).not.toBeNull();
+    expect(q('ws-total').dataset.settled).toBe('true');
+    expect(q('ws-progress').dataset.pct).toBe('100');
+  });
+
+  it('a quote that is not valid yet: no invented debt (a dash), no line, only what was collected', async () => {
     const empty = newProject({ regionCode: 'CL', name: 'Nueva' });
     await open({ ...empty, payments: [{ id: 'pay001', amount: 150000, at: 1, note: '' }] });
-    expect(q('bar-cash')).not.toBeNull();
-    expect(q('bar-cash').dataset.pct).toBeUndefined();
-    expect(q('cash-liquid').dataset.liquid).toBe('150000');
-    expect(q('cash-liquid').textContent).not.toContain('·');
+    expect(q('ws-due').textContent).toBe('—');
+    expect(q('ws-due').className).not.toContain('text-orange');
+    expect(q('ws-settled')).toBeNull();
+    expect(q('ws-progress')).toBeNull();
+    expect(q('ws-quote')).toBeNull();
+    expect(q('ws-collected').textContent.replace(/\D/g, '')).toBe('150000'); // es-CL: 150.000
   });
 
-  it('a brand-new project with no money and no valid quote draws no Caja bar at all (and does not fail)', async () => {
+  it('a brand-new project with no money and no valid quote does not fail', async () => {
     await open({ ...newProject({ regionCode: 'CL', name: 'Vacía' }) });
     expect(q('project-workspace')).not.toBeNull();
-    expect(q('bar-cash')).toBeNull();
-    expect(q('cash-liquid')).toBeNull();
+    expect(q('ws-settled')).toBeNull();
+    expect(q('ws-collected')).toBeNull();
   });
 });
 
 describe('the number follows the money booked in the app', () => {
-  it('adding a client payment in Zone B raises it at once; the bar and the amount move together', async () => {
+  it('adding a client payment in Zone B lowers what is left to collect at once and moves the line', async () => {
     await open(job({ payments: [], expenses: [], advances: [] }));
+    const before = Number(q('ws-due').textContent.replace(/[^\d.]/g, ''));
     await click(q('ws-cash').querySelector('summary'));
-    expect(q('cash-liquid').dataset.liquid).toBe('0');
     await click(q('cash-amount'));
     for (const k of ['1', '0', '0', '0']) await click(q(`pad-${k}`));
     await click(q('pad-done'));
     await click(q('cash-add'));
-    expect(q('cash-liquid').dataset.liquid).toBe('1000');
-    expect(q('cash-liquid').textContent).toMatch(/1,000\.00/);
+    const after = Number(q('ws-due').textContent.replace(/[^\d.]/g, ''));
+    expect(before - after).toBeCloseTo(1000, 1);
+    expect(q('ws-collected').textContent).toMatch(/1,000\.00/);
+    expect(Number(q('ws-progress').dataset.pct)).toBeGreaterThan(0);
   });
 });

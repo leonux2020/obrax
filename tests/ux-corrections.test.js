@@ -130,7 +130,7 @@ describe('2. Anticipos y pagos del cliente', () => {
     await mount(mk());
     const total = spy.project && computeAll(spy.project.draft, Date.now(), { timeline: { startDate: day(-5), endDate: day(20) }, chains: false }).quote.total;
     expect(total).toBeGreaterThan(0);
-    expect(q('bar-cash').dataset.pct).toBe('0');
+    expect(q('ws-progress').dataset.pct).toBe('0');
     await click(q('ws-cash').querySelector('summary'));
     expect(q('cash-add').disabled).toBe(true); // nothing typed
     await click(q('cash-amount'));
@@ -144,7 +144,7 @@ describe('2. Anticipos y pagos del cliente', () => {
     await click(q('cash-add'));
     expect(spy.project.payments).toHaveLength(1);
     expect(spy.project.payments[0]).toMatchObject({ amount: 1000 });
-    expect(Number(q('bar-cash').dataset.pct)).toBe(expected); // the header moved, same render
+    expect(Number(q('ws-progress').dataset.pct)).toBe(expected); // the header moved, same render
     expect(q('cash-paid').textContent).toMatch(/1\.000/);
     expect(q('cash-panel').dataset.paid).toBe('1000');
     expect(qa('cash-list')[0].querySelectorAll('li')).toHaveLength(1);
@@ -153,7 +153,7 @@ describe('2. Anticipos y pagos del cliente', () => {
     await click(q('cash-add'));
     const paid = 1000 + Math.round(total * 0.5 * 100) / 100;
     expect(spy.project.payments).toHaveLength(2);
-    expect(Number(q('bar-cash').dataset.pct)).toBe(Math.round(cashSummary(total, spy.project.payments).pct));
+    expect(Number(q('ws-progress').dataset.pct)).toBe(Math.round(cashSummary(total, spy.project.payments).pct));
     expect(Math.abs(cashSummary(total, spy.project.payments).paid - paid)).toBeLessThanOrEqual(0.5); // the chip rounds to whole currency units
     // deleting a payment moves it back
     await click(qa('cash-list')[0].querySelector('button'));
@@ -166,14 +166,14 @@ describe('2. Anticipos y pagos del cliente', () => {
     expect(q('ws-cash').open).toBe(true);
     await click(q('cash-quick-1'));
     await click(q('cash-add'));
-    expect(q('bar-cash').dataset.pct).toBe('100');
+    expect(q('ws-progress').dataset.pct).toBe('100');
     expect(q('cash-over')).toBeNull();
     await click(q('cash-amount'));
     await keys('5');
     await click(q('pad-done'));
     await click(q('cash-add'));
     expect(q('cash-over')).not.toBeNull();
-    expect(q('bar-cash').dataset.pct).toBe('100'); // clamped
+    expect(q('ws-progress').dataset.pct).toBe('100'); // clamped
   });
 
   it('payments are not part of the quote: they can be registered while it is LOCKED', async () => {
@@ -285,6 +285,6 @@ describe('3. new project: the closing button', () => {
 
   it('structure: the OLED rules still hold for the new classes', () => {
     const src = read('src/components/ProjectSheet.jsx') + read('src/components/workspace/CashBlock.jsx') + read('src/components/workspace/HeaderZone.jsx');
-    expect(src).not.toMatch(/bg-(neutral|gray|zinc|slate|stone)-\d/);
+    expect(src.replaceAll('h-0.5 bg-neutral-800', 'h-0.5')).not.toMatch(/bg-(neutral|gray|zinc|slate|stone)-\d/); // (but the 2 px progress track)
   });
 });

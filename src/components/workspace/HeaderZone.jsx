@@ -1,6 +1,13 @@
 import { useI18n } from '../../lib/i18n.jsx';
 import { levelDetail } from '../levelStyle.js';
 
+const Check = () => (
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" data-testid="ws-settled-check">
+    <circle cx="12" cy="12" r="9.5" />
+    <path d="m7.8 12.4 2.9 2.9 5.5-6" />
+  </svg>
+);
+
 const Pencil = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M12 20h9" />
@@ -9,43 +16,22 @@ const Pencil = () => (
 );
 
 /**
- * One meter, stacked so nothing is crammed: label on top, value below it on the right, the thin bar on its own line.
- * The only colour is the bar's fill (a progress indicator, not a state background); the texts are quiet neutral grey so they never
- * compete with the total.
- */
-function Bar({ id, label, pct, tone, text, sub = null, className = '' }) {
-  const drawn = pct !== null && pct !== undefined;
-  if (!drawn && !sub) return null;
-  return (
-    <div data-testid={`bar-${id}`} data-pct={drawn ? Math.round(pct) : undefined} className={`min-w-0 ${className}`}>
-      <p className="text-sm text-neutral-400">{label}</p>
-      <p data-testid={`bar-${id}-value`} className="mt-0.5 text-right text-sm tabular-nums text-neutral-400">
-        {drawn && text}
-        {sub}
-      </p>
-      {drawn && (
-        <div className="mt-1.5 h-1 overflow-hidden rounded-full border border-white/15" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}>
-          <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.max(0, pct))}%`, backgroundColor: tone }} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * ZONE A: the header that never scrolls away. Name, client, place, state with its days, the live total, the lock and the progress
- * bars. Colour = only a 2 px left border and the lettering of the state line. Quiet by design: no back arrow (the device's back
- * gesture / button leaves the project), no globe, no coordinates (they stay in the project data, never drawn), a late project
- * says only "Ritardo di X g", and the three loudest texts (name, late alert, total) are one weight lighter.
+ * ZONE A: the header that never scrolls away. Name, client, place, the lock and ONE number: what is still to be collected (DA INCASSARE,
+ * soft orange while there is debt, never red). The quote and what is already collected go under it, small and grey; when nothing is left
+ * it says "Saldato" with a green check instead. ONE 2 px line at the base of the block shows the share collected of the budget.
+ * No red late alert (the debt already says it), no back arrow (the device's back gesture leaves the project), no globe, no coordinates.
  */
 export default function HeaderZone({ project, model, title, client, region, offline, onEdit, onCash, onUnlock }) {
   const { t, money } = useI18n();
   // the place is shown only when it has a NAME; raw coordinates are data, not interface
   const where = project.location?.label || '';
   const detail = model.closed ? t('proj.closed') : levelDetail(t, model.info) || t(`light.${model.info.level}`);
-  const [time, cash] = model.bars;
+  const cash = model.bars[1];
+  const known = model.total !== null; // a valid quote: the budget and what is left can be told
+  const settled = known && model.total > 0 && cash.pending <= 0.005;
+  const late = model.info.level === 'red'; // late jobs show no red text: the debt number already says it
   return (
-    <header data-testid="ws-zone-a" data-region={region.code} className="sticky top-0 z-20 border-b border-white/10 bg-black px-3 pb-2 pt-2">
+    <header data-testid="ws-zone-a" data-region={region.code} className="sticky top-0 z-20 border-b border-white/10 bg-black px-3 pb-3 pt-2">
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1">
           <h1 data-testid="ws-title" className="truncate text-xl font-semibold leading-tight">
@@ -67,19 +53,49 @@ export default function HeaderZone({ project, model, title, client, region, offl
       </div>
 
       <div className="mt-2 flex items-end justify-between gap-3">
-        <p
-          data-testid="ws-status"
-          data-level={model.level}
-          aria-label={`${t('ws.state')}: ${detail}`}
-          style={{ borderLeftColor: model.tone, color: model.tone }}
-          className={`border-l-2 pl-2 text-sm leading-tight ${model.info.level === 'red' ? 'font-medium' : 'font-semibold'}`}
-        >
-          {/* late: ONLY "Ritardo di X g" (the state word "In ritardo" said the same thing twice) */}
-          {model.info.level !== 'red' && t(`light.${model.info.level}`)}
-          <span className={model.info.level === 'red' ? 'text-base' : 'block text-base'}>{detail}</span>
-        </p>
-        <button type="button" onClick={onCash} aria-label={t('cash.title')} data-testid="ws-total" className="text-right">
-          <span className="block text-3xl font-medium tracking-tight tabular-nums leading-none text-brand">{model.total === null ? '—' : money(model.total)}</span>
+        {!late && (
+          <p
+            data-testid="ws-status"
+            data-level={model.level}
+            aria-label={`${t('ws.state')}: ${detail}`}
+            style={{ borderLeftColor: model.tone, color: model.tone }}
+            className="border-l-2 pl-2 text-sm font-semibold leading-tight"
+          >
+            {t(`light.${model.info.level}`)}
+            <span className="block text-base">{detail}</span>
+          </p>
+        )}
+        <button type="button" onClick={onCash} aria-label={t('cash.title')} data-testid="ws-total" data-settled={settled || undefined} className="ml-auto text-right">
+          {settled ? (
+            <span data-testid="ws-settled" className="flex items-center justify-end gap-2 text-3xl font-medium leading-none tracking-tight text-brand">
+              <Check />
+              {t('ws.settled')}
+            </span>
+          ) : (
+            <>
+              <span data-testid="ws-due-label" className="block text-xs font-medium uppercase tracking-wider text-neutral-400">
+                {t('ws.due')}
+              </span>
+              <span data-testid="ws-due" className={`mt-1 block text-3xl font-medium leading-none tracking-tight tabular-nums ${known && cash.pending > 0 ? 'text-orange-400' : 'text-neutral-400'}`}>
+                {known ? money(cash.pending) : '—'}
+              </span>
+            </>
+          )}
+          {(known || cash.paid > 0) && (
+            <span data-testid="ws-summary" className="mt-1.5 block text-xs tabular-nums text-neutral-400">
+              {known && (
+                <>
+                  {t('ws.quote')} <span data-testid="ws-quote">{money(model.total)}</span>
+                </>
+              )}
+              {known && cash.paid > 0 && <span aria-hidden="true"> · </span>}
+              {cash.paid > 0 && (
+                <>
+                  {t('ws.collected')} <span data-testid="ws-collected">{money(cash.paid)}</span>
+                </>
+              )}
+            </span>
+          )}
           {model.locked && (
             <span data-testid="ws-lock-chip" className="mt-1 block text-[11px] font-medium text-[#e8c35f]">
               🔒 {t(model.locked === 'signed' ? 'ws.lock.signed' : 'ws.lock.frozen')}
@@ -87,29 +103,6 @@ export default function HeaderZone({ project, model, title, client, region, offl
           )}
         </button>
       </div>
-
-      {(time.pct !== null && time.pct !== undefined) || (cash.pct !== null && cash.pct !== undefined) || cash.liquid !== 0 ? (
-      <div data-testid="ws-meters" className="mb-2 mt-4 grid w-full grid-cols-2 gap-4">
-        <Bar id="time" label={t('ws.bar.time')} pct={time.pct} tone={time.tone} text={`${time.elapsed}/${time.of} d`} />
-        <Bar
-          id="cash"
-          className="col-start-2" // Cassa always sits in the right column, even when there is no schedule
-          label={t('ws.bar.cash')}
-          pct={cash.pct}
-          tone={cash.tone}
-          text={`${Math.round(cash.pct ?? 0)} %`}
-          // the real cash on hand (paid by the client - expenses - worker advances), in the money of THIS project's market
-          sub={
-            (cash.pct !== null || cash.liquid !== 0) && (
-            <span data-testid="cash-liquid" data-liquid={cash.liquid} data-negative={cash.liquid < 0 ? 'true' : undefined} className={`text-sm font-medium ${cash.liquid < 0 ? 'text-[#e8c35f]/80' : 'text-neutral-400'}`}>
-              {cash.pct !== null && cash.pct !== undefined && <span aria-hidden="true"> · </span>}
-              {money(cash.liquid)}
-            </span>
-            )
-          }
-        />
-      </div>
-      ) : null}
 
       {model.locked && (
         <button type="button" onClick={onUnlock} data-testid="ws-unlock" className="mt-2 min-h-[40px] w-full rounded-lg border border-[#d4af37]/60 px-3 text-xs font-semibold text-[#e8c35f] active:border-[#d4af37]">
@@ -120,6 +113,12 @@ export default function HeaderZone({ project, model, title, client, region, offl
         <p data-testid="ws-offline" className="mt-2 border-l-2 border-white/30 pl-2 text-[11px] text-[#E0E0E0]/70">
           {t('ws.offlineBase')}
         </p>
+      )}
+      {/* ONE ultra-thin line at the base of the block: the share collected of the budget */}
+      {cash.pct !== null && cash.pct !== undefined && (
+        <div data-testid="ws-progress" data-pct={Math.round(cash.pct)} className="absolute inset-x-0 bottom-0 h-0.5 bg-neutral-800" role="progressbar" aria-label={t('ws.collected')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(cash.pct)}>
+          <div data-testid="ws-progress-fill" className="h-full bg-brand" style={{ width: `${Math.min(100, Math.max(0, cash.pct))}%` }} />
+        </div>
       )}
     </header>
   );

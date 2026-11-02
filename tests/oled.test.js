@@ -12,7 +12,8 @@ describe('strict OLED theme', () => {
   it('no grey background utilities anywhere in src (neutral/gray/zinc/slate/stone fills)', () => {
     const offenders = [];
     for (const f of files) {
-      const text = fs.readFileSync(f, 'utf8');
+      // the one documented exception: the 2 px track of the project header's single progress line (HeaderZone)
+      const text = fs.readFileSync(f, 'utf8').replaceAll('h-0.5 bg-neutral-800', 'h-0.5');
       const m = text.match(/(?:^|[^\w-])(?:[a-z-]+:)*bg-(?:neutral|gray|zinc|slate|stone)-\d+(?:\/\d+)?/g);
       if (m) offenders.push(`${path.relative(root, f)}: ${m.join(', ')}`);
     }
