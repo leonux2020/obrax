@@ -113,14 +113,18 @@ describe('browser tab', () => {
     expect(q('splash-start').textContent).toBe('Iniciar');
     expect(q('splash').className).toContain('bg-black');
     expect(q('splash-credit')).toBeNull(); // the credit is gone
-    // the logo (hard hat isotype) is centred right above the buttons, 128 px high, with generous air below
-    const logo = q('splash-logo');
-    expect(logo.className).toMatch(/mx-auto/);
-    expect(logo.className).toMatch(/mb-10/);
-    expect(logo.querySelector('[data-testid="logo"]').style.height).toBe('128px');
-    expect(logo.querySelector('img').getAttribute('src')).toMatch(/helmet\.png$/);
-    expect(logo.compareDocumentPosition(q('splash-start')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // above the button
-    expect(q('splash').querySelector('[data-testid="wordmark"]')).toBeNull();
+    // the imagotype (hard hat + CUBRAX, one rectangular SVG) is centred right above the buttons, h-24 w-auto, with generous air below
+    const wrap = q('splash-logo');
+    expect(wrap.className).toMatch(/mx-auto/);
+    expect(wrap.className).toMatch(/mb-12/);
+    const logo = wrap.querySelector('[data-testid="logo"]');
+    expect(logo.getAttribute('data-variant')).toBe('imagotype');
+    expect(logo.getAttribute('class')).toMatch(/h-24/);
+    expect(logo.getAttribute('class')).toMatch(/w-auto/);
+    expect(logo.getAttribute('class')).not.toMatch(/\b(w|h)-\d+\b.*\b(w|h)-\d+\b.*w-\d/); // no rigid square
+    expect(logo.hasAttribute('style')).toBe(false); // no fixed pixel size
+    expect(logo.querySelector('image[data-testid="logo-helmet"]').getAttribute('href')).toMatch(/helmet\.png$/);
+    expect(wrap.compareDocumentPosition(q('splash-start')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // above the button
     expect(q('splash-name').className).toContain('sr-only');
     expect(vi.getTimerCount()).toBe(0);
     await advance(10_000);

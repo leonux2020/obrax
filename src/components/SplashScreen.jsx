@@ -5,8 +5,8 @@ import InstallButton from './InstallButton.jsx';
 
 /**
  * Welcome screen, reduced to the minimum. It is ONLY for the first visit in a browser tab (a brand-new profile): plain black, the CUBRAX
- * logo (hard hat isotype, static, 128 px) centred right above one "Iniciar" button in the thumb zone and the install button. No lettering,
- * no credit, no timer, no animation and no fade-out. An installed app never mounts it (App starts in the main view or the setup), and
+ * imagotype (hard hat + the lettering with its green X, one rectangular SVG, h-24) centred right above one "Iniciar" button in the thumb
+ * zone and the install button. No credit, no timer, no animation and no fade-out. An installed app never mounts it (App starts in the main view or the setup), and
  * neither does anybody who already has a profile or a session.
  * `auto` (coming back from Google's consent redirect): continue at once, in the same frame, without waiting for a tap or a timer.
  */
@@ -27,8 +27,8 @@ export default function SplashScreen({ onStart, auto = false, pwa = null }) {
       <div className="absolute inset-x-0 bottom-0 z-40 px-6 [padding-bottom:max(2rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto w-full max-w-md">
           {!auto && (
-            <div className="mx-auto mb-10 flex justify-center" data-testid="splash-logo">
-              <Logo size={128} />
+            <div className="mx-auto mb-12 flex justify-center" data-testid="splash-logo">
+              <Logo variant="imagotype" className="mx-auto h-24 w-auto" />
             </div>
           )}
           {!auto && (

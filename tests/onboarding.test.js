@@ -58,7 +58,7 @@ describe('first run: splash -> setup -> dashboard', () => {
   it('a brand-new install shows the CUBRAX logo above one "Iniciar" button', async () => {
     await mountApp();
     expect(q('splash')).not.toBeNull();
-    expect(q('splash-logo').querySelector('img[data-testid="logo-helmet"]')).not.toBeNull(); // the hard hat is on screen
+    expect(q('splash-logo').querySelector('image[data-testid="logo-helmet"]')).not.toBeNull(); // the hard hat is on screen
     // "Iniciar" + the "Instalar App" button (hidden once installed), both in the bottom third (thumb zone)
     const buttons = [...host.querySelectorAll('button')].filter((b) => b.dataset.testid !== 'install-app');
     expect(buttons).toHaveLength(1);

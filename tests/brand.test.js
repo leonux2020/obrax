@@ -105,7 +105,7 @@ describe('lettering', () => {
     await render(React.createElement(Wordmark, { height: 40 }));
     const paths = [...host.querySelectorAll('path')];
     expect(paths).toHaveLength(6);
-    expect(paths.map((p) => p.getAttribute('fill'))).toEqual(['#ffffff', '#ffffff', '#ffffff', '#ffffff', '#ffffff', BRAND.green]); // CUBRA white, only X green
+    expect(paths.map((p) => p.getAttribute('fill'))).toEqual(['#e5e5e5', '#e5e5e5', '#e5e5e5', '#e5e5e5', '#e5e5e5', BRAND.green]); // CUBRA light grey (off-white), only X green
     expect(host.innerHTML).not.toContain('stroke');
     expect(host.querySelector('text')).toBeNull();
   });
@@ -137,13 +137,13 @@ describe('lettering', () => {
 });
 
 describe('splash + dashboard', () => {
-  it('the welcome screen (first browser visit) draws the hard-hat logo above the button, no lettering and no credit', async () => {
+  it('the welcome screen (first browser visit) draws the full imagotype (hard hat + CUBRAX) above the button and no credit', async () => {
     await render(React.createElement(SplashScreen, { onStart: () => {}, auto: false }));
     const h1 = host.querySelector('h1');
     expect(h1.textContent).toBe('CUBRAX');
     expect(h1.className).toContain('sr-only');
-    expect(host.querySelector('[data-testid="splash-logo"] img[data-testid="logo-helmet"]')).not.toBeNull();
-    expect(host.querySelector('[data-testid="wordmark"]')).toBeNull();
+    expect(host.querySelector('[data-testid="splash-logo"] image[data-testid="logo-helmet"]')).not.toBeNull();
+    expect(host.querySelector('[data-testid="splash-logo"] [data-testid="logo-word"]')).not.toBeNull();
     expect(host.querySelector('[data-testid="splash-credit"]')).toBeNull();
     expect(host.querySelector('[data-testid="splash-start"]')).not.toBeNull();
   });
@@ -209,4 +209,36 @@ describe('app icons: hat + CUBRAX as one centred lockup (the OS draws it as the 
     }
     expect(iconScale(true)).toBeLessThanOrEqual(iconScale(false));
   }, 60000);
+});
+
+describe('Logo variant="imagotype" (isotype + CUBRAX lettering)', () => {
+  it('one rectangular SVG whose viewBox is the whole lockup: nothing cut, the lettering to the right of the hat and vertically centred', async () => {
+    const { IMAGO_LAYOUT, MARK_LAYOUT } = await import('../src/brand/icon.js');
+    await render(React.createElement(Logo, { variant: 'imagotype', className: 'h-24 w-auto' }));
+    const svg = host.querySelector('[data-testid="logo"]');
+    expect(svg.tagName.toLowerCase()).toBe('svg');
+    expect(svg.getAttribute('viewBox')).toBe(`0 0 ${IMAGO_LAYOUT.w} ${IMAGO_LAYOUT.h}`);
+    expect(IMAGO_LAYOUT.w / IMAGO_LAYOUT.h).toBeGreaterThan(2.5); // a wide rectangle, not a square
+    const { word } = IMAGO_LAYOUT;
+    expect(word.x).toBeGreaterThanOrEqual(MARK_LAYOUT.w); // never over the hat
+    expect(word.x + word.w).toBeLessThanOrEqual(IMAGO_LAYOUT.w); // inside the box
+    expect(word.y).toBeGreaterThan(0);
+    expect(word.y + word.h).toBeLessThanOrEqual(IMAGO_LAYOUT.h);
+    expect(Math.abs(word.y + word.h / 2 - IMAGO_LAYOUT.h / 2)).toBeLessThanOrEqual(1);
+    expect(svg.getAttribute('aria-label')).toBe('CUBRAX');
+  });
+
+  it('"CUBRA" is light grey #e5e5e5 and ONLY the X is brand green #22c55e', async () => {
+    await render(React.createElement(Logo, { variant: 'imagotype' }));
+    const letters = [...host.querySelectorAll('[data-testid="logo-word"] path')];
+    expect(letters.map((p) => p.getAttribute('data-letter')).join('')).toBe('CUBRAX');
+    for (const p of letters) expect(p.getAttribute('fill')).toBe(p.getAttribute('data-letter') === 'X' ? '#22c55e' : '#e5e5e5');
+    expect(host.querySelector('[data-testid="logo"]').innerHTML.toLowerCase()).not.toMatch(/#fff(fff)?\b/); // no pure white anywhere in the lockup
+  });
+
+  it('the default Logo (header, dashboard) is unchanged: isotype only, sized by height', async () => {
+    await render(React.createElement(Logo, { size: 32 }));
+    expect(host.querySelector('[data-testid="logo"]').style.height).toBe('32px');
+    expect(host.querySelector('[data-testid="logo-word"]')).toBeNull();
+  });
 });

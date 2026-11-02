@@ -82,6 +82,8 @@ export function buildMarkSvg({ helmetHref } = {}) {
 
 // ---- the wordmark: geometric sans (Montserrat SemiBold outlines), white, with the X in brand green ---------------
 export const wordmarkInner = (ink = '#ffffff') => [...WORD].map((c) => `<path d="${LETTER_PATHS[c]}" fill="${c === 'X' ? BRAND.green : ink}"/>`).join('');
+/** Light ink of the UI (neutral-200): the lettering never uses pure white on OLED black. */
+export const IMAGO_INK = '#e5e5e5';
 export const WORD_VIEWBOX = `${WORD_BOX.x} ${WORD_BOX.y} ${WORD_BOX.w} ${WORD_BOX.h}`;
 
 /** The isotype nested at a position/scale inside a larger SVG. */
@@ -191,3 +193,16 @@ export function buildManifest() {
     ],
   };
 }
+
+/**
+ * The IMAGOTYPE for screens (welcome): isotype on the left and the CUBRAX lettering on its right, vertically centred, as ONE rectangular
+ * SVG. "CUBRA" is light grey (IMAGO_INK), only the "X" is brand green. Units are the isotype's own.
+ */
+const IMAGO_WORD_W = 900; // lettering width
+const IMAGO_GAP = 60; // air between the isotype and the lettering
+const IMAGO_WORD_H = Math.round((WORD_BOX.h * IMAGO_WORD_W) / WORD_BOX.w);
+export const IMAGO_LAYOUT = Object.freeze({
+  w: W + IMAGO_GAP + IMAGO_WORD_W,
+  h: MARK_LAYOUT.h,
+  word: Object.freeze({ x: W + IMAGO_GAP, y: Math.round((MARK_LAYOUT.h - IMAGO_WORD_H) / 2), w: IMAGO_WORD_W, h: IMAGO_WORD_H }),
+});

@@ -1,9 +1,39 @@
 import { useId, useState } from 'react';
-import { LETTER_PATHS, MARK_LAYOUT, DIM_ART, RULER_ART, HELMET_FILE, WORD, WORD_BOX, WORD_VIEWBOX, BRAND } from '../brand/icon.js';
+import { LETTER_PATHS, MARK_LAYOUT, IMAGO_LAYOUT, IMAGO_INK, DIM_ART, RULER_ART, HELMET_FILE, WORD, WORD_BOX, WORD_VIEWBOX, BRAND } from '../brand/icon.js';
 import NumberPad from './workspace/NumberPad.jsx';
 
-/** The CUBRAX isotype (dimension line + 3/4 hard hat + ruler, vector, transparent): `size` is its HEIGHT in px. */
-export function Logo({ size = 40, className = '' }) {
+/**
+ * The complete CUBRAX imagotype: isotype + lettering in ONE rectangular SVG (viewBox = the whole lockup, nothing is cut or squeezed).
+ * "CUBRA" light grey (#e5e5e5), only the "X" brand green (#22c55e). Size it with classes (`h-24 w-auto`).
+ */
+function Imagotype({ className = '' }) {
+  const { w, h, word } = IMAGO_LAYOUT;
+  const ink = (art) => art.replaceAll('#ffffff', IMAGO_INK);
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label="CUBRAX" focusable="false" className={`block max-w-full select-none ${className}`} data-testid="logo" data-variant="imagotype">
+      <g dangerouslySetInnerHTML={{ __html: ink(DIM_ART) }} />
+      <image
+        href={`${import.meta.env.BASE_URL}${HELMET_FILE}`}
+        data-testid="logo-helmet"
+        x="0"
+        y={MARK_LAYOUT.helmet.y}
+        width={MARK_LAYOUT.w}
+        height={MARK_LAYOUT.helmet.h}
+        preserveAspectRatio="xMidYMid meet"
+      />
+      <g dangerouslySetInnerHTML={{ __html: ink(RULER_ART) }} />
+      <svg x={word.x} y={word.y} width={word.w} height={word.h} viewBox={WORD_VIEWBOX} data-testid="logo-word" aria-hidden="true">
+        {[...WORD].map((c) => (
+          <path key={c} d={LETTER_PATHS[c]} fill={c === 'X' ? BRAND.green : IMAGO_INK} data-letter={c} />
+        ))}
+      </svg>
+    </svg>
+  );
+}
+
+/** The CUBRAX isotype (dimension line + 3/4 hard hat + ruler, vector, transparent): `size` is its HEIGHT in px. `variant="imagotype"` = isotype + lettering (sized by classes). */
+export function Logo({ size = 40, className = '', variant = 'mark' }) {
+  if (variant === 'imagotype') return <Imagotype className={className} />;
   // Hybrid isotype, sized by HEIGHT: static SVG dimension line on top, the supplied photoreal hard hat in the middle
   // (<img>, object-fit: contain, never distorted) and the static SVG ruler below, with transparent air in between.
   const k = size / MARK_LAYOUT.h;
@@ -50,7 +80,7 @@ export function Wordmark({ height = 28, className = '' }) {
   return (
     <svg viewBox={WORD_VIEWBOX} height={height} width={Math.round((height * WORD_BOX.w) / WORD_BOX.h)} aria-hidden="true" focusable="false" className={className} data-testid="wordmark">
       {[...WORD].map((c) => (
-        <path key={c} d={LETTER_PATHS[c]} fill={c === 'X' ? BRAND.green : '#ffffff'} />
+        <path key={c} d={LETTER_PATHS[c]} fill={c === 'X' ? BRAND.green : IMAGO_INK} />
       ))}
     </svg>
   );
