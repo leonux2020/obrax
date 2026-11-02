@@ -650,16 +650,6 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   const [financeId, setFinanceId] = useState(null);
   const financeProject = financeId ? projects?.find((p) => p.id === financeId) ?? null : null;
   useHistoryBack(financeProject ? financeId : null, () => setFinanceId(null), 'cubraxFinance');
-  const changeFinance = useCallback(
-    (patch) => {
-      const target = projectsRef.current.find((p) => p.id === financeId);
-      if (!target) return;
-      const next = { ...target, ...patch, updatedAt: Date.now() };
-      projectsRef.current = projectsRef.current.map((p) => (p.id === next.id ? next : p));
-      commit(next);
-    },
-    [financeId, commit]
-  );
   const renditionUpload = useCallback(({ kind, title, fileName, bytes }) => uploadRendition({ client: driveClient, kind, title, fileName, bytes }), [driveClient]);
   const renditionRef = useRef(false);
   // The one way a rendición (of a project or the global one) leaves the app: Drive or the offline queue, never a download. `run` builds + delivers;
@@ -972,7 +962,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
           )}
 
           {financeProject && !active && (
-            <ProjectFinancialDashboard project={financeProject} onChange={changeFinance} onBack={() => setFinanceId(null)} onCloseRendition={submitRendition} onRetryQueue={exportSync.retry} onReconnect={reconnectDrive} needsReconnect={driveNeedsReconnect} />
+            <ProjectFinancialDashboard project={financeProject} onBack={() => setFinanceId(null)} onCloseRendition={submitRendition} onRetryQueue={exportSync.retry} onReconnect={reconnectDrive} needsReconnect={driveNeedsReconnect} />
           )}
           {sheet?.type === 'new' && <ProjectSheet defaultRegion={settings.region} onSave={createProject} onClose={() => setSheet(null)} />}
           {editing && (

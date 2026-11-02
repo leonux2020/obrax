@@ -8,10 +8,8 @@ import {
   daysAgo,
   getLastProjectActivity,
   globalBreakdown,
-  globalTaxLabel,
   projectDateRange,
   projectLiquidity,
-  receivableList,
   sortByActivity,
 } from '../lib/ledger.js';
 import GlobalBreakdownSheet from './GlobalBreakdownSheet.jsx';
@@ -24,26 +22,22 @@ import { Button, Logo } from './ui.jsx';
  * "Contabilidad Global": every project with its cash balance (collected - expenses - advances). Tick several and
  * one tap sends a single consolidated Excel to Drive (Rendiciones_Globales) or, offline, to the export queue; it is never downloaded.
  *
- * Above the list a minimal HUD (net cash, tax shield, receivables) over the ACTIVE projects, one line per currency; each card
+ * Above the list ONE metric: DISPONIBLE (real liquid cash, large and centred) over the ACTIVE projects, one line per currency; each card
  * shows its dates and last-activity pulse, the list is ordered by last movement, and an overdrawn project gets an amber edge.
  * Everything is deduced from the records already stored (nothing new is saved).
  */
 const AMBER = 'text-[#e8c35f]';
 
-/** Font size by length of the amount, so a figure always fits its third of the HUD on a 320 px screen (never wraps or clips). */
-const sizeFor = (text) =>
-  text.length <= 9 ? 'text-sm' : text.length <= 11 ? 'text-[13px]' : text.length <= 13 ? 'text-xs' : text.length <= 15 ? 'text-[11px]' : 'text-[10px]';
+/** Big font size by length of the amount, so the single metric always fits on a 320 px screen (never wraps or clips). */
+const sizeFor = (text) => (text.length <= 9 ? 'text-4xl' : text.length <= 12 ? 'text-3xl' : text.length <= 15 ? 'text-2xl' : 'text-xl');
 
-/** One floating HUD column: compact label + one amount per currency (never mixed). No box, no divider. */
-function HudColumn({ id, label, lines, fmtOf, warn = false, flag = null }) {
+/** The ONE main metric: label + one large, centred amount per currency (never mixed). No box, no divider. */
+function HudColumn({ id, label, lines, fmtOf, warn = false }) {
   return (
-    <span data-testid={id} className="block min-w-0">
-      <span className="block whitespace-nowrap text-[11px] font-semibold uppercase tracking-tight text-white/50 sm:text-xs">
-        {label}
-        {flag}
-      </span>
+    <span data-testid={id} className="block min-w-0 text-center">
+      <span className="block whitespace-nowrap text-xs font-semibold uppercase tracking-wider text-white/50">{label}</span>
       {lines.length === 0 ? (
-        <span className="mt-1 block text-sm font-extrabold tabular-nums text-[#E0E0E0]/50">—</span>
+        <span className="mt-1 block text-3xl font-extrabold tabular-nums text-[#E0E0E0]/50">—</span>
       ) : (
         lines.map((l) => {
           const text = fmtOf(l.regionCode)(l.amount);
@@ -85,15 +79,8 @@ export default function GlobalAccounting({ projects, onOpenProject = null, onExp
     return sortByActivity(projects).map((p) => byId.get(p.id));
   }, [projects, rows]);
   const breakdown = useMemo(() => globalBreakdown(projects, totals), [projects, totals]);
-  const receivables = useMemo(() => receivableList(projects, totals, now), [projects, totals, now]);
-  const taxLabel = useMemo(() => globalTaxLabel(projects), [projects]);
   const lines = (key) => breakdown.map((l) => ({ currency: l.currency, regionCode: l.regionCode, amount: l[key] }));
-  const lateCount = receivables.filter((x) => x.late > 0).length;
   const [open, setOpen] = useState(false);
-  const titleOf = (id) => {
-    const p = projects.find((x) => x.id === id);
-    return (p && projectTitle(p)) || t('proj.untitled');
-  };
   const moneyOf = useMemo(() => {
     const cache = new Map();
     return (code) => cache.get(code) ?? (cache.set(code, makeI18n(lang, code).money), cache.get(code));
@@ -130,7 +117,7 @@ export default function GlobalAccounting({ projects, onOpenProject = null, onExp
     <main className="mx-auto w-full max-w-3xl px-3 pb-44 pt-3 sm:px-4" data-testid="accounting">
       <header className="mb-3 flex items-center gap-3">
         <Logo size={32} />
-        <h1 className="min-w-0 flex-1 truncate text-2xl font-extrabold tracking-tight">{t('nav.accounting')}</h1>
+        <h1 className="min-w-0 flex-1 truncate text-2xl font-extrabold tracking-tight">{t('nav.accountingShort')}</h1>
         {projects.length > 0 && (
           <button
             type="button"
@@ -155,36 +142,12 @@ export default function GlobalAccounting({ projects, onOpenProject = null, onExp
             onClick={() => setOpen(true)}
             aria-label={`${t('acc.sheet.open')}: ${t('acc.hud')}`}
             aria-haspopup="dialog"
-            className="mb-3 grid w-full cursor-pointer grid-cols-3 gap-1 rounded-2xl border border-white/10 bg-black px-2 py-3 text-center transition-opacity active:opacity-80"
+            className="mb-3 block w-full cursor-pointer rounded-2xl border border-white/10 bg-black px-3 py-6 text-center transition-opacity active:opacity-80"
           >
             <HudColumn id="acc-liquid" label={t('acc.hud.liquid')} lines={lines('liquid')} fmtOf={moneyOf} warn />
-            <HudColumn id="acc-tax" label={taxLabel || t('acc.hud.tax')} lines={lines('tax')} fmtOf={moneyOf} />
-            <HudColumn
-              id="acc-receivable"
-              label={t('acc.hud.receivable')}
-              lines={lines('receivable')}
-              fmtOf={moneyOf}
-              flag={
-                lateCount > 0 && (
-                  <span
-                    data-testid="acc-late-badge"
-                    role="img"
-                    aria-label={t('acc.hud.late', { n: lateCount })}
-                    className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-orange-400 align-middle"
-                  />
-                )
-              }
-            />
           </button>
           {open && (
-            <GlobalBreakdownSheet
-              breakdown={breakdown}
-              receivables={receivables}
-              taxLabel={taxLabel}
-              titleOf={titleOf}
-              moneyOf={moneyOf}
-              onClose={() => setOpen(false)}
-            />
+            <GlobalBreakdownSheet breakdown={breakdown} moneyOf={moneyOf} onClose={() => setOpen(false)} />
           )}
           <ul className="space-y-2" aria-label={t('nav.accounting')}>
             {sorted.map(({ project: p, balance: b, fmt }) => {

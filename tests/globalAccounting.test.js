@@ -273,7 +273,7 @@ describe('Vista Contabilidad Global', () => {
     vi.restoreAllMocks();
   });
 
-  it('muestra el HUD de 3 bloques antes de la lista, sin mezclar monedas', async () => {
+  it('muestra UNA sola métrica (Disponible) antes de la lista, sin mezclar monedas; sin IVA ni Por cobrar', async () => {
     const cl = sized(mk('CL', { payments: [pay(119000, back(1))] }));
     const es = sized(mk('ES', { payments: [pay(121, back(1))] }));
     await render([cl, es]);
@@ -283,10 +283,8 @@ describe('Vista Contabilidad Global', () => {
     expect(q('acc-liquid-CLP').textContent).toMatch(/119/);
     expect(q('acc-liquid-EUR').textContent).toMatch(/121/);
     expect(q('acc-liquid-CLP').textContent).not.toMatch(/€/);
-    expect(q('acc-tax-CLP').textContent).toMatch(/19/);
-    expect(q('acc-tax-EUR').textContent).toMatch(/21/);
-    expect(q('acc-tax').textContent).not.toContain('A reservar'); // ultra-compact: the explanation lives in the sheet
-    expect(q('acc-receivable-CLP')).not.toBeNull();
+    for (const id of ['acc-tax', 'acc-tax-CLP', 'acc-receivable', 'acc-receivable-CLP', 'acc-late-badge']) expect(q(id), id).toBeNull();
+    expect(hud.textContent.toUpperCase()).not.toMatch(/IVA|IMPUESTOS|POR COBRAR/);
     expect(hud.className).toContain('border-white/10');
     expect(hud.className).toContain('bg-black');
   });
@@ -333,7 +331,7 @@ describe('Vista Contabilidad Global', () => {
     expect(q(`acc-row-${ok.id}`).className).not.toContain('#e8c35f');
   });
 
-  it('badge naranja de cobranza con saldo y más de 15 días sin abonos', async () => {
+  it('badge naranja de cobranza SOLO en la tarjeta de la obra (no en el panel superior)', async () => {
     const late = sized(mk('CL', { name: 'Atrasada', createdAt: back(40), payments: [pay(10, back(20))] }));
     const fine = sized(mk('CL', { name: 'Al día', createdAt: back(40), payments: [pay(10, back(1))] }));
     await render([late, fine]);
@@ -341,33 +339,29 @@ describe('Vista Contabilidad Global', () => {
     expect(q(`acc-late-${late.id}`).className).toContain('text-orange-400');
     expect(q(`acc-late-${late.id}`).textContent).toContain('20');
     expect(q(`acc-late-${fine.id}`)).toBeNull();
-    expect(q('acc-late-badge').getAttribute('aria-label')).toContain('1');
+    expect(q('acc-late-badge')).toBeNull();
   });
 
-  it('es UN solo rectángulo táctil con 3 columnas sin cajas internas y etiquetas cortas', async () => {
+  it('el título es "Contabilidad" a secas (sin "Global") y el panel es UN solo rectángulo táctil, centrado y grande', async () => {
     const cl = sized(mk('CL', { payments: [pay(119000, back(1))] }));
     await render([cl]);
+    expect(host.querySelector('h1').textContent).toBe('Contabilidad');
+    expect(host.querySelector('h1').textContent).not.toMatch(/Global/i);
     const hud = q('acc-hud');
     expect(hud.tagName).toBe('BUTTON');
     expect(host.querySelectorAll('[data-testid^="acc-hud"]')).toHaveLength(1);
-    for (const c of ['grid-cols-3', 'rounded-2xl', 'border', 'border-white/10', 'bg-black', 'cursor-pointer', 'active:opacity-80', 'text-center']) expect(hud.className).toContain(c);
-    for (const id of ['acc-liquid', 'acc-tax', 'acc-receivable']) {
-      expect(hud.contains(q(id))).toBe(true);
-      expect(q(id).className).not.toMatch(/border|rounded|bg-/); // floating: no per-column box or divider
-    }
-    const labels = [q('acc-liquid'), q('acc-tax'), q('acc-receivable')].map((el) => el.firstChild);
-    labels.forEach((l) => {
-      expect(l.className).toContain('uppercase');
-      expect(l.className).toContain('text-white/50');
-    });
-    expect(labels.map((l) => l.textContent.toUpperCase())).toEqual(['DISPONIBLE', 'IVA', 'POR COBRAR']);
+    for (const c of ['rounded-2xl', 'border', 'border-white/10', 'bg-black', 'cursor-pointer', 'active:opacity-80', 'text-center']) expect(hud.className).toContain(c);
+    expect(hud.contains(q('acc-liquid'))).toBe(true);
+    expect(q('acc-liquid').className).not.toMatch(/border|rounded|bg-/); // floating: no per-column box or divider
+    const label = q('acc-liquid').firstChild;
+    expect(label.className).toContain('uppercase');
+    expect(label.textContent.toUpperCase()).toBe('DISPONIBLE');
+    expect(q('acc-liquid-CLP').className).toMatch(/text-(4xl|3xl)/); // the one big figure
   });
 
-  it('el rótulo de impuesto es el del país y cae a uno genérico con mercados distintos', async () => {
-    await render([mk('ES')]);
-    expect(q('acc-tax').firstChild.textContent).toBe('IVA');
-    await render([mk('ES'), mk('GB')]);
-    expect(q('acc-tax').firstChild.textContent.toUpperCase()).toBe('IMPUESTOS');
+  it('el título en italiano es "Contabilità"', async () => {
+    const { DICT } = await import('../src/lib/dict.js');
+    expect(DICT.it['nav.accountingShort']).toBe('Contabilità');
   });
 
   it('los montos no saltan de línea y reducen la letra cuando son largos (pantallas de 320 px)', async () => {
@@ -375,11 +369,11 @@ describe('Vista Contabilidad Global', () => {
     const small = mk('ES', { payments: [pay(5, back(1))] });
     await render([big, small]);
     for (const code of ['CLP', 'EUR']) expect(q(`acc-liquid-${code}`).className).toContain('whitespace-nowrap');
-    expect(q('acc-liquid-CLP').className).toMatch(/text-\[1[01]px\]|text-xs/);
-    expect(q('acc-liquid-EUR').className).toContain('text-sm');
+    expect(q('acc-liquid-CLP').className).toMatch(/text-(2xl|xl)/);
+    expect(q('acc-liquid-EUR').className).toContain('text-4xl');
   });
 
-  it('tocar el rectángulo abre la ficha "Desglose Financiero Global" con las tres secciones', async () => {
+  it('tocar el panel abre el detalle: solo Ingresos − Gastos − Adelantos = Saldo líquido por moneda', async () => {
     const a = sized(mk('CL', { name: 'Casa Norte', createdAt: back(40), payments: [pay(119000, back(20))], expenses: [{ id: 'e', amount: 30000, at: back(20) }], advances: [{ id: 'v', amount: 9000, at: back(20) }] }));
     await render([a]);
     expect(q('acc-sheet')).toBeNull();
@@ -390,24 +384,21 @@ describe('Vista Contabilidad Global', () => {
     expect(q('acc-sheet-exp-CLP').textContent).toMatch(/30/);
     expect(q('acc-sheet-adv-CLP').textContent).toMatch(/9/);
     expect(q('acc-sheet-liquid-CLP').textContent).toMatch(/80/);
-    expect(q('acc-sheet-avail').textContent).toContain('Efectivo real para operar hoy');
-    expect(q('acc-sheet-taxamt-CLP').textContent).toMatch(/19/);
-    expect(q('acc-sheet-tax').textContent).toContain('Monto a apartar para evitar imprevistos fiscales');
-    expect(q('acc-sheet-tax').textContent).toContain('IVA');
-    expect(q(`acc-sheet-rec-${a.id}`).textContent).toContain('Casa Norte');
-    expect(q(`acc-sheet-late-${a.id}`).className).toContain('text-orange-400'); // 20 days without payments
+    // nothing theoretical, nothing per project
+    for (const id of ['acc-sheet-tax', 'acc-sheet-taxamt-CLP', 'acc-sheet-rec', `acc-sheet-rec-${a.id}`, `acc-sheet-late-${a.id}`, 'acc-sheet-avail']) expect(q(id), id).toBeNull();
+    const text = q('acc-sheet').textContent;
+    expect(text).not.toMatch(/imprevistos fiscales|Sobre lo realmente cobrado|Por cobrar|Casa Norte|IVA/);
+    expect(q('acc-sheet').querySelectorAll('dl')).toHaveLength(1); // one compact block (one currency)
   });
 
-  it('en la ficha una obra al día no lleva el distintivo naranja y sin pendientes lo dice', async () => {
-    const fine = sized(mk('CL', { payments: [pay(10, back(1))] }));
-    await render([fine]);
+  it('con dos monedas el detalle trae un bloque compacto por moneda, sin mezclar', async () => {
+    const cl = sized(mk('CL', { payments: [pay(119000, back(1))] }));
+    const es = sized(mk('ES', { payments: [pay(121, back(1))] }));
+    await render([cl, es]);
     await click(q('acc-hud'));
-    expect(q(`acc-sheet-rec-${fine.id}`)).not.toBeNull();
-    expect(q(`acc-sheet-late-${fine.id}`)).toBeNull();
-    await click(document.querySelector('[data-sheet-close]'));
-    await render([mk('CL')]); // no quote yet: nothing to collect
-    await click(q('acc-hud'));
-    expect(q('acc-sheet-rec').textContent).toContain('Nada pendiente de cobro');
+    expect(q('acc-sheet').querySelectorAll('dl')).toHaveLength(2);
+    expect(q('acc-sheet-liquid-CLP').textContent).toMatch(/119/);
+    expect(q('acc-sheet-liquid-EUR').textContent).toMatch(/121/);
   });
 
   it('se cierra con ✕ (≥44 px), tocando fuera, Escape y deslizando hacia abajo', async () => {
@@ -463,7 +454,7 @@ describe('Vista Contabilidad Global', () => {
     await render([sized(mk('CL', { payments: [pay(10, back(1))] }))]);
     await click(q('acc-hud'));
     const backdrop = q('sheet-backdrop');
-    for (const inside of [document.querySelector('[role="dialog"]'), q('acc-sheet'), q('acc-sheet-avail'), q('acc-sheet-liquid-CLP')]) {
+    for (const inside of [document.querySelector('[role="dialog"]'), q('acc-sheet'), q('acc-sheet-liquid-CLP')]) {
       await click(inside);
       expect(q('acc-sheet')).not.toBeNull();
     }

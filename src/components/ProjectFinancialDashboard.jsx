@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
-import { cashSummary, expensesTotal, newFundEntry } from '../lib/ledger.js';
-import { projectClient, projectTitle, toDayString } from '../lib/projects.js';
-import { sanitizeText } from '../lib/sanitize.js';
+import { cashSummary, expensesTotal } from '../lib/ledger.js';
+import { projectClient, projectTitle } from '../lib/projects.js';
 import { UI_WATCHDOG_MS, settleWithin } from '../lib/exportSync.js';
 import { useExportQueue } from '../lib/useExportSync.js';
-import { Button, DateInput, NumberField, TextField } from './ui.jsx';
-import { SupplierTotals } from './ExpenseParts.jsx';
+import { ExpenseHead, SupplierTotals } from './ExpenseParts.jsx';
+import { CloudUploadIcon } from './workspace/icons.jsx';
 
 /** Font size by length of the amount, so a figure always fits its third of the header on a 320 px screen. */
 const sizeFor = (text) => (text.length <= 9 ? 'text-lg' : text.length <= 11 ? 'text-base' : text.length <= 13 ? 'text-sm' : 'text-xs');
@@ -25,17 +24,15 @@ function Stat({ id, label, value, tone = '' }) {
 /**
  * Financial command center of ONE project (full screen, opened from the Contabilidad card):
  *  - OLED headers: Fondo asignado (income) · Total gastado · Saldo a rendir (fund - spent),
- *  - Ingresos: a quick manager of "Adelantos / Caja chica" (date, amount, description) saved with the project in IndexedDB,
- *  - Egresos: the per-supplier totals strip and the grand total,
+ *  - Ingresos / Egresos: READ-ONLY lists. They show what was typed in the project itself (the client's payments of the CashBlock and the
+ *    expenses module): the single source of truth. Nothing is entered here,
  *  - "Cerrar Rendición (Enviar a Drive)": the Excel goes to Drive, or to the offline queue (it is never downloaded).
  *
- * `onChange(patch)` saves a change of the project ({ payments }); `onClose()` goes back; `onCloseRendition()` resolves when it is done.
+ * `onBack()` goes back; `onCloseRendition()` resolves when it is done.
  */
-export default function ProjectFinancialDashboard({ project, onChange, onBack, onCloseRendition, onRetryQueue = null, onReconnect = null, needsReconnect = false, queue, watchdogMs = UI_WATCHDOG_MS }) {
+export default function ProjectFinancialDashboard({ project, onBack, onCloseRendition, onRetryQueue = null, onReconnect = null, needsReconnect = false, queue, watchdogMs = UI_WATCHDOG_MS }) {
   const { t, money, locale } = useI18n();
-  const [date, setDate] = useState(() => toDayString(new Date()));
-  const [amount, setAmount] = useState(null);
-  const [note, setNote] = useState('');
+  const day = useMemo(() => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }), [locale]);
   const [busy, setBusy] = useState(false);
   const [connecting, setConnecting] = useState(false); // the user asked for the Google window: the button says so until Google answers
   const rows = useExportQueue(queue).filter((r) => r.projectId === project.id);
@@ -47,15 +44,6 @@ export default function ProjectFinancialDashboard({ project, onChange, onBack, o
   const toRender = Math.round((fund - spent) * 100) / 100;
   const entries = useMemo(() => [...project.payments].sort((a, b) => b.at - a.at), [project.payments]);
   const title = projectTitle(project) || t('proj.untitled');
-
-  const add = (e) => {
-    e.preventDefault();
-    const entry = newFundEntry({ amount, date, note });
-    if (!entry) return;
-    onChange({ payments: [entry, ...project.payments] });
-    setAmount(null);
-    setNote('');
-  };
 
   // "Reconectar Drive": the ONLY place besides "Enviar a Drive" where the Google window may open, and only by this tap
   const reconnect = async () => {
@@ -110,53 +98,35 @@ export default function ProjectFinancialDashboard({ project, onChange, onBack, o
           <Stat id="fin-balance" label={t('fin.toRender')} value={money(toRender)} tone={toRender < 0 ? 'text-red-400' : 'text-brand'} />
         </section>
 
-        {/* Ingresos */}
+        <p className="mt-4 text-xs text-neutral-500" data-testid="fin-readonly">
+          {t('fin.readonly')}
+        </p>
+
+        {/* Ingresos: read-only mirror of the CashBlock */}
         <section className="mt-5" data-testid="fin-income">
           <h2 className="mb-2 text-xs font-bold uppercase tracking-wider text-neutral-400">{t('fin.income')}</h2>
-          <form onSubmit={add} className="space-y-3 rounded-2xl border border-white/10 p-3" data-testid="fin-income-form">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label" htmlFor="fin-date">
-                  {t('fin.income.date')}
-                </label>
-                <DateInput id="fin-date" value={date} onChange={(e) => setDate(e.target.value)} data-testid="fin-income-date" />
-              </div>
-              <NumberField label={t('fin.income.amount')} value={amount} onChange={setAmount} decimals={2} placeholder="0" />
-            </div>
-            <TextField label={t('fin.income.desc')} placeholder={t('fin.income.descPh')} value={note} sanitize={(v) => sanitizeText(v, 80)} onChange={setNote} testId="fin-income-note" />
-            <Button type="submit" className="w-full" disabled={!(amount > 0)} data-testid="fin-income-add">
-              {t('fin.income.add')}
-            </Button>
-          </form>
-
           {entries.length === 0 ? (
-            <p className="mt-2 text-sm text-neutral-400" data-testid="fin-income-empty">
+            <p className="text-sm text-neutral-400" data-testid="fin-income-empty">
               {t('fin.income.empty')}
             </p>
           ) : (
-            <ul className="mt-2 space-y-2" data-testid="fin-income-list">
+            <ul className="space-y-2" data-testid="fin-income-list">
               {entries.map((x) => (
                 <li key={x.id} data-testid={`fin-income-${x.id}`} className="flex items-center gap-3 rounded-xl border border-white/10 px-3 py-2">
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-bold">{x.note || t('fin.income')}</span>
-                    <span className="block text-xs text-neutral-400">{new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(x.at))}</span>
+                    <span className="block truncate text-sm font-bold">{x.note || (x.method && t(`ws.cash.m.${x.method}`)) || t('fin.income')}</span>
+                    <span className="block truncate text-xs text-neutral-400">
+                      {[day.format(new Date(x.at)), x.note && x.method ? t(`ws.cash.m.${x.method}`) : ''].filter(Boolean).join(' · ')}
+                    </span>
                   </span>
                   <span className="text-sm font-extrabold tabular-nums text-brand">{money(x.amount)}</span>
-                  <button
-                    type="button"
-                    onClick={() => onChange({ payments: project.payments.filter((p) => p.id !== x.id) })}
-                    aria-label={`${t('fin.income.delete')}: ${x.note || money(x.amount)}`}
-                    className="-mr-1 flex h-10 w-10 items-center justify-center text-lg text-neutral-500 hover:text-red-400"
-                  >
-                    ×
-                  </button>
                 </li>
               ))}
             </ul>
           )}
         </section>
 
-        {/* Egresos */}
+        {/* Egresos: read-only mirror of the expenses module */}
         <section className="mt-5" data-testid="fin-expenses">
           <h2 className="mb-2 text-xs font-bold uppercase tracking-wider text-neutral-400">{t('fin.expenses')}</h2>
           {project.expenses.length === 0 ? (
@@ -166,6 +136,14 @@ export default function ProjectFinancialDashboard({ project, onChange, onBack, o
           ) : (
             <>
               <SupplierTotals expenses={project.expenses} />
+              <ul className="mb-2 space-y-2" data-testid="fin-expenses-list">
+                {project.expenses.map((e) => (
+                  <li key={e.id} data-testid={`fin-expense-${e.id}`} className="flex items-center gap-3 rounded-xl border border-white/10 px-3 py-2">
+                    <ExpenseHead e={e} />
+                    <span className="text-sm font-extrabold tabular-nums">{money(e.amount)}</span>
+                  </li>
+                ))}
+              </ul>
               <p className="flex items-baseline justify-between rounded-2xl border border-white/10 px-4 py-3" data-testid="fin-expenses-total">
                 <span className="text-sm font-bold">{t('fin.expenses.total')}</span>
                 <span className="font-extrabold tabular-nums">{money(spent)}</span>
@@ -200,7 +178,7 @@ export default function ProjectFinancialDashboard({ project, onChange, onBack, o
             data-testid="fin-close"
             className="flex min-h-[64px] w-full select-none items-center justify-center gap-2 rounded-2xl border-2 border-brand bg-black px-5 text-lg font-extrabold text-brand transition active:scale-[0.98] disabled:opacity-40"
           >
-            <span aria-hidden="true">☁️</span>
+            <CloudUploadIcon size={24} />
             {busy ? t('fin.closing') : t('fin.close')}
           </button>
         </div>

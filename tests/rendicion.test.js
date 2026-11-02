@@ -413,24 +413,41 @@ describe('ProjectFinancialDashboard + the Contabilidad card', () => {
     expect(q('fin-income-empty')).not.toBeNull();
   });
 
-  it('the quick manager adds an advance (date, amount, description) and deletes one; an empty amount cannot be added', async () => {
+  it('READ-ONLY: no income form, no fields, no delete; the lists mirror what the project already holds (CashBlock + expenses)', async () => {
     const changes = [];
     const p = project();
     await mount(React.createElement(ProjectFinancialDashboard, { project: p, onChange: (c) => changes.push(c), onBack: () => {}, onCloseRendition: async () => {}, queue: createExportQueue() }));
-    expect(q('fin-income-add').disabled).toBe(true);
-    const form = q('fin-income-form');
-    await type(q('fin-income-date'), '2026-10-29');
-    await type(form.querySelector('input[inputmode]'), '25000');
-    await type(q('fin-income-note'), 'Adelanto herramientas');
-    expect(q('fin-income-add').disabled).toBe(false);
-    await click(q('fin-income-add'));
-    expect(changes).toHaveLength(1);
-    const [entry, ...rest] = changes[0].payments;
-    expect(entry).toMatchObject({ amount: 25000, note: 'Adelanto herramientas', at: new Date('2026-10-29T12:00:00').getTime() });
-    expect(rest.map((x) => x.id)).toEqual(['adel0001', 'adel0002']);
-    expect(q('fin-income-add').disabled).toBe(true); // the form was cleared
-    await click(q('fin-income-adel0001').querySelector('button'));
-    expect(changes[1].payments.map((x) => x.id)).toEqual(['adel0002']);
+    const view = q('project-finance');
+    for (const id of ['fin-income-form', 'fin-income-add', 'fin-income-date', 'fin-income-note']) expect(q(id), id).toBeNull();
+    expect(view.querySelector('input, textarea, select, form')).toBeNull(); // nothing to type anywhere
+    expect(view.textContent).not.toMatch(/Añadir adelanto|Descripción|Fecha|Monto/);
+    expect(q('fin-readonly').textContent).toContain('Proyectos');
+    // ENTRATE: every payment of the project, as plain rows with no buttons
+    expect(q('fin-income-list').querySelectorAll('li')).toHaveLength(p.payments.length);
+    expect(q('fin-income-adel0001').querySelector('button')).toBeNull();
+    expect(q('fin-income-list').textContent).toContain('100.000');
+    // USCITE: every expense, read-only too
+    expect(q('fin-expenses-list').querySelectorAll('li')).toHaveLength(p.expenses.length);
+    expect(q('fin-expenses-list').querySelector('button')).toBeNull();
+    // the only button left on the screen besides "back" is the one that closes / exports the rendición
+    expect([...view.querySelectorAll('button')].map((b) => b.dataset.testid)).toEqual(['fin-back', 'fin-close']);
+    expect(changes).toHaveLength(0);
+  });
+
+  it('a payment registered in the project (with method) shows up here by itself, newest first, with the method tag', async () => {
+    const p = project({
+      payments: [
+        { id: 'p1', amount: 10000, at: new Date(2026, 9, 1, 12).getTime(), note: '' },
+        { id: 'p2', amount: 25000, at: new Date(2026, 9, 20, 12).getTime(), note: 'Cuota 2', method: 'transfer' },
+        { id: 'p3', amount: 5000, at: new Date(2026, 9, 25, 12).getTime(), note: '', method: 'check', photo: true },
+      ],
+    });
+    await mount(React.createElement(ProjectFinancialDashboard, { project: p, onBack: () => {}, onCloseRendition: async () => {}, queue: createExportQueue() }));
+    expect([...q('fin-income-list').querySelectorAll('li')].map((li) => li.dataset.testid)).toEqual(['fin-income-p3', 'fin-income-p2', 'fin-income-p1']);
+    expect(q('fin-income-p3').textContent).toContain('Cheque'); // no note: the method is the title
+    expect(q('fin-income-p2').textContent).toContain('Cuota 2');
+    expect(q('fin-income-p2').textContent).toContain('Transferencia');
+    expect(q('fin-fund-value').textContent).toContain('40.000');
   });
 
   it('"Cerrar Rendición" calls the delivery once (no double tap) and shows the waiting files of the offline queue', async () => {

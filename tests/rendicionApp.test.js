@@ -101,22 +101,31 @@ describe('Contabilidad -> financial command center', () => {
     expect(q('accounting')).not.toBeNull();
   });
 
-  it('an advance added in the view is saved with the project in IndexedDB and moves the headers', async () => {
+  it('what is registered in the project (CashBlock) appears in Contabilidad by itself; Contabilidad cannot add anything', async () => {
     h = createHost(App);
     await h.mount();
     await flush(100);
+    // add a payment where it belongs: the project
+    await click(h.host.querySelector(`[data-testid="project-card"]`));
+    await click(q('ws-cash').querySelector('summary'));
+    await click(q('cash-amount'));
+    for (const k of '20000') await click(q(`pad-${k}`));
+    await click(q('pad-done'));
+    await click(q('cash-method-transfer'));
+    await click(q('cash-add'));
+    await flush(100);
+    await act(async () => {
+      window.dispatchEvent(new PopStateEvent('popstate', { state: null })); // the device's Back: out of the project
+    });
+    await flush(60);
     await openFinance();
-    await typeInto(q('fin-income-form').querySelector('input[inputmode]'), '20000');
-    await typeInto(q('fin-income-note'), 'Caja chica octubre');
-    await click(q('fin-income-add'));
     expect(q('fin-fund-value').textContent).toContain('120.000');
     expect(q('fin-balance-value').textContent).toContain('78.000');
-    await flush(100);
+    expect(q('fin-income-list').querySelectorAll('li')).toHaveLength(2);
+    expect(q('fin-income-list').textContent).toContain('Transferencia');
+    expect(q('project-finance').querySelector('input, form')).toBeNull();
     const saved = (await projectStore.load()).find((p) => p.id === project.id);
-    expect(saved.payments).toHaveLength(2);
-    expect(saved.payments.find((x) => x.note === 'Caja chica octubre')).toMatchObject({ amount: 20000 });
-    expect(saved.payments.every((x) => x.amount > 0 && typeof x.id === 'string')).toBe(true);
-    expect(saved.id).toBe(project.id); // the same project, nothing orphan
+    expect(saved.payments).toHaveLength(2); // viewing never writes
   });
 });
 
