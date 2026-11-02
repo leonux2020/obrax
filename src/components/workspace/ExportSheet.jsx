@@ -1,12 +1,18 @@
 import { useState } from 'react';
 import { useI18n } from '../../lib/i18n.jsx';
 import BottomSheet from '../BottomSheet.jsx';
+import { CloudUploadIcon, FileCogIcon, FileSignatureIcon, TableIcon } from './icons.jsx';
 
 const OPTIONS = [
-  ['client', '📄', 'ws.export.client', 'ws.export.clientHint'],
-  ['tech', '🛠️', 'ws.export.tech', 'ws.export.techHint'],
-  ['xlsx', '📊', 'ws.export.xlsx', 'ws.export.xlsxHint'],
+  ['client', FileSignatureIcon, 'ws.export.client', 'ws.export.clientHint'],
+  ['tech', FileCogIcon, 'ws.export.tech', 'ws.export.techHint'],
+  ['xlsx', TableIcon, 'ws.export.xlsx', 'ws.export.xlsxHint'],
 ];
+
+// Hierarchy: ONLY the client PDF (the one that closes the deal) is highlighted; the rest stay neutral and secondary.
+const CARD = 'flex min-h-[72px] w-full items-center gap-3 rounded-2xl border px-4 text-left transition active:scale-[0.99] disabled:opacity-40';
+const NEUTRAL = 'border-white/10 active:border-white/40';
+const PRIMARY = 'border-brand active:border-brand-light';
 
 /** Export bottom sheet: three clear documents. `onExport(kind)` resolves to 'shared' | 'downloaded' | 'cancelled' or throws. */
 export default function ExportSheet({ onExport, onClose, canPdf, onSync = null, syncing = false }) {
@@ -31,7 +37,7 @@ export default function ExportSheet({ onExport, onClose, canPdf, onSync = null, 
   return (
     <BottomSheet title={t('ws.export.title')} onClose={onClose}>
       <ul className="mt-3 space-y-2" data-testid="export-sheet">
-        {OPTIONS.map(([kind, icon, label, hint]) => {
+        {OPTIONS.map(([kind, Icon, label, hint]) => {
           const disabled = Boolean(busy) || (kind !== 'xlsx' && !canPdf);
           return (
             <li key={kind}>
@@ -40,14 +46,15 @@ export default function ExportSheet({ onExport, onClose, canPdf, onSync = null, 
                 disabled={disabled}
                 onClick={() => run(kind)}
                 data-testid={`export-${kind}`}
-                className="flex min-h-[72px] w-full items-center gap-3 rounded-2xl border border-white/15 px-4 text-left transition active:scale-[0.99] active:border-white/50 disabled:opacity-40"
+                data-primary={kind === 'client' ? 'true' : undefined}
+                className={`${CARD} ${kind === 'client' ? PRIMARY : NEUTRAL}`}
               >
-                <span aria-hidden="true" className="text-3xl">
-                  {icon}
-                </span>
+                <Icon size={28} className="text-neutral-400" />
                 <span className="min-w-0 flex-1">
-                  <span className="block text-base font-extrabold">{busy === kind ? t('pdf.generating') : t(label)}</span>
-                  <span className="block text-xs text-neutral-300">{t(hint)}</span>
+                  <span className={`block text-base font-extrabold ${kind === 'client' ? 'text-brand' : ''}`}>
+                    {busy === kind ? t('pdf.generating') : t(label)}
+                  </span>
+                  <span className="block text-xs text-neutral-400">{t(hint)}</span>
                 </span>
               </button>
             </li>
@@ -63,14 +70,12 @@ export default function ExportSheet({ onExport, onClose, canPdf, onSync = null, 
             onClose();
           }}
           data-testid="export-drive"
-          className="mt-3 flex min-h-[72px] w-full items-center gap-3 rounded-2xl border border-white/15 px-4 text-left transition active:scale-[0.99] active:border-brand disabled:opacity-40"
+          className={`mt-3 ${CARD} ${NEUTRAL}`}
         >
-          <span aria-hidden="true" className="text-3xl">
-            ☁️
-          </span>
+          <CloudUploadIcon size={28} className="text-neutral-400" />
           <span className="min-w-0 flex-1">
-            <span className="block text-base font-extrabold text-brand">{syncing ? t('dossier.syncing') : t('ws.export.drive')}</span>
-            <span className="block text-xs text-neutral-300">{t('ws.export.driveHint')}</span>
+            <span className="block text-base font-extrabold">{syncing ? t('dossier.syncing') : t('ws.export.drive')}</span>
+            <span className="block text-xs text-neutral-400">{t('ws.export.driveHint')}</span>
           </span>
         </button>
       )}

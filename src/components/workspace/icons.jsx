@@ -275,3 +275,36 @@ export const CameraIcon = (props) => (
     <circle cx="12" cy="13" r="3" />
   </Outline>
 );
+
+// Export sheet: one quiet line icon per document (drawn after Lucide's FileSignature, FileCog, Table and CloudUpload).
+export const FileSignatureIcon = (props) => (
+  <Outline {...props}>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <path d="M14 2v6h6" />
+    <path d="M8 17c1.4-2.4 2.4-3.4 3.2-2.2.8 1.3 1.6 1.2 4.8-1.3" />
+  </Outline>
+);
+
+export const FileCogIcon = (props) => (
+  <Outline {...props}>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <path d="M14 2v6h6" />
+    <circle cx="12" cy="15" r="2" />
+    <path d="M12 11.5v1.5M12 17v1.5M8.5 15h1.5M14 15h1.5" />
+  </Outline>
+);
+
+export const TableIcon = (props) => (
+  <Outline {...props}>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M3 9h18M3 15h18M9 3v18" />
+  </Outline>
+);
+
+export const CloudUploadIcon = (props) => (
+  <Outline {...props}>
+    <path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2" />
+    <path d="M12 12v9" />
+    <path d="m16 16-4-4-4 4" />
+  </Outline>
+);
