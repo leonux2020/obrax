@@ -503,7 +503,7 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
       </div>
 
       {cashOpen && <CashSheet total={total} payments={project.payments} onChange={setList('payments')} onClose={() => setCashOpen(false)} />}
-      {scanOpen && <ReceiptSheet onSave={saveExpenses} onClose={() => setScanOpen(false)} {...(prepareReceipt ? { prepareImage: prepareReceipt } : {})} {...(fetchImpl ? { fetchImpl } : {})} />}
+      {scanOpen && <ReceiptSheet onSave={saveExpenses} existing={project.expenses} onClose={() => setScanOpen(false)} {...(prepareReceipt ? { prepareImage: prepareReceipt } : {})} {...(fetchImpl ? { fetchImpl } : {})} />}
     </main>
   );
 }

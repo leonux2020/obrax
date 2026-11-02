@@ -107,7 +107,8 @@ export function buildRenditionSheets(projects, totals, { t, locale = 'es', curre
             whenDay(e.date, locale) || when(e.at, locale),
             e.documentType ? t(`exp.doc.${e.documentType}`) : '',
             e.documentNumber ?? '',
-            e.supplier,
+            // the branch travels with the shop ("Sodimac - Via Roma 123"): the column layout of the sheet does not change
+            e.sucursal ? [e.supplier, e.sucursal].filter(Boolean).join(' - ') : e.supplier,
             e.vendorTaxId ?? '',
             e.description,
             t(`exp.cat.${e.category}`),

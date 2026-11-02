@@ -4,7 +4,7 @@ import { InvoiceError } from '../lib/invoice.js';
 import { EXPENSE_CATEGORIES, RENTAL_CATEGORIES } from '../lib/ledger.js';
 import { PhotoError, compressInvoiceImage } from '../lib/photos.js';
 import { pushToast } from '../lib/notify.js';
-import { expensesFromRows, receiptMeta, requestReceipt } from '../lib/receipt.js';
+import { dropDuplicateReceipts, expensesFromRows, receiptMeta, requestReceipt } from '../lib/receipt.js';
 import { Button, DateInput, NumberField } from './ui.jsx';
 import BottomSheet from './BottomSheet.jsx';
 import Hourglass from './Hourglass.jsx';
@@ -17,7 +17,7 @@ import Hourglass from './Hourglass.jsx';
  * is what lights the hourglass on the project card.
  * The photo is compressed on the device and sent ONLY to our own proxy; the Gemini key never reaches this code.
  */
-export default function ReceiptSheet({ onSave, onClose, onQueue, prepareImage = compressInvoiceImage, fetchImpl, today = Date.now }) {
+export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], prepareImage = compressInvoiceImage, fetchImpl, today = Date.now }) {
   const { t, region, lang, money } = useI18n();
   const [phase, setPhase] = useState('pick'); // 'pick' | 'reading' | 'review'
   const [error, setError] = useState('');
@@ -61,6 +61,14 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, prepareImage = 
         throw err;
       }
       if (!alive.current) return;
+      // Smart deduplication: a paper already stored in the project (same total + date + shop) is dropped from the batch without asking anything
+      const { fresh, skipped } = dropDuplicateReceipts(batch.receipts, existing);
+      if (skipped) pushToast({ key: skipped === 1 ? 'rcpt.dup.one' : 'rcpt.dup.many', params: { n: skipped }, tone: 'info' });
+      if (!fresh.length) {
+        setPhase('pick'); // nothing new in this photo: back to the camera, no error, nothing to delete
+        return;
+      }
+      batch = { ...batch, receipts: fresh };
       let n = 0;
       setReceipts(batch.receipts);
       setImage(img);
@@ -84,6 +92,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, prepareImage = 
     if (file) read(file);
   };
 
+  const setBranch = (doc, value) => setReceipts((list) => list.map((r, i) => (i === doc ? { ...r, sucursal: value } : r)));
   const patch = (key, change) => setRows((list) => list.map((r) => (r.key === key ? { ...r, ...change } : r)));
   const chosen = rows.filter((r) => r.selected && r.amount > 0);
   const total = chosen.reduce((s, r) => s + r.amount, 0);
@@ -162,13 +171,31 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, prepareImage = 
             <ul className="divide-y divide-white/10 rounded-2xl border border-white/10">
               {rows.map((r, idx) => {
                 const rental = RENTAL_CATEGORIES.includes(r.category);
-                const head = receipts.length > 1 && (idx === 0 || rows[idx - 1].doc !== r.doc) ? receipts[r.doc] : null;
+                const first = idx === 0 || rows[idx - 1].doc !== r.doc;
+                const head = receipts.length > 1 && first ? receipts[r.doc] : null;
                 return (
                   <React.Fragment key={r.key}>
                     {head && (
                       <li role="presentation" data-testid={`receipt-doc-${r.doc}`} className="bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-wide text-[#e8c35f]">
                         {t('rcpt.doc', { i: r.doc + 1, n: receipts.length })}
                         {[head.supplier, head.documentNumber, head.total ? money(head.total) : ''].filter(Boolean).map((x) => ` · ${x}`).join('')}
+                      </li>
+                    )}
+                    {first && (
+                      <li role="presentation" className="px-4 py-3">
+                        <label className="label" htmlFor={`branch-${r.doc}`}>
+                          {t('rcpt.branch')}
+                        </label>
+                        <input
+                          id={`branch-${r.doc}`}
+                          type="text"
+                          maxLength={80}
+                          autoComplete="off"
+                          className="field-input"
+                          value={receipts[r.doc]?.sucursal ?? ''}
+                          onChange={(e) => setBranch(r.doc, e.target.value)}
+                          data-testid={`receipt-branch-${r.doc}`}
+                        />
                       </li>
                     )}
                   <li data-testid={`receipt-row-${r.key}`} className={`space-y-3 p-4 ${r.selected ? '' : 'opacity-50'}`}>

@@ -61,6 +61,7 @@ import { closeGlobalRendition, closeRendition, uploadRendition } from './lib/exp
 import { useExportSync } from './lib/useExportSync.js';
 import { projectTotals } from './lib/projectTotals.js';
 import { addExpenses, registerBackgroundSync } from './lib/receiptSync.js';
+import { dropDuplicateExpenses } from './lib/receipt.js';
 import { useReceiptSync } from './lib/useReceiptSync.js';
 import GlobalAccounting from './components/GlobalAccounting.jsx';
 import AppShell from './components/AppShell.jsx';
@@ -360,6 +361,10 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   const applyReceipt = useCallback(async (projectId, expenses, row) => {
     const target = projectsRef.current.find((p) => p.id === projectId);
     if (!target) return false; // the project was deleted meanwhile
+    // Smart deduplication: a paper that is already in the project (same total + date + shop) is skipped silently, with a quiet toast
+    const dedup = dropDuplicateExpenses(expenses, target.expenses);
+    if (dedup.skipped) pushToast({ key: dedup.skipped === 1 ? 'rcpt.dup.one' : 'rcpt.dup.many', params: { n: dedup.skipped }, tone: 'info', ms: 5000 });
+    expenses = dedup.fresh;
     if (row?.blob) {
       // the queued photo is kept with its lines (Comprobantes of the expediente) before the queue row is dropped
       try {
@@ -369,6 +374,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
         /* the expenses matter more than the picture */
       }
     }
+    if (!expenses.length) return false; // nothing new: the queued photo is dropped, there is nothing to announce as saved
     const next = addExpenses(target, expenses);
     projectsRef.current = projectsRef.current.map((p) => (p.id === projectId ? next : p)); // two receipts in a row stack up
     setProjects((list) => list.map((p) => (p.id === projectId ? addExpenses(p, expenses) : p)));

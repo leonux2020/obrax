@@ -168,3 +168,62 @@ export async function requestReceipt(dataUrl, opts = {}) {
   if (!batch.receipts.length) throw new InvoiceError('unreadable');
   return batch;
 }
+
+// ---- Smart deduplication ---------------------------------------------------------------------------------------------------------------
+// The same paper scanned twice (a batch of photos, a retry, a queued photo that was also taken online) must not count twice. A DOCUMENT's
+// fingerprint is its total + the date printed on it + the shop name (normalized: no case, accents, punctuation or spacing). All three must
+// be known: a receipt without date or without shop is never discarded (better a double than a lost purchase).
+
+/** "Sodimac  S.A." / "SODIMAC S.A" / "sodímac sa" -> "sodimacsa". */
+export const normalizeShop = (name) => (typeof name === 'string' ? name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '') : '');
+
+/** `null` when the document cannot be fingerprinted. `amount` = the sum of its lines. */
+export function receiptFingerprint({ amount, date, supplier }) {
+  const cents = Math.round((Number(amount) || 0) * 100);
+  const shop = normalizeShop(supplier);
+  return cents > 0 && DAY_RE.test(date || '') && shop ? `${cents}|${date}|${shop}` : null;
+}
+
+/** Expenses grouped by document (lines of one receipt share `docId`; a manual expense is a document of one line). */
+const documentsOf = (expenses) => {
+  const docs = new Map();
+  for (const e of Array.isArray(expenses) ? expenses : []) {
+    const key = e?.docId || `line:${e?.id}`;
+    const d = docs.get(key) || { amount: 0, date: e?.date, supplier: e?.supplier };
+    d.amount += Number(e?.amount) || 0;
+    docs.set(key, d);
+  }
+  return [...docs.values()];
+};
+
+/** The set of fingerprints the project already holds. */
+export const expenseFingerprints = (expenses) => new Set(documentsOf(expenses).map(receiptFingerprint).filter(Boolean));
+
+/** Split scanned receipts (normalizeReceipt shape) into the new ones and the ones already stored. */
+export function dropDuplicateReceipts(receipts, existing) {
+  const known = expenseFingerprints(existing);
+  const fresh = [];
+  let skipped = 0;
+  for (const r of receipts) {
+    const fp = receiptFingerprint({ amount: r.items.reduce((s, it) => s + (Number(it.amount) || 0), 0), date: r.date, supplier: r.supplier });
+    if (fp && known.has(fp)) skipped += 1;
+    else fresh.push(r);
+  }
+  return { fresh, skipped };
+}
+
+/** Same for ready expense lines (the offline queue path): each `docId` is one document. Returns the lines to add and how many documents were skipped. */
+export function dropDuplicateExpenses(lines, existing) {
+  const known = expenseFingerprints(existing);
+  const byDoc = new Map();
+  for (const e of lines) byDoc.set(e.docId || `line:${e.id}`, [...(byDoc.get(e.docId || `line:${e.id}`) || []), e]);
+  const fresh = [];
+  let skipped = 0;
+  for (const group of byDoc.values()) {
+    const [d] = documentsOf(group);
+    const fp = receiptFingerprint(d);
+    if (fp && known.has(fp)) skipped += 1;
+    else fresh.push(...group);
+  }
+  return { fresh, skipped };
+}

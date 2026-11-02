@@ -265,7 +265,7 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
           </div>
         </BottomSheet>
       )}
-      {ui.sheet === 'scan' && <ReceiptSheet onSave={saveExpenses} onQueue={park} onClose={closeSheet} />}
+      {ui.sheet === 'scan' && <ReceiptSheet onSave={saveExpenses} existing={project.expenses} onQueue={park} onClose={closeSheet} />}
     </main>
   );
 }
