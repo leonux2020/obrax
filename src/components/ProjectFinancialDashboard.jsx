@@ -152,8 +152,21 @@ export default function ProjectFinancialDashboard({ project, onCloseRendition, o
                       <ul className="divide-y divide-white/5 px-3 pb-1 pt-1">
                         {g.items.map((e) => (
                           <li key={e.id} data-testid={`fin-expense-${e.id}`} className="flex items-baseline justify-between gap-3 py-1.5 text-sm">
-                            <span className="min-w-0 flex-1 truncate text-neutral-400" data-testid="fin-expense-date">
-                              {expenseDayLabel(e.date, locale) || day.format(new Date(e.at))}
+                            <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
+                              <span className="shrink-0 whitespace-nowrap text-neutral-400" data-testid="fin-expense-date">
+                                {expenseDayLabel(e.date, locale) || day.format(new Date(e.at))}
+                              </span>
+                              {/* "Receipt stack": the receipt's own line (the branch / address / note the scan stored) as grey micro-text; nothing when there is none */}
+                              {e.description && (
+                                <>
+                                  <span aria-hidden="true" className="shrink-0 text-xs text-neutral-600">
+                                    •
+                                  </span>
+                                  <span className="min-w-0 max-w-[150px] truncate text-xs text-neutral-500" title={e.description} data-testid="fin-expense-note">
+                                    {e.description}
+                                  </span>
+                                </>
+                              )}
                             </span>
                             <span className="shrink-0 tabular-nums text-[#E0E0E0]">{fmt(e.amount)}</span>
                           </li>

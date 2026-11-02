@@ -485,6 +485,41 @@ describe('ProjectFinancialDashboard + the Contabilidad card', () => {
     expect(q('fin-expenses-total').textContent).toContain('70.000');
   });
 
+  it('"Receipt stack": each ticket shows its description / branch as grey micro-text after the date, separated by a bullet; no description = only the date', async () => {
+    const p = project();
+    p.expenses = normalizeExpenses([
+      { id: 'gasto01', amount: 30000, category: 'material', supplier: 'Sodimac', description: 'Sodimac Maipú · Av. Pajaritos 1234', date: '2026-10-02' },
+      { id: 'gasto02', amount: 20000, category: 'material', supplier: 'Sodimac', description: '', date: '2026-10-05' },
+      { id: 'gasto03', amount: 9000, category: 'material', supplier: 'Sodimac', description: 'Tienda Las Condes — devolución de garantía hasta el 30/11 con boleta original', date: '2026-10-07' },
+    ]);
+    await mount(React.createElement(ProjectFinancialDashboard, { project: p, onCloseRendition: async () => {}, queue: createExportQueue() }));
+    // two levels: ONE master heading with the chain's total, the tickets below
+    expect(q('fin-expenses').querySelectorAll('[data-testid="fin-shop-name"]')).toHaveLength(1);
+    expect(q('fin-shop-total').textContent).toContain('59.000');
+    expect(q('fin-expenses').querySelectorAll('li')).toHaveLength(3);
+    // ticket with a description: date • micro-text
+    const g1 = q('fin-expense-gasto01');
+    const note = g1.querySelector('[data-testid="fin-expense-note"]');
+    expect(note.textContent).toBe('Sodimac Maipú · Av. Pajaritos 1234');
+    for (const c of ['text-xs', 'text-neutral-500', 'truncate', 'max-w-[150px]']) expect(note.className).toContain(c);
+    expect(note.getAttribute('title')).toBe('Sodimac Maipú · Av. Pajaritos 1234'); // the full text is one long-press away
+    const dateEl = g1.querySelector('[data-testid="fin-expense-date"]');
+    expect(dateEl.nextElementSibling.textContent).toBe('•'); // the bullet sits between date and note
+    expect(dateEl.nextElementSibling.getAttribute('aria-hidden')).toBe('true');
+    expect(dateEl.nextElementSibling.nextElementSibling).toBe(note);
+    expect(dateEl.className).toContain('shrink-0'); // the date is never squeezed by a long note
+    expect(g1.textContent).toContain('30.000');
+    // a long note is truncated, never wraps (one line per ticket)
+    expect(q('fin-expense-gasto03').querySelector('[data-testid="fin-expense-note"]').className).toContain('truncate');
+    // FALLBACK: no description -> only the date, same alignment (amount still right-aligned in the same flex row)
+    const g2 = q('fin-expense-gasto02');
+    expect(g2.querySelector('[data-testid="fin-expense-note"]')).toBeNull();
+    expect(g2.textContent).not.toContain('•');
+    expect(g2.className).toBe(g1.className);
+    expect(g2.querySelector('[data-testid="fin-expense-date"]').textContent).toMatch(/2026/);
+    expect(g2.textContent).toContain('20.000');
+  });
+
   it('a payment registered in the project (with method) shows up here by itself, newest first, with the method tag', async () => {
     const p = project({
       payments: [
