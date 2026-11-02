@@ -294,6 +294,7 @@ describe('finance + expenses inside the same screen', () => {
     const p = mk({ expenses: [{ id: 'e1', description: 'Taladro', category: 'tool_rental', supplier: 'Easy', amount: 25000, returnDate: day(3), returned: false }] });
     await mount(p);
     const total0 = q('ws-total').textContent;
+    await click(q('finance-lock')); // the parameters start locked
     const slider = q('slider-profit-input');
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(slider, '20');
@@ -304,6 +305,60 @@ describe('finance + expenses inside the same screen', () => {
     expect(q('ws-total').textContent).not.toBe(total0);
     await click(q('expense-return-e1'));
     expect(spy.project.expenses[0].returned).toBe(true);
+  });
+});
+
+describe('Parametri del preventivo: error-prevention lock', () => {
+  const svgOf = (el) => el.querySelector('svg').innerHTML;
+
+  it('starts locked: inputs disabled, dimmed, numbers still high-contrast, grey toggle with a closed padlock', async () => {
+    await mount(mk());
+    const params = q('finance-params');
+    expect(params.disabled).toBe(true);
+    expect(params.dataset.safe).toBe('true');
+    for (const k of ['labor', 'transport', 'contingency', 'profit']) {
+      expect(q(`slider-${k}-input`).disabled).toBe(true);
+      expect(q(`slider-${k}-input`).className).toContain('opacity-60');
+      expect(q(`slider-${k}-value`).className).toContain('text-white'); // the number is not dimmed
+      expect(q(`slider-${k}-value`).className).not.toContain('bg-brand');
+    }
+    const btn = q('finance-lock');
+    expect(btn.dataset.state).toBe('locked');
+    expect(btn.className).toContain('text-neutral-400');
+    expect(btn.className).toContain('border-neutral-600');
+    expect(btn.className).toContain('min-h-[60px]');
+    expect(btn.textContent).toContain('Parámetros bloqueados');
+    expect(svgOf(btn)).toContain('rect'); // the padlock body
+    expect(svgOf(btn)).toContain('v4'); // closed shackle
+    // it is the LAST thing of the section, after the controls
+    expect(params.compareDocumentPosition(btn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('unlocking enables the controls and turns the button amber with an open padlock; locking again restores it', async () => {
+    await mount(mk());
+    await click(q('finance-lock'));
+    const btn = q('finance-lock');
+    expect(q('finance-params').disabled).toBe(false);
+    expect(q('slider-profit-input').disabled).toBe(false);
+    expect(btn.dataset.state).toBe('unlocked');
+    expect(btn.className).toContain('text-amber-500');
+    expect(btn.className).toContain('border-amber-500');
+    expect(btn.textContent).toContain('Bloquear parámetros');
+    expect(svgOf(btn)).toContain('9.9-1'); // open shackle
+    await click(btn);
+    expect(q('finance-params').disabled).toBe(true);
+    expect(q('finance-lock').dataset.state).toBe('locked');
+  });
+
+  it('closing and reopening the section locks it again', async () => {
+    await mount(mk());
+    await click(q('finance-lock'));
+    expect(q('finance-params').disabled).toBe(false);
+    const summary = q('ws-finance').querySelector('summary');
+    await click(summary); // collapse
+    await click(summary); // enter again
+    expect(q('finance-params').disabled).toBe(true);
+    expect(q('finance-lock').dataset.state).toBe('locked');
   });
 });
 

@@ -3,8 +3,10 @@ import { useId } from 'react';
 /**
  * Minimal percentage control: the title, ONE continuous range slider and the current number in a green pill above the right end of the rail
  * (a single thumb, no preset buttons). The value is always an integer inside [min, max].
+ * `disabled` (read-only): the rail is dimmed and the pill drops the bright green for a white outline, but the NUMBER keeps full contrast
+ * so it stays readable in the sun.
  */
-export default function PercentSlider({ label, value, min = 0, max = 100, step = 1, suffix = '%', onChange, testId }) {
+export default function PercentSlider({ label, value, min = 0, max = 100, step = 1, suffix = '%', onChange, testId, disabled = false }) {
   const id = useId();
   const clamp = (n) => Math.min(max, Math.max(min, n));
   const shown = clamp(Number.isFinite(value) ? value : min);
@@ -16,7 +18,7 @@ export default function PercentSlider({ label, value, min = 0, max = 100, step =
         <label htmlFor={id} className="text-sm font-bold text-neutral-200">
           {label}
         </label>
-        <output htmlFor={id} data-testid={`${testId}-value`} className="rounded-md bg-brand px-2 py-0.5 text-sm font-extrabold tabular-nums leading-tight text-black">
+        <output htmlFor={id} data-testid={`${testId}-value`} className={`rounded-md px-2 py-0.5 text-sm font-extrabold tabular-nums leading-tight ${disabled ? 'border border-white/40 bg-black text-white' : 'bg-brand text-black'}`}>
           {shown}
           {suffix}
         </output>
@@ -24,7 +26,8 @@ export default function PercentSlider({ label, value, min = 0, max = 100, step =
       <input
         id={id}
         type="range"
-        className="slider-min"
+        className={`slider-min ${disabled ? 'opacity-60' : ''}`}
+        disabled={disabled}
         min={min}
         max={max}
         step={step}
