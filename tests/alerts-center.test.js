@@ -74,15 +74,13 @@ describe('projectAlerts', () => {
     expect(projectAlerts({ ...old, closedAt: Date.now() }, tt, { budget: 1000, money })).toEqual([]);
   });
 
-  it('deadline: exceeded end date -> late; plan that cannot fit -> short; never both; a finished project is silent', () => {
+  it('deadline: only an exceeded delivery date alerts; the system never questions whether the work fits the typed dates; a finished project is silent', () => {
     const over = newProject({ regionCode: 'CL', name: 'Torre', startDate: day(-20), endDate: day(-2) });
     expect(projectAlerts(over, tt).map((a) => [a.kind, a.level, a.text])).toEqual([['deadline', 'late', 'ws.alert.deadlineLate|Torre|']]);
-    expect(projectAlerts(over, tt, { fits: false }).map((a) => a.text)).toEqual(['ws.alert.deadlineLate|Torre|']);
-    const tight = newProject({ regionCode: 'CL', name: 'Torre', startDate: day(-1), endDate: day(5) });
+    const tight = newProject({ regionCode: 'CL', name: 'Torre', startDate: day(-1), endDate: day(0) }); // a 1-day window for any job: not our business
     expect(projectAlerts(tight, tt)).toEqual([]);
-    expect(projectAlerts(tight, tt, { fits: true })).toEqual([]);
-    expect(projectAlerts(tight, tt, { fits: false }).map((a) => [a.level, a.text])).toEqual([['short', 'ws.alert.deadlineShort|Torre|']]);
-    expect(projectAlerts({ ...over, closedAt: Date.now() }, tt, { fits: false })).toEqual([]);
+    expect(projectAlerts(tight, tt, { fits: false })).toEqual([]); // the old "plazo insuficiente" signal no longer exists
+    expect(projectAlerts({ ...over, closedAt: Date.now() }, tt)).toEqual([]);
   });
 
   it('receipts: only review / failed rows of THIS project; pending, sending and other projects stay silent', () => {
@@ -179,19 +177,20 @@ describe('Dashboard bell + GlobalAlerts', () => {
   });
 
   it('an old project WITHOUT a valid budget raises no collection alert (an amount is never invented)', async () => {
-    const { projectSummary } = await import('../src/lib/projectTotals.js');
+    const { projectTotal } = await import('../src/lib/projectTotals.js');
     const base = newProject({ regionCode: 'CL', name: 'Casa', client: 'Ana', startDate: day(-30), endDate: day(30) });
     const p = { ...base, createdAt: Date.now() - 40 * 86400000 };
-    expect(projectSummary(p).total).toBeNull();
+    expect(projectTotal(p)).toBeNull();
     await mount([p], 'es');
     expect(q('dash-bell-dot')).toBeNull();
   });
 
   it('the new keys exist in the six languages with the same placeholders', async () => {
     const { DICT: all } = await import('../src/lib/dict.js');
-    for (const k of ['ws.alerts.title', 'ws.alerts.none', 'ws.alert.rentalToday', 'ws.alert.rentalLate', 'ws.alert.collection', 'ws.alert.deadlineLate', 'ws.alert.deadlineShort', 'ws.alert.receiptReview', 'ws.alert.receiptFailed']) {
+    for (const k of ['ws.alerts.title', 'ws.alerts.none', 'ws.alert.rentalToday', 'ws.alert.rentalLate', 'ws.alert.collection', 'ws.alert.deadlineLate', 'ws.alert.receiptReview', 'ws.alert.receiptFailed']) {
       for (const lang of ['es', 'en', 'pt', 'fr', 'it', 'de']) expect(all[lang][k], `${lang}:${k}`).toBeTruthy();
     }
+    expect(DICT.es['ws.alert.deadlineShort']).toBeUndefined(); // the "plazo insuficiente" alert is gone for good
     expect(DICT.it['ws.alerts.title']).toBe('Allarmi');
     expect(DICT.it['ws.alerts.none']).toBe('Nessun allarme per oggi');
   });

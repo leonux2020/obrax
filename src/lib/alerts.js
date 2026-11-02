@@ -4,7 +4,8 @@ import { isClosed, projectClient, projectLevel, projectTitle } from './projects.
 /**
  * Real exceptions of ONE project (exception-based UI: no exception, no alert). Everything is derived from data that already exists:
  *
- *   deadline  the end date has passed (traffic light red) -> 'late'; or the crew plan cannot fit the deadline (`fits === false`) -> 'short'
+ *   deadline  the delivery date has passed (traffic light red). The system never questions whether the work fits the typed dates:
+ *             the contractor owns the schedule
  *   cobro     a balance is pending and more than 15 days went by without a client payment (ledger.collectionDelay)
  *   rental    a rented tool / machine is due back today (-> 'today') or already overdue (-> 'late'), not marked as returned
  *   receipt   a receipt photo of the deferred queue needs the user: 'review' (other currency) or 'failed' (unreadable)
@@ -14,14 +15,12 @@ import { isClosed, projectClient, projectLevel, projectTitle } from './projects.
  * @param opts     { now, budget (total with tax | null), fits (schedule fits the deadline | null), queue (queue rows of ANY project), money (n => text) }
  * @returns {{ id, kind: 'deadline'|'collection'|'rental'|'receipt', level: string, text: string }[]}  most serious first
  */
-export function projectAlerts(project, t, { now = Date.now(), budget = null, fits = null, queue = [], money = (n) => String(n) } = {}) {
+export function projectAlerts(project, t, { now = Date.now(), budget = null, queue = [], money = (n) => String(n) } = {}) {
   const out = [];
   const name = projectTitle(project) || t('proj.untitled');
 
   if (!isClosed(project)) {
-    const late = projectLevel(project, now).level === 'red';
-    if (late) out.push({ id: 'deadline', kind: 'deadline', level: 'late', text: t('ws.alert.deadlineLate', { name }) });
-    else if (fits === false) out.push({ id: 'deadline', kind: 'deadline', level: 'short', text: t('ws.alert.deadlineShort', { name }) });
+    if (projectLevel(project, now).level === 'red') out.push({ id: 'deadline', kind: 'deadline', level: 'late', text: t('ws.alert.deadlineLate', { name }) });
   }
 
   if (collectionDelay(project, budget, now) > 0) {

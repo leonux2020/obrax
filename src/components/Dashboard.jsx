@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { projectAlerts } from '../lib/alerts.js';
-import { projectSummary } from '../lib/projectTotals.js';
+import { projectTotal } from '../lib/projectTotals.js';
 import { projectMarket } from '../lib/ledger.js';
 import { isClosed, projectLevel, projectTitle, sortProjects } from '../lib/projects.js';
 import { usePro } from '../lib/usePro.js';
@@ -55,13 +55,13 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro, 
   }, [projects, now]);
 
   // the Action Center: every real exception of every open project (overdue deadline, late collection, rental due, receipt to review);
-  // none => the quiet "no alarms" screen. Budget and schedule fit come from the same engine the project screens use.
+  // none => the quiet "no alarms" screen. The budget comes from the same engine the project screens use.
   const alerts = useMemo(
     () =>
       active.flatMap((p) => {
-        const { total, fits } = projectSummary(p, now);
+        const total = projectTotal(p, now);
         const currency = projectMarket(p).currency;
-        return projectAlerts(p, t, { now, budget: total, fits, queue: receiptRows, money: (n) => moneyIn(n, currency) }).map((a) => ({ ...a, id: `${p.id}:${a.id}`, projectId: p.id, project: projectTitle(p) || t('proj.untitled') }));
+        return projectAlerts(p, t, { now, budget: total, queue: receiptRows, money: (n) => moneyIn(n, currency) }).map((a) => ({ ...a, id: `${p.id}:${a.id}`, projectId: p.id, project: projectTitle(p) || t('proj.untitled') }));
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [active, t, now, receiptRows]

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { newDraft, newPartida, normalizeDraft } from '../src/lib/draft.js';
 import { defaultDims, TASK_IDS } from '../src/lib/tasks.js';
 import { computeAll } from '../src/lib/engine.js';
-import { SCHEDULE, activeDaysFor, buildSchedule, clampCrew } from '../src/lib/schedule.js';
+import { spanDays, toISODay } from '../src/lib/schedule.js';
 import { MACHINE_IDS, MACHINES, machineryRate } from '../src/lib/machinery.js';
 import { HSE, ERGO_IDS, PPE_IDS, WASTE_IDS, hseFor, hseKeys } from '../src/lib/hse.js';
 import { buildClientModel, buildTechModel } from '../src/lib/reports.js';
@@ -34,62 +34,24 @@ function project(tasks, patch = {}) {
   return { ...d, ...patch };
 }
 
-describe('schedule: man-hours vs technical dead time', () => {
-  it('HH and dead days do not depend on the crew; only the active days do', () => {
-    const d = project(['slab', 'floor']);
-    const a = computeAll({ ...d, crew: 2 }, NOW).schedule;
-    const b = computeAll({ ...d, crew: 8 }, NOW).schedule;
-    expect(a.totals.hh).toBe(b.totals.hh);
-    expect(a.totals.deadDays).toBe(b.totals.deadDays);
-    expect(b.totals.activeDays).toBeLessThan(a.totals.activeDays);
-    expect(a.totals.hh).toBeGreaterThan(0);
-    expect(a.totals.deadDays).toBeGreaterThan(0);
+describe('schedule: manual calendar (no theoretical planner)', () => {
+  it('spanDays is the plain subtraction of two ISO days; invalid, missing or reversed dates give null', () => {
+    expect(spanDays('2026-11-02', '2026-11-16')).toBe(14);
+    expect(spanDays('2026-11-02', '2026-11-02')).toBe(0);
+    expect(spanDays('2026-02-27', '2026-03-02')).toBe(3);
+    expect(spanDays('', '2026-11-16')).toBeNull();
+    expect(spanDays('2026-11-02', '')).toBeNull();
+    expect(spanDays('2026-11-10', '2026-11-01')).toBeNull();
+    expect(spanDays('2026-02-30', '2026-03-05')).toBeNull();
   });
 
-  it('total days = active days + dead days, and the rows chain end to start', () => {
-    const s = computeAll(project(['slab', 'masonry', 'paint']), NOW).schedule;
-    expect(s.totals.totalDays).toBe(s.totals.activeDays + s.totals.deadDays);
-    let cursor = 0;
-    for (const r of s.rows) {
-      expect(r.start).toBe(cursor);
-      expect(r.activeEnd).toBe(r.start + r.activeDays);
-      expect(r.end).toBe(r.activeEnd + r.deadDays);
-      cursor = r.end;
-    }
-    expect(cursor).toBe(s.totals.totalDays);
-  });
-
-  it('adding workers never makes the job longer and eventually hits the half-day floor', () => {
-    const d = project(['slab', 'floor', 'paint']);
-    let prev = Infinity;
-    for (let crew = SCHEDULE.minCrew; crew <= SCHEDULE.maxCrew; crew++) {
-      const total = computeAll({ ...d, crew }, NOW).schedule.totals.totalDays;
-      expect(total).toBeLessThanOrEqual(prev);
-      prev = total;
-    }
-    const s = computeAll({ ...d, crew: SCHEDULE.maxCrew }, NOW).schedule;
-    for (const r of s.rows) expect(r.activeDays).toBeGreaterThanOrEqual(SCHEDULE.dayStep);
-    // the dead time is a hard floor: no crew can finish before it
-    expect(s.totals.totalDays).toBeGreaterThanOrEqual(s.totals.deadDays);
-  });
-
-  it('activeDaysFor rounds up in half days, clamps the crew and ignores 0 HH', () => {
-    expect(activeDaysFor(0, 3)).toBe(0);
-    expect(activeDaysFor(24, 3)).toBe(1);
-    expect(activeDaysFor(25, 3)).toBe(1.5);
-    expect(activeDaysFor(1, 99)).toBe(0.5);
-    expect(clampCrew(0)).toBe(1);
-    expect(clampCrew(500)).toBe(SCHEDULE.maxCrew);
-    expect(clampCrew('abc')).toBe(SCHEDULE.defaultCrew);
-    expect(buildSchedule([{ task: 'slab', calc: null }]).totals.totalDays).toBe(0);
-  });
-
-  it('every task type produces labour and a sensible plan', () => {
-    for (const task of TASK_IDS) {
-      const s = computeAll(project([task]), NOW).schedule;
-      expect(s.rows[0].hh, task).toBeGreaterThan(0);
-      expect(s.totals.totalDays, task).toBeGreaterThan(0);
-    }
+  it('computeAll no longer carries a crew plan: no schedule, no HH; just the calendar days the user typed', () => {
+    const d = project(['slab', 'roof']);
+    const r = computeAll(d, NOW, { timeline: { startDate: '2026-11-02', endDate: '2026-11-12' } });
+    expect(r.schedule).toBeUndefined();
+    expect(r.siteDays).toBe(10);
+    expect(computeAll(d, NOW).siteDays).toBeNull();
+    expect(Object.keys(d)).not.toContain('crew');
   });
 });
 
@@ -132,11 +94,38 @@ describe('major machinery: suggested, priced and added as an indirect cost', () 
     expect(noScaffold.quote.partidas.reduce((s, c) => s + c.amount, 0)).toBe(noScaffold.quote.subtotal);
   });
 
-  it('rental days follow the crew (more workers = fewer rental days = cheaper rental)', () => {
+  const timeline = (days) => ({ startDate: '2026-11-02', endDate: toISODay(new Date(2026, 10, 2 + days)) });
+  const machineDays = (d, tl, id) => computeAll(d, NOW, { timeline: tl }).machinery.items.find((i) => i.id === id)?.days;
+
+  it('rental days follow the REAL duration typed by the user (delivery - start): longer job = more rental days = costlier rental', () => {
     const d = project(['slab', 'roof']);
-    const small = computeAll({ ...d, crew: 1 }, NOW).quote.machinery;
-    const big = computeAll({ ...d, crew: 12 }, NOW).quote.machinery;
-    expect(big).toBeLessThan(small);
+    const short = computeAll(d, NOW, { timeline: timeline(10) }).quote.machinery;
+    const long = computeAll(d, NOW, { timeline: timeline(40) }).quote.machinery;
+    expect(long).toBeGreaterThan(short);
+    expect(computeAll(d, NOW, { timeline: timeline(40) }).quote.machinery).toBe(long); // deterministic
+  });
+
+  it('the rule per machine: the mixer works half of the partida\'s calendar days, the scaffold all of them plus one day to assemble, the compactor one day', () => {
+    const one = project(['slab']);
+    expect(machineDays(one, timeline(20), 'mixer')).toBe(10); // 50 % of 20
+    expect(machineDays(one, timeline(21), 'mixer')).toBe(11); // rounded up
+    expect(machineDays(one, timeline(20), 'compactor')).toBe(1);
+    const roof = project(['roof']);
+    expect(machineDays(roof, timeline(20), 'scaffold')).toBe(21); // 20 + 1
+  });
+
+  it('the calendar days are shared equally between the valid partidas (a mixer and a scaffold in different partidas do not both bill the whole job)', () => {
+    const two = project(['slab', 'roof']);
+    expect(machineDays(two, timeline(20), 'mixer')).toBe(5); // share = 10 days, 50 % of it
+    expect(machineDays(two, timeline(20), 'scaffold')).toBe(11); // 10 + 1
+  });
+
+  it('without both dates the rental is the smallest one (1 day per partida) until the user types them; the crew / HH never enter', () => {
+    const two = project(['slab', 'roof']);
+    expect(machineDays(two, null, 'mixer')).toBe(1);
+    expect(machineDays(two, { startDate: '2026-11-02', endDate: '' }, 'scaffold')).toBe(2);
+    expect(machineDays(two, { startDate: '2026-11-10', endDate: '2026-11-01' }, 'mixer')).toBe(1); // reversed = ignored
+    expect(computeAll({ ...two, crew: 12 }, NOW).quote.machinery).toBe(computeAll(two, NOW).quote.machinery); // an old crew field changes nothing
   });
 
   it('daily rates are positive, stable over time and scale with the region currency', () => {
@@ -158,10 +147,10 @@ describe('major machinery: suggested, priced and added as an indirect cost', () 
     const tech = buildTechModel({ ...base, money: (v) => String(v) });
     expect(tech.costs.machinery).toBe(result.quote.machinery);
     expect(tech.machinery.some((m) => m.included)).toBe(true);
-    expect(tech.planning.totals.totalDays).toBe(result.schedule.totals.totalDays);
+    expect(tech.planning).toBeUndefined(); // no man-hour planning section any more
   });
 
-  it('the technical PDF renders planning and machinery sections in every language', async () => {
+  it('the technical PDF renders (machinery section included) in every language', async () => {
     for (const lang of LANGS) {
       const d = project(['slab', 'roof']);
       const result = computeAll(d, NOW);
@@ -175,29 +164,27 @@ describe('major machinery: suggested, priced and added as an indirect cost', () 
 });
 
 describe('draft: crew and machinery persistence', () => {
-  it('new drafts carry the default crew and machinery switched on', () => {
+  it('new drafts carry machinery switched on and no theoretical crew fields', () => {
     const d = newDraft('CL');
-    expect(d.crew).toBe(SCHEDULE.defaultCrew);
     expect(d.machinery).toEqual({ include: true, excluded: [] });
-    expect(d.crewAuto).toBe(true);
-    expect(Object.keys(d).slice(-5)).toEqual(['crew', 'crewAuto', 'machinery', 'frozen', 'regionCode']);
+    expect(d.crew).toBeUndefined();
+    expect(d.crewAuto).toBeUndefined();
+    expect(Object.keys(d).slice(-3)).toEqual(['machinery', 'frozen', 'regionCode']);
   });
 
-  it('normalizes hostile input', () => {
-    const n = normalizeDraft({ ...newDraft('CL'), crew: 9999, machinery: { include: 'x', excluded: ['mixer', 'mixer', '<script>', 7] } }, 'CL');
-    expect(n.crew).toBe(SCHEDULE.defaultCrew); // out of range -> safe default, like every other numeric field
+  it('normalizes hostile input and drops the old crew fields of saved drafts', () => {
+    const n = normalizeDraft({ ...newDraft('CL'), crew: 9999, crewAuto: false, machinery: { include: 'x', excluded: ['mixer', 'mixer', '<script>', 7] } }, 'CL');
     expect(n.machinery.excluded).toEqual(['mixer']);
     expect(typeof n.machinery.include).toBe('boolean');
-    expect(normalizeDraft({ ...newDraft('CL'), crew: -4 }, 'CL').crew).toBe(SCHEDULE.defaultCrew);
-    expect(normalizeDraft({ ...newDraft('CL'), crew: 7.6 }, 'CL').crew).toBe(8);
-    expect(normalizeDraft({ ...newDraft('CL'), crew: 'many' }, 'CL').crew).toBe(SCHEDULE.defaultCrew);
+    expect(n.crew).toBeUndefined();
+    expect(n.crewAuto).toBeUndefined();
     expect(Object.keys(normalizeDraft(newDraft('CL'), 'CL'))).toEqual(Object.keys(newDraft('CL')));
   });
 
   it('legacy drafts: unsigned ones get the suggestion, a signed one keeps its signed total', () => {
     const full = newDraft('CL');
     full.partidas[0].dims = { ...full.partidas[0].dims, length: 8, width: 5 };
-    const { machinery: _m, crew: _c, ...legacy } = full;
+    const { machinery: _m, ...legacy } = full;
     expect(normalizeDraft(legacy, 'CL').machinery.include).toBe(true);
     const base = computeAll(normalizeDraft({ ...legacy, machinery: { include: false, excluded: [] } }, 'CL'), NOW);
     const sig = buildSignature({ ink: { dataUrl: PNG, w: 10, h: 10 }, name: 'Ana', total: base.quote.total, now: NOW });
@@ -248,9 +235,8 @@ describe('HSE guide', () => {
     for (const id of WASTE_IDS) expect(used.has(`hse.waste.${id}`), id).toBe(true);
   });
 
-  it('planning keys needed by the engine exist in every language', () => {
+  it('machinery keys needed by the engine exist in every language', () => {
     for (const lang of LANGS) {
-      for (const k of ['curing', 'mortar', 'compound', 'screed', 'adhesive', 'drying']) expect(DICT[lang][`sched.dead.${k}`], `${lang} ${k}`).toBeTruthy();
       for (const id of MACHINE_IDS) {
         expect(DICT[lang][`mach.${id}`]).toBeTruthy();
         expect(DICT[lang][`mach.why.${id}`]).toBeTruthy();
@@ -268,17 +254,8 @@ describe('Phase 3 UI structure and OLED compliance', () => {
     expect(read('components/steps/StepPartidas.jsx')).toContain('HseButton');
   });
 
-  it('the crew stepper is pinned to the bottom with large touch targets', () => {
-    const src = read('components/ScheduleSheet.jsx');
-    expect(src).toContain('BottomSheet');
-    expect(src).toContain('sticky bottom-0');
-    expect(src).toMatch(/h-16 w-16/);
-    expect(src).toContain('crew-plus');
-    expect(src).toContain('crew-minus');
-  });
-
   it('no grey backgrounds in the new components, only thin white/10 borders', () => {
-    for (const f of ['components/HseSheet.jsx', 'components/ScheduleSheet.jsx', 'components/MachineryCard.jsx']) {
+    for (const f of ['components/HseSheet.jsx', 'components/MachineryCard.jsx']) {
       const text = read(f);
       expect(text, f).not.toMatch(/bg-(neutral|gray|zinc|slate|stone)-\d/);
       if (!f.includes('Machinery')) expect(text, f).toContain('border-white/10'); // the machinery card is built from the shared Switch / card
@@ -287,12 +264,11 @@ describe('Phase 3 UI structure and OLED compliance', () => {
 });
 
 describe('Phase 3 components render (server-side smoke test, every language)', () => {
-  it('HSE sheet, planning sheet, machinery card and the entry buttons render real content', async () => {
+  it('HSE sheet, machinery card and the entry buttons render real content', async () => {
     const React = (await import('react')).default;
     const { renderToStaticMarkup } = await import('react-dom/server');
     const { I18nProvider } = await import('../src/lib/i18n.jsx');
     const { HseSheet, default: HseButton } = await import('../src/components/HseSheet.jsx');
-    const { default: ScheduleSheet } = await import('../src/components/ScheduleSheet.jsx');
     const { default: MachineryCard } = await import('../src/components/MachineryCard.jsx');
     const draft = project(['slab', 'roof']);
     const result = computeAll(draft, NOW);
@@ -306,10 +282,6 @@ describe('Phase 3 components render (server-side smoke test, every language)', (
         expect(html).not.toMatch(/hse\.(ppe|erg|waste)\./); // a missing translation would print the raw key
       }
       expect(wrap(React.createElement(HseButton, { task: 'roof' }))).toContain('data-testid="hse-open"');
-      const sched = wrap(React.createElement(ScheduleSheet, { draft, setDraft: noop, result, onClose: noop }));
-      expect(sched).toContain(DICT[lang]['sched.crew']);
-      expect(sched).toContain('data-testid="crew-plus"');
-      expect(sched).not.toMatch(/sched\.[a-z.]+/);
       const mach = wrap(React.createElement(MachineryCard, { draft, setDraft: noop, result }));
       expect(mach).toContain(DICT[lang]['mach.mixer']);
       expect(mach).toContain(DICT[lang]['mach.scaffold']);
@@ -332,7 +304,7 @@ describe('steps that host the Phase 3 entry points', () => {
     const good = project(['slab', 'roof']);
     const goodResult = computeAll(good, NOW);
     const fin = render(React.createElement(StepFinance, { draft: good, setDraft: noop, result: goodResult }));
-    expect(fin).toContain('data-testid="schedule-open"');
+    expect(fin).not.toContain('schedule-open'); // the planner sheet is gone
     expect(fin).toContain('data-testid="machinery-card"');
     expect(fin).toContain(DICT.es['mach.total']);
 
@@ -340,7 +312,6 @@ describe('steps that host the Phase 3 entry points', () => {
     const badResult = computeAll(bad, NOW);
     expect(badResult.valid).toBe(false);
     const finBad = render(React.createElement(StepFinance, { draft: bad, setDraft: noop, result: badResult }));
-    expect(finBad).not.toContain('schedule-open');
 
     expect(render(React.createElement(StepDims, { draft: bad, setDraft: noop, result: badResult, showErrors: false }))).toContain('data-testid="hse-open"');
     const parts = render(React.createElement(StepPartidas, { draft: good, setDraft: noop, result: goodResult, showErrors: false }));

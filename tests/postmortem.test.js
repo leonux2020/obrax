@@ -234,7 +234,7 @@ describe('postMortem model', () => {
     expect(pm.days).toMatchObject({ estimated: 10, actual: 6, delta: -4, source: 'log' });
     const quiet = postMortem({ ...p, logbook: [] }, { total: 1 });
     expect(quiet.days).toMatchObject({ actual: 19, source: 'dates', delta: 9 }); // 2 Mar -> 20 Mar
-    expect(estimatedDays({ startDate: '', endDate: '' }, { schedule: { totals: { totalDays: 4.2 } } })).toBe(5); // the plan of the quote
+    expect(estimatedDays({ startDate: '', endDate: '' }, { siteDays: 4 })).toBeNull(); // no dates typed = no estimate (nothing is guessed)
     expect(estimatedDays({ startDate: '', endDate: '' }, null)).toBeNull();
     expect(actualDays({ logbook: [], startDate: '', createdAt: 0, closedAt: 0 })).toEqual({ days: null, source: 'none' });
   });

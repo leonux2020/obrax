@@ -4,8 +4,8 @@
 // crew's own equipment and never part of the budget.
 //
 // Rates are SIMULATED like the material prices: USD base x regional fx x regional price index x a stable
-// per-country spread. Rental days follow the crew plan (see schedule.js): a bigger crew finishes sooner
-// and the machine is rented for fewer days.
+// per-country spread. Rental days follow the job's REAL duration, the one the contractor typed (delivery date - start date, see
+// schedule.js): each partida gets an equal share of those calendar days and every machine is used for a logical fraction of it.
 
 import { getRegion } from './regions.js';
 import { roundMoney, marketBucket } from './pricing.js';
@@ -55,30 +55,40 @@ export function machineryRate(id, regionCode, bucket = marketBucket(), book = nu
 /** Where a machine's daily rate comes from: the user's saved rate, the live AI rate or the built-in simulation. */
 export const rentSource = (id, regionCode, book) => (savedRent(book, regionCode, id) > 0 ? 'saved' : liveRent(book, regionCode, id) > 0 ? 'ai' : 'ref');
 
+/** Logical use of each machine inside the days of ITS partida (documented so it is easy to review and tune). */
+export const MACHINE_USE = Object.freeze({
+  mixerShare: 0.5, // concrete is ~half of a slab job: the mixer works half of the partida's calendar days
+  scaffoldSetupDays: 1, // + one day to assemble / dismantle the scaffold
+  minDays: 1,
+});
+
 /**
  * Which machines does each valid partida need, for how many units and days?
- * @param partidas computeAll() partidas  @param schedule buildSchedule() result
+ * The job's calendar days (`siteDays`, delivery - start) are shared equally by the valid partidas; without both dates every partida
+ * counts one day (the smallest rental) until the contractor types them.
+ * @param partidas computeAll() partidas  @param siteDays calendar days of the job, or null
  * @returns {{id, partida, task, qty, days}[]}
  */
-export function suggestMachinery(partidas, schedule) {
+export function suggestMachinery(partidas, siteDays = null) {
+  const valid = partidas.filter((p) => p.calc).length;
+  const share = Number.isFinite(siteDays) && siteDays > 0 && valid > 0 ? Math.max(MACHINE_USE.minDays, siteDays / valid) : MACHINE_USE.minDays;
+  const days = Math.max(MACHINE_USE.minDays, Math.ceil(share - 1e-9));
   const out = [];
   partidas.forEach((p, index) => {
     if (!p.calc) return;
-    const active = schedule.rows[index]?.activeDays ?? 1;
-    const days = Math.max(1, Math.ceil(active));
     const push = (id, qty, d) => out.push({ id, partida: index, task: p.task, qty, days: d });
     switch (p.task) {
       case 'slab':
-        if (metric(p, 'volume') >= MACHINE_RULES.mixerMinVolumeM3) push('mixer', 1, Math.max(1, Math.ceil(active * 0.5))); // concrete is ~half of the job
+        if (metric(p, 'volume') >= MACHINE_RULES.mixerMinVolumeM3) push('mixer', 1, Math.max(MACHINE_USE.minDays, Math.ceil(share * MACHINE_USE.mixerShare - 1e-9)));
         if (metric(p, 'area') >= MACHINE_RULES.compactorMinAreaM2) push('compactor', 1, 1);
         break;
       case 'roof':
-        push('scaffold', sets(metric(p, 'ridgeLength')), days + 1); // always: work at height; +1 day to assemble / dismantle
+        push('scaffold', sets(metric(p, 'ridgeLength')), days + MACHINE_USE.scaffoldSetupDays); // always: work at height
         break;
       case 'masonry':
       case 'drywall':
       case 'paint':
-        if (p.values.height >= MACHINE_RULES.scaffoldMinWallHeightM) push('scaffold', sets(p.values.length), days + 1);
+        if (p.values.height >= MACHINE_RULES.scaffoldMinWallHeightM) push('scaffold', sets(p.values.length), days + MACHINE_USE.scaffoldSetupDays);
         break;
       default:
         break;
@@ -94,11 +104,11 @@ export const DEFAULT_MACHINERY = Object.freeze({ include: true, excluded: [] });
  * `config` = { include: master switch, excluded: machine ids the user turned off }.
  * @returns {{items, total, byPartida, suggested}} total and byPartida count only the INCLUDED items.
  */
-export function planMachinery({ partidas, schedule, regionCode, config = DEFAULT_MACHINERY, bucket = marketBucket(), book = null }) {
+export function planMachinery({ partidas, siteDays = null, regionCode, config = DEFAULT_MACHINERY, bucket = marketBucket(), book = null }) {
   const region = getRegion(regionCode);
   const include = config?.include !== false;
   const excluded = new Set(config?.excluded ?? []);
-  const items = suggestMachinery(partidas, schedule).map((s) => {
+  const items = suggestMachinery(partidas, siteDays).map((s) => {
     const rate = machineryRate(s.id, regionCode, bucket, book);
     return { ...s, rate, source: rentSource(s.id, regionCode, book), total: roundMoney(s.qty * s.days * rate, region), included: include && !excluded.has(s.id) };
   });

@@ -6,6 +6,7 @@ import { calendarDays, withAdvance, withProjectDates, withWorker, withWorkerEdit
 import BottomSheet from '../BottomSheet.jsx';
 import { DateInput, TextField } from '../ui.jsx';
 import Block from './Block.jsx';
+import LockedZone from './LockedZone.jsx';
 import NumberPad from './NumberPad.jsx';
 import { SPECIALTY_ICON, UsersIcon } from './icons.jsx';
 
@@ -144,7 +145,7 @@ function WorkerCard({ row, onEdit, onAdvance, onRemoveAdvance }) {
  * button, which opens the app's numpad); every advance is still one entry of `project.advances`, so the labour pool and the project's
  * cash (ledger.js) keep adding all of them. Nothing here is a theoretical estimate any more (no man-hours, no dead days, no bars).
  */
-export default function CrewBlock({ project, result, setProject, open, onToggle }) {
+export default function CrewBlock({ project, result, locked, onBlocked, setProject, open, onToggle }) {
   const { t, money, region } = useI18n();
   const [sheet, setSheet] = useState(null); // null | 'new' | worker id
   const [advFor, setAdvFor] = useState(null); // worker id whose advance is being typed on the pad
@@ -164,9 +165,13 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
   const advanceFull = (project.advances ?? []).length >= LEDGER_LIMITS.advances;
 
   return (
-    <Block icon={<UsersIcon />} id="crew" title={t('ws.crew.title')} meta={`${t('ws.crew.count', { n: crew.length })}${days !== null ? ` · ${days} ${t('sched.d')}` : ''}`} open={open} onToggle={onToggle} testId="ws-crew">
+    <Block icon={<UsersIcon />} id="crew" title={t('ws.crew.title')} meta={`${t(crew.length === 1 ? 'ws.crew.count1' : 'ws.crew.countN', { n: crew.length })}${days !== null ? ` · ${days} ${t('sched.d')}` : ''}`} open={open} onToggle={onToggle} testId="ws-crew">
       <div className="space-y-5">
-        <Dates project={project} setProject={setProject} />
+        {/* the dates set the days of the machinery rental (a direct cost): read-only, with the shield, while the quote is frozen / signed.
+            The people and their advances below are operational, so they stay editable. */}
+        <LockedZone locked={locked} onBlocked={onBlocked}>
+          <Dates project={project} setProject={setProject} />
+        </LockedZone>
 
         <div className="space-y-3">
           {crew.length === 0 ? (

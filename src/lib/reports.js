@@ -244,7 +244,6 @@ export function buildTechModel({ draft, result, company, region, t, num, unit, m
       tax: q.tax,
       total: q.total,
     },
-    planning: buildPlanningModel({ result, t }),
     machinery: (result.machinery?.items ?? []).map((m) => ({
       name: t(`mach.${m.id}`),
       partida: partidaTitle(result.partidas[m.partida], t),
@@ -290,23 +289,5 @@ export function buildLogbookModel({ project, company, region, t, date, whenOf, t
     count: entries.length,
     entries,
     footer: t('report.generatedBy'),
-  };
-}
-
-export function buildPlanningModel({ result, t }) {
-  const s = result.schedule;
-  if (!s) return null;
-  return {
-    crew: s.crew,
-    hoursPerDay: s.hoursPerDay,
-    rows: s.rows.map((r) => ({
-      n: r.index + 1,
-      title: t('com.chapter', { n: r.index + 1, title: partidaTitle(result.partidas[r.index], t) }),
-      hh: r.hh,
-      activeDays: r.activeDays,
-      deadDays: r.deadDays,
-      deadNote: r.dead.map((d) => `${t(`sched.dead.${d.key}`)} ${d.days} ${t('sched.d')}`).join(' · '),
-    })),
-    totals: s.totals,
   };
 }

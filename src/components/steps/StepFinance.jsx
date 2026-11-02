@@ -2,9 +2,7 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { FINANCE_LIMITS, TAX_LIMITS } from '../../lib/draft.js';
 import { WASTE_LIMITS } from '../../lib/tasks.js';
 import { partidaTitle } from '../../lib/reports.js';
-import { useState } from 'react';
 import { NumberField, Slider } from '../ui.jsx';
-import ScheduleSheet from '../ScheduleSheet.jsx';
 import MachineryCard from '../MachineryCard.jsx';
 
 export default function StepFinance({ draft, setDraft, result }) {
@@ -14,8 +12,6 @@ export default function StepFinance({ draft, setDraft, result }) {
     setDraft((d) => ({ ...d, partidas: d.partidas.map((p) => (p.id === id ? { ...p, waste } : p)) }));
   const officialPct = num(region.taxRate * 100);
   const many = draft.partidas.length > 1;
-  const [planning, setPlanning] = useState(false);
-  const sched = result.schedule; // only present once every partida is valid
 
   return (
     <section aria-labelledby="fin-title" className="space-y-4">
@@ -49,27 +45,7 @@ export default function StepFinance({ draft, setDraft, result }) {
         />
       ))}
 
-      {result.valid && sched.totals.hh > 0 && (
-        <button
-          type="button"
-          data-testid="schedule-open"
-          onClick={() => setPlanning(true)}
-          className="card flex min-h-[64px] w-full items-center gap-3 text-left transition hover:border-brand active:scale-[0.99]"
-        >
-          <span className="min-w-0 flex-1">
-            <span className="block font-bold">{t('sched.open')}</span>
-            <span className="block text-sm text-neutral-300">
-              {t('sched.summary', { days: num(sched.totals.totalDays, 1), hh: num(sched.totals.hh, 1), n: sched.crew })}
-            </span>
-          </span>
-          <span aria-hidden="true" className="text-2xl text-brand">
-            ›
-          </span>
-        </button>
-      )}
-
       {result.valid && <MachineryCard draft={draft} setDraft={setDraft} result={result} />}
-      {planning && <ScheduleSheet draft={draft} setDraft={setDraft} result={result} onClose={() => setPlanning(false)} />}
 
       <div className="card">
         {region.taxEditable ? (

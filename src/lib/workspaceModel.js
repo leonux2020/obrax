@@ -4,7 +4,7 @@
 import { LEVEL_COLOR } from '../components/levelStyle.js';
 import { MAX_PRICE } from './pricing.js';
 import { dayDiff, isClosed, parseDay, projectLevel } from './projects.js';
-import { parseISODay } from './schedule.js';
+import { parseISODay, spanDays } from './schedule.js';
 import { CREW_LIMIT, LEDGER_LIMITS, newEntryId, normalizeAdvances, normalizeCrew } from './ledger.js';
 import { DEFAULT_MACHINERY, MACHINE_IDS } from './machinery.js';
 import { savedMeta } from './priceBook.js';
@@ -113,15 +113,16 @@ export function partidaMachines(result, index, regionCode = null) {
 }
 
 // ---- the schedule is manual: two dates and the days between them ---------------------------------------------------------------
-const DAY_MS = 86400000;
 const validDay = (v) => v === '' || Boolean(parseISODay(v));
 
 /**
  * The job's two dates, typed by the user ("Data di inizio" / "Data di consegna"). `patch` = { startDate?, endDate? } with ISO days or ''.
  * Moving the start past the end drags the end to the same day; an end before the start is refused; junk changes nothing (the SAME
- * project comes back). The dates stay editable on a locked quote: a locked quote plans with the dates it was frozen with.
+ * project comes back). The dates set the days of the machinery rental (a direct cost), so they are part of the quote: while it is
+ * frozen / signed the SAME project comes back (read-only), like every other editor of the budget.
  */
 export function withProjectDates(project, patch) {
+  if (quoteLock(project.draft)) return project;
   const startGiven = typeof patch?.startDate === 'string';
   let start = startGiven ? patch.startDate : project.startDate;
   let end = typeof patch?.endDate === 'string' ? patch.endDate : project.endDate;
@@ -133,12 +134,8 @@ export function withProjectDates(project, patch) {
   return start === project.startDate && end === project.endDate ? project : { ...project, startDate: start, endDate: end };
 }
 
-/** Calendar days between the two dates (end - start, so same day = 0), or null while one of them is missing. Pure subtraction, no estimate. */
-export function calendarDays(project) {
-  const a = parseISODay(project?.startDate);
-  const b = parseISODay(project?.endDate);
-  return a && b ? Math.max(0, Math.round((b - a) / DAY_MS)) : null;
-}
+/** Calendar days between the two dates (delivery - start, so same day = 0), or null while one of them is missing. Pure subtraction, no estimate. */
+export const calendarDays = (project) => spanDays(project?.startDate, project?.endDate);
 
 // ---- the crew: named people, and the cash advanced to each one ---------------------------------------------------------------------
 const cleanWorker = (w) => normalizeCrew([w])[0] ?? null;

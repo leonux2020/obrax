@@ -6,7 +6,6 @@ import { TASKS, TASK_IDS, WASTE_LIMITS, defaultDims, pickOption } from './tasks.
 import { MATERIAL_IDS } from './catalog.js';
 import { MAX_PRICE } from './pricing.js';
 import { normalizeSignature, normalizeInk, normalizeFrozen } from './signature.js';
-import { SCHEDULE } from './schedule.js';
 import { MACHINE_IDS, DEFAULT_MACHINERY } from './machinery.js';
 import {
   coerceNumber,
@@ -128,8 +127,6 @@ export function newDraft(regionCode, mode = 'quick') {
     photosChoice: false, // true once the user has touched that switch: only then is `attachPhotos` taken literally
     showBreakdown: false, // client PDF also lists the Materials / Labor / Transport totals (never stores or unit prices)
     signature: null, // client signature + data, see lib/signature.js
-    crew: SCHEDULE.defaultCrew, // workers on site (planning, see lib/schedule.js)
-    crewAuto: true, // crew derived from the project deadline (when it has one); false = the manual `crew`
     machinery: { ...DEFAULT_MACHINERY, excluded: [] }, // major machinery rental: master switch + machines the user turned off
     frozen: null, // "Generar PDF" freezes the quote: market prices and project dates stop moving (see lib/signature.js)
     regionCode: region ? region.code : null,
@@ -213,8 +210,6 @@ export function normalizeDraft(obj, regionCode) {
     photosChoice,
     showBreakdown: obj.showBreakdown === true,
     signature,
-    crew: coerceNumber(obj.crew, { min: SCHEDULE.minCrew, max: SCHEDULE.maxCrew, decimals: 0, fallback: SCHEDULE.defaultCrew }),
-    crewAuto: obj.crewAuto !== false,
     machinery: normalizeMachinery(obj.machinery, signature),
     frozen: normalizeFrozen(obj.frozen),
     regionCode,

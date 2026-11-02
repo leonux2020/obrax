@@ -1,6 +1,6 @@
 import { validateDims, runCalculation } from './tasks.js';
 import { resolvePrices, buildQuote, chainTotals, marketBucket, planAll } from './pricing.js';
-import { planProject } from './schedule.js';
+import { spanDays } from './schedule.js';
 import { planMachinery, DEFAULT_MACHINERY } from './machinery.js';
 import { effectiveBook } from './priceBook.js';
 import { currentBook } from './priceRegistry.js';
@@ -47,10 +47,10 @@ export function computeAll(draft, now = Date.now(), { timeline = null, book: liv
     bucket,
     book,
   });
-  // Crew plan (HH vs dead technical time, crew derived from the project's deadline unless set by hand) and
-  // the major machinery it implies (rented per day of use, at the same 15-minute market window as materials).
-  const schedule = planProject(partidas, draft, timeline, now);
-  const machinery = planMachinery({ partidas, schedule, regionCode: draft.regionCode, config: draft.machinery ?? DEFAULT_MACHINERY, bucket, book });
+  // The job's real duration is the one the contractor typed (delivery date - start date): the major machinery rented for it is
+  // priced per day of use, at the same 15-minute market window as materials. No theoretical crew / man-hours plan exists.
+  const siteDays = spanDays(timeline?.startDate, timeline?.endDate);
+  const machinery = planMachinery({ partidas, siteDays, regionCode: draft.regionCode, config: draft.machinery ?? DEFAULT_MACHINERY, bucket, book });
   const quote = buildQuote({ partidas: inputs, plan, prices, finance: draft.finance, regionCode: draft.regionCode, machinery });
   const totals = !chains ? null : chainTotals({
     partidas: inputs,
@@ -66,7 +66,7 @@ export function computeAll(draft, now = Date.now(), { timeline = null, book: liv
     validation: partidas[0].validation,
     prices,
     quote,
-    schedule,
+    siteDays, // calendar days of the job (null while a date is missing)
     machinery,
     chainTotals: totals,
     book, // the price book that priced this quote (null = built-in reference prices)

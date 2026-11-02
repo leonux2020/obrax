@@ -5,12 +5,11 @@ import path from 'node:path';
 import React, { act, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { I18nProvider, makeI18n } from '../src/lib/i18n.jsx';
-import ScheduleSheet from '../src/components/ScheduleSheet.jsx';
 import ProfileSheet from '../src/components/ProfileSheet.jsx';
 import ContractorSignatureSheet from '../src/components/ContractorSignatureSheet.jsx';
 import { newDraft, normalizeDraft, normalizeCompany, EMPTY_COMPANY, saveCompany, loadCompany } from '../src/lib/draft.js';
 import { computeAll } from '../src/lib/engine.js';
-import { SCHEDULE, buildSchedule, planningWindow, planProject, suggestCrew, parseISODay } from '../src/lib/schedule.js';
+import { parseISODay, spanDays } from '../src/lib/schedule.js';
 import { MACHINES, machineryRate } from '../src/lib/machinery.js';
 import { marketBucket, nextBucketAt, MARKET_WINDOW_MS, referencePrice } from '../src/lib/pricing.js';
 import { useMarketClock } from '../src/lib/marketClock.js';
@@ -57,129 +56,38 @@ const click = (el) => act(async () => { el.dispatchEvent(new MouseEvent('click',
 const withI18n = (el) => React.createElement(I18nProvider, { lang: 'es', regionCode: 'CL' }, el);
 
 // ---------------------------------------------------------------------------------------------------------
-describe('Cronograma y cuadrillas: automatic from the project', () => {
-  it('planningWindow: start = project start (or today), end optional, inclusive day count, bad end ignored', () => {
-    const w = planningWindow({ startDate: '2026-11-02', endDate: '2026-11-16' }, NOW);
-    expect(w.availableDays).toBe(15);
-    expect(planningWindow({ startDate: '2026-11-02', endDate: '2026-11-02' }, NOW).availableDays).toBe(1);
-    const noStart = planningWindow({ endDate: '2026-11-06' }, NOW); // starts today (2 Nov)
-    expect(noStart.availableDays).toBe(5);
-    expect(planningWindow({}, NOW).availableDays).toBeNull();
-    expect(planningWindow({ startDate: '2026-11-10', endDate: '2026-11-01' }, NOW).end).toBeNull(); // end before start: ignored
-    expect(planningWindow({ endDate: '2026-02-30' }, NOW).end).toBeNull(); // impossible date
-    expect(planningWindow({ endDate: '2020-01-01' }, NOW).availableDays).toBeNull(); // already past relative to today: no window
+describe('Cronograma manual: the dates the user types drive the machinery', () => {
+  it('spanDays: delivery - start in calendar days; impossible, reversed or missing dates give null', () => {
+    expect(spanDays('2026-11-02', '2026-11-16')).toBe(14);
+    expect(spanDays('2026-11-02', '2026-11-02')).toBe(0);
+    expect(spanDays('2026-11-10', '2026-11-01')).toBeNull();
+    expect(spanDays('2026-02-30', '2026-03-05')).toBeNull();
+    expect(spanDays('', '2026-11-16')).toBeNull();
     expect(parseISODay('2026-13-01')).toBeNull();
   });
 
-  it('suggestCrew returns the SMALLEST crew that fits the window; dead technical time is never shortened', () => {
-    const partidas = partidasOf(bigDraft());
-    const days = (c) => buildSchedule(partidas, c).totals.totalDays;
-    expect(days(1)).toBeGreaterThan(days(5));
-    for (const available of [30, 20, 15, 12]) {
-      const { crew, fits } = suggestCrew(partidas, available);
-      expect(fits).toBe(true);
-      expect(days(crew)).toBeLessThanOrEqual(available);
-      if (crew > SCHEDULE.minCrew) expect(days(crew - 1)).toBeGreaterThan(available); // minimal
-    }
-    // a window shorter than the dead time cannot be met by any crew: best effort, flagged
-    const dead = buildSchedule(partidas, SCHEDULE.maxCrew).totals.deadDays;
-    const tight = suggestCrew(partidas, dead - 1);
-    expect(tight.fits).toBe(false);
-    expect(days(tight.crew)).toBe(days(SCHEDULE.maxCrew)); // reaches the best possible duration...
-    if (tight.crew > 1) expect(days(tight.crew - 1)).toBeGreaterThan(days(SCHEDULE.maxCrew)); // ...with the fewest workers
+  it('computeAll carries the calendar days (siteDays) and no theoretical crew plan', () => {
+    const d = bigDraft();
+    const r = computeAll(d, NOW, { timeline: { startDate: '2026-11-02', endDate: '2026-11-16' } });
+    expect(r.siteDays).toBe(14);
+    expect(r.schedule).toBeUndefined();
+    expect(computeAll(d, NOW).siteDays).toBeNull();
   });
 
-  it('computeAll: automatic crew follows the project dates; manual crew and "no deadline" keep the stored crew', () => {
+  it('machinery rental days follow the typed dates (never the crew), and the quote follows machinery', () => {
     const d = bigDraft();
-    const tl = { startDate: '2026-11-02', endDate: '2026-11-16' };
-    const auto = computeAll(d, NOW, { timeline: tl }).schedule;
-    expect(auto.plan).toMatchObject({ auto: true, hasDeadline: true, availableDays: 15, fits: true, startDate: '2026-11-02', deadline: '2026-11-16' });
-    expect(auto.crew).toBeGreaterThan(SCHEDULE.defaultCrew - 3); // computed, not the stored default
-    expect(auto.plan.spareDays).toBeGreaterThanOrEqual(0);
-    // a tighter deadline needs a bigger crew
-    const tighter = computeAll(d, NOW, { timeline: { startDate: '2026-11-02', endDate: '2026-11-12' } }).schedule;
-    expect(tighter.crew).toBeGreaterThanOrEqual(auto.crew);
-    // a looser one a smaller (or equal) crew
-    const looser = computeAll(d, NOW, { timeline: { startDate: '2026-11-02', endDate: '2026-12-31' } }).schedule;
-    expect(looser.crew).toBeLessThanOrEqual(auto.crew);
-    // manual: the stored crew wins, and the plan says whether it fits
-    const manual = computeAll({ ...d, crew: 1, crewAuto: false }, NOW, { timeline: tl }).schedule;
-    expect(manual.crew).toBe(1);
-    expect(manual.plan.auto).toBe(false);
-    expect(manual.plan.fits).toBe(false);
-    expect(manual.plan.spareDays).toBeLessThan(0);
-    // no deadline: nothing to derive from, the stored crew (default 3) is used and no check is made
-    const none = computeAll(d, NOW).schedule;
-    expect(none.crew).toBe(SCHEDULE.defaultCrew);
-    expect(none.plan.hasDeadline).toBe(false);
-    expect(none.plan.fits).toBeNull();
-    expect(none.plan.estimatedEnd).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-  });
-
-  it('machinery rental days follow the automatic crew, and the quote follows machinery', () => {
-    const d = bigDraft();
-    const a = computeAll(d, NOW, { timeline: { startDate: '2026-11-02', endDate: '2026-11-08' } }); // tight: big crew
-    const b = computeAll(d, NOW, { timeline: { startDate: '2026-11-02', endDate: '2026-12-30' } }); // loose: small crew
+    const a = computeAll(d, NOW, { timeline: { startDate: '2026-11-02', endDate: '2026-11-08' } }); // 6 days
+    const b = computeAll(d, NOW, { timeline: { startDate: '2026-11-02', endDate: '2026-12-30' } }); // 58 days
     const mixer = (r) => r.machinery.items.find((i) => i.id === 'mixer');
-    expect(mixer(a).days).toBeLessThanOrEqual(mixer(b).days);
-    expect(a.quote.total).not.toBeNaN();
+    expect(mixer(a).days).toBe(3);
+    expect(mixer(b).days).toBe(29);
+    expect(a.quote.total).toBeLessThan(b.quote.total);
   });
 
-  it('draft: crewAuto defaults true, only `false` turns it off, hostile values are safe', () => {
-    expect(newDraft('CL').crewAuto).toBe(true);
-    expect(normalizeDraft({ regionCode: 'CL', crewAuto: false }, 'CL').crewAuto).toBe(false);
-    expect(normalizeDraft({ regionCode: 'CL', crewAuto: 'no' }, 'CL').crewAuto).toBe(true);
-    expect(normalizeDraft({ regionCode: 'CL' }, 'CL').crewAuto).toBe(true); // drafts from before this field
-  });
-
-  function Harness({ startDate = '2026-11-02', endDate = '2026-11-16', draft0 = bigDraft() }) {
-    const [draft, setDraft] = useState(draft0);
-    const result = useMemo(() => computeAll(draft, NOW, { timeline: { startDate, endDate } }), [draft, startDate, endDate]);
-    return withI18n(React.createElement(ScheduleSheet, { draft, setDraft, result, onClose: () => {} }));
-  }
-  const mountSheet = (props) => act(() => root.render(React.createElement(Harness, props)));
-
-  it('the sheet shows the calendar plan and the deadline check, with the crew in automatic mode', () => {
-    mountSheet();
-    expect(q('sched-window').textContent).toMatch(/^Inicio .+ · Término estimado /);
-    expect(q('sched-deadline').getAttribute('data-fits')).toBe('true');
-    expect(q('sched-deadline').textContent).toContain('Cabe en el plazo del proyecto');
-    expect(document.getElementById('crew-label').textContent).toBe('Cuadrilla automática según el plazo del proyecto');
-    expect(q('crew-auto')).toBeNull(); // nothing to restore while automatic
-    expect(q('sched-noend')).toBeNull();
-  });
-
-  it('+ / - take manual control from the crew shown; the "Automática" chip brings the computed crew back (same UX as before)', async () => {
-    mountSheet();
-    const auto = Number(q('crew-count').textContent);
-    await click(q('crew-plus'));
-    expect(Number(q('crew-count').textContent)).toBe(auto + 1);
-    expect(q('crew-auto')).not.toBeNull();
-    expect(document.getElementById('crew-label').textContent).not.toContain('automática');
-    await click(q('crew-minus'));
-    await click(q('crew-minus'));
-    expect(Number(q('crew-count').textContent)).toBe(Math.max(1, auto - 1));
-    await click(q('crew-auto'));
-    expect(Number(q('crew-count').textContent)).toBe(auto);
-    expect(q('crew-auto')).toBeNull();
-    // the pinned, thumb-zone stepper is intact
-    expect(q('crew-plus').className).toContain('h-16');
-    expect(q('crew-plus').closest('.sticky')).not.toBeNull();
-  });
-
-  it('a manual crew that misses the deadline says so; without an end date it asks for one', async () => {
-    mountSheet({ endDate: '2026-11-08' });
-    for (let i = 0; i < 40; i += 1) await click(q('crew-minus')); // all the way down
-    expect(Number(q('crew-count').textContent)).toBe(1);
-    expect(q('sched-deadline').getAttribute('data-fits')).toBe('false');
-    expect(q('sched-deadline').textContent).toContain('No cabe en el plazo');
-    act(() => root.unmount());
-    root = createRoot(host);
-    mountSheet({ endDate: '' });
-    expect(q('sched-noend')).not.toBeNull();
-    expect(q('sched-deadline')).toBeNull();
-    expect(q('crew-auto')).toBeNull();
-    expect(Number(q('crew-count').textContent)).toBe(SCHEDULE.defaultCrew);
+  it('draft: the old crew / crewAuto fields are gone, also from saved drafts', () => {
+    expect(newDraft('CL').crewAuto).toBeUndefined();
+    expect(normalizeDraft({ regionCode: 'CL', crewAuto: false, crew: 7 }, 'CL').crewAuto).toBeUndefined();
+    expect(normalizeDraft({ regionCode: 'CL', crewAuto: false, crew: 7 }, 'CL').crew).toBeUndefined();
   });
 
   it('the wizard and the dashboard card pass the project dates to the engine', () => {
@@ -440,13 +348,13 @@ describe('strings of this round exist in six languages', () => {
 });
 
 // ---------------------------------------------------------------------------------------------------------
-describe('signed documents are frozen: later date edits cannot move crew, rentals or total', () => {
+describe('signed documents are frozen: later date edits cannot move the machinery days, rentals or total', () => {
   const SIGNED_AT = NOW;
   const tight = { startDate: '2026-11-02', endDate: '2026-11-08' };
   const loose = { startDate: '2026-11-02', endDate: '2026-12-30' };
   const totalOf = (draft, live, at) => {
     const r = computeAll(draft, pricingTime(draft, at), { timeline: planningTimeline(draft, live) });
-    return { total: r.quote.total, crew: r.schedule.crew, rent: r.machinery.total };
+    return { total: r.quote.total, days: r.siteDays, rent: r.machinery.total };
   };
   const sign = (draft, live) => {
     const total = totalOf(draft, live, SIGNED_AT).total;
@@ -458,7 +366,8 @@ describe('signed documents are frozen: later date edits cannot move crew, rental
     const d = bigDraft();
     const a = totalOf(d, tight, NOW);
     const b = totalOf(d, loose, NOW);
-    expect(a.crew).toBeGreaterThan(b.crew);
+    expect(a.days).toBeLessThan(b.days);
+    expect(a.rent).toBeLessThan(b.rent);
     expect(a.total).not.toBe(b.total);
   });
 

@@ -3,7 +3,7 @@
 //   Balance:  Presupuestado (the quote's total)  vs  Cobrado en Caja (payments)  and  Utilidad real
 //             Utilidad real = Cobrado - Gastos reales, where Gastos reales = expenses (receipts, rentals...) + cash advanced to workers.
 //             Margen = Utilidad real / Cobrado (null while nothing was collected).
-//   Tiempos:  Días estimados (the plan: the project dates, else the schedule of the quote)  vs  Días reales según la bitácora
+//   Tiempos:  Días estimados (the plan: the dates the contractor typed)  vs  Días reales según la bitácora
 //             (first to last logbook day, both included). Without logbook entries: from the start date to the closing day.
 
 import { LEDGER_LIMITS, cashSummary, dayOf, expensesTotal } from './ledger.js';
@@ -16,13 +16,10 @@ const spanDays = (from, to) => {
   return a && b ? Math.max(1, dayDiff(a, b) + 1) : null;
 };
 
-/** Planned duration in days: the dates of the project when both exist, else the quote's schedule, else null. */
+/** Planned duration in days: the dates the contractor typed (both ends count), else null. */
 export function estimatedDays(project, result, timeline = null) {
   const t = timeline ?? { startDate: project.startDate, endDate: project.endDate };
-  const byDates = spanDays(t.startDate, t.endDate);
-  if (byDates) return byDates;
-  const total = result?.schedule?.totals?.totalDays;
-  return Number.isFinite(total) && total > 0 ? Math.max(1, Math.ceil(total - 1e-9)) : null;
+  return spanDays(t.startDate, t.endDate);
 }
 
 /** Real duration in days and where it comes from ('log' | 'dates'), or null when it cannot be told. */

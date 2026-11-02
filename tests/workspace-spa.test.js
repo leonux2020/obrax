@@ -73,6 +73,8 @@ describe('model: crew, machinery, deadline', () => {
     expect(withProjectDates(p, { endDate: 'ayer' })).toBe(p);
     expect(withProjectDates(p, { endDate: p.endDate })).toBe(p); // no change
     expect(withProjectDates(p, { endDate: '' })).toMatchObject({ startDate: day(-5), endDate: '' });
+    const locked = { ...p, draft: freezeQuote(p.draft, { pricedAt: 1000, total: 5, live: p }) };
+    expect(withProjectDates(locked, { endDate: day(10) })).toBe(locked); // the dates set the machinery days: part of the locked quote
   });
 
   it('calendarDays is a plain subtraction of the two dates (null while one is missing)', () => {
@@ -203,6 +205,17 @@ afterEach(() => {
 });
 
 describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
+  it('the summary pluralizes in every language (1 vs many)', () => {
+    const one = { es: 'trabajador', en: 'worker', pt: 'trabalhador', fr: 'ouvrier', it: 'lavoratore', de: 'Mitarbeiter' };
+    const many = { es: 'trabajadores', en: 'workers', pt: 'trabalhadores', fr: 'ouvriers', it: 'lavoratori', de: 'Mitarbeiter' };
+    for (const l of Object.keys(one)) {
+      expect(DICT[l]['ws.crew.count1'], l).toBe(`{n} ${one[l]}`);
+      expect(DICT[l]['ws.crew.countN'], l).toBe(`{n} ${many[l]}`);
+    }
+    expect(DICT.it['ws.crew.count1'].replace('{n}', '1')).toBe('1 lavoratore');
+    expect(DICT.it['ws.crew.countN'].replace('{n}', '2')).toBe('2 lavoratori');
+  });
+
   const openCrew = async () => {
     await click(q('ws-crew').querySelector('summary'));
   };
@@ -272,8 +285,10 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(q(`worker-spec-${w.id}`).textContent).toBe('Electricista · Tablero general');
     expect(card.querySelector('svg[data-outline-icon="true"] path[d^="M13 2 3 14"]')).not.toBeNull(); // Zap = electrician
     expect(q('crew-empty')).toBeNull();
-    expect(q('ws-crew').querySelector('summary').textContent).toContain('1 trabajadores');
+    expect(q('ws-crew').querySelector('summary').textContent).toContain('1 trabajador');
+    expect(q('ws-crew').querySelector('summary').textContent).not.toContain('1 trabajadores');
     await addWorker('Pía', 'plumber');
+    expect(q('ws-crew').querySelector('summary').textContent).toContain('2 trabajadores');
     await addWorker('Nico');
     const [, plumber, generic] = spy.project.crew;
     expect(q(`worker-${plumber.id}`).querySelector('svg path[d^="M14.7 6.3"]')).not.toBeNull(); // Wrench
@@ -527,11 +542,44 @@ describe('read-only while locked', () => {
     await click(q('partida-add') ?? qa('locked-shield')[0]);
   });
 
+  it('the Start / Delivery dates are read-only behind the shield while locked; the people and their advances stay editable', async () => {
+    await mount(lockedProject());
+    await click(q('ws-crew').querySelector('summary'));
+    const dates = q('crew-dates');
+    expect(dates.closest('fieldset').disabled).toBe(true);
+    expect(q('crew-start').closest('fieldset').disabled).toBe(true); // the inputs sit inside the disabled fieldset: no focus, no keyboard
+    expect(q('crew-end').closest('fieldset').disabled).toBe(true);
+    const shield = dates.closest('[data-locked="true"]').querySelector('[data-testid="locked-shield"]');
+    const before = spy.project;
+    await click(shield);
+    expect(q('toast').textContent).toBe('Precios bloqueados');
+    expect(spy.project.startDate).toBe(before.startDate);
+    expect(spy.project.endDate).toBe(before.endDate);
+    expect(q('crew-duration').dataset.days).toBe('25'); // still shown (statically)
+    // operational: NOT locked
+    expect(q('crew-add').closest('fieldset')).toBeNull();
+    await click(q('crew-add'));
+    await typeInto(q('crew-name'), 'Luca');
+    await click(q('crew-save'));
+    expect(spy.project.crew).toHaveLength(1);
+    const id = spy.project.crew[0].id;
+    expect(q(`worker-adv-${id}`).closest('fieldset')).toBeNull();
+    await click(q(`worker-adv-${id}`));
+    await keys('900');
+    await click(q('pad-done'));
+    expect(spy.project.advances[0]).toMatchObject({ workerId: id, amount: 900 });
+    expect(spy.project.draft).toBe(before.draft); // the frozen quote did not move
+  });
+
   it('unlocking makes every editor live again', async () => {
     await mount(lockedProject());
     await click(q('ws-unlock'));
     await click(q('unlock-confirm'));
     expect(qa('locked-shield')).toHaveLength(0);
+    await click(q('ws-crew').querySelector('summary'));
+    expect(q('crew-start').closest('fieldset')).toBeNull();
+    await typeInto(q('crew-end'), day(24));
+    expect(spy.project.endDate).toBe(day(24));
   });
 });
 
