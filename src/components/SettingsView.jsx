@@ -3,6 +3,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { sanitizeEmail, sanitizeEmailInput, sanitizePhone, sanitizeTaxId, sanitizeText, sanitizeTextInput } from '../lib/sanitize.js';
 import { EMPTY_COMPANY, normalizeCompany } from '../lib/draft.js';
 import { googleConfigured } from '../lib/auth.js';
+import { detectCurrentRegion } from '../lib/geo.js';
 import { BACKUP_FOLDER } from '../lib/drive.js';
 import { backupAge } from '../lib/driveSync.js';
 import { compressLogo, LOGO_LIMITS } from '../lib/logo.js';
@@ -253,15 +254,20 @@ export default function SettingsView({
         <ProQaTag className="block text-center" />
 
         {/* ---- 1. Perfil de Empresa ---------------------------------------------------------------------------------- */}
-        <section className="card divide-y divide-white/10 !py-0" data-testid="settings-main">
-          <div className="relative space-y-4 py-4" role="group" aria-labelledby="settings-profile-title" data-testid="settings-profile">
-            <div className="flex items-center gap-3">
-              <UserIcon size={22} className="text-neutral-400" />
-              <h2 id="settings-profile-title" className="text-lg font-bold">
-                {t('settings.profile')}
-              </h2>
-            </div>
-
+        <details className="card group !p-0" data-testid="settings-profile">
+          <summary
+            data-testid="settings-profile-summary"
+            className="flex min-h-[64px] cursor-pointer list-none items-center gap-3 px-4 sm:px-5 [&::-webkit-details-marker]:hidden"
+          >
+            <UserIcon size={22} className="text-neutral-400" />
+            <h2 id="settings-profile-title" className="min-w-0 flex-1 truncate text-lg font-bold">
+              {t('settings.profile')}
+            </h2>
+            <span aria-hidden="true" className="text-lg text-neutral-500 transition-transform group-open:rotate-90">
+              ›
+            </span>
+          </summary>
+          <div className="relative space-y-4 border-t border-white/10 px-4 py-4 sm:px-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             <div className="shrink-0">
               <button
@@ -333,9 +339,14 @@ export default function SettingsView({
             />
             <TextField label={t('company.city')} value={form.city} onChange={setField('city')} onBlur={commitField} testId="settings-company-city" maxLength={60} optional={t('common.optional')} sanitize={(v) => sanitizeTextInput(v, 60)} placeholder={t('company.city.ph')} />
           </div>
-
           </div>
+        </details>
 
+        {/* ---- 2. Operaciones y Sincronización: firma + Drive en UNA tarjeta ---------------------------------------- */}
+        <section className="card divide-y divide-white/10 !py-0" aria-labelledby="settings-ops-title" data-testid="settings-ops">
+          <h2 id="settings-ops-title" className="pb-2 pt-4 text-xs font-bold uppercase tracking-wider text-neutral-500">
+            {t('settings.ops')}
+          </h2>
           <button
             type="button"
             onClick={() => setSigning(true)}
@@ -358,7 +369,7 @@ export default function SettingsView({
             )}
           </button>
 
-        {/* ---- 3. Google Drive y Respaldo ---------------------------------------------------------------------------- */}
+        {/* ---- Google Drive y Respaldo ---------------------------------------------------------------------------- */}
         <div className="space-y-3 py-4" data-testid="settings-cloud">
           <h2 id="settings-drive-title" className="sr-only">
             {t('settings.cloud')}
@@ -368,9 +379,9 @@ export default function SettingsView({
             <Switch checked={drive} onChange={toggleDrive} label={t('settings.driveSync')} className="min-w-0 flex-1 !border-0 !bg-transparent !p-0" data-testid="settings-drive" />
           </div>
 
-          {googleUser && <div className="border-t border-white/10 pt-3">{accountRow}</div>}
+          {drive && googleUser && <div className="border-t border-white/10 pt-3">{accountRow}</div>}
 
-          {backup && (
+          {backup && (drive || !backup.configured) && (
             <div className="space-y-3 border-t border-white/10 pt-3" data-testid="settings-backup" data-state={!backup.configured ? 'unconfigured' : !backup.enabled ? 'off' : backup.linked ? 'connected' : 'disconnected'}>
               {!backup.configured ? (
                 <p className="text-xs leading-snug text-[#e8c35f]" role="status" data-testid="backup-config-diagnostic" data-config={backup.configStatus || 'missing'}>
@@ -445,7 +456,7 @@ export default function SettingsView({
         </div>
         </section>
 
-        {/* ---- 2. Idioma y País -------------------------------------------------------------------------------------- */}
+        {/* ---- 3. Preferencias del sistema: Idioma y País -------------------------------------------------------------------------------------- */}
         <section className="card space-y-3" aria-labelledby="settings-locale-title" data-testid="settings-locale">
           <h2 id="settings-locale-title" className="text-lg font-bold">
             {t('settings.locale')}
@@ -456,7 +467,7 @@ export default function SettingsView({
             </div>
             <div className="min-w-0" data-testid="settings-region">
               {onConfirmRegion ? (
-                <RegionCombobox value={regionCode} onChange={onConfirmRegion} />
+                <RegionCombobox value={regionCode || detectCurrentRegion()} onChange={onConfirmRegion} />
               ) : (
                 <button type="button" onClick={onChangeRegion} className="flex min-h-[52px] w-full items-center justify-between gap-2 rounded-xl border-2 border-neutral-700 px-4 text-left font-bold hover:border-brand">
                   <span className="truncate">{t('settings.region.change')}</span>

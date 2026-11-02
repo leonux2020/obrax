@@ -4,12 +4,13 @@ import { useI18n } from '../lib/i18n.jsx';
 import { Button, Logo } from './ui.jsx';
 import RegionCombobox from './RegionCombobox.jsx';
 import LangSelect from './LangSelect.jsx';
+import { detectCurrentRegion } from '../lib/geo.js';
 
 const pct = (rate) => `${Math.round(rate * 1000) / 10}%`;
 
 export default function RegionSelect({ initial, onConfirm, onCancel, onChangeLang }) {
   const { t, lang } = useI18n();
-  const [code, setCode] = useState(initial || null);
+  const [code, setCode] = useState(() => initial || detectCurrentRegion() || null); // never a blank picker: the device's own country (time zone, then language) is already selected
   const region = code ? REGIONS[code] : null;
 
   return (

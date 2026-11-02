@@ -114,24 +114,28 @@ describe('Ajustes as a full-screen tab', () => {
 });
 
 describe('Ajustes "Zero Stress": main block, quiet logout, invisible autosave', () => {
-  it('Profilo, Firma Digitale and Google Drive form ONE main block at the top, each row with a grey line icon', async () => {
+  it('Firma Digitale and Google Drive share ONE operations card with grey line icons; the profile is its own accordion above it', async () => {
     await mount();
     await click(h.tab('Ajustes'));
-    const main = q('settings-main');
-    expect(main).not.toBeNull();
-    for (const id of ['settings-profile', 'settings-signature', 'settings-cloud']) expect(main.contains(q(id)), id).toBe(true);
-    for (const id of ['settings-profile', 'settings-signature', 'settings-cloud']) {
+    const ops = q('settings-ops');
+    expect(ops).not.toBeNull();
+    expect(ops.contains(q('settings-signature'))).toBe(true);
+    expect(ops.contains(q('settings-cloud'))).toBe(true);
+    expect(ops.contains(q('settings-profile'))).toBe(false);
+    expect(ops.className).toContain('card'); // the card's subtle border + black fill tie both rows together
+    expect(ops.className).toContain('divide-white/10');
+    for (const id of ['settings-signature', 'settings-cloud']) {
       const svg = q(id).querySelector('svg[data-outline-icon="true"]');
       expect(svg, id).not.toBeNull();
       expect(svg.getAttribute('class')).toContain('text-neutral-400');
-      expect(svg.getAttribute('stroke')).toBe('currentColor');
     }
+    const sum = q('settings-profile-summary').querySelector('svg[data-outline-icon="true"]');
+    expect(sum.getAttribute('class')).toContain('text-neutral-400');
     expect(q('settings-drive').textContent).toBe('Sincronizar con Google Drive');
-    // order: main block, then language & country, then everything else
-    expect(idx(q('settings-main'))).toBeLessThan(idx(q('settings-locale')));
-    expect(idx(q('settings-profile'))).toBeLessThan(idx(q('settings-signature')));
+    // order: profile accordion, operations, then language & country
+    expect(idx(q('settings-profile'))).toBeLessThan(idx(q('settings-ops')));
     expect(idx(q('settings-signature'))).toBeLessThan(idx(q('settings-cloud')));
-    // the Drive row stays a real switch
+    expect(idx(q('settings-ops'))).toBeLessThan(idx(q('settings-locale')));
     expect(q('settings-drive').getAttribute('role')).toBe('switch');
   });
 
@@ -203,6 +207,108 @@ describe('Ajustes "Zero Stress": main block, quiet logout, invisible autosave', 
     expect(quiet.className).toContain('text-neutral-400');
     expect(quiet.className).not.toContain('border-brand');
     expect(loud.className).toContain('border-brand');
+    act(() => r.unmount());
+    el.remove();
+  });
+});
+
+describe('Ajustes: shorter screen and nothing to configure by hand', () => {
+  it('the company + professional fields live in an accordion that is CLOSED by default (and opens on tap)', async () => {
+    await mount('it');
+    await click(q('nav-settings'));
+    const acc = q('settings-profile');
+    expect(acc.tagName).toBe('DETAILS');
+    expect(acc.open).toBe(false);
+    expect(q('settings-profile-summary').textContent).toContain('Azienda e professionista');
+    for (const id of ['settings-logo', 'settings-company-name', 'settings-pro-name', 'settings-company-email', 'settings-company-phone', 'settings-company-tax', 'settings-company-city'])
+      expect(acc.contains(q(id)), id).toBe(true);
+    // the signature, Drive and language are NOT inside the accordion: they stay visible while it is closed
+    for (const id of ['settings-signature', 'settings-drive', 'settings-locale']) expect(acc.contains(q(id)), id).toBe(false);
+    acc.open = true;
+    expect(acc.open).toBe(true);
+  });
+
+  it('Drive OFF: no account, no status, no "Guardar ahora" / "Restaurar"; Drive ON shows them', async () => {
+    localStorage.setItem('cp.drive.linked.v1', '1');
+    seed();
+    localStorage.setItem('cp.user.v1', JSON.stringify({ provider: 'google', name: 'Leo Pc', email: 'leo@x.com', picture: '' }));
+    localStorage.setItem('cp.profile.v1', JSON.stringify({ onboarded: true, drive: false }));
+    h = createHost(App);
+    await h.mount();
+    await click(h.tab('Ajustes'));
+    const gone = ['settings-account', 'backup-account', 'backup-connected', 'backup-status', 'backup-now', 'backup-restore', 'backup-folder', 'backup-connect'];
+    if (q('settings-drive').getAttribute('aria-checked') === 'true') await click(q('settings-drive'));
+    expect(q('settings-drive').getAttribute('aria-checked')).toBe('false');
+    for (const id of gone) expect(q(id), `${id} hidden while OFF`).toBeNull();
+    expect(q('settings-cloud').textContent).not.toContain('Leo Pc');
+    await click(q('settings-drive'));
+    expect(q('settings-drive').getAttribute('aria-checked')).toBe('true');
+    await flush(60);
+    expect(q('settings-cloud').textContent).toContain('Leo Pc');
+  });
+});
+
+describe('Autodetection of language and country (Zero Stress)', () => {
+  it('a new device gets its language from navigator.language(s) and its country from the time zone, then from the language', async () => {
+    const { detectCurrentRegion, languageFor } = await import('../src/lib/geo.js');
+    expect(languageFor({}, { languages: ['it-IT', 'en'] })).toBe('it');
+    expect(languageFor({}, { languages: ['de-AT'] })).toBe('de');
+    expect(languageFor({ lang: 'es', langLocked: true }, { languages: ['it-IT'] })).toBe('es'); // a manual choice wins
+    expect(detectCurrentRegion({ timeZone: 'Europe/Rome', languages: ['es-CL'] })).toBe('IT'); // where the phone IS
+    expect(detectCurrentRegion({ timeZone: '', languages: ['pt-BR'] })).toBe('BR'); // no zone: the language tag
+    expect(detectCurrentRegion({ timeZone: 'Mars/Base', languages: ['xx'] })).toBeNull();
+  });
+
+  it('the real browser APIs feed it: Intl time zone + navigator.language', async () => {
+    const { detectCurrentRegion, languageFor } = await import('../src/lib/geo.js');
+    const tz = vi.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions').mockReturnValue({ timeZone: 'America/Santiago', locale: 'es-CL' });
+    vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['fr-FR']);
+    expect(detectCurrentRegion()).toBe('CL');
+    expect(languageFor({})).toBe('fr');
+    tz.mockRestore();
+  });
+
+  it('the Ajustes selects show the detected values and the user can still change them', async () => {
+    vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['it-IT']);
+    vi.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions').mockReturnValue({ timeZone: 'Europe/Rome', locale: 'it-IT' });
+    localStorage.setItem('cp.settings.v1', JSON.stringify({ region: 'IT' })); // no lang stored, never locked: the device decides
+    localStorage.setItem('cp.user.v1', JSON.stringify({ provider: 'local', name: 'Ana', email: '' }));
+    localStorage.setItem('cp.company.v1', JSON.stringify({ name: 'Aurora', proName: 'Ana', phone: '', email: '' }));
+    localStorage.setItem('cp.profile.v1', JSON.stringify({ onboarded: true, drive: false }));
+    h = createHost(App);
+    await h.mount();
+    await click(q('nav-settings'));
+    expect(q('settings-title').textContent).toBe('Impostazioni');
+    expect(q('settings-lang').querySelector('select').value).toBe('it');
+    expect(q('settings-region').querySelector('input').value).toMatch(/Ital/); // the detected country, shown in the combobox
+    // manual change still works and sticks (locked from now on)
+    const { act } = await import('react');
+    const select = q('settings-lang').querySelector('select');
+    await act(async () => {
+      select.value = 'de';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await flush(60);
+    expect(q('settings-title').textContent).toBe('Einstellungen');
+    expect(JSON.parse(localStorage.getItem('cp.settings.v1')).langLocked).toBe(true);
+  });
+
+  it('the country picker of a new profile opens with the detected country already selected', async () => {
+    vi.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions').mockReturnValue({ timeZone: 'Europe/Rome', locale: 'it-IT' });
+    vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['it-IT']);
+    const React = (await import('react')).default;
+    const { act } = await import('react');
+    const { createRoot } = await import('react-dom/client');
+    const { I18nProvider } = await import('../src/lib/i18n.jsx');
+    const RegionSelect = (await import('../src/components/RegionSelect.jsx')).default;
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+    const r = createRoot(el);
+    await act(async () => {
+      r.render(React.createElement(I18nProvider, { lang: 'it', regionCode: null }, React.createElement(RegionSelect, { initial: null, onConfirm: () => {} })));
+    });
+    expect(el.textContent).toContain('Italia');
+    expect(el.querySelector('[aria-live="polite"]')).not.toBeNull(); // the selected-country summary is already there
     act(() => r.unmount());
     el.remove();
   });

@@ -88,7 +88,7 @@ describe('Google Drive card in Ajustes', () => {
     h = createHost(App);
     await h.mount();
     await click(h.tab('Ajustes'));
-    expect(q('settings-backup').dataset.state).toBe('off');
+    expect(q('settings-backup')).toBeNull(); // switch OFF: no Drive details at all (account, status, buttons)
     expect(requests).toEqual([]);
     await click(q('settings-drive'));
     await flush(120);
