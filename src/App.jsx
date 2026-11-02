@@ -962,7 +962,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
           )}
 
           {financeProject && !active && (
-            <ProjectFinancialDashboard project={financeProject} onBack={() => setFinanceId(null)} onCloseRendition={submitRendition} onRetryQueue={exportSync.retry} onReconnect={reconnectDrive} needsReconnect={driveNeedsReconnect} />
+            <ProjectFinancialDashboard project={financeProject} onCloseRendition={submitRendition} onRetryQueue={exportSync.retry} onReconnect={reconnectDrive} needsReconnect={driveNeedsReconnect} />
           )}
           {sheet?.type === 'new' && <ProjectSheet defaultRegion={settings.region} onSave={createProject} onClose={() => setSheet(null)} />}
           {editing && (

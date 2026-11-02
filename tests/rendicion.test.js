@@ -394,21 +394,21 @@ describe('ProjectFinancialDashboard + the Contabilidad card', () => {
   const mount = (node) => act(async () => root.render(React.createElement(I18nProvider, { lang: 'es', regionCode: 'CL' }, node)));
 
   it('three OLED headers (Fondo asignado, Total gastado, Saldo a rendir), the supplier carousel and the grand total', async () => {
-    await mount(React.createElement(ProjectFinancialDashboard, { project: project(), onChange: () => {}, onBack: () => {}, onCloseRendition: async () => {}, queue: createExportQueue() }));
+    await mount(React.createElement(ProjectFinancialDashboard, { project: project(), onCloseRendition: async () => {}, queue: createExportQueue() }));
     expect(q('fin-fund').textContent).toContain('Fondo asignado');
     expect(q('fin-fund-value').textContent).toContain('150.000');
     expect(q('fin-spent-value').textContent).toContain('70.000');
     expect(q('fin-balance').textContent).toContain('Saldo a rendir');
     expect(q('fin-balance-value').textContent).toContain('80.000');
     expect(q('fin-balance-value').className).toContain('text-brand');
-    expect([...q('fin-expenses').querySelectorAll('[data-testid="supplier-total-name"]')].map((n) => n.textContent)).toEqual(['Sodimac', 'Copec', 'Sin proveedor']);
+    expect([...q('fin-expenses').querySelectorAll('[data-testid="fin-shop-name"]')].map((n) => n.textContent)).toEqual(['Sodimac', 'Copec', 'Sin proveedor']);
     expect(q('fin-expenses-total').textContent).toContain('70.000');
     expect(q('fin-close').textContent).toContain('Cerrar Rendición (Enviar a Drive)');
   });
 
   it('an overspent project shows the balance in red', async () => {
     const p = project({ payments: [] });
-    await mount(React.createElement(ProjectFinancialDashboard, { project: p, onChange: () => {}, onBack: () => {}, onCloseRendition: async () => {}, queue: createExportQueue() }));
+    await mount(React.createElement(ProjectFinancialDashboard, { project: p, onCloseRendition: async () => {}, queue: createExportQueue() }));
     expect(q('fin-balance-value').className).toContain('text-red-400');
     expect(q('fin-income-empty')).not.toBeNull();
   });
@@ -416,22 +416,73 @@ describe('ProjectFinancialDashboard + the Contabilidad card', () => {
   it('READ-ONLY: no income form, no fields, no delete; the lists mirror what the project already holds (CashBlock + expenses)', async () => {
     const changes = [];
     const p = project();
-    await mount(React.createElement(ProjectFinancialDashboard, { project: p, onChange: (c) => changes.push(c), onBack: () => {}, onCloseRendition: async () => {}, queue: createExportQueue() }));
+    await mount(React.createElement(ProjectFinancialDashboard, { project: p, onChange: (c) => changes.push(c), onCloseRendition: async () => {}, queue: createExportQueue() }));
     const view = q('project-finance');
     for (const id of ['fin-income-form', 'fin-income-add', 'fin-income-date', 'fin-income-note']) expect(q(id), id).toBeNull();
     expect(view.querySelector('input, textarea, select, form')).toBeNull(); // nothing to type anywhere
     expect(view.textContent).not.toMatch(/Añadir adelanto|Descripción|Fecha|Monto/);
-    expect(q('fin-readonly').textContent).toContain('Proyectos');
+    expect(q('fin-readonly')).toBeNull(); // the missing inputs explain themselves: no warning text
     // ENTRATE: every payment of the project, as plain rows with no buttons
     expect(q('fin-income-list').querySelectorAll('li')).toHaveLength(p.payments.length);
     expect(q('fin-income-adel0001').querySelector('button')).toBeNull();
     expect(q('fin-income-list').textContent).toContain('100.000');
     // USCITE: every expense, read-only too
-    expect(q('fin-expenses-list').querySelectorAll('li')).toHaveLength(p.expenses.length);
+    expect(q('fin-expenses-list').querySelectorAll('li')).toHaveLength(p.expenses.length); // one line per ticket, grouped under its shop
     expect(q('fin-expenses-list').querySelector('button')).toBeNull();
-    // the only button left on the screen besides "back" is the one that closes / exports the rendición
-    expect([...view.querySelectorAll('button')].map((b) => b.dataset.testid)).toEqual(['fin-back', 'fin-close']);
+    // the ONLY button on the screen is the one that closes / exports the rendición (no back arrow: the phone's Back does that)
+    expect([...view.querySelectorAll('button')].map((b) => b.dataset.testid)).toEqual(['fin-close']);
     expect(changes).toHaveLength(0);
+  });
+
+  it('no back arrow and no "read-only" sentence in the header, in any of the six languages', async () => {
+    const { DICT } = await import('../src/lib/dict.js');
+    await mount(React.createElement(ProjectFinancialDashboard, { project: project(), onCloseRendition: async () => {}, queue: createExportQueue() }));
+    expect(q('fin-back')).toBeNull();
+    expect(q('project-finance').textContent).not.toContain('←');
+    expect(q('project-finance').querySelector('header button')).toBeNull();
+    expect(q('project-finance').querySelector('header').textContent).toContain('Casa Soto');
+    for (const l of ['es', 'en', 'pt', 'fr', 'it', 'de']) {
+      expect(DICT[l]['fin.readonly'], l).toBeUndefined();
+      expect(DICT[l]['fin.back'], l).toBeUndefined();
+    }
+  });
+
+  it('the three figures live in ONE cohesive black card (3 columns, hairline dividers), not in three boxes', async () => {
+    await mount(React.createElement(ProjectFinancialDashboard, { project: project(), onCloseRendition: async () => {}, queue: createExportQueue() }));
+    const card = q('fin-summary');
+    expect(card.className).toContain('grid-cols-3');
+    expect(card.className).toContain('bg-black');
+    expect(card.className).toContain('border-white/10');
+    expect(card.className).toContain('rounded-2xl');
+    expect(card.className).toContain('divide-x');
+    for (const id of ['fin-fund', 'fin-spent', 'fin-balance']) {
+      expect(card.contains(q(id)), id).toBe(true);
+      expect(q(id).className, id).not.toMatch(/border|rounded|bg-/); // no per-figure box
+    }
+    expect(card.children).toHaveLength(3);
+    expect(q('fin-fund-value').textContent).toContain('150.000');
+    expect(q('fin-spent-value').textContent).toContain('70.000');
+    expect(q('fin-balance-value').textContent).toContain('80.000');
+  });
+
+  it('USCITE grouped by shop: the name appears ONCE as a heading; its tickets list date + amount underneath', async () => {
+    await mount(React.createElement(ProjectFinancialDashboard, { project: project(), onCloseRendition: async () => {}, queue: createExportQueue() }));
+    const names = [...q('fin-expenses').querySelectorAll('[data-testid="fin-shop-name"]')].map((n) => n.textContent);
+    expect(names).toEqual(['Sodimac', 'Copec', 'Sin proveedor']); // "sodimac " and "Sodimac" are ONE shop
+    expect(q('fin-expenses').textContent.match(/Sodimac/gi)).toHaveLength(1);
+    const sodimac = q('fin-shop-0');
+    expect(sodimac.querySelector('[data-testid="fin-shop-total"]').textContent).toContain('50.000');
+    const rows = [...sodimac.querySelectorAll('li')];
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.dataset.testid).sort()).toEqual(['fin-expense-gasto001', 'fin-expense-gasto002']);
+    expect(q('fin-expense-gasto001').textContent).toContain('30.000');
+    expect(q('fin-expense-gasto001').textContent).toMatch(/2026/); // the printed receipt date
+    expect(q('fin-expense-gasto002').textContent).toContain('20.000');
+    // a ticket is only a date and an amount: no repeated shop, no card per ticket, no supplier chips strip
+    expect(sodimac.querySelectorAll('li')[0].textContent).not.toMatch(/Sodimac/i);
+    expect(q('supplier-totals')).toBeNull();
+    expect(q('fin-shop-2').querySelector('[data-testid="fin-shop-name"]').textContent).toBe('Sin proveedor');
+    expect(q('fin-expenses-total').textContent).toContain('70.000');
   });
 
   it('a payment registered in the project (with method) shows up here by itself, newest first, with the method tag', async () => {
@@ -442,7 +493,7 @@ describe('ProjectFinancialDashboard + the Contabilidad card', () => {
         { id: 'p3', amount: 5000, at: new Date(2026, 9, 25, 12).getTime(), note: '', method: 'check', photo: true },
       ],
     });
-    await mount(React.createElement(ProjectFinancialDashboard, { project: p, onBack: () => {}, onCloseRendition: async () => {}, queue: createExportQueue() }));
+    await mount(React.createElement(ProjectFinancialDashboard, { project: p, onCloseRendition: async () => {}, queue: createExportQueue() }));
     expect([...q('fin-income-list').querySelectorAll('li')].map((li) => li.dataset.testid)).toEqual(['fin-income-p3', 'fin-income-p2', 'fin-income-p1']);
     expect(q('fin-income-p3').textContent).toContain('Cheque'); // no note: the method is the title
     expect(q('fin-income-p2').textContent).toContain('Cuota 2');
@@ -457,7 +508,7 @@ describe('ProjectFinancialDashboard + the Contabilidad card', () => {
     const queue = createExportQueue();
     const p = project();
     await queue.enqueue({ projectId: p.id, title: 'Casa', fileName: 'Rendicion_2026-10-30.xlsx', blob: new Blob([Uint8Array.from([1, 2, 3])]) });
-    await mount(React.createElement(ProjectFinancialDashboard, { project: p, onChange: () => {}, onBack: () => {}, onCloseRendition: close, onRetryQueue: () => {}, queue }));
+    await mount(React.createElement(ProjectFinancialDashboard, { project: p, onCloseRendition: close, onRetryQueue: () => {}, queue }));
     expect(q('fin-queued').textContent).toContain('En cola: 1');
     await click(q('fin-close'));
     await click(q('fin-close'));

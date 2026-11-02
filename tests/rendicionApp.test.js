@@ -96,7 +96,12 @@ describe('Contabilidad -> financial command center', () => {
     expect(q('fin-fund-value').textContent).toContain('100.000');
     expect(q('fin-spent-value').textContent).toContain('42.000');
     expect(q('fin-balance-value').textContent).toContain('58.000');
-    await click(q('fin-back'));
+    expect(q('fin-back')).toBeNull(); // no arrow: only the phone's own Back leaves the view
+    expect(window.history.state?.cubraxFinance).toBe(project.id); // the view owns one history entry...
+    await act(async () => {
+      window.history.back(); // ...so the device's Back closes it
+    });
+    await flush(60);
     expect(q('project-finance')).toBeNull();
     expect(q('accounting')).not.toBeNull();
   });

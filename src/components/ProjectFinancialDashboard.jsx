@@ -1,10 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
-import { cashSummary, expensesTotal } from '../lib/ledger.js';
+import { cashSummary, expenseDayLabel, expensesTotal, supplierTotals } from '../lib/ledger.js';
 import { projectClient, projectTitle } from '../lib/projects.js';
 import { UI_WATCHDOG_MS, settleWithin } from '../lib/exportSync.js';
 import { useExportQueue } from '../lib/useExportSync.js';
-import { ExpenseHead, SupplierTotals } from './ExpenseParts.jsx';
 import { CloudUploadIcon } from './workspace/icons.jsx';
 
 /** Font size by length of the amount, so a figure always fits its third of the header on a 320 px screen. */
@@ -12,7 +11,7 @@ const sizeFor = (text) => (text.length <= 9 ? 'text-lg' : text.length <= 11 ? 't
 
 function Stat({ id, label, value, tone = '' }) {
   return (
-    <div data-testid={id} className="min-w-0 rounded-2xl border border-white/10 bg-black px-2 py-3 text-center">
+    <div data-testid={id} className="min-w-0 px-2 py-3 text-center">
       <p className="truncate text-[11px] font-semibold uppercase tracking-tight text-white/50">{label}</p>
       <p className={`mt-1 whitespace-nowrap font-extrabold tabular-nums ${sizeFor(value)} ${tone || 'text-[#E0E0E0]'}`} data-testid={`${id}-value`}>
         {value}
@@ -28,10 +27,10 @@ function Stat({ id, label, value, tone = '' }) {
  *    expenses module): the single source of truth. Nothing is entered here,
  *  - "Cerrar Rendición (Enviar a Drive)": the Excel goes to Drive, or to the offline queue (it is never downloaded).
  *
- * `onBack()` goes back; `onCloseRendition()` resolves when it is done.
+ * No back arrow: the phone's own Back (history) leaves it. `onCloseRendition()` resolves when it is done.
  */
-export default function ProjectFinancialDashboard({ project, onBack, onCloseRendition, onRetryQueue = null, onReconnect = null, needsReconnect = false, queue, watchdogMs = UI_WATCHDOG_MS }) {
-  const { t, money, locale } = useI18n();
+export default function ProjectFinancialDashboard({ project, onCloseRendition, onRetryQueue = null, onReconnect = null, needsReconnect = false, queue, watchdogMs = UI_WATCHDOG_MS }) {
+  const { t, money, moneyIn, locale } = useI18n();
   const day = useMemo(() => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }), [locale]);
   const [busy, setBusy] = useState(false);
   const [connecting, setConnecting] = useState(false); // the user asked for the Google window: the button says so until Google answers
@@ -44,6 +43,23 @@ export default function ProjectFinancialDashboard({ project, onBack, onCloseRend
   const toRender = Math.round((fund - spent) * 100) / 100;
   const entries = useMemo(() => [...project.payments].sort((a, b) => b.at - a.at), [project.payments]);
   const title = projectTitle(project) || t('proj.untitled');
+  // USCITE grouped by shop: the name ONCE as a heading, then its tickets (date + amount) newest first
+  const groups = useMemo(() => {
+    // the day printed on the receipt when there is one, else the moment it was registered
+    const when = (e) => {
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(e.date || '');
+      return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12).getTime() : e.at;
+    };
+    return supplierTotals(project.expenses).map((g) => ({
+      ...g,
+      items: project.expenses
+        .filter((e) => {
+          const name = (e.supplier || '').trim().replace(/\s+/g, ' ').toLowerCase();
+          return name === g.name.toLowerCase() && (String(e.currency || '').toUpperCase() === g.currency);
+        })
+        .sort((a, b) => when(b) - when(a) || b.at - a.at),
+    }));
+  }, [project.expenses]);
 
   // "Reconectar Drive": the ONLY place besides "Enviar a Drive" where the Google window may open, and only by this tap
   const reconnect = async () => {
@@ -74,33 +90,18 @@ export default function ProjectFinancialDashboard({ project, onBack, onCloseRend
   return (
     <div className="fixed inset-0 z-40 overflow-y-auto bg-black text-[#E0E0E0]" data-testid="project-finance" role="dialog" aria-modal="true" aria-label={`${t('fin.title')}: ${title}`}>
       <main className="mx-auto w-full max-w-3xl px-3 pb-40 pt-3 sm:px-4">
-        <header className="mb-3 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label={t('fin.back')}
-            data-testid="fin-back"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/10 text-xl hover:border-brand"
-          >
-            ←
-          </button>
-          <span className="min-w-0 flex-1">
-            <h1 className="truncate text-xl font-extrabold tracking-tight" data-testid="fin-title">
-              {title}
-            </h1>
-            <span className="block truncate text-xs text-neutral-400">{projectClient(project) || t('proj.noClient')}</span>
-          </span>
+        <header className="mb-3">
+          <h1 className="truncate text-xl font-extrabold tracking-tight" data-testid="fin-title">
+            {title}
+          </h1>
+          <span className="block truncate text-xs text-neutral-400">{projectClient(project) || t('proj.noClient')}</span>
         </header>
 
-        <section className="grid grid-cols-3 gap-2" aria-label={t('fin.title')}>
+        <section className="grid grid-cols-3 divide-x divide-white/10 rounded-2xl border border-white/10 bg-black" aria-label={t('fin.title')} data-testid="fin-summary">
           <Stat id="fin-fund" label={t('fin.fund')} value={money(fund)} />
           <Stat id="fin-spent" label={t('fin.spent')} value={money(spent)} />
           <Stat id="fin-balance" label={t('fin.toRender')} value={money(toRender)} tone={toRender < 0 ? 'text-red-400' : 'text-brand'} />
         </section>
-
-        <p className="mt-4 text-xs text-neutral-500" data-testid="fin-readonly">
-          {t('fin.readonly')}
-        </p>
 
         {/* Ingresos: read-only mirror of the CashBlock */}
         <section className="mt-5" data-testid="fin-income">
@@ -135,15 +136,33 @@ export default function ProjectFinancialDashboard({ project, onBack, onCloseRend
             </p>
           ) : (
             <>
-              <SupplierTotals expenses={project.expenses} />
-              <ul className="mb-2 space-y-2" data-testid="fin-expenses-list">
-                {project.expenses.map((e) => (
-                  <li key={e.id} data-testid={`fin-expense-${e.id}`} className="flex items-center gap-3 rounded-xl border border-white/10 px-3 py-2">
-                    <ExpenseHead e={e} />
-                    <span className="text-sm font-extrabold tabular-nums">{money(e.amount)}</span>
-                  </li>
-                ))}
-              </ul>
+              <div className="mb-2 space-y-3" data-testid="fin-expenses-list">
+                {groups.map((g, i) => {
+                  const fmt = (v) => (g.currency ? moneyIn(v, g.currency) : money(v));
+                  return (
+                    <section key={g.key} data-testid={`fin-shop-${i}`} className="rounded-xl border border-white/10">
+                      <h3 className="flex items-baseline justify-between gap-3 px-3 pt-2.5">
+                        <span className={`min-w-0 flex-1 truncate text-sm font-bold ${g.name ? 'text-neutral-100' : 'text-neutral-400'}`} data-testid="fin-shop-name">
+                          {g.name || t('exp.noSupplier')}
+                        </span>
+                        <span className="shrink-0 text-sm font-extrabold tabular-nums text-neutral-100" data-testid="fin-shop-total">
+                          {fmt(g.total)}
+                        </span>
+                      </h3>
+                      <ul className="divide-y divide-white/5 px-3 pb-1 pt-1">
+                        {g.items.map((e) => (
+                          <li key={e.id} data-testid={`fin-expense-${e.id}`} className="flex items-baseline justify-between gap-3 py-1.5 text-sm">
+                            <span className="min-w-0 flex-1 truncate text-neutral-400" data-testid="fin-expense-date">
+                              {expenseDayLabel(e.date, locale) || day.format(new Date(e.at))}
+                            </span>
+                            <span className="shrink-0 tabular-nums text-[#E0E0E0]">{fmt(e.amount)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  );
+                })}
+              </div>
               <p className="flex items-baseline justify-between rounded-2xl border border-white/10 px-4 py-3" data-testid="fin-expenses-total">
                 <span className="text-sm font-bold">{t('fin.expenses.total')}</span>
                 <span className="font-extrabold tabular-nums">{money(spent)}</span>
