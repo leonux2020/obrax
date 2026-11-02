@@ -63,8 +63,7 @@ describe('Ajustes: three cards', () => {
     expect(loadCompany().taxId).toBe('76.123.456-7');
     expect(loadCompany().city).toBe('Santiago');
     expect(loadCompany().name).toBe('Aurora');
-    expect(q('settings-saved').className).toMatch(/opacity-100/);
-    expect(q('settings-saved').textContent).toContain('Guardado');
+    expect(q('settings-saved')).toBeNull(); // autosave is implicit: no "Guardado" badge, no switch
 
     await click(q('settings-signature'));
     expect(q('contractor-sign-sheet')).not.toBeNull();
@@ -84,6 +83,6 @@ describe('Ajustes: three cards', () => {
     await typeInto(q('settings-pro-name'), 'Ana Ruiz');
     await flush(400);
     expect(loadCompany().proName).toBe('Ana Ruiz');
-    expect(q('settings-saved').textContent).toContain('Guardado');
+    expect(q('settings-saved')).toBeNull();
   });
 });

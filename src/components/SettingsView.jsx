@@ -8,6 +8,7 @@ import { backupAge } from '../lib/driveSync.js';
 import { compressLogo, LOGO_LIMITS } from '../lib/logo.js';
 import { PhotoError } from '../lib/photos.js';
 import ProQaTag from './ProQaTag.jsx';
+import { CloudUploadIcon, FileSignatureIcon, UserIcon } from './workspace/icons.jsx';
 import { Button, Switch, TextField } from './ui.jsx';
 import GoogleButton from './GoogleButton.jsx';
 import LangSelect from './LangSelect.jsx';
@@ -52,7 +53,6 @@ export default function SettingsView({
   const [logoError, setLogoError] = useState('');
   const [logoBusy, setLogoBusy] = useState(false);
   const [signing, setSigning] = useState(false); // only the signature canvas (never the old profile modal)
-  const [savedFlash, setSavedFlash] = useState(false); // "Guardado" after a successful autosave
   const logoRef = useRef(null);
   const saving = useRef(null);
   const formRef = useRef(form);
@@ -60,11 +60,6 @@ export default function SettingsView({
   const dirty = useRef(false);
   // do NOT write `formRef.current = form` on every render: a parent re-render would wipe a value just typed
   // before React has committed setForm, and blur / debounce would persist the empty previous profile
-  useEffect(() => {
-    if (!savedFlash) return undefined;
-    const id = setTimeout(() => setSavedFlash(false), 2000);
-    return () => clearTimeout(id);
-  }, [savedFlash]);
   const cloud = Boolean(backup?.enabled);
   const busy = phase === 'syncing';
 
@@ -160,7 +155,6 @@ export default function SettingsView({
     const job = Promise.resolve(onSaveProfile(payload))
       .then(() => {
         baseline.current = JSON.stringify({ company: stored, logo: nextLogo || '' });
-        setSavedFlash(true);
       })
       .catch(() => setLogoError(t('company.logo.err.store')));
     saving.current = job;
@@ -259,19 +253,14 @@ export default function SettingsView({
         <ProQaTag className="block text-center" />
 
         {/* ---- 1. Perfil de Empresa ---------------------------------------------------------------------------------- */}
-        <section className="card relative space-y-4" aria-labelledby="settings-profile-title" data-testid="settings-profile">
-          <div className="flex items-center justify-between gap-3">
-            <h2 id="settings-profile-title" className="text-lg font-bold">
-              {t('settings.profile')}
-            </h2>
-            <span
-              aria-live="polite"
-              data-testid="settings-saved"
-              className={`text-xs font-semibold text-brand transition-opacity duration-500 ${savedFlash ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
-            >
-              {t('settings.saved')}
-            </span>
-          </div>
+        <section className="card divide-y divide-white/10 !py-0" data-testid="settings-main">
+          <div className="relative space-y-4 py-4" role="group" aria-labelledby="settings-profile-title" data-testid="settings-profile">
+            <div className="flex items-center gap-3">
+              <UserIcon size={22} className="text-neutral-400" />
+              <h2 id="settings-profile-title" className="text-lg font-bold">
+                {t('settings.profile')}
+              </h2>
+            </div>
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             <div className="shrink-0">
@@ -345,56 +334,39 @@ export default function SettingsView({
             <TextField label={t('company.city')} value={form.city} onChange={setField('city')} onBlur={commitField} testId="settings-company-city" maxLength={60} optional={t('common.optional')} sanitize={(v) => sanitizeTextInput(v, 60)} placeholder={t('company.city.ph')} />
           </div>
 
+          </div>
+
           <button
             type="button"
             onClick={() => setSigning(true)}
             data-testid="settings-signature"
-            className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-xl border border-white/10 px-4 text-left transition hover:border-brand"
+            className="flex min-h-[64px] w-full items-center gap-3 py-4 text-left transition hover:text-white"
           >
-            <span className="min-w-0">
-              <span className="block text-sm font-bold">{t('settings.sign')}</span>
-              <span className="block truncate text-xs text-[#E0E0E0]/55">{t(form.signature ? 'sign.pro.change' : 'sign.pro.empty')}</span>
+            <FileSignatureIcon size={22} className="text-neutral-400" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-lg font-bold">{t('settings.sign')}</span>
+              <span className="block truncate text-xs text-neutral-400">{t(form.signature ? 'sign.pro.change' : 'sign.pro.empty')}</span>
             </span>
             {form.signature ? (
               <span className="flex h-10 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-white px-1">
                 <img src={form.signature.dataUrl} alt="" className="max-h-full max-w-full object-contain" />
               </span>
             ) : (
-              <span aria-hidden="true" className="text-lg text-[#E0E0E0]/40">
+              <span aria-hidden="true" className="text-lg text-neutral-500">
                 ›
               </span>
             )}
           </button>
-        </section>
-
-        {/* ---- 2. Idioma y País -------------------------------------------------------------------------------------- */}
-        <section className="card space-y-3" aria-labelledby="settings-locale-title" data-testid="settings-locale">
-          <h2 id="settings-locale-title" className="text-lg font-bold">
-            {t('settings.locale')}
-          </h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="min-w-0" data-testid="settings-lang">
-              <LangSelect onChange={onChangeLang} hideLabel={false} className="w-full !min-h-[52px] text-base" />
-            </div>
-            <div className="min-w-0" data-testid="settings-region">
-              {onConfirmRegion ? (
-                <RegionCombobox value={regionCode} onChange={onConfirmRegion} />
-              ) : (
-                <button type="button" onClick={onChangeRegion} className="flex min-h-[52px] w-full items-center justify-between gap-2 rounded-xl border-2 border-neutral-700 px-4 text-left font-bold hover:border-brand">
-                  <span className="truncate">{t('settings.region.change')}</span>
-                  <span aria-hidden="true">›</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </section>
 
         {/* ---- 3. Google Drive y Respaldo ---------------------------------------------------------------------------- */}
-        <section className="card space-y-3" aria-labelledby="settings-drive-title" data-testid="settings-cloud">
+        <div className="space-y-3 py-4" data-testid="settings-cloud">
           <h2 id="settings-drive-title" className="sr-only">
             {t('settings.cloud')}
           </h2>
-          <Switch checked={drive} onChange={toggleDrive} label={t('setup.drive')} className="!border-0 !bg-transparent !p-0" data-testid="settings-drive" />
+          <div className="flex items-center gap-3">
+            <CloudUploadIcon size={22} className="text-neutral-400" />
+            <Switch checked={drive} onChange={toggleDrive} label={t('settings.driveSync')} className="min-w-0 flex-1 !border-0 !bg-transparent !p-0" data-testid="settings-drive" />
+          </div>
 
           {googleUser && <div className="border-t border-white/10 pt-3">{accountRow}</div>}
 
@@ -470,9 +442,32 @@ export default function SettingsView({
               )}
             </div>
           )}
+        </div>
         </section>
 
-        <InstallButton pwa={pwa} />
+        {/* ---- 2. Idioma y País -------------------------------------------------------------------------------------- */}
+        <section className="card space-y-3" aria-labelledby="settings-locale-title" data-testid="settings-locale">
+          <h2 id="settings-locale-title" className="text-lg font-bold">
+            {t('settings.locale')}
+          </h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="min-w-0" data-testid="settings-lang">
+              <LangSelect onChange={onChangeLang} hideLabel={false} className="w-full !min-h-[52px] text-base" />
+            </div>
+            <div className="min-w-0" data-testid="settings-region">
+              {onConfirmRegion ? (
+                <RegionCombobox value={regionCode} onChange={onConfirmRegion} />
+              ) : (
+                <button type="button" onClick={onChangeRegion} className="flex min-h-[52px] w-full items-center justify-between gap-2 rounded-xl border-2 border-neutral-700 px-4 text-left font-bold hover:border-brand">
+                  <span className="truncate">{t('settings.region.change')}</span>
+                  <span aria-hidden="true">›</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <InstallButton pwa={pwa} quiet />
 
         {/* Local account (Google account lives inside the Drive card when connected) */}
         {!googleUser && (
@@ -490,14 +485,14 @@ export default function SettingsView({
           </section>
         )}
 
-        <div className="border-t border-white/10 pt-4">
+        <div className="mt-10 border-t border-white/10 pt-6" data-testid="settings-logout-zone">
           {phase !== 'idle' && (
             <p className={`mb-3 rounded-xl border px-4 py-3 text-sm ${phase === 'failed' ? 'border-amber-400/50 text-amber-200' : 'border-red-500/40 text-red-300'}`} role="alert" data-testid="logout-warning">
               {phase === 'failed' ? t('settings.logout.fail') : t(cloud ? 'settings.logout.warn.backup' : 'settings.logout.warn')}
             </p>
           )}
           {phase === 'idle' ? (
-            <button type="button" onClick={() => setPhase('confirming')} data-testid="logout-button" className="min-h-[52px] w-full rounded-xl bg-red-600 text-base font-bold text-white transition hover:bg-red-500 active:scale-[0.98]">
+            <button type="button" onClick={() => setPhase('confirming')} data-testid="logout-button" className="min-h-[44px] w-full rounded-xl border border-white/10 bg-transparent text-sm font-medium text-neutral-500 transition hover:text-neutral-300 active:scale-[0.98]">
               {t('settings.logout')}
             </button>
           ) : (
@@ -506,7 +501,7 @@ export default function SettingsView({
                 <Button variant="ghost" onClick={() => setPhase('idle')} disabled={busy} data-testid="logout-cancel">
                   {t('common.cancel')}
                 </Button>
-                <button type="button" disabled={busy} onClick={() => leave()} data-testid="logout-confirm" className="min-h-[52px] rounded-xl bg-red-600 px-3 text-sm font-bold text-white transition hover:bg-red-500 active:scale-[0.98] disabled:opacity-60">
+                <button type="button" disabled={busy} onClick={() => leave()} data-testid="logout-confirm" className="min-h-[52px] rounded-xl border border-red-500/40 bg-transparent px-3 text-sm font-semibold text-red-300 transition hover:bg-red-500/10 active:scale-[0.98] disabled:opacity-60">
                   {busy ? (cloud ? t('settings.logout.syncing') : t('settings.logout.working')) : phase === 'failed' ? t('settings.logout.retry') : t(cloud ? 'settings.logout' : 'settings.logout.confirm')}
                 </button>
               </div>

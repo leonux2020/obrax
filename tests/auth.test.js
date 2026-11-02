@@ -190,7 +190,7 @@ describe('Google login on the main access screen (VITE_GOOGLE_CLIENT_ID)', () =>
     expect(q('settings-account').textContent).toContain('ana@example.com');
   });
 
-  it('Ajustes has a red "Cerrar sesión" button; without a cloud backup, confirming erases the device and goes back to the start', async () => {
+  it('Ajustes has a quiet "Cerrar sesión" button at the bottom; without a cloud backup, confirming erases the device and goes back to the start', async () => {
     seed();
     localStorage.setItem('cp.profile.v1', JSON.stringify({ onboarded: true, drive: false })); // Drive backup off
     sessionStorage.setItem('cp.oauth.result', 'token-ish');
@@ -201,7 +201,8 @@ describe('Google login on the main access screen (VITE_GOOGLE_CLIENT_ID)', () =>
     await click(tab('Ajustes'));
     const btn = q('logout-button');
     expect(btn.textContent.trim()).toBe('Cerrar sesión');
-    expect(btn.className).toMatch(/bg-red-/);
+    expect(btn.className).not.toMatch(/bg-red-/); // never a loud red solid: a quiet, grey, deliberate action
+    expect(btn.className).toContain('text-neutral-500');
     expect(q('logout-warning')).toBeNull();
     await click(btn); // first tap only asks: it cannot be undone
     expect(out).not.toHaveBeenCalled();
@@ -269,7 +270,7 @@ describe('PRO paywall opens when a locked function is used', () => {
     await click(tab('Ajustes'));
     const sw = q('settings-drive');
     expect(sw.getAttribute('role')).toBe('switch');
-    expect(sw.textContent).toContain('Respaldo en Google Drive (Gratis)');
+    expect(sw.textContent).toContain('Sincronizar con Google Drive');
     expect(sw.textContent).not.toContain('PRO');
     expect(sw.getAttribute('aria-checked')).toBe('true');
     await click(sw);

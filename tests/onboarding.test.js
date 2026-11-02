@@ -197,7 +197,7 @@ describe('after onboarding, the profile lives only in Ajustes', () => {
     expect(q('settings-pro-name').value).toBe('Ana Ruiz Soto');
     expect(loadCompany().proName).toBe('Ana Ruiz Soto');
     expect(loadProfileMeta().onboarded).toBe(true);
-    expect(q('settings-saved').textContent).toContain('Guardado');
+    expect(q('settings-saved')).toBeNull(); // saved silently
   });
 
   it('nothing else can open a profile editor modal', () => {
