@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Temporary quality-control build: the paywall is open in every environment and says so.
+// Temporary quality-control build: the paywall is open in every environment (silently: no badge anywhere).
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import { I18nProvider } from '../src/lib/i18n.jsx';
 import Dashboard from '../src/components/Dashboard.jsx';
 import SettingsView from '../src/components/SettingsView.jsx';
-import { PRO_QA_OPEN, PRO_QA_LABEL, qaProOpen, isPro, aiAccess, projectLimitReached, FREE_PROJECT_LIMIT } from '../src/lib/pro.js';
+import { PRO_QA_OPEN, qaProOpen, isPro, aiAccess, projectLimitReached, FREE_PROJECT_LIMIT } from '../src/lib/pro.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let host;
@@ -54,14 +54,18 @@ describe('PRO paywall open for quality control', () => {
     expect(q('pro-scan')).toBeNull();
     expect(q('qa-pro-tag')).toBeNull();
     expect(host.textContent).not.toMatch(/MODO PRO/i);
-    expect(PRO_QA_LABEL).toBe('MODO PRO (Prueba)'); // still the reminder of Ajustes
   });
 
-  it('Ajustes carries the same reminder', async () => {
+  it('Ajustes does NOT carry the tag either: its title is just "Ajustes", the component and the label are gone for good', async () => {
     vi.stubEnv('MODE', 'production');
     vi.stubEnv('DEV', false);
-    await mount(React.createElement(SettingsView, { settings: { region: 'CL', lang: 'es' }, user: { name: 'Ana', email: 'a@b.cl', provider: 'local' }, company: null, logo: '', onClose: () => {}, onChange: () => {},  }));
-    expect(q('qa-pro-tag')?.textContent).toBe('MODO PRO (Prueba)');
+    await mount(React.createElement(SettingsView, { settings: { region: 'CL', lang: 'es' }, user: { name: 'Ana', email: 'a@b.cl', provider: 'local' }, company: null, logo: '', onChange: () => {} }));
+    expect(q('qa-pro-tag')).toBeNull();
+    expect(host.textContent).not.toMatch(/MODO PRO|Prueba/i);
+    expect(q('settings-title').textContent).toBe('Ajustes');
+    expect(fs.existsSync('src/components/ProQaTag.jsx')).toBe(false);
+    expect(fs.readFileSync('src/lib/pro.js', 'utf8')).not.toContain('PRO_QA_LABEL');
+    expect(fs.readFileSync('src/components/SettingsView.jsx', 'utf8')).not.toMatch(/ProQaTag|qa-pro-tag/);
   });
 
   it('in the test runner the tag is not shown (the real paywall is what tests exercise)', async () => {

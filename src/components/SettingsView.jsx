@@ -8,14 +8,36 @@ import { BACKUP_FOLDER } from '../lib/drive.js';
 import { backupAge } from '../lib/driveSync.js';
 import { compressLogo, LOGO_LIMITS } from '../lib/logo.js';
 import { PhotoError } from '../lib/photos.js';
-import ProQaTag from './ProQaTag.jsx';
-import { CloudUploadIcon, FileSignatureIcon, UserIcon } from './workspace/icons.jsx';
+import { CloudUploadIcon, FileSignatureIcon, GlobeIcon, SmartphoneIcon, UserIcon } from './workspace/icons.jsx';
 import { Button, Switch, TextField } from './ui.jsx';
 import GoogleButton from './GoogleButton.jsx';
 import LangSelect from './LangSelect.jsx';
 import RegionCombobox from './RegionCombobox.jsx';
 import InstallButton from './InstallButton.jsx';
 import ContractorSignatureSheet from './ContractorSignatureSheet.jsx';
+
+/** One collapsible block of Ajustes (closed by default). `open` is kept by the parent so it survives the signature canvas (which swaps the screen). */
+function Accordion({ testId, titleId, icon: Icon, title, open, onToggle, children, bodyClassName = '' }) {
+  return (
+    <details
+      open={open}
+      onToggle={(e) => e.currentTarget.open !== open && onToggle(e.currentTarget.open)}
+      className="card group !p-0"
+      data-testid={testId}
+    >
+      <summary data-testid={`${testId}-summary`} className="flex min-h-[64px] cursor-pointer list-none items-center gap-3 px-4 sm:px-5 [&::-webkit-details-marker]:hidden">
+        <Icon size={22} className="text-neutral-400" />
+        <h2 id={titleId} className="min-w-0 flex-1 truncate text-lg font-bold">
+          {title}
+        </h2>
+        <span aria-hidden="true" className="text-lg text-neutral-500 transition-transform group-open:rotate-90">
+          ›
+        </span>
+      </summary>
+      <div className={`border-t border-white/10 ${bodyClassName}`}>{children}</div>
+    </details>
+  );
+}
 
 /**
  * Ajustes: a top-level, full-screen view wired to the bottom navigation tab (never a floating sheet: no close button, no drag;
@@ -53,6 +75,8 @@ export default function SettingsView({
   const [emailError, setEmailError] = useState(false);
   const [logoError, setLogoError] = useState('');
   const [logoBusy, setLogoBusy] = useState(false);
+  const [openAcc, setOpenAcc] = useState({ profile: false, ops: false, locale: false }); // everything starts closed: a nearly empty screen
+  const toggleAcc = (key) => (isOpen) => setOpenAcc((o) => ({ ...o, [key]: isOpen }));
   const [signing, setSigning] = useState(false); // only the signature canvas (never the old profile modal)
   const logoRef = useRef(null);
   const saving = useRef(null);
@@ -251,23 +275,10 @@ export default function SettingsView({
         <h1 className="text-2xl font-extrabold" data-testid="settings-title">
           {t('settings.title')}
         </h1>
-        <ProQaTag className="block text-center" />
 
         {/* ---- 1. Perfil de Empresa ---------------------------------------------------------------------------------- */}
-        <details className="card group !p-0" data-testid="settings-profile">
-          <summary
-            data-testid="settings-profile-summary"
-            className="flex min-h-[64px] cursor-pointer list-none items-center gap-3 px-4 sm:px-5 [&::-webkit-details-marker]:hidden"
-          >
-            <UserIcon size={22} className="text-neutral-400" />
-            <h2 id="settings-profile-title" className="min-w-0 flex-1 truncate text-lg font-bold">
-              {t('settings.profile')}
-            </h2>
-            <span aria-hidden="true" className="text-lg text-neutral-500 transition-transform group-open:rotate-90">
-              ›
-            </span>
-          </summary>
-          <div className="relative space-y-4 border-t border-white/10 px-4 py-4 sm:px-5">
+        <Accordion testId="settings-profile" titleId="settings-profile-title" icon={UserIcon} title={t('settings.profile')} open={openAcc.profile} onToggle={toggleAcc('profile')}>
+          <div className="relative space-y-4 px-4 py-4 sm:px-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             <div className="shrink-0">
               <button
@@ -340,13 +351,10 @@ export default function SettingsView({
             <TextField label={t('company.city')} value={form.city} onChange={setField('city')} onBlur={commitField} testId="settings-company-city" maxLength={60} optional={t('common.optional')} sanitize={(v) => sanitizeTextInput(v, 60)} placeholder={t('company.city.ph')} />
           </div>
           </div>
-        </details>
+        </Accordion>
 
         {/* ---- 2. Operaciones y Sincronización: firma + Drive en UNA tarjeta ---------------------------------------- */}
-        <section className="card divide-y divide-white/10 !py-0" aria-labelledby="settings-ops-title" data-testid="settings-ops">
-          <h2 id="settings-ops-title" className="pb-2 pt-4 text-xs font-bold uppercase tracking-wider text-neutral-500">
-            {t('settings.ops')}
-          </h2>
+        <Accordion testId="settings-ops" titleId="settings-ops-title" icon={SmartphoneIcon} title={t('settings.ops')} open={openAcc.ops} onToggle={toggleAcc('ops')} bodyClassName="divide-y divide-white/10 px-4 sm:px-5">
           <button
             type="button"
             onClick={() => setSigning(true)}
@@ -454,13 +462,10 @@ export default function SettingsView({
             </div>
           )}
         </div>
-        </section>
+        </Accordion>
 
         {/* ---- 3. Preferencias del sistema: Idioma y País -------------------------------------------------------------------------------------- */}
-        <section className="card space-y-3" aria-labelledby="settings-locale-title" data-testid="settings-locale">
-          <h2 id="settings-locale-title" className="text-lg font-bold">
-            {t('settings.locale')}
-          </h2>
+        <Accordion testId="settings-locale" titleId="settings-locale-title" icon={GlobeIcon} title={t('settings.locale')} open={openAcc.locale} onToggle={toggleAcc('locale')} bodyClassName="px-4 py-4 sm:px-5">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="min-w-0" data-testid="settings-lang">
               <LangSelect onChange={onChangeLang} hideLabel={false} className="w-full !min-h-[52px] text-base" />
@@ -476,7 +481,7 @@ export default function SettingsView({
               )}
             </div>
           </div>
-        </section>
+        </Accordion>
 
         <InstallButton pwa={pwa} quiet />
 

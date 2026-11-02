@@ -14,12 +14,11 @@ export const PRO_FEATURES = Object.freeze(['projects', 'ai']);
 export const SIM_PRO_KEY = 'cp.pro.sim.v1';
 
 // TEMPORARY QUALITY-CONTROL SWITCH. While true, the paywall is open in EVERY environment (production, preview,
-// localhost): isPro() is always true, so the project limit and the AI scanners are unlocked, and the app shows a
-// subtle "MODO PRO (Prueba)" tag as a reminder. Set it to false to bring the paywall back (nothing else to change).
+// localhost): isPro() is always true, so the project limit and the AI scanners are unlocked. The app shows NO badge or label
+// for it (it only adds noise in the field). Set it to false to bring the paywall back (nothing else to change).
 // The test runner (MODE 'test') is the only exception, so the paywall logic stays testable; tests exercise the open
 // state through qaProOpen({ mode }). The AI server proxy keeps its own origin check and rate limits either way.
 export const PRO_QA_OPEN = true;
-export const PRO_QA_LABEL = 'MODO PRO (Prueba)';
 
 /** Is the paywall intentionally open for quality control? (always, except inside the test runner). */
 export const qaProOpen = ({ flag = PRO_QA_OPEN, mode = import.meta.env.MODE } = {}) => Boolean(flag) && mode !== 'test';

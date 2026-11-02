@@ -123,7 +123,8 @@ describe('Ajustes "Zero Stress": main block, quiet logout, invisible autosave', 
     expect(ops.contains(q('settings-cloud'))).toBe(true);
     expect(ops.contains(q('settings-profile'))).toBe(false);
     expect(ops.className).toContain('card'); // the card's subtle border + black fill tie both rows together
-    expect(ops.className).toContain('divide-white/10');
+    expect(ops.tagName).toBe('DETAILS');
+    expect(ops.querySelector(':scope > div').className).toContain('divide-white/10');
     for (const id of ['settings-signature', 'settings-cloud']) {
       const svg = q(id).querySelector('svg[data-outline-icon="true"]');
       expect(svg, id).not.toBeNull();
@@ -311,5 +312,63 @@ describe('Autodetection of language and country (Zero Stress)', () => {
     expect(el.querySelector('[aria-live="polite"]')).not.toBeNull(); // the selected-country summary is already there
     act(() => r.unmount());
     el.remove();
+  });
+});
+
+describe('Ajustes loads almost empty: three closed accordions', () => {
+  it('Azienda e professionista, Operazioni e Sincronizzazione and Lingua e Paese are <details>, all CLOSED, each with a grey icon', async () => {
+    await mount('it');
+    await click(q('nav-settings'));
+    const want = [
+      ['settings-profile', 'Azienda e professionista'],
+      ['settings-ops', 'Operazioni e Sincronizzazione'],
+      ['settings-locale', 'Lingua e Paese'],
+    ];
+    for (const [id, title] of want) {
+      const d = q(id);
+      expect(d.tagName, id).toBe('DETAILS');
+      expect(d.open, id).toBe(false);
+      expect(q(`${id}-summary`).textContent, id).toContain(title);
+      expect(q(`${id}-summary`).querySelector('svg[data-outline-icon="true"]').getAttribute('class'), id).toContain('text-neutral-400');
+      expect(q(`${id}-summary`).className, id).toContain('min-h-[64px]');
+    }
+    // three different icons
+    expect(new Set(want.map(([id]) => q(`${id}-summary`).querySelector('svg').innerHTML)).size).toBe(3);
+    // ops + locale hold exactly what they should
+    expect(q('settings-ops').contains(q('settings-signature'))).toBe(true);
+    expect(q('settings-ops').contains(q('settings-drive'))).toBe(true);
+    expect(q('settings-locale').contains(q('settings-lang'))).toBe(true);
+    expect(q('settings-locale').contains(q('settings-region'))).toBe(true);
+  });
+
+  it('the initial screen has only: the title, the three accordion headers and the quiet bottom buttons (no PRO label, no badges)', async () => {
+    await mount('it');
+    await click(q('nav-settings'));
+    const view = q('settings-view');
+    expect(q('settings-title').textContent).toBe('Impostazioni');
+    expect(view.textContent).not.toMatch(/MODO PRO|PRUEBA|Prueba/i);
+    expect(q('qa-pro-tag')).toBeNull();
+    // everything inside a closed <details> is out of sight; what stays visible is outside any closed details or inside a summary
+    const hidden = (el) => [...view.querySelectorAll('details')].some((d) => !d.open && d.contains(el) && !el.closest('summary'));
+    const visible = [...view.querySelectorAll('button, input, select, [role="switch"], summary')].filter((el) => !hidden(el));
+    const ids = visible.map((el) => el.dataset.testid || el.tagName.toLowerCase());
+    expect(ids).toEqual(expect.arrayContaining(['settings-profile-summary', 'settings-ops-summary', 'settings-locale-summary', 'logout-button']));
+    expect(ids.some((i) => /^settings-(company|pro-name|logo|drive|signature|lang)/.test(i))).toBe(false);
+    expect(visible.length).toBeLessThanOrEqual(5); // 3 summaries + logout (+ install when the app is not installed)
+  });
+
+  it('the open state of an accordion survives the signature canvas (it swaps the screen) and the content is reachable once opened', async () => {
+    await mount();
+    await click(h.tab('Ajustes'));
+    const sum = q('settings-ops-summary');
+    await click(sum);
+    expect(q('settings-ops').open).toBe(true);
+    expect(q('settings-profile').open).toBe(false);
+    await click(q('settings-signature'));
+    expect(q('contractor-sign-sheet')).not.toBeNull();
+    expect(q('settings-ops')).toBeNull();
+    await click(document.querySelector('[data-sheet-close]'));
+    expect(q('settings-ops').open).toBe(true); // still open: not collapsed behind the user's back
+    expect(q('settings-locale').open).toBe(false);
   });
 });

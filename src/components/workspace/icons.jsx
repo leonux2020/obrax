@@ -308,3 +308,19 @@ export const CloudUploadIcon = (props) => (
     <path d="m16 16-4-4-4 4" />
   </Outline>
 );
+
+// Ajustes accordions: a phone (operations / sync) and a globe (language and country).
+export const SmartphoneIcon = (props) => (
+  <Outline {...props}>
+    <rect x="5" y="2" width="14" height="20" rx="2" />
+    <path d="M12 18h.01" />
+  </Outline>
+);
+
+export const GlobeIcon = (props) => (
+  <Outline {...props}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M2 12h20" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+  </Outline>
+);
