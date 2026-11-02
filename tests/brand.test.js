@@ -137,13 +137,13 @@ describe('lettering', () => {
 });
 
 describe('splash + dashboard', () => {
-  it('the welcome screen (first browser visit) draws neither hat, lettering nor credit: hidden name + the button only', async () => {
+  it('the welcome screen (first browser visit) draws the hard-hat logo above the button, no lettering and no credit', async () => {
     await render(React.createElement(SplashScreen, { onStart: () => {}, auto: false }));
     const h1 = host.querySelector('h1');
     expect(h1.textContent).toBe('CUBRAX');
     expect(h1.className).toContain('sr-only');
-    expect(host.querySelector('svg')).toBeNull();
-    expect(host.querySelector('img')).toBeNull();
+    expect(host.querySelector('[data-testid="splash-logo"] img[data-testid="logo-helmet"]')).not.toBeNull();
+    expect(host.querySelector('[data-testid="wordmark"]')).toBeNull();
     expect(host.querySelector('[data-testid="splash-credit"]')).toBeNull();
     expect(host.querySelector('[data-testid="splash-start"]')).not.toBeNull();
   });
