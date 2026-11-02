@@ -98,6 +98,7 @@ describe('Drive backup (device A)', () => {
     await click(h.tab('Ajustes'));
     await click(q('backup-now'));
     await flush(60);
+    await click(h.tab('Proyectos'));
     await createProject('Ultima obra'); // made right before leaving: not uploaded yet
     expect(names()).not.toContain('Ultima obra');
     await click(h.tab('Ajustes'));
@@ -130,6 +131,7 @@ describe('Drive backup (device A)', () => {
     await click(h.tab('Ajustes'));
     await click(q('backup-now'));
     await flush(60);
+    await click(h.tab('Proyectos'));
     await createProject('Sin subir');
     drive.state.offline = true;
     await click(h.tab('Ajustes'));

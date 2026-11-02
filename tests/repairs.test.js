@@ -118,7 +118,7 @@ describe('1. "Instalar App": the install event is captured early and survives la
 
   it('the opening screen and Ajustes both render the button (source check) and the early listener is started in main.jsx', () => {
     expect(read('src/components/SplashScreen.jsx')).toContain('<InstallButton');
-    expect(read('src/components/SettingsSheet.jsx')).toContain('<InstallButton');
+    expect(read('src/components/SettingsView.jsx')).toContain('<InstallButton');
     expect(read('src/main.jsx')).toContain('startInstallCapture()');
   });
 });

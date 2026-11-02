@@ -136,24 +136,37 @@ describe('universal back stack: sheets inside the real app', () => {
     expect(q('project-card')).not.toBeNull(); // now the Dashboard
   });
 
-  it('the Settings sheet over the Dashboard: Back closes it and the app is not reset', async () => {
+  it('Ajustes is a top-level screen (a tab): Back returns to Proyectos, the app is not reset and no layer is left', async () => {
     await click(q('nav-settings'));
-    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(q('settings-view')).not.toBeNull();
+    expect(document.querySelector('[role="dialog"]')).toBeNull(); // not a floating sheet
+    expect(q('project-card')).toBeNull(); // the projects are hidden: the whole viewport is Ajustes
     await deviceBack();
-    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(q('settings-view')).toBeNull();
     expect(q('project-card')).not.toBeNull();
     expect(window.history.state).toBeNull();
     expect(layerDepth()).toBe(0);
   });
 
-  it('closing a sheet with its x or the backdrop leaves no entry behind (no "Back twice")', async () => {
-    const back = vi.spyOn(window.history, 'back');
+  it('switching between tabs keeps ONE history entry: Contabilidad -> Ajustes -> Back lands on Proyectos', async () => {
+    await click(q('nav-accounting'));
     await click(q('nav-settings'));
+    expect(q('settings-view')).not.toBeNull();
+    await deviceBack();
+    expect(q('settings-view')).toBeNull();
+    expect(q('accounting')).toBeNull();
+    expect(q('project-card')).not.toBeNull();
+    expect(window.history.state).toBeNull();
+  });
+
+  it('closing a real sheet with its x or the backdrop leaves no entry behind (no "Back twice")', async () => {
+    const back = vi.spyOn(window.history, 'back');
+    await click(q('fab-new'));
     await click(document.querySelector('[data-sheet-close]'));
     await flush(30);
     expect(back).toHaveBeenCalledTimes(1);
     expect(window.history.state).toBeNull();
-    await click(q('nav-settings'));
+    await click(q('fab-new'));
     await click(q('sheet-backdrop'));
     await flush(30);
     expect(back).toHaveBeenCalledTimes(2);

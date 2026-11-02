@@ -6,7 +6,7 @@ import { createRoot } from 'react-dom/client';
 import fs from 'node:fs';
 import { I18nProvider } from '../src/lib/i18n.jsx';
 import Dashboard from '../src/components/Dashboard.jsx';
-import SettingsSheet from '../src/components/SettingsSheet.jsx';
+import SettingsView from '../src/components/SettingsView.jsx';
 import { PRO_QA_OPEN, PRO_QA_LABEL, qaProOpen, isPro, aiAccess, projectLimitReached, FREE_PROJECT_LIMIT } from '../src/lib/pro.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -60,7 +60,7 @@ describe('PRO paywall open for quality control', () => {
   it('Ajustes carries the same reminder', async () => {
     vi.stubEnv('MODE', 'production');
     vi.stubEnv('DEV', false);
-    await mount(React.createElement(SettingsSheet, { settings: { region: 'CL', lang: 'es' }, user: { name: 'Ana', email: 'a@b.cl', provider: 'local' }, company: null, logo: '', onClose: () => {}, onChange: () => {},  }));
+    await mount(React.createElement(SettingsView, { settings: { region: 'CL', lang: 'es' }, user: { name: 'Ana', email: 'a@b.cl', provider: 'local' }, company: null, logo: '', onClose: () => {}, onChange: () => {},  }));
     expect(q('qa-pro-tag')?.textContent).toBe('MODO PRO (Prueba)');
   });
 

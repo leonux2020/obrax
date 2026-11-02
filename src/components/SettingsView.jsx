@@ -10,20 +10,20 @@ import { PhotoError } from '../lib/photos.js';
 import ProQaTag from './ProQaTag.jsx';
 import { Button, Switch, TextField } from './ui.jsx';
 import GoogleButton from './GoogleButton.jsx';
-import BottomSheet from './BottomSheet.jsx';
 import LangSelect from './LangSelect.jsx';
 import RegionCombobox from './RegionCombobox.jsx';
 import InstallButton from './InstallButton.jsx';
 import ContractorSignatureSheet from './ContractorSignatureSheet.jsx';
 
 /**
- * Ajustes as three OLED cards (black + white/10):
+ * Ajustes: a top-level, full-screen view wired to the bottom navigation tab (never a floating sheet: no close button, no drag;
+ * you leave it by tapping another tab). Three OLED cards (black + white/10):
  *   1. Perfil de Empresa  — logo (tap to change) + name / professional / email / phone
  *   2. Idioma y País      — language and country side by side
  *   3. Google Drive       — the cloud command centre (toggle, account, backup / restore)
  * Advanced profile (tax IDs, signature) stays one tap away via "Editar".
  */
-export default function SettingsSheet({
+export default function SettingsView({
   user,
   company,
   logo,
@@ -38,7 +38,6 @@ export default function SettingsSheet({
   onChangeRegion, // legacy: opens the full-screen picker (kept for callers that still pass it)
   onConfirmRegion = null, // preferred: change country in place without leaving Ajustes
   onLogout,
-  onClose,
   backup = null,
   onBackupNow = null,
   onRestore = null,
@@ -252,8 +251,11 @@ export default function SettingsSheet({
   }
 
   return (
-    <BottomSheet title={t('settings.title')} onClose={onClose}>
-      <div className="mt-3 space-y-4">
+    <div className="min-h-screen bg-black" data-testid="settings-view">
+      <main className="mx-auto w-full max-w-3xl space-y-4 px-3 pb-44 pt-4 sm:px-4">
+        <h1 className="text-2xl font-extrabold" data-testid="settings-title">
+          {t('settings.title')}
+        </h1>
         <ProQaTag className="block text-center" />
 
         {/* ---- 1. Perfil de Empresa ---------------------------------------------------------------------------------- */}
@@ -516,7 +518,7 @@ export default function SettingsSheet({
             </div>
           )}
         </div>
-      </div>
-    </BottomSheet>
+      </main>
+    </div>
   );
 }

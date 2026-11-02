@@ -131,6 +131,7 @@ describe('Restore from Ajustes on a device that already has data', () => {
     await flush(150);
     expect(q('backup-note').textContent).toContain('Respaldo restaurado');
     expect(JSON.parse(localStorage.getItem('cp.company.v1')).name).toBe('Mi empresa local'); // untouched
+    await click(h.tab('Proyectos'));
     expect(cards().join('|')).toContain('Obra de Drive'); // the missing project came back
   });
 

@@ -66,7 +66,7 @@ describe('Drive in the app', () => {
     expect(names()).toEqual(['Uno']);
     requests.length = 0;
     drive.rotate('tok-renewed-9999999'); // Google expired the token the app is holding
-    await click(q('backup-status')?.closest('[role="dialog"]')?.querySelector('[data-sheet-close]') ?? document.querySelector('[data-sheet-close]'));
+    await click(h.tab('Proyectos'));
     await createProject('Dos'); // the user keeps working
     await flush(3600); // debounce -> upload -> 401 -> silent renewal -> same upload again
     expect(requests).toEqual(['none']); // ONE silent request, never the consent screen
@@ -84,7 +84,7 @@ describe('Drive in the app', () => {
     await click(q('backup-now')); // the device is connected to Drive once (first and only consent)
     await flush(60);
     expect(names()).toEqual(['Casa Norte']);
-    await click(document.querySelector('[data-sheet-close]'));
+    await click(h.tab('Proyectos'));
     await createProject('Casa Sur'); // work in the field...
     setOnline(false); // ...without coverage
     await click(h.tab('Ajustes'));

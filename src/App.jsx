@@ -68,7 +68,7 @@ import ProjectFinancialDashboard from './components/ProjectFinancialDashboard.js
 import Dashboard from './components/Dashboard.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import ProjectSheet from './components/ProjectSheet.jsx';
-import SettingsSheet from './components/SettingsSheet.jsx';
+import SettingsView from './components/SettingsView.jsx';
 import { clearOAuthResult, connectDrive, peekOAuthResult } from './lib/oauthCallback.js';
 import SplashScreen from './components/SplashScreen.jsx';
 import ProfileSetup from './components/ProfileSetup.jsx';
@@ -161,8 +161,8 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   const [stage, setStage] = useState(() =>
     !isNewProfile(user, meta, company) ? 'app' : installed ? 'setup' : 'splash'
   );
-  const [sheet, setSheet] = useState(null); // { type: 'new' | 'edit' | 'settings', id? }
-  const [tab, setTab] = useState('projects'); // bottom navigation: 'projects' | 'accounting' (Ajustes is a sheet)
+  const [sheet, setSheet] = useState(null); // { type: 'new' | 'edit', id? }
+  const [tab, setTab] = useState('projects'); // bottom navigation: 'projects' | 'accounting' | 'settings' (all three are top-level screens)
   const [dashTab, setDashTab] = useState('active'); // dashboard tabs: 'active' | 'history'
   const [editor, setEditor] = useState(false); // the technical editor (measures, prices, schedule) of the open project
   const [pickingRegion, setPickingRegion] = useState(false);
@@ -416,9 +416,9 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     closeProject();
   }, [closeProject]);
   useHistoryBack(activeId, leaveByBack);
-  // Bottom navigation: Contabilidad is ONE history entry on top of Proyectos, so the device's Back goes ordered to the previous screen
-  // (Proyectos) instead of leaving the app; tapping "Proyectos" drops that entry. A project / sheet opened over it stacks on top.
-  useHistoryBack(tab === 'accounting' ? 'accounting' : null, () => setTab('projects'), 'cubraxTab');
+  // Bottom navigation: Contabilidad and Ajustes are ONE history entry on top of Proyectos (switching between them replaces it), so the
+  // device's Back goes ordered to the previous screen (Proyectos) instead of leaving the app; tapping "Proyectos" drops that entry.
+  useHistoryBack(tab !== 'projects' ? tab : null, () => setTab('projects'), 'cubraxTab');
 
   // The open project's draft: all wizard / project-view edits flow through here.
   const setDraft = useCallback(
@@ -830,7 +830,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     return setStage('setup');
   };
   const editing = sheet?.type === 'edit' ? projects?.find((p) => p.id === sheet.id) : null;
-  const navActive = sheet?.type === 'settings' ? 'settings' : tab;
+  const navActive = tab;
 
   return (
     <I18nProvider lang={settings.lang} regionCode={active ? active.draft.regionCode : financeProject ? financeProject.draft.regionCode : settings.region}>
@@ -863,7 +863,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
           {projects === null ? (
             <>
               <AppShell />
-              <BottomNav active={navActive} onProjects={() => setTab('projects')} onAccounting={() => setTab('accounting')} onSettings={() => setSheet({ type: 'settings' })} />
+              <BottomNav active={navActive} onProjects={() => setTab('projects')} onAccounting={() => setTab('accounting')} onSettings={() => setTab('settings')} />
             </>
           ) : active ? (
             wsOn ? (
@@ -931,22 +931,42 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
             )
           ) : (
             <>
-              {tab === 'accounting' ? (
+              {tab === 'settings' ? (
+                <SettingsView
+                  user={user}
+                  company={company}
+                  logo={logo}
+                  regionCode={settings.region}
+                  pwa={pwa}
+                  drive={meta.drive}
+                  onDriveChange={changeDrive}
+                  onConnect={connectAndBackup}
+                  onSaveProfile={async (data) => {
+                    await saveProfile(data); // stays on Ajustes: email / phone / logo land in localStorage + IndexedDB and the PDFs
+                  }}
+                  onSignIn={signIn}
+                  onChangeLang={changeLang}
+                  onConfirmRegion={(code) => confirmRegion(code)}
+                  onChangeRegion={() => setPickingRegion(true)}
+                  backup={{ configured: googleConfigured, configStatus: GOOGLE_CONFIG_STATUS, enabled: backupOn, linked: driveLinked, held: Boolean(backup.held), state: backup }}
+                  onBackupNow={async () => {
+                    const r = await sync.flush({ force: true, interactive: true, override: true }); // the user's explicit choice also lifts the hold
+                    if (r.ok) setMeta((m) => (m.drive ? m : { ...m, drive: true }));
+                    return r;
+                  }}
+                  onRestore={() => restoreFromDrive({ interactive: true })}
+                  onLogout={logout}
+                />
+              ) : tab === 'accounting' ? (
                 <GlobalAccounting projects={projects} onOpenProject={setFinanceId} onExportGlobal={submitGlobalRendition} />
               ) : (
                 <Dashboard projects={projects} receiptRows={receipts.rows} tab={dashTab} onTab={setDashTab} onNew={requestNewProject} onOpen={openProject} onPro={() => openPaywall('promo')} />
               )}
               <BottomNav
                 active={navActive}
-                onProjects={() => {
-                  setSheet(null);
-                  setTab('projects');
-                }}
-                onAccounting={() => {
-                  setSheet(null);
-                  setTab('accounting');
-                }}
-                onSettings={() => setSheet({ type: 'settings' })}
+                onProjects={() => setTab('projects')}
+                onAccounting={() => setTab('accounting')}
+                onSettings={() => setTab('settings')}
               />
             </>
           )}
@@ -957,37 +977,6 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
           {sheet?.type === 'new' && <ProjectSheet defaultRegion={settings.region} onSave={createProject} onClose={() => setSheet(null)} />}
           {editing && (
             <ProjectSheet project={editing} onSave={(f) => editProject(editing, f)} onDelete={() => deleteProject(editing.id)} onClose={() => setSheet(null)} />
-          )}
-          {sheet?.type === 'settings' && (
-            <SettingsSheet
-              user={user}
-              company={company}
-              logo={logo}
-              regionCode={settings.region}
-              pwa={pwa}
-              drive={meta.drive}
-              onDriveChange={changeDrive}
-              onConnect={connectAndBackup}
-              onSaveProfile={async (data) => {
-                await saveProfile(data); // stays on Ajustes: email / phone / logo land in localStorage + IndexedDB and the PDFs
-              }}
-              onSignIn={signIn}
-              onChangeLang={changeLang}
-              onConfirmRegion={(code) => confirmRegion(code)}
-              onChangeRegion={() => {
-                setSheet(null);
-                setPickingRegion(true);
-              }}
-              backup={{ configured: googleConfigured, configStatus: GOOGLE_CONFIG_STATUS, enabled: backupOn, linked: driveLinked, held: Boolean(backup.held), state: backup }}
-              onBackupNow={async () => {
-                const r = await sync.flush({ force: true, interactive: true, override: true }); // the user's explicit choice also lifts the hold
-                if (r.ok) setMeta((m) => (m.drive ? m : { ...m, drive: true }));
-                return r;
-              }}
-              onRestore={() => restoreFromDrive({ interactive: true })}
-              onLogout={logout}
-              onClose={() => setSheet(null)}
-            />
           )}
           {paywall && <ProPaywall feature={paywall} onClose={() => setPaywall(null)} />}
           <ToastHost />

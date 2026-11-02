@@ -213,7 +213,8 @@ describe('after onboarding, the profile lives only in Ajustes', () => {
     expect(q('splash')).toBeNull();
     expect(q('company-hint')).toBeNull(); // no long hint text any more
     await click(tab('Ajustes'));
-    expect(document.querySelector('[role="dialog"]').textContent).toContain('Idioma');
+    expect(q('settings-view').textContent).toContain('Idioma'); // a full screen, not a dialog
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 });
 
