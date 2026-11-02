@@ -55,10 +55,10 @@ afterEach(() => {
 });
 
 describe('first run: splash -> setup -> dashboard', () => {
-  it('a brand-new install shows an empty black centre (the OS draws the logo), and one "Iniciar" button', async () => {
+  it('a brand-new install shows the CUBRAX logo above one "Iniciar" button', async () => {
     await mountApp();
     expect(q('splash')).not.toBeNull();
-    expect(host.querySelector('img')).toBeNull(); // neither hat nor lettering: the manifest icon is the logo
+    expect(q('splash-logo').querySelector('img[data-testid="logo-helmet"]')).not.toBeNull(); // the hard hat is on screen
     // "Iniciar" + the "Instalar App" button (hidden once installed), both in the bottom third (thumb zone)
     const buttons = [...host.querySelectorAll('button')].filter((b) => b.dataset.testid !== 'install-app');
     expect(buttons).toHaveLength(1);
@@ -67,7 +67,7 @@ describe('first run: splash -> setup -> dashboard', () => {
     expect(q('install-app').closest('.absolute').className).toContain('bottom-0');
     expect(q('splash-credit')).toBeNull(); // the credit left the welcome screen
     const name = host.querySelector('h1');
-    expect(name.textContent).toBe('CUBRAX'); // only for screen readers: the visible lettering is in the OS icon
+    expect(name.textContent).toBe('CUBRAX'); // the accessible name (the logo itself is decorative)
     expect(name.className).toContain('sr-only');
     expect(host.querySelectorAll('p')).toHaveLength(0); // no tagline, no credit, no text at all
     expect(host.querySelector('header')).toBeNull(); // no app chrome around the splash

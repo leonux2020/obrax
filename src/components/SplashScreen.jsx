@@ -1,13 +1,13 @@
 import { useEffect } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
-import { Button } from './ui.jsx';
+import { Button, Logo } from './ui.jsx';
 import InstallButton from './InstallButton.jsx';
 
 /**
- * Welcome screen, reduced to the minimum. It is ONLY for the first visit in a browser tab (a brand-new profile): plain black, one "Iniciar"
- * button in the thumb zone and the install button. It has no logo, no lettering, no credit, no timer, no animation and no fade-out.
- * An installed app never mounts it (App starts in the main view or the setup), and neither does anybody who already has a profile or a
- * session: the logo of an installed app is the manifest icon the OS draws while the app loads.
+ * Welcome screen, reduced to the minimum. It is ONLY for the first visit in a browser tab (a brand-new profile): plain black, the CUBRAX
+ * logo (hard hat isotype, static, 128 px) centred right above one "Iniciar" button in the thumb zone and the install button. No lettering,
+ * no credit, no timer, no animation and no fade-out. An installed app never mounts it (App starts in the main view or the setup), and
+ * neither does anybody who already has a profile or a session.
  * `auto` (coming back from Google's consent redirect): continue at once, in the same frame, without waiting for a tap or a timer.
  */
 export default function SplashScreen({ onStart, auto = false, pwa = null }) {
@@ -26,6 +26,11 @@ export default function SplashScreen({ onStart, auto = false, pwa = null }) {
       </h1>
       <div className="absolute inset-x-0 bottom-0 z-40 px-6 [padding-bottom:max(2rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto w-full max-w-md">
+          {!auto && (
+            <div className="mx-auto mb-10 flex justify-center" data-testid="splash-logo">
+              <Logo size={128} />
+            </div>
+          )}
           {!auto && (
             <Button className="w-full" onClick={onStart} data-testid="splash-start">
               {t('splash.start')}

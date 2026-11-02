@@ -113,7 +113,13 @@ describe('browser tab', () => {
     expect(q('splash-start').textContent).toBe('Iniciar');
     expect(q('splash').className).toContain('bg-black');
     expect(q('splash-credit')).toBeNull(); // the credit is gone
-    expect(q('splash').querySelector('img')).toBeNull();
+    // the logo (hard hat isotype) is centred right above the buttons, 128 px high, with generous air below
+    const logo = q('splash-logo');
+    expect(logo.className).toMatch(/mx-auto/);
+    expect(logo.className).toMatch(/mb-10/);
+    expect(logo.querySelector('[data-testid="logo"]').style.height).toBe('128px');
+    expect(logo.querySelector('img').getAttribute('src')).toMatch(/helmet\.png$/);
+    expect(logo.compareDocumentPosition(q('splash-start')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // above the button
     expect(q('splash').querySelector('[data-testid="wordmark"]')).toBeNull();
     expect(q('splash-name').className).toContain('sr-only');
     expect(vi.getTimerCount()).toBe(0);
@@ -150,7 +156,7 @@ describe('the component', () => {
   it('the source holds no timer, no credit and no animation; the stylesheet no longer has the fade keyframes', async () => {
     const fs = await import('node:fs');
     const src = fs.readFileSync('src/components/SplashScreen.jsx', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-    expect(src).not.toMatch(/setTimeout|setInterval|animation|transition|splash\.credit|<Logo|<Wordmark|<img/);
+    expect(src).not.toMatch(/setTimeout|setInterval|animation|transition|splash\.credit|<Wordmark|<img/);
     expect(fs.readFileSync('src/index.css', 'utf8')).not.toContain('splash-text-in');
     expect(fs.readFileSync('src/App.jsx', 'utf8')).toContain('isStandalone');
   });
