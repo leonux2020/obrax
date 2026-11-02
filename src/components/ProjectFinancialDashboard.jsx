@@ -156,14 +156,14 @@ export default function ProjectFinancialDashboard({ project, onCloseRendition, o
                               <span className="shrink-0 whitespace-nowrap text-neutral-400" data-testid="fin-expense-date">
                                 {expenseDayLabel(e.date, locale) || day.format(new Date(e.at))}
                               </span>
-                              {/* "Receipt stack": the receipt's own line (the branch / address / note the scan stored) as grey micro-text; nothing when there is none */}
-                              {e.description && (
+                              {/* "Receipt stack": the receipt's own line (the branch / street address the scan read, else the product description) as grey micro-text; nothing when there is none */}
+                              {(e.sucursal || e.description) && (
                                 <>
                                   <span aria-hidden="true" className="shrink-0 text-xs text-neutral-600">
                                     •
                                   </span>
-                                  <span className="min-w-0 max-w-[150px] truncate text-xs text-neutral-500" title={e.description} data-testid="fin-expense-note">
-                                    {e.description}
+                                  <span className="min-w-0 max-w-[150px] truncate text-xs text-neutral-500" title={e.sucursal || e.description} data-testid="fin-expense-note" data-source={e.sucursal ? 'sucursal' : 'description'}>
+                                    {e.sucursal || e.description}
                                   </span>
                                 </>
                               )}

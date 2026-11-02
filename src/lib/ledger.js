@@ -137,6 +137,8 @@ export const normalizeExpenses = (raw) =>
       returned: rental && p.returned === true,
       // transcription of the receipt line (all optional; older records have none): printed date, ISO currency, quantity, unit price
       ...(day(p.date) ? { date: day(p.date) } : {}),
+      // the shop's branch / street address as printed on the receipt (optional; older records have none)
+      ...(sanitizeText(p.sucursal, 80).trim() ? { sucursal: sanitizeText(p.sucursal, 80).trim() } : {}),
       ...(typeof p.currency === 'string' && /^[A-Za-z]{3}$/.test(p.currency.trim()) ? { currency: p.currency.trim().toUpperCase() } : {}),
       ...(amount(p.quantity) !== null ? { quantity: amount(p.quantity) } : {}),
       ...(amount(p.unitPrice) !== null ? { unitPrice: amount(p.unitPrice) } : {}),

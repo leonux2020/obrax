@@ -17,7 +17,7 @@ const day = (v) => (typeof v === 'string' && DAY_RE.test(v.trim()) && !Number.is
 
 /**
  * Clean ONE untrusted receipt (a photo may hold several: see normalizeReceipts):
- *   { isReceipt, currency, supplier, date, purchaseType, total|null, vendorTaxId|null, documentType|null, documentNumber|null,
+ *   { isReceipt, currency, supplier, sucursal|null, date, purchaseType, total|null, vendorTaxId|null, documentType|null, documentNumber|null,
  *     paymentMethod|null, netAmount|null, taxAmount|null, items: [{ description, quantity|null, unitPrice|null, amount, category, returnDate }] }
  * `category` / `purchaseType` are whitelisted (EXPENSE_CATEGORIES): anything unknown becomes the purchase's type or 'other'.
  * `amount` is the LINE TOTAL actually paid (the printed text wins over the model's own number); lines without a
@@ -33,6 +33,8 @@ export function normalizeReceipt(raw) {
     return n !== null && n <= MAX_PRICE * 100 ? Math.round(n * 100) / 100 : null;
   })();
   const supplier = text(src.vendorName || src.supplier, 60); // `vendorName` is what the AI answers; `supplier` is the name already stored / normalised
+  // the branch / street address printed on the paper (null when none): `sucursal` is the key the AI answers and the one we store; `branch` is accepted too
+  const sucursal = text(src.sucursal ?? src.branch, 80) || null;
   // ---- fiscal metadata (audit): null whenever the paper did not show it, never invented ----------------------------------
   const vendorTaxId = cleanFiscalCode(src.vendorTaxId, 24) || null;
   const documentNumber = cleanFiscalCode(src.documentNumber, 32) || null;
@@ -74,12 +76,13 @@ export function normalizeReceipt(raw) {
   // a slip with only a grand total (restaurant, fuel ticket) is still one valid expense
   if (isReceipt && !items.length && total !== null) items.push({ description: '', quantity: null, unitPrice: null, amount: total, category: purchaseType || 'other', returnDate: '' });
   const currency = typeof src.currency === 'string' && /^[A-Za-z]{3}$/.test(src.currency.trim()) ? src.currency.trim().toUpperCase() : '';
-  return { isReceipt, currency, supplier, date: day(src.receiptDate) || day(src.date), purchaseType, total, vendorTaxId, documentType, documentNumber, paymentMethod, netAmount, taxAmount, items };
+  return { isReceipt, currency, supplier, sucursal, date: day(src.receiptDate) || day(src.date), purchaseType, total, vendorTaxId, documentType, documentNumber, paymentMethod, netAmount, taxAmount, items };
 }
 
 /** The document-level data of a receipt that every expense line copies (what the callers pass to expensesFromRows). */
 export const receiptMeta = (receipt) => ({
   supplier: receipt?.supplier || '',
+  sucursal: receipt?.sucursal ?? null,
   date: receipt?.date || '',
   currency: receipt?.currency || '',
   vendorTaxId: receipt?.vendorTaxId ?? null,
@@ -95,7 +98,8 @@ export const receiptMeta = (receipt) => ({
  * The document's NET and TAX are PRORATED over the lines by their share of the total (net + tax), so every line carries its own
  * net / tax and the columns add up to the document's figures however many lines the user keeps.
  */
-export function expensesFromRows(rows, { supplier = '', date = '', currency = '', vendorTaxId = null, documentType = null, documentNumber = null, paymentMethod = null, netAmount = null, taxAmount = null, now = Date.now() } = {}) {
+export function expensesFromRows(rows, { supplier = '', sucursal = null, date = '', currency = '', vendorTaxId = null, documentType = null, documentNumber = null, paymentMethod = null, netAmount = null, taxAmount = null, now = Date.now() } = {}) {
+  const branch = text(sucursal, 80);
   const taxId = cleanFiscalCode(vendorTaxId, 24);
   const folio = cleanFiscalCode(documentNumber, 32);
   const kind = oneOfOrEmpty(documentType, DOCUMENT_TYPES);
@@ -122,6 +126,7 @@ export function expensesFromRows(rows, { supplier = '', date = '', currency = ''
         ...(/^[A-Z]{3}$/.test(currency) ? { currency } : {}),
         ...(r.quantity > 0 ? { quantity: r.quantity } : {}),
         ...(r.unitPrice > 0 ? { unitPrice: r.unitPrice } : {}),
+        ...(branch ? { sucursal: branch } : {}), // where the purchase was made (for warranty returns)
         // fiscal metadata (see normalizeExpenses): only what the paper showed
         ...(taxId ? { vendorTaxId: taxId } : {}),
         ...(kind ? { documentType: kind } : {}),
