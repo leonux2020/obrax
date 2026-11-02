@@ -9,7 +9,7 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'dot', '0', 'back'];
  * The app's own numeric pad (the OS keyboard never opens): prices, daily rental rates, crew size, days, advances.
  * Every keystroke that makes a valid number calls `onChange(n)` at once, so the quote recalculates while the user types;
  * an empty / zero value applies nothing. `max` refuses a digit that would go over it. Big keys, bottom of the screen,
- * reachable with the thumb.
+ * reachable with the thumb: keys are h-16 (64 px) and the "Confirm" button is a full-width 72 px block.
  *
  *   title / unit   header line and the small "per m³" caption     foot   the line under the display (where the number goes)
  *   top            optional node above the title (the supplier tags of the price pads)
@@ -41,7 +41,7 @@ export default function NumberPad({ title, unit = '', value, decimals = 2, max =
         disabled={k === 'dot' && decimals === 0}
         aria-label={k === 'back' ? t('ws.pad.backspace') : label}
         data-testid={`pad-${k}`}
-        className="flex min-h-[60px] items-center justify-center rounded-xl border border-white/15 text-2xl font-bold text-[#E0E0E0] transition active:scale-95 active:border-white/50 disabled:opacity-30"
+        className="flex h-16 min-w-16 items-center justify-center rounded-xl border border-white/20 text-3xl font-bold text-white transition active:scale-95 active:border-white/60 disabled:opacity-30"
       >
         {label}
       </button>
@@ -64,11 +64,11 @@ export default function NumberPad({ title, unit = '', value, decimals = 2, max =
         <div className="grid grid-cols-3 gap-2">{KEYS.map(key)}</div>
         <div className={`mt-2 grid gap-2 ${onReset ? 'grid-cols-2' : 'grid-cols-1'}`}>
           {onReset && (
-            <button type="button" onClick={onReset} data-testid="pad-reset" className="min-h-[52px] rounded-xl border border-white/15 px-3 text-sm font-bold text-[#E0E0E0]/80 active:border-white/50">
+            <button type="button" onClick={onReset} data-testid="pad-reset" className="min-h-[72px] rounded-2xl border border-white/20 px-3 text-sm font-bold text-[#E0E0E0]/80 active:border-white/50">
               {t('ws.pad.reset')}
             </button>
           )}
-          <button type="button" onClick={onClose} data-testid="pad-done" className="min-h-[52px] rounded-xl border-2 border-brand px-3 text-base font-extrabold text-brand active:scale-[0.98]">
+          <button type="button" onClick={onClose} data-testid="pad-done" className="min-h-[72px] rounded-2xl bg-brand px-3 text-2xl font-black text-black transition active:scale-[0.98]">
             {t('ws.pad.ok')}
           </button>
         </div>

@@ -9,11 +9,27 @@ export const CLIENT = 'test-client-123.apps.googleusercontent.com';
 export const q = (id) => document.querySelector(`[data-testid="${id}"]`);
 export const flush = (ms = 30) => act(async () => { await new Promise((r) => setTimeout(r, ms)); });
 export const click = (el) => act(async () => { el.dispatchEvent(new MouseEvent('click', { bubbles: true })); await new Promise((r) => setTimeout(r, 5)); });
-export const typeInto = (input, value) =>
+const setNative = (input, value) =>
   act(() => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
+
+// Numeric fields never open the OS keyboard: they are read-only and a tap opens the app's NumberPad. For those fields `typeInto`
+// does what a thumb does: open the pad, (reset if needed,) press the keys, confirm. Plain text fields keep the native path.
+export const typeInto = async (input, value) => {
+  if (input.dataset?.numpad !== 'true') return setNative(input, value);
+  const text = String(value);
+  await click(input);
+  const pad = document.querySelector('[data-testid="field-numpad"]');
+  const press = (id) => click(pad.querySelector(`[data-testid="pad-${id}"]`));
+  if (text === '') {
+    await click(pad.querySelector('[data-testid="pad-reset"]'));
+    return;
+  }
+  for (const ch of text) await press(ch === '.' || ch === ',' ? 'dot' : ch);
+  await click(pad.querySelector('[data-testid="pad-done"]'));
+};
 
 // The project workspace has NO back arrow: the device's back (Android gesture / button, browser arrow) leaves it. history.back() is the
 // real thing: useHistoryBack pushed an entry when the project opened.

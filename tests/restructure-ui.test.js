@@ -2,6 +2,7 @@
 // The restructured screens: Dashboard + cards, new-project sheet, the project interior, the AI receipt flow
 // and the global accounting export.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { typeInto as padType } from './helpers/appHarness.js';
 import React, { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { I18nProvider } from '../src/lib/i18n.jsx';
@@ -25,7 +26,7 @@ const click = async (el) => {
   await flush();
 };
 const type = (el, value) =>
-  act(() => {
+  el.dataset?.numpad === 'true' ? padType(el, value) : act(() => {
     const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
     Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, value);
     el.dispatchEvent(new Event('input', { bubbles: true }));

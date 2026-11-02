@@ -3,8 +3,8 @@ import { useId } from 'react';
 /**
  * Minimal percentage control: the title, ONE continuous range slider and the current number in a green pill above the right end of the rail
  * (a single thumb, no preset buttons). The value is always an integer inside [min, max].
- * `disabled` (read-only): the rail is dimmed and the pill drops the bright green for a white outline, but the NUMBER keeps full contrast
- * so it stays readable in the sun.
+ * `disabled` (read-only): fill and handle turn CEMENT GREY (#737373, see index.css) instead of a dimmed green, and the pill drops the
+ * bright green for a white outline; the NUMBER stays pure white at full contrast so it is readable in the sun. Only unlocked = green.
  */
 export default function PercentSlider({ label, value, min = 0, max = 100, step = 1, suffix = '%', onChange, testId, disabled = false }) {
   const id = useId();
@@ -26,7 +26,7 @@ export default function PercentSlider({ label, value, min = 0, max = 100, step =
       <input
         id={id}
         type="range"
-        className={`slider-min ${disabled ? 'opacity-60' : ''}`}
+        className={`slider-min ${disabled ? 'slider-locked' : ''}`}
         disabled={disabled}
         min={min}
         max={max}

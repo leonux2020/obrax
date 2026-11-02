@@ -134,6 +134,26 @@ input[type='range'].slider-min::-moz-range-thumb {
   background: #22c55e;
   border: 0;
 }
+/* READ-ONLY (locked) state: no green at all. Fill, handle and focus ring turn CEMENT GREY so "can't touch" is unmistakable,
+   not just a dimmer green. The number keeps full contrast (see PercentSlider). */
+input[type='range'].slider-min:disabled {
+  cursor: not-allowed;
+}
+input[type='range'].slider-min:disabled::-webkit-slider-runnable-track {
+  background: linear-gradient(to right, #737373 0, #737373 var(--p, 0%), rgba(255, 255, 255, 0.12) var(--p, 0%), rgba(255, 255, 255, 0.12) 100%);
+}
+input[type='range'].slider-min:disabled::-webkit-slider-thumb {
+  background: #737373;
+}
+input[type='range'].slider-min:disabled::-moz-range-progress {
+  background: #737373;
+}
+input[type='range'].slider-min:disabled::-moz-range-thumb {
+  background: #737373;
+}
+input[type='range'].slider-min:disabled:focus-visible {
+  outline-color: #737373;
+}
 input[type='range'].slider-min:focus-visible {
   outline: 2px solid #22c55e;
   outline-offset: 2px;

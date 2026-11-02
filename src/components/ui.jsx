@@ -1,6 +1,6 @@
-import { useEffect, useId, useState } from 'react';
+import { useId, useState } from 'react';
 import { LETTER_PATHS, MARK_LAYOUT, DIM_ART, RULER_ART, HELMET_FILE, WORD, WORD_BOX, WORD_VIEWBOX, BRAND } from '../brand/icon.js';
-import { sanitizeNumericText, parseDecimal } from '../lib/sanitize.js';
+import NumberPad from './workspace/NumberPad.jsx';
 
 /** The CUBRAX isotype (dimension line + 3/4 hard hat + ruler, vector, transparent): `size` is its HEIGHT in px. */
 export function Logo({ size = 40, className = '' }) {
@@ -74,8 +74,9 @@ export function Button({ variant = 'primary', className = '', type = 'button', .
 }
 
 /**
- * Numeric input with strict sanitization: only digits and one decimal mark can ever be entered.
- * Emits a number (or null). Range validation is reported through `error` by the parent.
+ * Numeric field that NEVER opens the OS keyboard: the input is read-only with inputMode="none", and tapping it (or Enter / Space)
+ * slides up the app's own NumberPad (big keys, backspace, a giant "Confirm"). Every valid keystroke calls `onChange(n)` at once;
+ * "Reset" empties the field (null). Emits a number (or null). Range validation is reported through `error` by the parent.
  */
 export function NumberField({
   label,
@@ -89,24 +90,13 @@ export function NumberField({
   optional,
   hideLabel = false,
   className = '',
+  testId,
   'aria-label': ariaLabel,
 }) {
   const id = useId();
-  const [text, setText] = useState(value === null || value === undefined ? '' : String(value));
-
-  // keep text in sync with external changes (reset, task switch) without fighting the user's typing
-  useEffect(() => {
-    const parsed = parseDecimal(text);
-    const ext = value === undefined ? null : value;
-    if (parsed !== ext) setText(ext === null ? '' : String(ext));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
-
-  const handle = (e) => {
-    const clean = sanitizeNumericText(e.target.value, decimals);
-    setText(clean);
-    onChange(parseDecimal(clean));
-  };
+  const [open, setOpen] = useState(false);
+  const shown = value === null || value === undefined ? '' : String(value);
+  const title = label || ariaLabel || '';
 
   return (
     <div className={className}>
@@ -120,18 +110,27 @@ export function NumberField({
         <input
           id={id}
           type="text"
-          inputMode="decimal"
+          inputMode="none"
+          readOnly
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
-          maxLength={12}
-          value={text}
+          value={shown}
           placeholder={placeholder}
-          onChange={handle}
+          onClick={() => setOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setOpen(true);
+            }
+          }}
+          aria-haspopup="dialog"
           aria-invalid={error ? 'true' : 'false'}
           aria-label={hideLabel ? ariaLabel || label : undefined}
           aria-describedby={error || hint ? `${id}-msg` : undefined}
-          className={`field-input ${unit ? 'pr-16' : ''}`}
+          data-testid={testId}
+          data-numpad="true"
+          className={`field-input cursor-pointer ${unit ? 'pr-16' : ''}`}
         />
         {unit && (
           <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-base font-semibold text-neutral-300">
@@ -143,6 +142,22 @@ export function NumberField({
         <p id={`${id}-msg`} className={`mt-1.5 text-sm ${error ? 'font-semibold text-red-400' : 'text-neutral-400'}`}>
           {error || hint}
         </p>
+      )}
+      {open && (
+        <NumberPad
+          testId="field-numpad"
+          title={title}
+          unit={unit || ''}
+          value={typeof value === 'number' ? value : null}
+          decimals={decimals}
+          foot={hint && !error ? hint : ''}
+          onChange={onChange}
+          onReset={() => {
+            onChange(null);
+            setOpen(false);
+          }}
+          onClose={() => setOpen(false)}
+        />
       )}
     </div>
   );

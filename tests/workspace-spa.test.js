@@ -318,7 +318,7 @@ describe('Parametri del preventivo: error-prevention lock', () => {
     expect(params.dataset.safe).toBe('true');
     for (const k of ['labor', 'transport', 'contingency', 'profit']) {
       expect(q(`slider-${k}-input`).disabled).toBe(true);
-      expect(q(`slider-${k}-input`).className).toContain('opacity-60');
+      expect(q(`slider-${k}-input`).className).toContain('slider-locked'); // cement grey rail, not a dimmed green
       expect(q(`slider-${k}-value`).className).toContain('text-white'); // the number is not dimmed
       expect(q(`slider-${k}-value`).className).not.toContain('bg-brand');
     }

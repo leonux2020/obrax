@@ -2,6 +2,7 @@
 // "Cerrar Rendición": the Excel (Hoja 1 financial summary + Hoja 2 expense detail) goes to Drive and is NEVER downloaded; with no connection or when
 // Drive fails it is parked in IndexedDB (exportQueue) and uploaded by the background sync. Plus the "Adelantos / Caja chica" fund of the project.
 import 'fake-indexeddb/auto';
+import { typeInto as padType } from './helpers/appHarness.js';
 import { IDBFactory } from 'fake-indexeddb';
 import { Blob as NodeBlob } from 'node:buffer';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -377,7 +378,7 @@ describe('ProjectFinancialDashboard + the Contabilidad card', () => {
     await flush();
   };
   const type = (el, value) =>
-    act(() => {
+    el.dataset?.numpad === 'true' ? padType(el, value) : act(() => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, value);
       el.dispatchEvent(new Event('input', { bubbles: true }));
     });

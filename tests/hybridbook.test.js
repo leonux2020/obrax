@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 // "Libro Maestro Híbrido": user price (1) > live AI price (2) > local simulation (3); editable inputs; persistence.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { typeInto as padType } from './helpers/appHarness.js';
 import React, { act, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { I18nProvider } from '../src/lib/i18n.jsx';
@@ -177,7 +178,7 @@ describe('2. editable prices in the price screen', () => {
   const q = (id) => document.querySelector(`[data-testid="${id}"]`);
   const probe = {};
   const typeInto = (input, value) =>
-    act(async () => {
+    input.dataset?.numpad === 'true' ? padType(input, value) : act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value);
       input.dispatchEvent(new Event('input', { bubbles: true }));
       await new Promise((r) => setTimeout(r, 5));
