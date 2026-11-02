@@ -1,7 +1,7 @@
 import { useReducer } from 'react';
 import { useBackLayer } from '../../lib/backStack.js';
 import { useI18n } from '../../lib/i18n.jsx';
-import { padDisplay, padInit, padReduce, padValue } from '../../lib/numpad.js';
+import { padDisplay, padInit, padIsZero, padReduce, padValue } from '../../lib/numpad.js';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'dot', '0', 'back'];
 
@@ -57,7 +57,15 @@ export default function NumberPad({ title, unit = '', value, decimals = 2, max =
           <p className="min-w-0 flex-1 truncate text-sm font-bold text-[#E0E0E0]/80">{title}</p>
           <p className="text-xs text-[#E0E0E0]/60">{unit}</p>
         </div>
-        <p data-testid="pad-display" data-value={state.text} className="my-2 truncate text-right text-5xl font-black tabular-nums text-[#E0E0E0]" aria-live="polite">
+        {/* nothing typed yet: the "0" is a dim placeholder; the moment a key is pressed (even a "0") the number turns solid white = visible feedback */}
+        <p
+          data-testid="pad-display"
+          data-value={state.text}
+          data-empty={state.text === '' ? 'true' : undefined}
+          data-zero={padIsZero(state) ? 'true' : undefined}
+          className={`my-2 truncate text-right text-5xl font-black tabular-nums ${state.text === '' ? 'text-white/30' : 'text-white'}`}
+          aria-live="polite"
+        >
           {padDisplay(state, locale)}
         </p>
         <p className="mb-3 min-h-[1rem] text-right text-xs text-[#E0E0E0]/60">{foot}</p>

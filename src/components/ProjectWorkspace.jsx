@@ -3,7 +3,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { useMarketClock } from '../lib/marketClock.js';
 import { computeAll } from '../lib/engine.js';
 import { freezeSignature, pricingTime, planningTimeline } from '../lib/signature.js';
-import { LEDGER_LIMITS, cashSummary, liquidity, newEntryId, withProjectContext } from '../lib/ledger.js';
+import { LEDGER_LIMITS, cashSummary, liquidity, newEntryId, projectMarket, withProjectContext } from '../lib/ledger.js';
 import { MAX_PARTIDAS, newPartida } from '../lib/draft.js';
 import { TASKS, defaultDims } from '../lib/tasks.js';
 import { projectClient, projectTitle } from '../lib/projects.js';
@@ -211,7 +211,7 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
         <LogBlock entries={project.logbook} onChange={setList('logbook')} open={ui.open.log} onToggle={toggle} projectId={project.id} />
         <ExpensesBlock expenses={project.expenses} queued={queued} receipts={receipts} onChange={setList('expenses')} open={ui.open.expenses} onToggle={toggle} />
         {/* machinery has no module of its own: each task lists the machines it uses; exceptions surface in the tray */}
-        <AlertTray alerts={projectAlerts(project, t)} />
+        <AlertTray alerts={projectAlerts(project, t, { now: Date.now(), budget: result.valid ? total : null, fits: result.valid ? result.schedule.plan.fits : null, queue: queued, money: (n) => i18n.moneyIn(n, projectMarket(project).currency) })} />
       </div>
 
       <Dock onOpen={openDock} queued={queued.filter((r) => r.status === 'pending' || r.status === 'sending').length} />

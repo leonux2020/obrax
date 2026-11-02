@@ -33,6 +33,7 @@ export default function GlobalAlerts({ alerts = [], onOpen, onClose }) {
                 type="button"
                 onClick={() => onOpen?.(a.projectId)}
                 data-testid="global-alert"
+                data-kind={a.kind}
                 className="flex min-h-[56px] w-full items-center gap-3 rounded-xl border border-amber-500/30 bg-black px-3 py-3 text-left text-amber-500 active:border-amber-500/70"
               >
                 <AlertTriangleIcon size={22} />

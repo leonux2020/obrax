@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { projectAlerts } from '../lib/alerts.js';
+import { projectSummary } from '../lib/projectTotals.js';
+import { projectMarket } from '../lib/ledger.js';
 import { isClosed, projectLevel, projectTitle, sortProjects } from '../lib/projects.js';
 import { usePro } from '../lib/usePro.js';
 import { Logo, Wordmark } from './ui.jsx';
@@ -39,9 +41,9 @@ const PILLS = [
  * Main view. Header (logo + "Proyectos" on one line, a discreet PRO badge), four colour counters instead of a
  * sentence, the Activos / Historial tabs and one full-width card per job. "Nuevo proyecto" is the FAB.
  */
-export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro }) {
+export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro, receiptRows = [] }) {
   const pro = usePro();
-  const { t } = useI18n();
+  const { t, moneyIn } = useI18n();
   const now = useNow();
   const [alertsOpen, setAlertsOpen] = useState(false);
 
@@ -52,8 +54,18 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro }
     return { active: sortProjects(a, now), history: [...h].sort((x, y) => y.closedAt - x.closedAt) };
   }, [projects, now]);
 
-  // the Action Center: every real exception of every open project (none => the quiet "no alarms" screen)
-  const alerts = useMemo(() => active.flatMap((p) => projectAlerts(p, t, now).map((a) => ({ ...a, id: `${p.id}:${a.id}`, projectId: p.id, project: projectTitle(p) || t('proj.untitled') }))), [active, t, now]);
+  // the Action Center: every real exception of every open project (overdue deadline, late collection, rental due, receipt to review);
+  // none => the quiet "no alarms" screen. Budget and schedule fit come from the same engine the project screens use.
+  const alerts = useMemo(
+    () =>
+      active.flatMap((p) => {
+        const { total, fits } = projectSummary(p, now);
+        const currency = projectMarket(p).currency;
+        return projectAlerts(p, t, { now, budget: total, fits, queue: receiptRows, money: (n) => moneyIn(n, currency) }).map((a) => ({ ...a, id: `${p.id}:${a.id}`, projectId: p.id, project: projectTitle(p) || t('proj.untitled') }));
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [active, t, now, receiptRows]
+  );
 
   const counts = useMemo(() => {
     const c = { red: 0, orange: 0, green: 0, future: 0 };

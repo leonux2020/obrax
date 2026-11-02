@@ -17,6 +17,8 @@ export default function AlertTray({ alerts }) {
           key={a.id}
           role="alert"
           data-testid="ws-alert"
+          data-kind={a.kind}
+          data-level={a.level}
           className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-black px-3 py-3 text-amber-500"
         >
           <AlertTriangleIcon size={22} />

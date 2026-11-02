@@ -932,7 +932,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
               {tab === 'accounting' ? (
                 <GlobalAccounting projects={projects} onOpenProject={setFinanceId} onExportGlobal={submitGlobalRendition} />
               ) : (
-                <Dashboard projects={projects} tab={dashTab} onTab={setDashTab} onNew={requestNewProject} onOpen={openProject} onPro={() => openPaywall('promo')} />
+                <Dashboard projects={projects} receiptRows={receipts.rows} tab={dashTab} onTab={setDashTab} onNew={requestNewProject} onOpen={openProject} onPro={() => openPaywall('promo')} />
               )}
               <BottomNav
                 active={navActive}

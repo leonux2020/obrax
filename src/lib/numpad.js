@@ -42,6 +42,13 @@ export function padValue(state) {
   return Number.isFinite(n) && n > 0 && n <= MAX_PRICE ? n : null;
 }
 
+/**
+ * The pad is in a TRANSIENT ZERO: the user typed "0" (or "0.", "0.0"...) and has not typed a significant digit yet. It is a real, visible
+ * state ("0" on the display, "0." after the point, a digit replaces it) but not an applicable amount: padValue() stays null, so a price
+ * or a quantity never becomes 0 by accident while the user is still on the way to "0.5" or "7".
+ */
+export const padIsZero = (state) => /^0(\.0*)?$/.test(state.text);
+
 /** Text to show in the display, with the region's decimal separator and thousands grouping on the integer part. */
 export function padDisplay(state, locale = 'en') {
   if (!state.text) return '0';
