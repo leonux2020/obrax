@@ -1,17 +1,17 @@
+import { useI18n } from '../../lib/i18n.jsx';
 import { AlertTriangleIcon } from './icons.jsx';
 
 /**
  * "Bandeja de Alertas": the end of Zone B, under every module. Exception-based UI: the modules stay quiet and anything that needs
  * attention (a rented machine due back, ...) surfaces here, in amber, with a warning icon.
  *
- * TEMPORARY MOCKUP: the single alert below is static text so the layout can be judged. Later this tray renders conditionally: one row
- * per real exception (e.g. `rentalsDue(project)`), and nothing at all when there are none.
+ * It renders ONLY when the project has real exceptions (`alerts`, see lib/alerts.js): with none it returns null (absolute visual silence).
  */
-const MOCK_ALERTS = Object.freeze([{ id: 'mock-rental', text: 'RESTITUZIONE MACCHINARIO: ESCAVATORE (SCADE OGGI)' }]);
-
-export default function AlertTray({ alerts = MOCK_ALERTS }) {
+export default function AlertTray({ alerts }) {
+  const { t } = useI18n();
+  if (!(alerts?.length > 0)) return null;
   return (
-    <section aria-label="Alertas" data-testid="ws-alerts" className="space-y-2">
+    <section aria-label={t('ws.alerts.title')} data-testid="ws-alerts" className="space-y-2">
       {alerts.map((a) => (
         <div
           key={a.id}

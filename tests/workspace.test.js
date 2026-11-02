@@ -398,22 +398,32 @@ describe('no way out to the old editor + queue list', () => {
     expect(q('partida-summary-0').querySelector('svg')).not.toBeNull();
     // the modules appear in this order
     const order = [...document.querySelectorAll('[data-testid="ws-zone-b"], [data-testid="ws-crew"], [data-testid="ws-finance"], [data-testid="ws-cash"], [data-testid="ws-log"], [data-testid="ws-expenses"], [data-testid="ws-alerts"]')].map((n) => n.dataset.testid);
-    expect(order).toEqual(['ws-zone-b', 'ws-crew', 'ws-finance', 'ws-cash', 'ws-log', 'ws-expenses', 'ws-alerts']);
+    expect(order).toEqual(['ws-zone-b', 'ws-crew', 'ws-finance', 'ws-cash', 'ws-log', 'ws-expenses']); // no exceptions => no tray
   });
 
-  it('the alert tray closes the list: one amber mock alert with a warning icon, on black with a subtle border', async () => {
+  it('no exceptions: the alert tray is not rendered at all (absolute visual silence)', async () => {
     await mount({ initial: mk() });
+    expect(q('ws-alerts')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/ESCAVATORE|RESTITUZIONE/i);
+  });
+
+  it('a rental due today surfaces as an amber alert (real data, no mock text) under the last module; returning it silences the tray', async () => {
+    const rental = { id: 'r1', description: 'Excavadora', category: 'machinery_rental', supplier: '', amount: 90000, returnDate: toDayString(new Date()), returned: false };
+    await mount({ initial: mk({ expenses: [rental] }) });
     const tray = q('ws-alerts');
     expect(tray).not.toBeNull();
     expect(tray.previousElementSibling.dataset.testid).toBe('ws-expenses'); // directly under the last module
     expect(tray.nextElementSibling).toBeNull(); // and last in the list
     const alert = q('ws-alert');
-    expect(alert.textContent).toBe('RESTITUZIONE MACCHINARIO: ESCAVATORE (SCADE OGGI)');
+    expect(alert.textContent).toBe('Devolución de Excavadora: vence hoy');
+    expect(alert.textContent).not.toMatch(/ESCAVATORE/i);
     expect(alert.className).toContain('text-amber-500');
     expect(alert.className).toMatch(/border-amber-500\/30/);
     expect(alert.className).toContain('bg-black');
     expect(alert.querySelector('svg[data-outline-icon="true"]')).not.toBeNull(); // the warning triangle
     expect(alert.querySelector('svg').getAttribute('stroke')).toBe('currentColor');
+    await click(q('expense-return-r1')); // returned
+    expect(q('ws-alerts')).toBeNull();
   });
 
   it('receipts waiting for a connection are listed with their state, badge on the dock, and can be discarded / retried', async () => {

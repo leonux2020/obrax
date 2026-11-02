@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
-import { isClosed, projectLevel, sortProjects } from '../lib/projects.js';
+import { projectAlerts } from '../lib/alerts.js';
+import { isClosed, projectLevel, projectTitle, sortProjects } from '../lib/projects.js';
 import { usePro } from '../lib/usePro.js';
 import { Logo, Wordmark } from './ui.jsx';
 import HelmetIcon from './HelmetIcon.jsx';
 import { LEVEL_COLOR } from './levelStyle.js';
 import ProjectCard from './ProjectCard.jsx';
+import GlobalAlerts from './GlobalAlerts.jsx';
+import { BellIcon } from './workspace/icons.jsx';
 
 /** Re-render once a minute (and when the tab becomes visible) so the traffic lights never go stale. */
 function useNow(intervalMs = 60_000) {
@@ -40,6 +43,7 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro }
   const pro = usePro();
   const { t } = useI18n();
   const now = useNow();
+  const [alertsOpen, setAlertsOpen] = useState(false);
 
   const { active, history } = useMemo(() => {
     const a = [];
@@ -47,6 +51,9 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro }
     for (const p of projects) (isClosed(p) ? h : a).push(p);
     return { active: sortProjects(a, now), history: [...h].sort((x, y) => y.closedAt - x.closedAt) };
   }, [projects, now]);
+
+  // the Action Center: every real exception of every open project (none => the quiet "no alarms" screen)
+  const alerts = useMemo(() => active.flatMap((p) => projectAlerts(p, t, now).map((a) => ({ ...a, id: `${p.id}:${a.id}`, projectId: p.id, project: projectTitle(p) || t('proj.untitled') }))), [active, t, now]);
 
   const counts = useMemo(() => {
     const c = { red: 0, orange: 0, green: 0, future: 0 };
@@ -68,6 +75,18 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro }
         <span className="flex min-w-0 flex-1 items-center">
           <Wordmark height={16} />
         </span>
+        {/* global alerts (Action Center): bell, 1.5 px outline, just left of PRO; an amber dot only when something needs attention */}
+        <button
+          type="button"
+          onClick={() => setAlertsOpen(true)}
+          aria-label={t('ws.alerts.title')}
+          data-testid="dash-bell"
+          data-alerts={alerts.length || undefined}
+          className="relative flex min-h-[52px] min-w-[52px] items-center justify-center rounded-xl border border-white/15 text-white/60 transition active:border-white/50 active:text-white"
+        >
+          <BellIcon size={26} />
+          {alerts.length > 0 && <span aria-hidden="true" data-testid="dash-bell-dot" className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-amber-500" />}
+        </button>
         {/* PRO: always a real button that opens the plans screen (also when PRO is already active). Gold hard hat on top. */}
         <button
           type="button"
@@ -156,6 +175,16 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro }
           <path d="M12 5v14M5 12h14" />
         </svg>
       </button>
+      {alertsOpen && (
+        <GlobalAlerts
+          alerts={alerts}
+          onClose={() => setAlertsOpen(false)}
+          onOpen={(id) => {
+            setAlertsOpen(false);
+            onOpen(id);
+          }}
+        />
+      )}
     </main>
   );
 }

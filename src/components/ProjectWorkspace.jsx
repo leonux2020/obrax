@@ -34,6 +34,7 @@ import FinanceBlock from './workspace/FinanceBlock.jsx';
 import LogBlock from './workspace/LogBlock.jsx';
 import HeaderZone from './workspace/HeaderZone.jsx';
 import AlertTray from './workspace/AlertTray.jsx';
+import { projectAlerts } from '../lib/alerts.js';
 import SupplierPad from './workspace/SupplierPad.jsx';
 import PartidaList from './workspace/PartidaList.jsx';
 
@@ -210,7 +211,7 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
         <LogBlock entries={project.logbook} onChange={setList('logbook')} open={ui.open.log} onToggle={toggle} projectId={project.id} />
         <ExpensesBlock expenses={project.expenses} queued={queued} receipts={receipts} onChange={setList('expenses')} open={ui.open.expenses} onToggle={toggle} />
         {/* machinery has no module of its own: each task lists the machines it uses; exceptions surface in the tray */}
-        <AlertTray />
+        <AlertTray alerts={projectAlerts(project, t)} />
       </div>
 
       <Dock onOpen={openDock} queued={queued.filter((r) => r.status === 'pending' || r.status === 'sending').length} />
