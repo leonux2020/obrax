@@ -36,7 +36,7 @@ export default function ProPaywall({ feature = 'promo', onClose }) {
       <div data-testid="pro-paywall" className="mx-auto max-w-lg pb-4">
         <div className="mb-5 mt-1 flex items-center gap-2 text-[#e8c35f]">
           <HelmetIcon size={32} />
-          <span className="rounded-md border border-[#d4af37]/60 px-1.5 text-[11px] font-extrabold tracking-wider">PRO</span>
+          <span className="rounded-md border border-[#d4af37]/60 px-1.5 text-[11px] font-semibold tracking-wider">PRO</span>
         </div>
 
         {pro && (
@@ -51,7 +51,7 @@ export default function ProPaywall({ feature = 'promo', onClose }) {
           </p>
         )}
 
-        <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-neutral-400">{t('pro.benefits')}</h3>
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-400">{t('pro.benefits')}</h3>
         <ul className="mb-6 divide-y divide-white/10 rounded-2xl border border-white/10" data-testid="pro-benefits">
           {BENEFITS.map((b) => (
             <li
@@ -63,14 +63,14 @@ export default function ProPaywall({ feature = 'promo', onClose }) {
                 <path d={b.icon} />
               </svg>
               <div>
-                <p className="font-bold text-white">{t(`pro.b.${b.id}`)}</p>
+                <p className="font-semibold text-neutral-200">{t(`pro.b.${b.id}`)}</p>
                 <p className="mt-0.5 text-sm text-neutral-300">{t(`pro.b.${b.id}.desc`)}</p>
               </div>
             </li>
           ))}
         </ul>
 
-        <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-neutral-400" id="pro-plans-label">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-400" id="pro-plans-label">
           {t('pro.plans')}
         </h3>
         <div role="radiogroup" aria-labelledby="pro-plans-label" className="flex flex-col gap-3">
@@ -91,9 +91,9 @@ export default function ProPaywall({ feature = 'promo', onClose }) {
               >
                 <span className="min-w-0">
                   <span className="flex flex-wrap items-center gap-2">
-                    <span className={`${p.featured ? 'text-lg' : 'text-base'} font-bold text-white`}>{t(p.name)}</span>
+                    <span className={`${p.featured ? 'text-lg' : 'text-base'} font-semibold text-neutral-200`}>{t(p.name)}</span>
                     {p.badges?.map((bd) => (
-                      <span key={bd} className="rounded-md border border-[#d4af37]/60 px-1.5 text-[11px] font-bold text-[#e8c35f]">
+                      <span key={bd} className="rounded-md border border-[#d4af37]/60 px-1.5 text-[11px] font-semibold text-[#e8c35f]">
                         {t(bd)}
                       </span>
                     ))}
@@ -101,7 +101,7 @@ export default function ProPaywall({ feature = 'promo', onClose }) {
                   {p.perMonth && <span className="mt-0.5 block text-sm text-neutral-300">{t('pro.permonth', { price: p.perMonth })}</span>}
                   {p.note && <span className="block text-xs text-neutral-400">{t(p.note)}</span>}
                 </span>
-                <span className={`shrink-0 text-right font-extrabold tabular-nums ${p.featured ? 'text-xl' : 'text-base'} ${on || p.featured ? 'text-[#e8c35f]' : 'text-white'}`}>{t(p.price)}</span>
+                <span className={`shrink-0 text-right font-medium tabular-nums ${p.featured ? 'text-xl' : 'text-base'} ${on || p.featured ? 'text-[#e8c35f]' : 'text-neutral-200'}`}>{t(p.price)}</span>
               </button>
             );
           })}

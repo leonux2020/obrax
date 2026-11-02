@@ -20,7 +20,7 @@ export default function TrafficLight({ light }) {
       role="img"
       aria-label={`${t('light.label')}: ${label}${detail ? `, ${detail}` : ''}`}
       data-level={level}
-      className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-sm font-bold"
+      className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-sm font-semibold"
     >
       <span aria-hidden="true" className="h-3.5 w-3.5 shrink-0 rounded-full" style={DOT[level]} />
       <span aria-hidden="true" className="truncate">

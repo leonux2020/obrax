@@ -19,8 +19,8 @@ export default function BottomNav({ active, onProjects, onAccounting, onSettings
       onClick={onClick}
       data-testid={`nav-${id}`}
       aria-current={active === id ? 'page' : undefined}
-      className={`flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-bold leading-tight transition ${
-        active === id ? 'text-brand' : 'text-neutral-300 hover:text-white'
+      className={`flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold leading-tight transition ${
+        active === id ? 'text-brand' : 'text-neutral-300 hover:text-neutral-200'
       }`}
     >
       {icon}

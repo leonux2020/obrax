@@ -7,14 +7,14 @@ export default function Header({ subtitle, pwa, bare = false }) {
   return (
     <>
       {!pwa.online && (
-        <div role="status" className="no-print border-b border-[#e8c35f]/40 bg-black px-4 py-1.5 text-center text-sm font-bold text-[#e8c35f]">
+        <div role="status" className="no-print border-b border-[#e8c35f]/40 bg-black px-4 py-1.5 text-center text-sm font-semibold text-[#e8c35f]">
           {t('pwa.offline')}
         </div>
       )}
       {pwa.updateReady && (
-        <div role="status" className="no-print flex items-center justify-center gap-3 bg-brand px-4 py-2 text-sm font-bold text-black">
+        <div role="status" className="no-print flex items-center justify-center gap-3 bg-brand px-4 py-2 text-sm font-semibold text-black">
           {t('pwa.update')}
-          <button type="button" onClick={pwa.applyUpdate} className="rounded-lg bg-black px-3 py-1.5 text-white">
+          <button type="button" onClick={pwa.applyUpdate} className="rounded-lg bg-black px-3 py-1.5 text-neutral-200">
             {t('pwa.updateBtn')}
           </button>
         </div>

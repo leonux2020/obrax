@@ -13,7 +13,7 @@ function Stat({ id, label, value, tone = '' }) {
   return (
     <div data-testid={id} className="min-w-0 px-2 py-3 text-center">
       <p className="truncate text-[11px] font-semibold uppercase tracking-tight text-white/50">{label}</p>
-      <p className={`mt-1 whitespace-nowrap font-extrabold tabular-nums ${sizeFor(value)} ${tone || 'text-[#E0E0E0]'}`} data-testid={`${id}-value`}>
+      <p className={`mt-1 whitespace-nowrap font-medium tracking-tight tabular-nums ${sizeFor(value)} ${tone || 'text-[#E0E0E0]'}`} data-testid={`${id}-value`}>
         {value}
       </p>
     </div>
@@ -91,13 +91,13 @@ export default function ProjectFinancialDashboard({ project, onCloseRendition, o
     <div className="fixed inset-0 z-40 overflow-y-auto bg-black text-[#E0E0E0]" data-testid="project-finance" role="dialog" aria-modal="true" aria-label={`${t('fin.title')}: ${title}`}>
       <main className="mx-auto w-full max-w-3xl px-3 pb-40 pt-3 sm:px-4">
         <header className="mb-3">
-          <h1 className="truncate text-xl font-extrabold tracking-tight" data-testid="fin-title">
+          <h1 className="truncate text-xl font-semibold tracking-tight" data-testid="fin-title">
             {title}
           </h1>
           <span className="block truncate text-xs text-neutral-400">{projectClient(project) || t('proj.noClient')}</span>
         </header>
 
-        <section className="grid grid-cols-3 divide-x divide-white/10 rounded-2xl border border-white/10 bg-black" aria-label={t('fin.title')} data-testid="fin-summary">
+        <section className="grid grid-cols-3 divide-x divide-white/10 rounded-2xl border border-white/10 bg-black tabular-nums" aria-label={t('fin.title')} data-testid="fin-summary">
           <Stat id="fin-fund" label={t('fin.fund')} value={money(fund)} />
           <Stat id="fin-spent" label={t('fin.spent')} value={money(spent)} />
           <Stat id="fin-balance" label={t('fin.toRender')} value={money(toRender)} tone={toRender < 0 ? 'text-red-400' : 'text-brand'} />
@@ -105,7 +105,7 @@ export default function ProjectFinancialDashboard({ project, onCloseRendition, o
 
         {/* Ingresos: read-only mirror of the CashBlock */}
         <section className="mt-5" data-testid="fin-income">
-          <h2 className="mb-2 text-xs font-bold uppercase tracking-wider text-neutral-400">{t('fin.income')}</h2>
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-400">{t('fin.income')}</h2>
           {entries.length === 0 ? (
             <p className="text-sm text-neutral-400" data-testid="fin-income-empty">
               {t('fin.income.empty')}
@@ -115,12 +115,12 @@ export default function ProjectFinancialDashboard({ project, onCloseRendition, o
               {entries.map((x) => (
                 <li key={x.id} data-testid={`fin-income-${x.id}`} className="flex items-center gap-3 rounded-xl border border-white/10 px-3 py-2">
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-bold">{x.note || (x.method && t(`ws.cash.m.${x.method}`)) || t('fin.income')}</span>
+                    <span className="block truncate text-sm font-semibold">{x.note || (x.method && t(`ws.cash.m.${x.method}`)) || t('fin.income')}</span>
                     <span className="block truncate text-xs text-neutral-400">
                       {[day.format(new Date(x.at)), x.note && x.method ? t(`ws.cash.m.${x.method}`) : ''].filter(Boolean).join(' · ')}
                     </span>
                   </span>
-                  <span className="text-sm font-extrabold tabular-nums text-brand">{money(x.amount)}</span>
+                  <span className="text-sm font-medium tabular-nums text-brand">{money(x.amount)}</span>
                 </li>
               ))}
             </ul>
@@ -129,7 +129,7 @@ export default function ProjectFinancialDashboard({ project, onCloseRendition, o
 
         {/* Egresos: read-only mirror of the expenses module */}
         <section className="mt-5" data-testid="fin-expenses">
-          <h2 className="mb-2 text-xs font-bold uppercase tracking-wider text-neutral-400">{t('fin.expenses')}</h2>
+          <h2 className="mb-2 text-xs font-medium uppercase tracking-wider text-neutral-400">{t('fin.expenses')}</h2>
           {project.expenses.length === 0 ? (
             <p className="text-sm text-neutral-400" data-testid="fin-expenses-empty">
               {t('fin.expenses.empty')}
@@ -142,10 +142,10 @@ export default function ProjectFinancialDashboard({ project, onCloseRendition, o
                   return (
                     <section key={g.key} data-testid={`fin-shop-${i}`} className="rounded-xl border border-white/10">
                       <h3 className="flex items-baseline justify-between gap-3 px-3 pt-2.5">
-                        <span className={`min-w-0 flex-1 truncate text-sm font-bold ${g.name ? 'text-neutral-100' : 'text-neutral-400'}`} data-testid="fin-shop-name">
+                        <span className={`min-w-0 flex-1 truncate text-sm font-semibold ${g.name ? 'text-neutral-100' : 'text-neutral-400'}`} data-testid="fin-shop-name">
                           {g.name || t('exp.noSupplier')}
                         </span>
-                        <span className="shrink-0 text-sm font-extrabold tabular-nums text-neutral-100" data-testid="fin-shop-total">
+                        <span className="shrink-0 text-sm font-medium tabular-nums text-neutral-100" data-testid="fin-shop-total">
                           {fmt(g.total)}
                         </span>
                       </h3>
@@ -153,7 +153,7 @@ export default function ProjectFinancialDashboard({ project, onCloseRendition, o
                         {g.items.map((e) => (
                           <li key={e.id} data-testid={`fin-expense-${e.id}`} className="flex items-baseline justify-between gap-3 py-1.5 text-sm">
                             <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
-                              <span className="shrink-0 whitespace-nowrap text-neutral-400" data-testid="fin-expense-date">
+                              <span className="shrink-0 whitespace-nowrap text-neutral-400 tabular-nums" data-testid="fin-expense-date">
                                 {expenseDayLabel(e.date, locale) || day.format(new Date(e.at))}
                               </span>
                               {/* "Receipt stack": the receipt's own line (the branch / street address the scan read, else the product description) as grey micro-text; nothing when there is none */}
@@ -177,8 +177,8 @@ export default function ProjectFinancialDashboard({ project, onCloseRendition, o
                 })}
               </div>
               <p className="flex items-baseline justify-between rounded-2xl border border-white/10 px-4 py-3" data-testid="fin-expenses-total">
-                <span className="text-sm font-bold">{t('fin.expenses.total')}</span>
-                <span className="font-extrabold tabular-nums">{money(spent)}</span>
+                <span className="text-sm font-semibold">{t('fin.expenses.total')}</span>
+                <span className="font-medium tabular-nums">{money(spent)}</span>
               </p>
             </>
           )}
@@ -208,7 +208,7 @@ export default function ProjectFinancialDashboard({ project, onCloseRendition, o
             onClick={close}
             disabled={busy}
             data-testid="fin-close"
-            className="flex min-h-[64px] w-full select-none items-center justify-center gap-2 rounded-2xl border-2 border-brand bg-black px-5 text-lg font-extrabold text-brand transition active:scale-[0.98] disabled:opacity-40"
+            className="flex min-h-[64px] w-full select-none items-center justify-center gap-2 rounded-2xl border-2 border-brand bg-black px-5 text-lg font-medium text-brand transition active:scale-[0.98] disabled:opacity-40"
           >
             <CloudUploadIcon size={24} />
             {busy ? t('fin.closing') : t('fin.close')}

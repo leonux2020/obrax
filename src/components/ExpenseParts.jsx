@@ -24,7 +24,7 @@ export function SupplierTotals({ expenses }) {
           <span className={`max-w-[9rem] truncate font-semibold ${g.name ? 'text-neutral-100' : 'text-neutral-400'}`} data-testid="supplier-total-name">
             {g.name || t('exp.noSupplier')}
           </span>
-          <span className="font-extrabold tabular-nums text-brand" data-testid="supplier-total-amount">
+          <span className="font-medium tabular-nums text-brand" data-testid="supplier-total-amount">
             {moneyIn(g.total, g.currency)}
           </span>
         </li>
@@ -44,7 +44,7 @@ export function ExpenseHead({ e, titleClass = 'text-sm', subClass = 'text-xs tex
   const detail = e.supplier && e.description ? e.description : '';
   return (
     <span className="min-w-0 flex-1">
-      <span className={`block truncate font-bold ${titleClass}`} data-testid="expense-title">
+      <span className={`block truncate font-semibold ${titleClass}`} data-testid="expense-title">
         {title}
       </span>
       <span className={`block truncate ${subClass}`} data-testid="expense-sub">

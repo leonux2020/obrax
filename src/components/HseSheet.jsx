@@ -18,7 +18,7 @@ function List({ title, ids, tone }) {
   const { t } = useI18n();
   return (
     <div>
-      <h4 className={`mb-2 text-sm font-bold uppercase tracking-wide ${tone === 'brand' ? 'text-brand' : 'text-neutral-400'}`}>{title}</h4>
+      <h4 className={`mb-2 text-sm font-semibold uppercase tracking-wide ${tone === 'brand' ? 'text-brand' : 'text-neutral-400'}`}>{title}</h4>
       <ul className="space-y-2">
         {ids.map((key) => (
           <li key={key} className="flex gap-3 rounded-xl border border-white/10 p-3 text-base leading-snug">
@@ -40,20 +40,20 @@ export function HseSheet({ task, onClose }) {
     <BottomSheet title={t('hse.title')} subtitle={t('hse.sub', { task: t(`task.${task}`) })} onClose={onClose}>
       <div className="space-y-6" data-testid="hse-sheet">
         <section aria-labelledby="hse-ppe" className="space-y-3">
-          <h3 id="hse-ppe" className="text-lg font-bold">
+          <h3 id="hse-ppe" className="text-lg font-semibold">
             {t('hse.ppe')}
           </h3>
           <List title={t('hse.mandatory')} ids={g.mandatory} tone="brand" />
           <List title={t('hse.recommended')} ids={g.recommended} />
         </section>
         <section aria-labelledby="hse-ergo" className="space-y-3">
-          <h3 id="hse-ergo" className="text-lg font-bold">
+          <h3 id="hse-ergo" className="text-lg font-semibold">
             {t('hse.ergo')}
           </h3>
           <List title="" ids={g.ergonomics} tone="brand" />
         </section>
         <section aria-labelledby="hse-waste" className="space-y-3">
-          <h3 id="hse-waste" className="text-lg font-bold">
+          <h3 id="hse-waste" className="text-lg font-semibold">
             {t('hse.waste')}
           </h3>
           <List title="" ids={g.waste} tone="brand" />

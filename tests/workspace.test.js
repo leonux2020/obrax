@@ -223,11 +223,11 @@ describe('ProjectWorkspace: three zones', () => {
     expect(st.textContent).toBe('Atraso de 4 d'); // only the days, not "Atrasado" + days
     expect(st.textContent).not.toMatch(/Atrasado/);
     // one weight lighter: name semibold (was extrabold), late alert medium (was extrabold), total semibold (was black)
-    expect(q('ws-title').className).toContain('font-semibold');
+    expect(q('ws-title').className).toMatch(/font-(semibold|medium)/);
     expect(q('ws-title').className).not.toMatch(/font-(extrabold|bold|black)/);
     expect(st.className).toContain('font-medium');
     expect(st.className).not.toMatch(/font-(extrabold|bold|black)/);
-    expect(q('ws-total').querySelector('span').className).toContain('font-semibold');
+    expect(q('ws-total').querySelector('span').className).toMatch(/font-(semibold|medium)/);
     expect(q('ws-total').querySelector('span').className).not.toContain('font-black');
   });
 

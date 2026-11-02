@@ -9,7 +9,7 @@ export default function ContractorSignatureField({ value, onOpen }) {
   const { t } = useI18n();
   return (
     <section aria-labelledby="pf-sign" className="card space-y-3" data-testid="profile-signature">
-      <h2 id="pf-sign" className="text-lg font-bold">
+      <h2 id="pf-sign" className="text-lg font-semibold">
         {t('sign.pro.title')}
       </h2>
       <button

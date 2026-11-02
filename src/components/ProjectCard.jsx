@@ -51,7 +51,7 @@ export default function ProjectCard({ project, now, onOpen }) {
       >
         <span className="flex items-start gap-3">
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-lg font-extrabold">{title}</span>
+            <span className="block truncate text-lg font-semibold">{title}</span>
             {client && <span className="block truncate text-sm text-neutral-300">{client}</span>}
           </span>
           {rentalDue && <Hourglass label={t('rental.dueToday')} />}
@@ -62,11 +62,11 @@ export default function ProjectCard({ project, now, onOpen }) {
         <span className="mt-3 flex items-end justify-between gap-3">
           <span
             data-testid="card-detail"
-            className={`text-sm font-bold text-neutral-300 ${level === 'red' ? 'text-base' : ''}`}
+            className={`text-sm font-semibold text-neutral-300 ${level === 'red' ? 'text-base' : ''}`}
           >
             {detail}
           </span>
-          {total && <span className="text-base font-extrabold tabular-nums">{total}</span>}
+          {total && <span className="text-base font-medium tabular-nums">{total}</span>}
         </span>
       </button>
     </li>

@@ -30,7 +30,7 @@ export default function ExpensesBlock({ expenses, queued, receipts, onChange, op
                 <div className="flex items-center gap-3">
                   <ExpenseHead e={e} subClass="text-xs text-[#E0E0E0]/60" />
                   {isDue && <Hourglass label={t('rental.dueToday')} size={18} />}
-                  <span className="text-sm font-extrabold tabular-nums">{moneyIn(e.amount, e.currency)}</span>
+                  <span className="text-sm font-medium tabular-nums">{moneyIn(e.amount, e.currency)}</span>
                   <button type="button" onClick={() => onChange(expenses.filter((x) => x.id !== e.id))} aria-label={`${t('common.delete')}: ${expenseTitle(e, t)}`} className="flex h-10 w-10 items-center justify-center text-lg text-[#E0E0E0]/50 hover:text-red-400">
                     ×
                   </button>
@@ -41,7 +41,7 @@ export default function ExpensesBlock({ expenses, queued, receipts, onChange, op
                     onClick={() => toggleReturned(e.id)}
                     aria-pressed={Boolean(e.returned)}
                     data-testid={`expense-return-${e.id}`}
-                    className="mt-2 min-h-[44px] w-full rounded-lg border border-white/15 px-3 text-sm font-bold"
+                    className="mt-2 min-h-[44px] w-full rounded-lg border border-white/15 px-3 text-sm font-semibold"
                     style={e.returned ? { color: '#22c55e' } : isDue ? { color: '#e8c35f', borderColor: '#d4af37' } : undefined}
                   >
                     {e.returned ? `✓ ${t('rental.returned')}` : e.returnDate ? t('rental.returnBy', { date: e.returnDate === dayOf(Date.now()) ? t('light.todayShort') : e.returnDate }) : t('rental.markReturned')}

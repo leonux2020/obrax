@@ -90,10 +90,10 @@ export default function PhotoGallery({ photos, setPhotos, projectId = '_' }) {
   return (
     <section aria-labelledby="photo-title" className="card space-y-3">
       <div className="flex items-baseline justify-between gap-3">
-        <h3 id="photo-title" className="text-lg font-bold">
+        <h3 id="photo-title" className="text-lg font-medium">
           {t('photo.title')}
         </h3>
-        <span className="text-sm font-semibold text-brand" aria-live="polite">
+        <span className="text-sm font-medium text-brand" aria-live="polite">
           {t('photo.count', { n: countPhotos(photos), max: MAX_PHOTOS })}
         </span>
       </div>
@@ -140,7 +140,7 @@ export default function PhotoGallery({ photos, setPhotos, projectId = '_' }) {
                   </button>
                 )}
               </div>
-              <p className="truncate px-2 pt-1.5 text-sm font-bold">{label}</p>
+              <p className="truncate px-2 pt-1.5 text-sm font-semibold">{label}</p>
               <div className="grid grid-cols-2 gap-1.5 p-2">
                 {['camera', 'gallery'].map((source) => (
                   <button

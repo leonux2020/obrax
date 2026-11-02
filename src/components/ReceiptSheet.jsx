@@ -134,7 +134,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
 
         {phase === 'queued' && (
           <div className="space-y-4 py-10 text-center" role="status" data-testid="receipt-queued">
-            <p className="text-lg font-bold text-[#e8c35f]">{t('q.parked')}</p>
+            <p className="text-lg font-medium text-[#e8c35f]">{t('q.parked')}</p>
             <p className="text-sm text-neutral-300">{t('q.parkedHint')}</p>
             <Button className="w-full" onClick={() => setPhase('pick')} data-testid="receipt-another">
               {t('q.another')}
@@ -148,7 +148,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
         {phase === 'reading' && (
           <div className="flex flex-col items-center gap-5 py-16 text-center" role="status" data-testid="receipt-reading">
             <span className="h-10 w-10 animate-spin rounded-full border-4 border-white/10 border-t-[#e8c35f]" aria-hidden="true" />
-            <p className="text-lg font-bold">{t('inv.reading')}</p>
+            <p className="text-lg font-medium">{t('inv.reading')}</p>
             <Button variant="ghost" onClick={() => abortRef.current?.abort()} data-testid="receipt-cancel">
               {t('inv.cancel')}
             </Button>
@@ -159,12 +159,12 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
           <div className="space-y-4 pb-32" data-testid="receipt-review">
             {receipts.length === 1 && receipts[0].supplier && <p className="text-sm text-neutral-300">{t('inv.supplier', { name: receipts[0].supplier })}</p>}
             {receipts.length > 1 && (
-              <p role="status" data-testid="receipt-batch" className="text-sm font-bold text-[#e8c35f]">
+              <p role="status" data-testid="receipt-batch" className="text-sm font-medium text-[#e8c35f]">
                 {t('rcpt.batch', { n: receipts.length })}
               </p>
             )}
             {otherCurrency && (
-              <p role="alert" data-testid="receipt-currency" className="rounded-xl border border-[#d4af37]/60 px-4 py-3 text-sm font-semibold text-[#e8c35f]">
+              <p role="alert" data-testid="receipt-currency" className="rounded-xl border border-[#d4af37]/60 px-4 py-3 text-sm font-medium text-[#e8c35f]">
                 {t('inv.currency', { cur: otherCurrency, proj: region.currency })}
               </p>
             )}
@@ -176,7 +176,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
                 return (
                   <React.Fragment key={r.key}>
                     {head && (
-                      <li role="presentation" data-testid={`receipt-doc-${r.doc}`} className="bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-wide text-[#e8c35f]">
+                      <li role="presentation" data-testid={`receipt-doc-${r.doc}`} className="bg-white/5 px-4 py-2 text-xs font-medium uppercase tracking-wide text-[#e8c35f] tabular-nums">
                         {t('rcpt.doc', { i: r.doc + 1, n: receipts.length })}
                         {[head.supplier, head.documentNumber, head.total ? money(head.total) : ''].filter(Boolean).map((x) => ` · ${x}`).join('')}
                       </li>
@@ -201,7 +201,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
                   <li data-testid={`receipt-row-${r.key}`} className={`space-y-3 p-4 ${r.selected ? '' : 'opacity-50'}`}>
                     <label className="flex cursor-pointer items-start gap-3">
                       <input type="checkbox" className="mt-1 h-6 w-6 shrink-0 accent-[#d4af37]" checked={r.selected} onChange={() => patch(r.key, { selected: !r.selected })} aria-label={r.description || t(`exp.cat.${r.category}`)} />
-                      <span className="min-w-0 flex-1 font-bold leading-snug">{r.description || t(`exp.cat.${r.category}`)}</span>
+                      <span className="min-w-0 flex-1 font-semibold leading-snug">{r.description || t(`exp.cat.${r.category}`)}</span>
                       {rental && <Hourglass label={t('rental.badge')} size={20} />}
                     </label>
                     <div className="grid grid-cols-2 gap-3 pl-9">
@@ -226,7 +226,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
                       </div>
                       {rental && (
                         <div className="col-span-2">
-                          <label className="label" htmlFor={`ret-${r.key}`}>
+                          <label className="label tabular-nums" htmlFor={`ret-${r.key}`}>
                             {t('rental.returnOn')}
                           </label>
                           <DateInput id={`ret-${r.key}`} value={r.returnDate} onChange={(e) => patch(r.key, { returnDate: e.target.value })} data-testid={`receipt-return-${r.key}`} />
@@ -249,7 +249,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
                 </Button>
               </div>
             </div>
-            <p className="text-right text-sm font-bold tabular-nums" data-testid="receipt-total">
+            <p className="text-right text-sm font-medium tabular-nums" data-testid="receipt-total">
               {t('rcpt.total')}: {money(total)}
             </p>
           </div>

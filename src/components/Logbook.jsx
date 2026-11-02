@@ -129,7 +129,7 @@ export default function Logbook({ entries, onChange, showList = true, onSaved, p
                 type="button"
                 onClick={() => onChange(entries.filter((x) => x.id !== e.id))}
                 aria-label={`${t('common.delete')}: ${stamp(e.at)}`}
-                className="mt-1 min-h-[36px] text-xs font-bold text-neutral-500 hover:text-red-400"
+                className="mt-1 min-h-[36px] text-xs font-semibold text-neutral-500 hover:text-red-400"
               >
                 {t('common.delete')}
               </button>
@@ -162,7 +162,7 @@ export default function Logbook({ entries, onChange, showList = true, onSaved, p
           data-testid="log-mic"
           data-listening={listening ? 'true' : 'false'}
           className={`absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full border transition active:scale-95 ${
-            listening ? 'animate-pulse border-red-500 bg-red-500 text-white shadow-[0_0_16px_rgba(239,68,68,0.7)]' : 'border-white/15 text-brand hover:border-brand'
+            listening ? 'animate-pulse border-red-500 bg-red-500 text-neutral-200 shadow-[0_0_16px_rgba(239,68,68,0.7)]' : 'border-white/15 text-brand hover:border-brand'
           }`}
         >
           {/* the microphone itself turns red and blinks while it listens; tap again to stop */}
@@ -181,7 +181,7 @@ export default function Logbook({ entries, onChange, showList = true, onSaved, p
             onClick={() => fileRef.current?.click()}
             disabled={photoBusy}
             data-testid="log-photo"
-            className="flex min-h-[44px] min-w-[44px] items-center gap-2 rounded-xl border border-white/15 px-3 text-sm font-bold text-[#E0E0E0] active:border-white/50 disabled:opacity-60"
+            className="flex min-h-[44px] min-w-[44px] items-center gap-2 rounded-xl border border-white/15 px-3 text-sm font-semibold text-[#E0E0E0] active:border-white/50 disabled:opacity-60"
           >
             <span aria-hidden="true" className="text-xl leading-none">
               📸

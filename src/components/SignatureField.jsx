@@ -89,7 +89,7 @@ export default function SignatureField({ model, signature, total, pricedAt, onCh
         {model.signClient}
         {shown && (
           <span className="mt-1 block text-xs">
-            {shown.name && <b className="block text-white">{shown.name}</b>}
+            {shown.name && <b className="block text-neutral-200">{shown.name}</b>}
             {shown.idLine && <span className="block">{shown.idLine}</span>}
             {shown.date && <span className="block">{shown.date}</span>}
           </span>

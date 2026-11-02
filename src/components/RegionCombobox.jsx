@@ -127,7 +127,7 @@ export default function RegionCombobox({ value, onChange, hideLabel = false, lab
           {flat.length === 0 && <p className="px-4 py-3 text-neutral-400">{t('region.noResults')}</p>}
           {groups.map((g) => (
             <div key={g.id} role="group" aria-label={t(g.id === 'AM' ? 'region.america' : 'region.europe')}>
-              <p className="sticky top-0 bg-black px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-brand">
+              <p className="sticky top-0 bg-black px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand">
                 {t(g.id === 'AM' ? 'region.america' : 'region.europe')}
               </p>
               {g.items.map((r) => {
@@ -145,13 +145,13 @@ export default function RegionCombobox({ value, onChange, hideLabel = false, lab
                     onMouseMove={() => setActive(i)}
                     className={`flex cursor-pointer items-center gap-3 px-4 py-2.5 ${
                       isActive ? 'bg-brand/20' : ''
-                    } ${r.code === value ? 'font-bold' : ''}`}
+                    } ${r.code === value ? 'font-semibold' : ''}`}
                   >
                     <span className="w-7 shrink-0 text-center text-2xl leading-none" aria-hidden="true">
                       {r.flag}
                     </span>
                     <span className="min-w-0 flex-1 truncate">{regionName(r, lang)}</span>
-                    <span className="shrink-0 text-xs text-neutral-300">
+                    <span className="shrink-0 text-xs text-neutral-300 tabular-nums">
                       {r.currency} {r.symbol} · {r.taxName} {pct(r.taxRate)}
                     </span>
                   </div>

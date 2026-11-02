@@ -15,10 +15,10 @@ export default function PercentSlider({ label, value, min = 0, max = 100, step =
     <div data-testid={testId}>
       {/* the title on the left; the value sits in a small green pill floating over the right end of the rail */}
       <div className="mb-0.5 flex items-end justify-between gap-3">
-        <label htmlFor={id} className="text-sm font-bold text-neutral-200">
+        <label htmlFor={id} className="text-sm font-semibold text-neutral-200">
           {label}
         </label>
-        <output htmlFor={id} data-testid={`${testId}-value`} className={`rounded-md px-2 py-0.5 text-sm font-extrabold tabular-nums leading-tight ${disabled ? 'border border-white/40 bg-black text-white' : 'bg-brand text-black'}`}>
+        <output htmlFor={id} data-testid={`${testId}-value`} className={`rounded-md px-2 py-0.5 text-sm font-medium tabular-nums leading-tight ${disabled ? 'border border-white/40 bg-black text-neutral-200' : 'bg-brand text-black'}`}>
           {shown}
           {suffix}
         </output>

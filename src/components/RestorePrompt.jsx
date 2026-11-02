@@ -44,7 +44,7 @@ export default function RestorePrompt({ onRestore, onLater, onDone, doneMs = 140
           <>
             <p className="mt-2 text-base leading-snug text-[#E0E0E0]">{t('restore.offer.msg')}</p>
             <div className="mt-5 space-y-2">
-              <button type="button" onClick={run} data-testid="restore-offer-now" className="min-h-[44px] w-full rounded-lg bg-brand px-4 text-base font-bold text-black hover:bg-brand-light">
+              <button type="button" onClick={run} data-testid="restore-offer-now" className="min-h-[44px] w-full rounded-lg bg-brand px-4 text-base font-semibold text-black hover:bg-brand-light">
                 {t('restore.offer.now')}
               </button>
               <button type="button" onClick={onLater} data-testid="restore-offer-later" className="min-h-[44px] w-full rounded-lg px-4 text-sm font-semibold text-[#E0E0E0]/70 hover:text-[#E0E0E0]">
@@ -73,7 +73,7 @@ export default function RestorePrompt({ onRestore, onLater, onDone, doneMs = 140
               {t('restore.offer.err')}
             </p>
             <div className="mt-5 space-y-2">
-              <button type="button" onClick={run} data-testid="restore-offer-retry" className="min-h-[44px] w-full rounded-lg bg-brand px-4 text-base font-bold text-black hover:bg-brand-light">
+              <button type="button" onClick={run} data-testid="restore-offer-retry" className="min-h-[44px] w-full rounded-lg bg-brand px-4 text-base font-semibold text-black hover:bg-brand-light">
                 {t('restore.offer.retry')}
               </button>
               <button type="button" onClick={onLater} data-testid="restore-offer-later" className="min-h-[44px] w-full rounded-lg px-4 text-sm font-semibold text-[#E0E0E0]/70 hover:text-[#E0E0E0]">

@@ -40,10 +40,10 @@ function PaymentRow({ payment: p, store, onDelete, onOpenPhoto, when }) {
     <li className="flex min-h-[52px] items-center gap-3 py-1.5" data-testid={`cash-row-${p.id}`} data-method={p.method ?? ''}>
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="text-sm font-bold tabular-nums">{money(p.amount)}</span>
+          <span className="text-sm font-medium tabular-nums">{money(p.amount)}</span>
           {p.method && <MethodTag method={p.method} />}
         </span>
-        <span className="block truncate text-xs text-[#E0E0E0]/60">{[when(p.at), p.note].filter(Boolean).join(' · ')}</span>
+        <span className="block truncate text-xs text-[#E0E0E0]/60 tabular-nums">{[when(p.at), p.note].filter(Boolean).join(' · ')}</span>
       </span>
       {p.photo === true &&
         (stored ? (
@@ -53,7 +53,7 @@ function PaymentRow({ payment: p, store, onDelete, onOpenPhoto, when }) {
             <CameraIcon size={20} />
           </span>
         ))}
-      <button type="button" onClick={() => onDelete(p)} aria-label={`${t('common.delete')}: ${money(p.amount)}`} data-testid={`cash-del-${p.id}`} className="flex h-11 w-11 shrink-0 items-center justify-center text-lg text-red-400">
+      <button type="button" onClick={() => onDelete(p)} aria-label={`${t('common.delete')}: ${money(p.amount)}`} data-testid={`cash-del-${p.id}`} className="flex h-11 w-11 shrink-0 items-center justify-center text-lg text-red-400 tabular-nums">
         ×
       </button>
     </li>
@@ -142,21 +142,21 @@ export default function CashBlock({ total, payments, onChange, open, onToggle, p
           ].map(([id, label, v]) => (
             <div key={id} className="rounded-xl border border-white/10 px-1 py-2">
               <dt className="text-[11px] font-semibold text-[#E0E0E0]/60">{label}</dt>
-              <dd data-testid={`cash-${id}`} className="truncate text-sm font-extrabold tabular-nums">
+              <dd data-testid={`cash-${id}`} className="truncate text-sm font-medium tabular-nums">
                 {money(v)}
               </dd>
             </div>
           ))}
         </dl>
         {summary.overpaid && (
-          <p role="status" className="border-l-2 border-[#e8c35f] pl-2 text-xs font-semibold text-[#e8c35f]" data-testid="cash-over">
+          <p role="status" className="border-l-2 border-[#e8c35f] pl-2 text-xs font-medium text-[#e8c35f]" data-testid="cash-over">
             {t('ws.cash.over')}
           </p>
         )}
 
         <button type="button" onClick={() => setPad(true)} data-testid="cash-amount" className="flex min-h-[52px] w-full items-center justify-between rounded-xl border border-white/15 px-3 active:border-white/50">
           <span className="text-sm text-[#E0E0E0]/70">{t('cash.amount')}</span>
-          <span className="text-base font-extrabold tabular-nums">{amount > 0 ? money(amount) : '—'}</span>
+          <span className="text-base font-medium tabular-nums">{amount > 0 ? money(amount) : '—'}</span>
         </button>
         {/* shortcuts: deliberately QUIET (hairline border, small regular text) so they never compete with the amount or the confirm button */}
         {total > 0 && (
@@ -181,7 +181,7 @@ export default function CashBlock({ total, payments, onChange, open, onToggle, p
                 aria-checked={on}
                 onClick={() => setMethod(on ? '' : m)}
                 data-testid={`cash-method-${m}`}
-                className={`flex min-h-[64px] flex-col items-center justify-center gap-1 rounded-xl border px-1 text-xs font-bold transition active:scale-[0.98] ${on ? 'border-2 border-brand text-brand' : 'border-white/15 text-[#E0E0E0]/80 active:border-white/50'}`}
+                className={`flex min-h-[64px] flex-col items-center justify-center gap-1 rounded-xl border px-1 text-xs font-semibold transition active:scale-[0.98] ${on ? 'border-2 border-brand text-brand' : 'border-white/15 text-[#E0E0E0]/80 active:border-white/50'}`}
               >
                 <Icon size={24} />
                 {t(`ws.cash.m.${m}`)}
@@ -192,7 +192,7 @@ export default function CashBlock({ total, payments, onChange, open, onToggle, p
 
         <div className="flex items-center gap-3">
           <input ref={fileRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true" data-testid="cash-photo-input" onChange={pick} />
-          <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} data-testid="cash-photo" className="flex min-h-[52px] min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-white/15 px-3 text-sm font-bold active:border-white/50 disabled:opacity-60">
+          <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} data-testid="cash-photo" className="flex min-h-[52px] min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-white/15 px-3 text-sm font-semibold active:border-white/50 disabled:opacity-60">
             <CameraIcon size={22} />
             <span className="truncate">{busy ? t('ws.log.photoBusy') : shot ? t('ws.cash.photoChange') : t('ws.cash.photoAdd')}</span>
           </button>
@@ -220,7 +220,7 @@ export default function CashBlock({ total, payments, onChange, open, onToggle, p
             {t(error)}
           </p>
         )}
-        <button type="button" disabled={!ready} onClick={add} data-testid="cash-add" className="min-h-[52px] w-full rounded-xl border-2 border-brand px-3 text-base font-extrabold text-brand disabled:opacity-40">
+        <button type="button" disabled={!ready} onClick={add} data-testid="cash-add" className="min-h-[52px] w-full rounded-xl border-2 border-brand px-3 text-base font-medium text-brand disabled:opacity-40">
           {t('cash.add')}
         </button>
 

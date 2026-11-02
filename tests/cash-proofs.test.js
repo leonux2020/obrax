@@ -207,7 +207,7 @@ describe('percentage shortcuts: clean and secondary', () => {
     }
     // the confirm button is the loud one
     expect(q('cash-add').className).toContain('border-2');
-    expect(q('cash-add').className).toContain('font-extrabold');
+    expect(q('cash-add').className).toMatch(/font-(semibold|medium)/);
     await click(q('cash-quick-0.5'));
     expect(q('cash-amount').textContent).toContain('50.000');
   });

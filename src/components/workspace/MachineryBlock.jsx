@@ -44,8 +44,8 @@ export default function MachineryBlock({ draft, result, regionCode, projectLocat
                   <button type="button" onClick={() => setPad(r.id)} data-testid={`rent-rate-${r.id}`} data-source={r.source} className="flex min-h-[52px] w-full items-center justify-between rounded-xl border border-white/15 px-3 active:border-white/50">
                     <span className="text-sm text-[#E0E0E0]/70">{t('ws.mach.rate')}</span>
                     <span className="text-right">
-                      <span className="block text-base font-extrabold tabular-nums">{money(r.rate)}</span>
-                      <span className="block text-[10px] font-semibold" style={{ color: r.source === 'saved' ? '#e8c35f' : 'rgba(224,224,224,0.6)' }}>
+                      <span className="block text-base font-medium tabular-nums">{money(r.rate)}</span>
+                      <span className="block text-[10px] font-medium" style={{ color: r.source === 'saved' ? '#e8c35f' : 'rgba(224,224,224,0.6)' }}>
                         {t(`ws.origin.${r.source === 'saved' ? 'user' : r.source === 'ai' ? 'ai' : 'base'}`)}
                       </span>
                       <span data-testid={`rent-supplier-${r.id}`} className="block max-w-[11rem] truncate text-xs text-gray-500">

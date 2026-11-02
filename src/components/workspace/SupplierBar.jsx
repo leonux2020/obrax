@@ -23,7 +23,7 @@ export default function SupplierBar({ suggestions, value, onSelect, onAdd }) {
 
   return (
     <div className="mb-3 -mx-1" data-testid="supplier-bar" role="group" aria-label={t('ws.supplier.label')}>
-      <p className="mb-1 px-1 text-[10px] font-bold uppercase tracking-wide text-[#E0E0E0]/50">{t('ws.supplier.label')}</p>
+      <p className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-[#E0E0E0]/50">{t('ws.supplier.label')}</p>
       {adding ? (
         <form
           className="flex items-center gap-2 px-1"
@@ -43,7 +43,7 @@ export default function SupplierBar({ suggestions, value, onSelect, onAdd }) {
             data-testid="supplier-input"
             className="min-h-[40px] min-w-0 flex-1 rounded-lg border border-white/20 bg-black px-3 text-sm text-[#E0E0E0] placeholder:text-[#E0E0E0]/40 focus:border-brand focus:outline-none"
           />
-          <button type="submit" data-testid="supplier-save" disabled={!cleanSupplierName(draft)} className="min-h-[40px] rounded-lg border border-brand px-3 text-sm font-bold text-brand disabled:opacity-40">
+          <button type="submit" data-testid="supplier-save" disabled={!cleanSupplierName(draft)} className="min-h-[40px] rounded-lg border border-brand px-3 text-sm font-semibold text-brand disabled:opacity-40">
             {t('ws.supplier.use')}
           </button>
           <button type="button" onClick={() => setAdding(false)} aria-label={t('common.cancel')} className="min-h-[40px] px-2 text-sm text-[#E0E0E0]/60">
@@ -70,7 +70,7 @@ export default function SupplierBar({ suggestions, value, onSelect, onAdd }) {
             );
           })}
           <li className="shrink-0">
-            <button type="button" onClick={() => setAdding(true)} data-testid="supplier-add" className="min-h-[36px] rounded-full border border-dashed border-white/25 px-3 text-xs font-bold text-[#E0E0E0]/75 active:border-white/50">
+            <button type="button" onClick={() => setAdding(true)} data-testid="supplier-add" className="min-h-[36px] rounded-full border border-dashed border-white/25 px-3 text-xs font-semibold text-[#E0E0E0]/75 active:border-white/50">
               + {t('ws.supplier.add')}
             </button>
           </li>

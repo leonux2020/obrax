@@ -33,7 +33,7 @@ const Icon = ({ children, size = 24 }) => (
 function Section({ id, title, children }) {
   return (
     <section aria-labelledby={id} className="mt-6">
-      <h2 id={id} className="mb-2 text-xs font-bold uppercase tracking-wider text-neutral-400">
+      <h2 id={id} className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-400">
         {title}
       </h2>
       {children}
@@ -68,7 +68,7 @@ function Advances({ advances, onChange, pool }) {
         aria-controls="adv-panel"
         onClick={() => setOpen((v) => !v)}
         data-testid="advances-toggle"
-        className="flex min-h-[48px] w-full items-center gap-2 rounded-xl border border-white/10 px-4 text-left text-sm font-bold text-neutral-200 transition hover:border-white/30"
+        className="flex min-h-[48px] w-full items-center gap-2 rounded-xl border border-white/10 px-4 text-left text-sm font-semibold text-neutral-200 transition hover:border-white/30"
       >
         <span className="flex-1">{t('adv.title')}</span>
         {pool.advanced > 0 && <span className="tabular-nums text-[#e8c35f]">−{money(pool.advanced)}</span>}
@@ -82,7 +82,7 @@ function Advances({ advances, onChange, pool }) {
             <TextField label={t('adv.worker')} value={worker} onChange={setWorker} sanitize={(v) => sanitizeText(v, 60)} placeholder={t('adv.workerPh')} />
             <NumberField label={t('adv.amount')} value={amount} onChange={setAmount} decimals={region.digits} placeholder="0" />
             <div>
-              <label htmlFor="adv-date" className="label">
+              <label htmlFor="adv-date" className="label tabular-nums">
                 {t('adv.date')}
               </label>
               <DateInput id="adv-date" value={date} onChange={(e) => setDate(e.target.value)} data-testid="advance-date" />
@@ -96,10 +96,10 @@ function Advances({ advances, onChange, pool }) {
               {advances.map((a) => (
                 <li key={a.id} className="flex min-h-[52px] items-center gap-3 py-1.5">
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold">{a.worker}</span>
+                    <span className="block truncate font-medium">{a.worker}</span>
                     <span className="block text-xs text-neutral-400">{stamp(a.at)}</span>
                   </span>
-                  <span className="font-bold tabular-nums">{money(a.amount)}</span>
+                  <span className="font-medium tabular-nums">{money(a.amount)}</span>
                   <button
                     type="button"
                     onClick={() => onChange(advances.filter((x) => x.id !== a.id))}
@@ -140,7 +140,7 @@ function LocationBlock({ location }) {
   };
   return (
     <section aria-labelledby="pv-loc" className="card mt-4" data-testid="pv-location-block">
-      <h2 id="pv-loc" className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+      <h2 id="pv-loc" className="text-xs font-medium uppercase tracking-wider text-neutral-400">
         {t('loc.title')}
       </h2>
       {location ? (
@@ -158,7 +158,7 @@ function LocationBlock({ location }) {
               target="_blank"
               rel="noopener noreferrer"
               data-testid="loc-open"
-              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-brand px-3 text-sm font-bold text-brand transition hover:bg-brand/10 active:scale-[0.98]"
+              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-brand px-3 text-sm font-medium text-brand transition hover:bg-brand/10 active:scale-[0.98]"
             >
               {t('loc.open')}
             </a>
@@ -166,7 +166,7 @@ function LocationBlock({ location }) {
               type="button"
               onClick={share}
               data-testid="loc-share"
-              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-white/15 px-3 text-sm font-bold text-white transition hover:border-white/40 active:scale-[0.98]"
+              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-white/15 px-3 text-sm font-medium text-neutral-200 transition hover:border-white/40 active:scale-[0.98]"
             >
               {t('loc.share')}
             </button>
@@ -281,7 +281,7 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
           </Icon>
         </button>
         <div className="min-w-0 flex-1 pt-0.5">
-          <h1 className="truncate text-2xl font-extrabold leading-tight">{title}</h1>
+          <h1 className="truncate text-2xl font-medium leading-tight">{title}</h1>
           <p className="truncate text-sm text-neutral-300">
             <span aria-hidden="true">{region.flag}</span> {client || t('proj.noClient')}
           </p>
@@ -297,7 +297,7 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
         <span
           data-testid="pv-status"
           data-level={level}
-          className="inline-flex max-w-full items-center gap-2 rounded-full border-2 px-3 py-1.5 text-sm font-extrabold"
+          className="inline-flex max-w-full items-center gap-2 rounded-full border-2 px-3 py-1.5 text-sm font-medium"
           style={{ color: LEVEL_COLOR[level], borderColor: LEVEL_COLOR[level] }}
         >
           <span aria-hidden="true" className="h-3 w-3 shrink-0 rounded-full" style={{ background: LEVEL_COLOR[level] }} />
@@ -310,14 +310,14 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
 
       {/* 2. money: the budget and the cash control bar */}
       <section aria-labelledby="pv-budget" className="card mt-4">
-        <h2 id="pv-budget" className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+        <h2 id="pv-budget" className="text-xs font-medium uppercase tracking-wider text-neutral-400">
           {t('pv.budget')}
         </h2>
-        <p data-testid="budget-total" className="mt-1 text-4xl font-black tabular-nums text-brand">
+        <p data-testid="budget-total" className="mt-1 text-4xl font-medium tracking-tight tabular-nums text-brand">
           {result.valid ? money(total) : '—'}
         </p>
         {draft.frozen && (
-          <p data-testid="frozen-chip" className="mt-1 text-xs font-bold text-[#e8c35f]">
+          <p data-testid="frozen-chip" className="mt-1 text-xs font-medium text-[#e8c35f]">
             {t('pv.frozen')}
           </p>
         )}
@@ -333,7 +333,7 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
           </span>
           <span className="mt-1.5 flex items-baseline justify-between gap-3 text-sm">
             <span>
-              {t('cash.paid')} <b className="tabular-nums">{money(cash.paid)}</b> <span className="text-neutral-400">· {Math.round(cash.pct)} %</span>
+              {t('cash.paid')} <b className="tabular-nums">{money(cash.paid)}</b> <span className="text-neutral-400 tabular-nums">· {Math.round(cash.pct)} %</span>
             </span>
             <span className="text-neutral-300">
               {t('cash.pending')} <b className="tabular-nums">{money(cash.pending)}</b>
@@ -347,7 +347,7 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
           onClick={onEditor}
           data-testid="editor-open"
           data-pending={result.valid ? undefined : 'true'}
-          className={`mt-4 flex min-h-[44px] w-full items-center gap-2 border-t border-white/10 pt-3 text-left text-sm font-semibold transition hover:text-white ${result.valid ? 'text-neutral-300' : 'text-brand'}`}
+          className={`mt-4 flex min-h-[44px] w-full items-center gap-2 border-t border-white/10 pt-3 text-left text-sm font-semibold transition hover:text-neutral-200 ${result.valid ? 'text-neutral-300' : 'text-brand'}`}
         >
           <Icon size={18}>
             <path d="M3 17L17 3l4 4L7 21H3z" />
@@ -365,8 +365,8 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
         <PercentSlider label={t('fin.labor')} testId="slider-labor" value={draft.finance.labor} min={FINANCE_LIMITS.labor.min} max={FINANCE_LIMITS.labor.max} onChange={setFinance('labor')} />
         {result.valid && (
           <p data-testid="labor-pool" data-available={pool.available} className="text-sm text-neutral-300">
-            {t('adv.pool')}: <b className="tabular-nums text-white">{money(pool.available)}</b>
-            {pool.advanced > 0 && <span className="text-[#e8c35f]"> (−{money(pool.advanced)})</span>}
+            {t('adv.pool')}: <b className="tabular-nums text-neutral-200">{money(pool.available)}</b>
+            {pool.advanced > 0 && <span className="text-[#e8c35f] tabular-nums"> (−{money(pool.advanced)})</span>}
           </p>
         )}
         <Advances advances={project.advances} onChange={setList('advances')} pool={pool} />
@@ -379,7 +379,7 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
         type="button"
         onClick={() => (pro ? setScanOpen(true) : onPro('ai'))}
         data-testid="scan-receipt"
-        className="mt-5 flex min-h-[64px] w-full items-center justify-center gap-3 rounded-2xl border-2 border-[#d4af37] px-4 text-lg font-extrabold text-[#e8c35f] transition active:scale-[0.99]"
+        className="mt-5 flex min-h-[64px] w-full items-center justify-center gap-3 rounded-2xl border-2 border-[#d4af37] px-4 text-lg font-medium text-[#e8c35f] transition active:scale-[0.99]"
       >
         <Icon size={28}>
           <path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" />
@@ -398,17 +398,17 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
               {visibleItems.map((i) => (
                 <li key={i.id} className="flex items-center gap-3 px-4 py-2.5">
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold">{t(`mat.${i.id}`)}</span>
-                    <span className="block text-xs text-neutral-400">
+                    <span className="block truncate font-medium">{t(`mat.${i.id}`)}</span>
+                    <span className="block text-xs text-neutral-400 tabular-nums">
                       {num(i.packs)} {unit(i.saleUnit)}
                     </span>
                   </span>
-                  <span className="text-sm font-bold tabular-nums">{money(i.total)}</span>
+                  <span className="text-sm font-medium tabular-nums">{money(i.total)}</span>
                 </li>
               ))}
             </ul>
             {items.length > 5 && (
-              <button type="button" onClick={() => setShowAll((v) => !v)} data-testid="supply-more" className="mt-1 min-h-[44px] w-full text-sm font-bold text-neutral-300 hover:text-white">
+              <button type="button" onClick={() => setShowAll((v) => !v)} data-testid="supply-more" className="mt-1 min-h-[44px] w-full text-sm font-medium text-neutral-300 hover:text-neutral-200">
                 {showAll ? t('sup.less') : t('sup.more', { n: items.length - 5 })}
               </button>
             )}
@@ -436,7 +436,7 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
                   <div className="flex items-start gap-3">
                     <ExpenseHead e={e} titleClass="" />
                     {isDue && <Hourglass label={t('rental.dueToday')} />}
-                    <span className="font-bold tabular-nums">{moneyIn(e.amount, e.currency)}</span>
+                    <span className="font-medium tabular-nums">{moneyIn(e.amount, e.currency)}</span>
                     <button
                       type="button"
                       onClick={() => setList('expenses')(project.expenses.filter((x) => x.id !== e.id))}
@@ -452,7 +452,7 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
                       onClick={() => toggleReturned(e.id)}
                       aria-pressed={e.returned}
                       data-testid={`expense-return-${e.id}`}
-                      className={`mt-2 min-h-[44px] w-full rounded-xl border px-3 text-sm font-bold ${e.returned ? 'border-brand/40 text-brand' : isDue ? 'border-[#d4af37] text-[#e8c35f]' : 'border-white/10 text-neutral-200'}`}
+                      className={`mt-2 min-h-[44px] w-full rounded-xl border px-3 text-sm font-semibold ${e.returned ? 'border-brand/40 text-brand' : isDue ? 'border-[#d4af37] text-[#e8c35f]' : 'border-white/10 text-neutral-200'}`}
                     >
                       {e.returned ? `✓ ${t('rental.returned')}` : e.returnDate ? t('rental.returnBy', { date: e.returnDate === dayOf(Date.now()) ? t('light.todayShort') : e.returnDate }) : t('rental.markReturned')}
                     </button>

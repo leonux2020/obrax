@@ -88,7 +88,7 @@ export default function CameraModal({ slotLabel, onCapture, onClose, onUpload, g
         className="flex max-h-full w-full max-w-2xl flex-col gap-3 rounded-2xl border border-neutral-700 bg-black p-4 outline-none"
       >
         <div className="flex items-baseline justify-between gap-3">
-          <h2 id="cam-title" className="text-lg font-bold">
+          <h2 id="cam-title" className="text-lg font-semibold">
             {t('photo.cameraTitle')}
           </h2>
           <span className="truncate text-sm text-brand">{t('photo.cameraFor', { slot: slotLabel })}</span>
@@ -117,13 +117,13 @@ export default function CameraModal({ slotLabel, onCapture, onClose, onUpload, g
         )}
 
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={onClose} className="min-h-[52px] rounded-xl border border-neutral-700 px-5 font-bold hover:border-white/40">
+          <button type="button" onClick={onClose} className="min-h-[52px] rounded-xl border border-neutral-700 px-5 font-semibold hover:border-white/40">
             {t('common.close')}
           </button>
           <button
             type="button"
             onClick={onUpload}
-            className="min-h-[52px] rounded-xl border-2 border-brand px-5 font-bold text-brand hover:bg-brand/10"
+            className="min-h-[52px] rounded-xl border-2 border-brand px-5 font-semibold text-brand hover:bg-brand/10"
           >
             {t('photo.upload')}
           </button>
@@ -133,7 +133,7 @@ export default function CameraModal({ slotLabel, onCapture, onClose, onUpload, g
               onClick={shoot}
               disabled={state !== 'live' || shooting}
               data-testid="camera-shoot"
-              className="min-h-[52px] flex-1 rounded-xl bg-brand px-5 font-bold text-black disabled:opacity-40"
+              className="min-h-[52px] flex-1 rounded-xl bg-brand px-5 font-semibold text-black disabled:opacity-40"
             >
               {t('photo.shoot')}
             </button>

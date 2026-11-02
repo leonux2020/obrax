@@ -38,7 +38,7 @@ export default function StepPartidas({ draft, setDraft, result, showErrors }) {
   return (
     <section aria-labelledby="part-title" className="space-y-4">
       <div>
-        <h2 id="part-title" className="text-2xl font-bold">
+        <h2 id="part-title" className="text-2xl font-medium tracking-tight">
           {t('part.title')}
           {draft.project.name && <span className="text-brand"> · {draft.project.name}</span>}
         </h2>
@@ -62,7 +62,7 @@ export default function StepPartidas({ draft, setDraft, result, showErrors }) {
                   <TaskIcon id={p.task} size={30} />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-lg font-bold">
+                  <p className="truncate text-lg font-medium">
                     {i + 1}. {partidaTitle(p, t)}
                   </p>
                   <p className="flex flex-wrap items-center gap-2 text-sm text-neutral-300">

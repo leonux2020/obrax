@@ -82,7 +82,7 @@ export default function ProfileSetup({ onSave, onChangeRegion = null, requestDri
   return (
     <>
       <main className="mx-auto w-full max-w-lg px-4 pb-44 pt-6" aria-labelledby="setup-title" data-testid="setup">
-        <h1 id="setup-title" className="mb-4 text-3xl font-extrabold leading-tight">
+        <h1 id="setup-title" className="mb-4 text-3xl font-medium leading-tight tracking-tight">
           {t('setup.title')}
         </h1>
         <form onSubmit={submit} className="space-y-4">
@@ -98,8 +98,8 @@ export default function ProfileSetup({ onSave, onChangeRegion = null, requestDri
               <span className="text-2xl" aria-hidden="true">
                 {region.flag}
               </span>
-              <span className="min-w-0 flex-1 truncate font-bold">{regionName(region, lang)}</span>
-              <span className="shrink-0 text-sm font-bold text-neutral-300" data-testid="setup-currency">
+              <span className="min-w-0 flex-1 truncate font-semibold">{regionName(region, lang)}</span>
+              <span className="shrink-0 text-sm font-semibold text-neutral-300" data-testid="setup-currency">
                 {region.currency}
               </span>
               {onChangeRegion && (
@@ -128,7 +128,7 @@ export default function ProfileSetup({ onSave, onChangeRegion = null, requestDri
           />
 
           <section aria-labelledby="setup-sign" className="card space-y-3">
-            <h2 id="setup-sign" className="text-lg font-bold">
+            <h2 id="setup-sign" className="text-lg font-semibold">
               {t('setup.sign')}
             </h2>
             <SignaturePad ref={pad} label={t('sign.pad')} placeholder={t('sign.pad.ph')} onInkChange={(v) => setInked(v)} className="!h-40 sm:!h-44" />
@@ -142,7 +142,7 @@ export default function ProfileSetup({ onSave, onChangeRegion = null, requestDri
           </section>
 
           <section aria-labelledby="setup-drive-title" className="card space-y-3">
-            <h2 id="setup-drive-title" className="text-lg font-bold">
+            <h2 id="setup-drive-title" className="text-lg font-semibold">
               {t('setup.driveTitle')}
             </h2>
             <Button

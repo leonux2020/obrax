@@ -20,13 +20,13 @@ function Dates({ project, setProject }) {
     <div className="space-y-3" data-testid="crew-dates">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="label" htmlFor={startId}>
+          <label className="label tabular-nums" htmlFor={startId}>
             {t('ws.crew.start')}
           </label>
           <DateInput id={startId} value={project.startDate} onChange={(e) => setProject((p) => withProjectDates(p, { startDate: e.target.value }))} data-testid="crew-start" />
         </div>
         <div>
-          <label className="label" htmlFor={endId}>
+          <label className="label tabular-nums" htmlFor={endId}>
             {t('ws.crew.end')}
           </label>
           <DateInput id={endId} value={project.endDate} min={project.startDate || undefined} onChange={(e) => setProject((p) => withProjectDates(p, { endDate: e.target.value }))} data-testid="crew-end" />
@@ -34,7 +34,7 @@ function Dates({ project, setProject }) {
       </div>
       <p className="flex min-h-[44px] items-center justify-between rounded-xl border border-white/10 px-3 text-sm" data-testid="crew-duration" data-days={days ?? ''}>
         <span className="text-[#E0E0E0]/70">{t('ws.crew.duration')}</span>
-        <span className="text-base font-extrabold tabular-nums">{days === null ? '—' : t(days === 1 ? 'ws.crew.day1' : 'ws.crew.dayN', { n: days })}</span>
+        <span className="text-base font-medium tabular-nums">{days === null ? '—' : t(days === 1 ? 'ws.crew.day1' : 'ws.crew.dayN', { n: days })}</span>
       </p>
     </div>
   );
@@ -72,12 +72,12 @@ function WorkerSheet({ worker, onSave, onDelete, onClose }) {
           </select>
         </div>
         <TextField label={t('ws.crew.notes')} optional={t('common.optional')} value={notes} onChange={setNotes} sanitize={(v) => sanitizeText(v, 120)} maxLength={120} testId="crew-notes" />
-        <button type="submit" disabled={!ready} data-testid="crew-save" className="min-h-[56px] w-full rounded-xl border-2 border-brand px-3 text-base font-extrabold text-brand disabled:opacity-40">
+        <button type="submit" disabled={!ready} data-testid="crew-save" className="min-h-[56px] w-full rounded-xl border-2 border-brand px-3 text-base font-medium text-brand disabled:opacity-40">
           {t('ws.crew.save')}
         </button>
         {worker && (
           <div className="space-y-1">
-            <button type="button" onClick={onDelete} data-testid="crew-delete" className="min-h-[52px] w-full rounded-xl border border-red-500/40 px-3 text-sm font-bold text-red-400 active:border-red-400">
+            <button type="button" onClick={onDelete} data-testid="crew-delete" className="min-h-[52px] w-full rounded-xl border border-red-500/40 px-3 text-sm font-medium text-red-400 active:border-red-400">
               {t('common.delete')}
             </button>
             <p className="text-center text-xs text-[#E0E0E0]/60">{t('ws.crew.deleteNote')}</p>
@@ -99,7 +99,7 @@ function WorkerCard({ row, onEdit, onAdvance, onRemoveAdvance }) {
       <button type="button" onClick={onEdit} data-testid={`worker-edit-${w.id}`} aria-label={`${t('ws.crew.sheetEdit')}: ${w.name}`} className="flex min-h-[64px] w-full items-center gap-3 px-3 py-2 text-left active:bg-black">
         <Icon size={26} className="text-brand" />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-base font-bold" data-testid={`worker-name-${w.id}`}>
+          <span className="block truncate text-base font-medium" data-testid={`worker-name-${w.id}`}>
             {w.name}
           </span>
           <span className="block truncate text-xs text-[#E0E0E0]/70" data-testid={`worker-spec-${w.id}`}>
@@ -117,7 +117,7 @@ function WorkerCard({ row, onEdit, onAdvance, onRemoveAdvance }) {
           type="button"
           onClick={onAdvance}
           data-testid={`worker-adv-${w.id}`}
-          className="flex min-h-[60px] w-full items-center justify-center gap-3 rounded-xl border-2 border-emerald-500 bg-black px-3 text-lg font-extrabold text-emerald-400 transition active:scale-[0.98] active:border-emerald-300"
+          className="flex min-h-[60px] w-full items-center justify-center gap-3 rounded-xl border-2 border-emerald-500 bg-black px-3 text-lg font-medium text-emerald-400 transition active:scale-[0.98] active:border-emerald-300"
         >
           <BanknoteIcon size={28} />
           <span>{t('ws.crew.advance')}</span>
@@ -126,7 +126,7 @@ function WorkerCard({ row, onEdit, onAdvance, onRemoveAdvance }) {
       <div className="border-t border-white/10 px-3 py-2">
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-[#E0E0E0]/70">{t('ws.crew.advanced')}</p>
-          <p className="text-base font-extrabold tabular-nums" data-testid={`worker-total-${w.id}`} data-total={total}>
+          <p className="text-base font-medium tabular-nums" data-testid={`worker-total-${w.id}`} data-total={total}>
             {total > 0 ? money(total) : t('ws.crew.noAdvances')}
           </p>
         </div>
@@ -135,7 +135,7 @@ function WorkerCard({ row, onEdit, onAdvance, onRemoveAdvance }) {
             {list.map((a) => (
               <li key={a.id} className="flex min-h-[44px] items-center gap-3">
                 <span className="min-w-0 flex-1 text-xs text-[#E0E0E0]/60">{stamp(a.at)}</span>
-                <span className="text-sm font-bold tabular-nums">{money(a.amount)}</span>
+                <span className="text-sm font-medium tabular-nums">{money(a.amount)}</span>
                 <button type="button" onClick={() => onRemoveAdvance(a.id)} aria-label={`${t('common.delete')}: ${w.name}`} data-testid={`worker-adv-del-${a.id}`} className="flex h-11 w-11 shrink-0 items-center justify-center text-lg text-red-400">
                   ×
                 </button>
@@ -204,7 +204,7 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
               ))}
             </ul>
           )}
-          <button type="button" onClick={() => setSheet('new')} disabled={crew.length >= CREW_LIMIT} data-testid="crew-add" className="min-h-[56px] w-full rounded-xl border-2 border-brand px-3 text-base font-extrabold text-brand disabled:opacity-40">
+          <button type="button" onClick={() => setSheet('new')} disabled={crew.length >= CREW_LIMIT} data-testid="crew-add" className="min-h-[56px] w-full rounded-xl border-2 border-brand px-3 text-base font-medium text-brand disabled:opacity-40">
             {t('ws.crew.add')}
           </button>
         </div>
@@ -212,7 +212,7 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
         {/* what the labour line of the quote still allows once every advance (to anybody) is discounted */}
         <p data-testid="labor-pool" data-available={pool.available} className="text-sm text-[#E0E0E0]/80">
           {t('adv.pool')}: <b className="tabular-nums text-[#E0E0E0]">{money(pool.available)}</b>
-          {pool.advanced > 0 && <span className="text-[#e8c35f]"> (−{money(pool.advanced)})</span>}
+          {pool.advanced > 0 && <span className="text-[#e8c35f] tabular-nums"> (−{money(pool.advanced)})</span>}
         </p>
 
         {loose.length > 0 && (
@@ -225,7 +225,7 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
               {loose.map((a) => (
                 <li key={a.id} className="flex min-h-[44px] items-center gap-3">
                   <span className="min-w-0 flex-1 truncate text-sm">{a.worker}</span>
-                  <span className="text-sm font-bold tabular-nums">{money(a.amount)}</span>
+                  <span className="text-sm font-medium tabular-nums">{money(a.amount)}</span>
                   <button type="button" onClick={() => setProject((p) => withoutAdvance(p, a.id))} aria-label={`${t('common.delete')}: ${a.worker}`} data-testid={`worker-adv-del-${a.id}`} className="flex h-11 w-11 shrink-0 items-center justify-center text-lg text-red-400">
                     ×
                   </button>

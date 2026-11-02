@@ -14,7 +14,7 @@ function DateField({ label, value, onChange, invalid }) {
   const id = useId();
   return (
     <div>
-      <label htmlFor={id} className="label">
+      <label htmlFor={id} className="label tabular-nums">
         {label}
       </label>
       <DateInput id={id} value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={invalid || undefined} />
@@ -22,7 +22,7 @@ function DateField({ label, value, onChange, invalid }) {
   );
 }
 
-const SectionTitle = ({ children }) => <h3 className="pt-2 text-xs font-bold uppercase tracking-wider text-neutral-400">{children}</h3>;
+const SectionTitle = ({ children }) => <h3 className="pt-2 text-xs font-semibold uppercase tracking-wider text-neutral-400">{children}</h3>;
 
 const ModeIcon = ({ mode }) => (
   <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -126,7 +126,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
                   }`}
                 >
                   <ModeIcon mode={m} />
-                  <span className="text-sm font-bold leading-tight">{t(key)}</span>
+                  <span className="text-sm font-medium leading-tight">{t(key)}</span>
                 </button>
               );
             })}
@@ -139,7 +139,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
           <DateField label={t('proj.end')} value={form.endDate} onChange={set('endDate')} invalid={badRange} />
         </div>
         {badRange && (
-          <p role="alert" className="text-sm font-semibold text-red-400">
+          <p role="alert" className="text-sm font-medium text-red-400">
             {t('proj.endBeforeStart')}
           </p>
         )}
@@ -159,7 +159,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
             </p>
           )}
           {editing && marketChanged && (
-            <p role="status" className="mt-1.5 text-sm font-semibold text-[#e8c35f]" data-testid="project-market-warn">
+            <p role="status" className="mt-1.5 text-sm font-medium text-[#e8c35f]" data-testid="project-market-warn">
               {t('ws.market.warn')}
             </p>
           )}
@@ -191,7 +191,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
             </p>
           )}
           {['unsupported', 'denied', 'unavailable', 'timeout'].includes(geo) && (
-            <p role="alert" data-testid="project-locate-error" className="mt-1.5 text-sm font-semibold text-red-400">
+            <p role="alert" data-testid="project-locate-error" className="mt-1.5 text-sm font-medium text-red-400">
               {t(`newp.geo.${geo}`)}
             </p>
           )}
@@ -223,7 +223,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
               type="submit"
               disabled={badRange}
               data-testid="project-save"
-              className="flex min-h-[64px] w-full select-none items-center justify-center gap-2 rounded-2xl border-2 border-brand bg-black px-5 text-lg font-extrabold text-brand transition active:scale-[0.98] disabled:opacity-40"
+              className="flex min-h-[64px] w-full select-none items-center justify-center gap-2 rounded-2xl border-2 border-brand bg-black px-5 text-lg font-medium text-brand transition active:scale-[0.98] disabled:opacity-40"
             >
               {t('proj.create')}
               <span aria-hidden="true">→</span>

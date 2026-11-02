@@ -15,7 +15,7 @@ import InvoiceSheet from '../InvoiceSheet.jsx';
 function SourceBadge({ source, t }) {
   if (source === 'ai')
     return (
-      <span data-testid="src-ai" className="inline-flex items-center gap-1 rounded-md border border-brand/40 bg-brand/15 px-2 py-0.5 text-xs font-bold text-brand-light">
+      <span data-testid="src-ai" className="inline-flex items-center gap-1 rounded-md border border-brand/40 bg-brand/15 px-2 py-0.5 text-xs font-semibold text-brand-light">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z" />
         </svg>
@@ -24,7 +24,7 @@ function SourceBadge({ source, t }) {
     );
   if (source === 'saved')
     return (
-      <span data-testid="src-saved" className="inline-flex items-center gap-1 rounded-md border border-[#d4af37]/60 px-2 py-0.5 text-xs font-bold text-[#e8c35f]">
+      <span data-testid="src-saved" className="inline-flex items-center gap-1 rounded-md border border-[#d4af37]/60 px-2 py-0.5 text-xs font-semibold text-[#e8c35f]">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M5 12l5 5L20 7" />
         </svg>
@@ -32,7 +32,7 @@ function SourceBadge({ source, t }) {
       </span>
     );
   return (
-    <span data-testid={source === 'manual' ? 'src-manual' : 'src-ref'} className="rounded-md border border-white/30 bg-white/10 px-2 py-0.5 text-xs font-bold text-white">
+    <span data-testid={source === 'manual' ? 'src-manual' : 'src-ref'} className="rounded-md border border-white/30 bg-white/10 px-2 py-0.5 text-xs font-semibold text-neutral-200">
       {source === 'manual' ? t('prices.manual') : t('prices.ref')}
     </span>
   );
@@ -137,7 +137,7 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
     <section aria-labelledby="prices-title" className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 id="prices-title" className="text-2xl font-bold">
+          <h2 id="prices-title" className="text-2xl font-medium tracking-tight">
             {t('prices.title')}
           </h2>
           <p className="text-sm text-neutral-300">{t('prices.updated', { time: time(new Date(now)) })}</p>
@@ -178,8 +178,8 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
             <path d="M4 7V5a1 1 0 0 1 1-1h2M20 7V5a1 1 0 0 0-1-1h-2M4 17v2a1 1 0 0 0 1 1h2M20 17v2a1 1 0 0 1-1 1h-2M8 12h8" />
           </svg>
           {t('inv.cta')}
-          {!pro && <span className="rounded-md border border-[#d4af37]/60 px-1.5 text-[11px] font-extrabold tracking-wider">PRO</span>}
-          {pro === 'dev' && <span data-testid="ai-dev-badge" className="rounded-md border border-white/30 px-1.5 text-[11px] font-extrabold tracking-wider text-neutral-300">DEV</span>}
+          {!pro && <span className="rounded-md border border-[#d4af37]/60 px-1.5 text-[11px] font-semibold tracking-wider">PRO</span>}
+          {pro === 'dev' && <span data-testid="ai-dev-badge" className="rounded-md border border-white/30 px-1.5 text-[11px] font-semibold tracking-wider text-neutral-300">DEV</span>}
         </Button>
         <p className="mt-2 text-xs text-neutral-300">{t('inv.cta.hint')}</p>
         {applied > 0 && (
@@ -213,8 +213,8 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
                 active ? 'border-brand bg-brand/10' : 'border-white/10 bg-black hover:border-white/30'
               }`}
             >
-              <span className="block truncate text-sm font-bold">{c.label}</span>
-              <span className="block text-base font-extrabold tabular-nums">{money(c.total)}</span>
+              <span className="block truncate text-sm font-medium">{c.label}</span>
+              <span className="block text-base font-medium tabular-nums">{money(c.total)}</span>
               {isCheap && <Badge>{t('prices.cheapest')}</Badge>}
             </button>
           );
@@ -231,13 +231,13 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
             <li key={item.id} className="card">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-bold leading-snug">{t(`mat.${item.id}`)}</p>
-                  <p className="text-sm text-neutral-300">
+                  <p className="font-medium leading-snug">{t(`mat.${item.id}`)}</p>
+                  <p className="text-sm text-neutral-300 tabular-nums">
                     {t('prices.need')}: {num(item.needWaste, 2)} {unit(item.baseUnit)}
                   </p>
                   <p className="text-sm text-neutral-300">
                     {t('prices.qty')}:{' '}
-                    <b className="text-white">
+                    <b className="text-neutral-200 tabular-nums">
                       {num(item.packs)} {unit(item.saleUnit)}
                     </b>
                     {item.saleSize !== 1 && (
@@ -248,7 +248,7 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
                     )}
                   </p>
                 </div>
-                <p className="shrink-0 text-lg font-extrabold tabular-nums">{money(item.total)}</p>
+                <p className="shrink-0 text-lg font-medium tabular-nums">{money(item.total)}</p>
               </div>
 
               <div className="mt-3 flex items-end gap-2">
@@ -268,7 +268,7 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
                   </Button>
                 )}
               </div>
-              <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-neutral-300">
+              <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-neutral-300 tabular-nums">
                 <SourceBadge source={origin} t={t} />
                 {money(item.refPrice)} / {unit(item.saleUnit)} · {chainName(item.chainId)}
               </p>
@@ -279,7 +279,7 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
 
       {rentRows.length > 0 && (
         <section aria-labelledby="rent-title" className="space-y-3" data-testid="rent-prices">
-          <h3 id="rent-title" className="text-lg font-bold">
+          <h3 id="rent-title" className="text-lg font-semibold">
             {t('prices.rent.title')}
           </h3>
           <ul className="grid gap-3 lg:grid-cols-2">
@@ -287,10 +287,10 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
               <li key={r.id} className="card" data-testid={`rent-${r.id}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-bold leading-snug">{t(`mach.${r.id}`)}</p>
-                    <p className="text-sm text-neutral-300">{r.lines.map((i) => t('mach.line', { qty: num(i.qty, 0), days: num(i.days, 0), rate: money(i.rate) })).join(' + ')}</p>
+                    <p className="font-semibold leading-snug">{t(`mach.${r.id}`)}</p>
+                    <p className="text-sm text-neutral-300 tabular-nums">{r.lines.map((i) => t('mach.line', { qty: num(i.qty, 0), days: num(i.days, 0), rate: money(i.rate) })).join(' + ')}</p>
                   </div>
-                  <p className="shrink-0 text-lg font-extrabold tabular-nums">{money(r.total)}</p>
+                  <p className="shrink-0 text-lg font-medium tabular-nums">{money(r.total)}</p>
                 </div>
                 <div className="mt-3 flex items-end gap-2">
                   <NumberField
@@ -319,8 +319,8 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
       )}
 
       <div className="card flex items-center justify-between border-brand/50">
-        <span className="text-lg font-bold">{t('prices.materials')}</span>
-        <span className="text-2xl font-extrabold tabular-nums text-brand">{money(result.quote.materials)}</span>
+        <span className="text-lg font-semibold">{t('prices.materials')}</span>
+        <span className="text-2xl font-medium tabular-nums text-brand tracking-tight">{money(result.quote.materials)}</span>
       </div>
       <p className="text-xs text-neutral-400" data-testid="prices-save-hint">
         {t('prices.src.hint')}

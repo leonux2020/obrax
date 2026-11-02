@@ -51,7 +51,7 @@ export default function ExportSheet({ onExport, onClose, canPdf, onSync = null, 
               >
                 <Icon size={28} className="text-neutral-400" />
                 <span className="min-w-0 flex-1">
-                  <span className={`block text-base font-extrabold ${kind === 'client' ? 'text-brand' : ''}`}>
+                  <span className={`block text-base font-semibold ${kind === 'client' ? 'text-brand' : ''}`}>
                     {busy === kind ? t('pdf.generating') : t(label)}
                   </span>
                   <span className="block text-xs text-neutral-400">{t(hint)}</span>
@@ -74,7 +74,7 @@ export default function ExportSheet({ onExport, onClose, canPdf, onSync = null, 
         >
           <CloudUploadIcon size={28} className="text-neutral-400" />
           <span className="min-w-0 flex-1">
-            <span className="block text-base font-extrabold">{syncing ? t('dossier.syncing') : t('ws.export.drive')}</span>
+            <span className="block text-base font-semibold">{syncing ? t('dossier.syncing') : t('ws.export.drive')}</span>
             <span className="block text-xs text-neutral-400">{t('ws.export.driveHint')}</span>
           </span>
         </button>

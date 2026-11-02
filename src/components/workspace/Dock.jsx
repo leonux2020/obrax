@@ -63,9 +63,9 @@ export default function Dock({ onOpen, queued = 0 }) {
               className="relative flex min-h-[64px] w-full flex-col items-center justify-center gap-0.5 text-[#E0E0E0] transition active:scale-95 active:text-brand"
             >
               {ICONS[id]}
-              <span className="text-[11px] font-bold">{t(key)}</span>
+              <span className="text-[11px] font-semibold">{t(key)}</span>
               {id === 'scan' && queued > 0 && (
-                <span data-testid="dock-queued" aria-label={t('q.pending')} className="absolute right-[22%] top-1.5 rounded-full border border-[#d4af37] px-1.5 text-[10px] font-extrabold leading-4 text-[#e8c35f]">
+                <span data-testid="dock-queued" aria-label={t('q.pending')} className="absolute right-[22%] top-1.5 rounded-full border border-[#d4af37] px-1.5 text-[10px] font-semibold leading-4 text-[#e8c35f]">
                   {queued}
                 </span>
               )}

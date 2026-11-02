@@ -20,12 +20,12 @@ export default class ErrorBoundary extends Component {
     const d = DICT[document.documentElement.lang] || DICT.es;
     return (
       <main role="alert" className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 text-center">
-        <h1 className="text-2xl font-extrabold">{d['err.title']}</h1>
+        <h1 className="text-2xl font-medium tracking-tight">{d['err.title']}</h1>
         <p className="mb-6 mt-2 text-neutral-300">{d['err.body']}</p>
         <button
           type="button"
           onClick={this.restart}
-          className="min-h-[52px] rounded-xl bg-brand px-5 font-bold text-black"
+          className="min-h-[52px] rounded-xl bg-brand px-5 font-semibold text-black"
         >
           {d['err.reload']}
         </button>

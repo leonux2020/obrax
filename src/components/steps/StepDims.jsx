@@ -15,7 +15,7 @@ export default function StepDims({ draft, setDraft, result, showErrors }) {
     <section aria-labelledby="dims-title" className="space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 id="dims-title" className="text-2xl font-bold">
+          <h2 id="dims-title" className="text-2xl font-medium tracking-tight">
             {t('dims.title')} · {t(`task.${partida.task}`)}
           </h2>
           <p className="text-neutral-300">{t('dims.hint')}</p>
@@ -29,13 +29,13 @@ export default function StepDims({ draft, setDraft, result, showErrors }) {
 
       {computed.calc && (
         <div className="card border-brand/50" aria-live="polite">
-          <h3 className="mb-3 text-lg font-bold text-brand">{t('dims.preview')}</h3>
+          <h3 className="mb-3 text-lg font-medium text-brand">{t('dims.preview')}</h3>
           <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             {computed.calc.metrics.map((m) => (
               <div key={m.key}>
                 <dt className="text-sm text-neutral-300">{t(`metric.${m.key}`)}</dt>
-                <dd className="text-2xl font-extrabold tabular-nums">
-                  {num(m.value, 3)} <span className="text-base font-semibold text-neutral-300">{unit(m.unit)}</span>
+                <dd className="text-2xl font-medium tabular-nums tracking-tight">
+                  {num(m.value, 3)} <span className="text-base font-medium text-neutral-300 tabular-nums">{unit(m.unit)}</span>
                 </dd>
               </div>
             ))}

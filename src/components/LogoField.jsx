@@ -41,7 +41,7 @@ export default function LogoField({ value, onChange, onBusy, externalError = '' 
       <p className="label">{t('company.logo')}</p>
       <div className="flex items-center gap-3">
         <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white p-1.5" data-testid="logo-preview">
-          {value ? <img src={value} alt={t('company.logo')} className="max-h-full max-w-full object-contain" decoding="async" /> : <span className="text-xs font-bold text-black/50">LOGO</span>}
+          {value ? <img src={value} alt={t('company.logo')} className="max-h-full max-w-full object-contain" decoding="async" /> : <span className="text-xs font-semibold text-black/50">LOGO</span>}
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <Button variant="secondary" className="!min-h-[48px] text-sm" disabled={busy} onClick={() => fileRef.current?.click()}>

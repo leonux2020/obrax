@@ -41,18 +41,18 @@ export default function PartidaList({ draft, groups, open, locked, onBlocked, on
                 <TaskIcon id={p.task} size={24} />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-base font-bold">{partidaTitle(p, t)}</span>
+                <span className="block truncate text-base font-semibold">{partidaTitle(p, t)}</span>
                 <span className="block truncate text-xs text-[#E0E0E0]/70">
                   {t(`task.${p.task}`)}
                   {g.incomplete && (
-                    <span style={{ color: LEVEL_COLOR.orange }} className="font-bold">
+                    <span style={{ color: LEVEL_COLOR.orange }} className="font-medium">
                       {' · '}
                       {t('ws.incomplete')}
                     </span>
                   )}
                 </span>
               </span>
-              <span className="text-base font-extrabold tabular-nums">{g.incomplete ? '—' : money(g.amount)}</span>
+              <span className="text-base font-medium tabular-nums">{g.incomplete ? '—' : money(g.amount)}</span>
               <span aria-hidden="true" className="text-lg text-[#E0E0E0]/50 transition-transform group-open:rotate-90">
                 ›
               </span>
@@ -73,7 +73,7 @@ export default function PartidaList({ draft, groups, open, locked, onBlocked, on
                 </div>
                 <PercentSlider label={t('fin.waste')} testId={`waste-${i}`} value={p.waste} min={WASTE_LIMITS.min} max={WASTE_LIMITS.max} step={WASTE_LIMITS.step} onChange={(waste) => onUpdate(p.id, (x) => ({ ...x, waste }))} />
                 {project && (
-                  <button type="button" onClick={() => onRemove(p.id)} data-testid={`partida-remove-${i}`} className="min-h-[44px] text-xs font-bold text-red-400">
+                  <button type="button" onClick={() => onRemove(p.id)} data-testid={`partida-remove-${i}`} className="min-h-[44px] text-xs font-semibold text-red-400">
                     ✕ {t('part.delete')}
                   </button>
                 )}
@@ -87,7 +87,7 @@ export default function PartidaList({ draft, groups, open, locked, onBlocked, on
                       <li key={r.id} className="flex items-center gap-3 px-3 py-2">
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold">{t(`mat.${r.id}`)}</span>
-                          <span className="block text-xs text-[#E0E0E0]/60">
+                          <span className="block text-xs text-[#E0E0E0]/60 tabular-nums">
                             {num(r.packs)} {unit(r.saleUnit)} · {money(r.total)}
                           </span>
                         </span>
@@ -101,7 +101,7 @@ export default function PartidaList({ draft, groups, open, locked, onBlocked, on
                           title={r.shared ? t('ws.shared') : undefined}
                           className="min-h-[48px] min-w-[104px] rounded-lg border border-white/15 px-3 text-right active:border-white/50"
                         >
-                          <span className="block text-sm font-extrabold tabular-nums">
+                          <span className="block text-sm font-medium tabular-nums">
                             {locked && <span aria-hidden="true">🔒 </span>}
                             {money(r.unitPrice)}
                           </span>
@@ -132,7 +132,7 @@ export default function PartidaList({ draft, groups, open, locked, onBlocked, on
           disabled={draft.partidas.length >= MAX_PARTIDAS}
           onClick={onAdd}
           data-testid="partida-add"
-          className="min-h-[52px] w-full rounded-xl border border-dashed border-white/25 text-sm font-bold text-[#E0E0E0]/80 disabled:opacity-40"
+          className="min-h-[52px] w-full rounded-xl border border-dashed border-white/25 text-sm font-semibold text-[#E0E0E0]/80 disabled:opacity-40"
         >
           + {t('ws.addPartida')}
         </button>

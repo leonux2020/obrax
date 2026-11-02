@@ -78,7 +78,7 @@ export default function Wizard({ projectId, draft, setDraft: setProjectDraft, ph
                   disabled={locked}
                   onClick={() => go(i)}
                   aria-current={current ? 'step' : undefined}
-                  className={`flex h-11 w-11 items-center justify-center rounded-full border-2 text-base font-extrabold transition disabled:opacity-40 ${
+                  className={`flex h-11 w-11 items-center justify-center rounded-full border-2 text-base font-semibold transition disabled:opacity-40 ${
                     current
                       ? 'border-brand bg-brand text-black'
                       : done
@@ -90,7 +90,7 @@ export default function Wizard({ projectId, draft, setDraft: setProjectDraft, ph
                 </button>
                 <span
                   className={`w-full truncate text-center text-[11px] font-semibold sm:text-sm ${
-                    current ? 'text-white' : 'text-neutral-400'
+                    current ? 'text-neutral-200' : 'text-neutral-400'
                   }`}
                 >
                   {t(`step.${s}`)}

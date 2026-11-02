@@ -37,7 +37,7 @@ export default function CashSheet({ total, payments, onChange, onClose }) {
           ].map(([label, v]) => (
             <div key={label} className="rounded-xl border border-white/10 px-1 py-2">
               <dt className="text-[11px] font-semibold text-neutral-400">{label}</dt>
-              <dd className="truncate text-sm font-extrabold tabular-nums">{money(v)}</dd>
+              <dd className="truncate text-sm font-medium tabular-nums">{money(v)}</dd>
             </div>
           ))}
         </dl>
@@ -52,7 +52,7 @@ export default function CashSheet({ total, payments, onChange, onClose }) {
                 ['75 %', 0.75],
                 [t('cash.rest'), 1],
               ].map(([label, f]) => (
-                <button key={label} type="button" onClick={() => quick(f)} className="min-h-[44px] rounded-xl border border-white/10 text-sm font-bold hover:border-brand">
+                <button key={label} type="button" onClick={() => quick(f)} className="min-h-[44px] rounded-xl border border-white/10 text-sm font-semibold hover:border-brand">
                   {label}
                 </button>
               ))}
@@ -69,8 +69,8 @@ export default function CashSheet({ total, payments, onChange, onClose }) {
             {payments.map((p) => (
               <li key={p.id} className="flex min-h-[56px] items-center gap-3 px-4 py-2">
                 <span className="min-w-0 flex-1">
-                  <span className="block font-bold tabular-nums">{money(p.amount)}</span>
-                  <span className="block truncate text-xs text-neutral-400">{[when(p.at), p.note].filter(Boolean).join(' · ')}</span>
+                  <span className="block font-medium tabular-nums">{money(p.amount)}</span>
+                  <span className="block truncate text-xs text-neutral-400 tabular-nums">{[when(p.at), p.note].filter(Boolean).join(' · ')}</span>
                 </span>
                 <button
                   type="button"

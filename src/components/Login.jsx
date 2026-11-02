@@ -22,7 +22,7 @@ export default function Login({ onLogin }) {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-8 text-center">
       <Logo size={96} className="mx-auto mb-5" />
-      <h1 className="text-3xl font-extrabold">{t('app.name')}</h1>
+      <h1 className="text-3xl font-medium tracking-tight">{t('app.name')}</h1>
       <p className="mt-1 text-neutral-300">{t('app.tagline')}</p>
 
       {googleConfigured && (
@@ -33,7 +33,7 @@ export default function Login({ onLogin }) {
       )}
 
       <form onSubmit={enter} className={`card text-left ${googleConfigured ? 'mt-4' : 'mt-7'}`} data-testid="login-local">
-        <h2 className="text-xl font-bold">{t('login.local.title')}</h2>
+        <h2 className="text-xl font-semibold">{t('login.local.title')}</h2>
         <p className="mb-4 mt-1 text-sm text-neutral-300">{t('login.local.subtitle')}</p>
         <TextField
           label={t('login.local.name')}

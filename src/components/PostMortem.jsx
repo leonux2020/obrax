@@ -15,7 +15,7 @@ import ExportSheet from './workspace/ExportSheet.jsx';
 const Stat = ({ id, label, value, tone, hint }) => (
   <div className="rounded-xl border border-white/10 p-3">
     <p className="text-xs font-semibold text-[#E0E0E0]/70">{label}</p>
-    <p data-testid={id} className="mt-0.5 break-words text-xl font-black tabular-nums" style={tone ? { color: tone } : undefined}>
+    <p data-testid={id} className="mt-0.5 break-words text-xl font-medium tabular-nums" style={tone ? { color: tone } : undefined}>
       {value}
     </p>
     {hint && <p className="mt-0.5 text-xs text-[#E0E0E0]/60">{hint}</p>}
@@ -24,7 +24,7 @@ const Stat = ({ id, label, value, tone, hint }) => (
 
 const Section = ({ title, children, testId }) => (
   <section data-testid={testId} className="rounded-xl border border-l-2 border-white/10 border-l-white/30 p-3">
-    <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-[#E0E0E0]/80">{title}</h2>
+    <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[#E0E0E0]/80">{title}</h2>
     {children}
   </section>
 );
@@ -70,7 +70,7 @@ export default function PostMortem({ project, parent = null, company, photos, se
       <header data-testid="ws-zone-a" className="sticky top-0 z-20 border-b border-white/10 bg-black px-3 pb-3 pt-2">
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
-            <h1 data-testid="ws-title" className="truncate text-xl font-extrabold leading-tight">
+            <h1 data-testid="ws-title" className="truncate text-xl font-semibold leading-tight">
               {title}
             </h1>
             <p className="truncate text-sm text-[#E0E0E0]/80">
@@ -80,7 +80,7 @@ export default function PostMortem({ project, parent = null, company, photos, se
             </p>
           </div>
         </div>
-        <p data-testid="pm-closed" className="mt-2 border-l-2 pl-2 text-sm font-extrabold" style={{ borderLeftColor: LEVEL_COLOR.closed, color: LEVEL_COLOR.closed }}>
+        <p data-testid="pm-closed" className="mt-2 border-l-2 pl-2 text-sm font-semibold" style={{ borderLeftColor: LEVEL_COLOR.closed, color: LEVEL_COLOR.closed }}>
           {t('proj.closed')} · {t('pm.closedOn', { date: date(project.closedAt) })}
           {parent && (
             <span data-testid="pm-parent" className="block text-xs font-semibold text-[#E0E0E0]/70">
@@ -92,7 +92,7 @@ export default function PostMortem({ project, parent = null, company, photos, se
 
       <div className="space-y-3 px-3 pt-3">
         <Section title={t('pm.balance')} testId="pm-balance">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 tabular-nums">
             <Stat id="pm-budget" label={t('pm.budget')} value={pm.budget > 0 ? money(pm.budget) : '—'} />
             <Stat id="pm-collected" label={t('pm.collected')} value={money(pm.collected)} hint={pm.budget > 0 ? `${Math.round(pm.collectedPct)} %` : ''} />
             <Stat id="pm-spent" label={t('pm.spent')} value={money(pm.spent)} />
@@ -112,12 +112,12 @@ export default function PostMortem({ project, parent = null, company, photos, se
         </Section>
 
         <Section title={t('pm.time')} testId="pm-time">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 tabular-nums">
             <Stat id="pm-days-est" label={t('pm.estimated')} value={pm.days.estimated === null ? '—' : num(pm.days.estimated, 0)} />
             <Stat id="pm-days-act" label={t('pm.actual')} value={pm.days.actual === null ? '—' : num(pm.days.actual, 0)} hint={t(pm.days.source === 'log' ? 'pm.actual.log' : 'pm.actual.dates')} />
           </div>
           {deltaText && (
-            <p data-testid="pm-delta" data-delta={delta} className="mt-2 border-l-2 pl-2 text-sm font-bold" style={{ borderLeftColor: delta > 0 ? LEVEL_COLOR.red : good, color: delta > 0 ? LEVEL_COLOR.red : good }}>
+            <p data-testid="pm-delta" data-delta={delta} className="mt-2 border-l-2 pl-2 text-sm font-medium" style={{ borderLeftColor: delta > 0 ? LEVEL_COLOR.red : good, color: delta > 0 ? LEVEL_COLOR.red : good }}>
               {deltaText}
             </p>
           )}
@@ -130,7 +130,7 @@ export default function PostMortem({ project, parent = null, company, photos, se
             <ul className="space-y-3">
               {groups.map((g, i) => (
                 <li key={g.id}>
-                  <p className="flex items-baseline justify-between gap-3 text-sm font-bold">
+                  <p className="flex items-baseline justify-between gap-3 text-sm font-medium">
                     <span className="min-w-0 flex-1 truncate">{partidaTitle(draft.partidas[i], t)}</span>
                     <span className="tabular-nums">{g.incomplete ? '—' : money(g.amount)}</span>
                   </p>
@@ -138,7 +138,7 @@ export default function PostMortem({ project, parent = null, company, photos, se
                     <ul className="mt-1 divide-y divide-white/10 border-l border-white/10 pl-3">
                       {g.rows.map((r) => (
                         <li key={r.id} className="flex items-baseline justify-between gap-3 py-1 text-xs text-[#E0E0E0]/80">
-                          <span className="min-w-0 flex-1 truncate">
+                          <span className="min-w-0 flex-1 truncate tabular-nums">
                             {t(`mat.${r.id}`)} · {num(r.packs)} {unit(r.saleUnit)}
                           </span>
                           <span className="tabular-nums">{money(r.total)}</span>
@@ -172,15 +172,15 @@ export default function PostMortem({ project, parent = null, company, photos, se
             type="button"
             onClick={onExtend}
             data-testid="pm-extension"
-            className="flex min-h-[64px] w-full select-none flex-col items-center justify-center rounded-2xl border-2 border-brand bg-black px-5 text-lg font-extrabold text-brand transition active:scale-[0.98]"
+            className="flex min-h-[64px] w-full select-none flex-col items-center justify-center rounded-2xl border-2 border-brand bg-black px-5 text-lg font-medium text-brand transition active:scale-[0.98]"
           >
             {t('pm.extension')}
             <span className="text-xs font-semibold text-[#E0E0E0]/70">{t('pm.extension.hint')}</span>
           </button>
-          <button type="button" onClick={() => setExporting(true)} data-testid="pm-export" className="min-h-[48px] w-full rounded-xl border border-white/15 text-sm font-bold text-[#E0E0E0]/80 active:border-white/50">
+          <button type="button" onClick={() => setExporting(true)} data-testid="pm-export" className="min-h-[48px] w-full rounded-xl border border-white/15 text-sm font-semibold text-[#E0E0E0]/80 active:border-white/50">
             {t('pm.export')}
           </button>
-          <button type="button" onClick={reopen} data-testid="pm-reopen" className="min-h-[44px] w-full text-xs font-bold text-[#E0E0E0]/60 active:text-[#E0E0E0]">
+          <button type="button" onClick={reopen} data-testid="pm-reopen" className="min-h-[44px] w-full text-xs font-semibold text-[#E0E0E0]/60 active:text-[#E0E0E0]">
             {t('pm.reopen')}
           </button>
         </div>

@@ -28,7 +28,7 @@ export default function StepStart({ draft, setDraft, photos, setPhotos, projectI
 
   return (
     <section aria-labelledby="start-title" className="space-y-5">
-      <h2 id="start-title" className="text-2xl font-bold">
+      <h2 id="start-title" className="text-2xl font-medium tracking-tight">
         {t('mode.title')}
       </h2>
 
@@ -46,7 +46,7 @@ export default function StepStart({ draft, setDraft, photos, setPhotos, projectI
                 active ? 'border-brand bg-brand/10' : 'border-white/10 bg-black hover:border-white/30'
               }`}
             >
-              <span className="block text-lg font-bold">{t(`mode.${m}`)}</span>
+              <span className="block text-lg font-semibold">{t(`mode.${m}`)}</span>
               <span className="block text-sm text-neutral-300">{t(`mode.${m}.desc`)}</span>
             </button>
           );
@@ -55,7 +55,7 @@ export default function StepStart({ draft, setDraft, photos, setPhotos, projectI
 
       {draft.mode === 'quick' ? (
         <>
-          <h3 id="task-title" className="text-xl font-bold">
+          <h3 id="task-title" className="text-xl font-semibold">
             {t('task.title')}
           </h3>
           <TaskPicker value={draft.partidas[0]?.task} onChange={pickTask} labelledBy="task-title" />
@@ -65,7 +65,7 @@ export default function StepStart({ draft, setDraft, photos, setPhotos, projectI
       )}
 
       <div className="card space-y-4">
-        <h3 className="text-lg font-bold">{t('project.title')}</h3>
+        <h3 className="text-lg font-semibold">{t('project.title')}</h3>
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField
             label={t('project.name')}

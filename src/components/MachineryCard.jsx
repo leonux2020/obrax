@@ -24,7 +24,7 @@ export default function MachineryCard({ draft, setDraft, result }) {
   return (
     <section aria-labelledby="mach-title" className="space-y-3" data-testid="machinery-card">
       <div>
-        <h3 id="mach-title" className="text-lg font-bold">
+        <h3 id="mach-title" className="text-lg font-semibold">
           {t('mach.title')}
         </h3>
         <p className="text-sm text-neutral-300">{t('mach.desc')}</p>

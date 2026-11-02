@@ -27,7 +27,7 @@ function Accordion({ testId, titleId, icon: Icon, title, open, onToggle, childre
     >
       <summary data-testid={`${testId}-summary`} className="flex min-h-[64px] cursor-pointer list-none items-center gap-3 px-4 sm:px-5 [&::-webkit-details-marker]:hidden">
         <Icon size={22} className="text-neutral-400" />
-        <h2 id={titleId} className="min-w-0 flex-1 truncate text-lg font-bold">
+        <h2 id={titleId} className="min-w-0 flex-1 truncate text-lg font-semibold">
           {title}
         </h2>
         <span aria-hidden="true" className="text-lg text-neutral-500 transition-transform group-open:rotate-90">
@@ -241,12 +241,12 @@ export default function SettingsView({
       {user?.picture ? (
         <img src={user.picture} alt="" className="h-10 w-10 shrink-0 rounded-full border border-white/10 object-cover" />
       ) : (
-        <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm font-bold text-[#E0E0E0]/70">
+        <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm font-medium text-[#E0E0E0]/70">
           {(user?.name || user?.email || '?').slice(0, 1).toUpperCase()}
         </span>
       )}
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-semibold">{user?.name}</span>
+        <span className="block truncate font-medium">{user?.name}</span>
         {user?.email && <span className="block truncate text-sm text-[#E0E0E0]/60">{user.email}</span>}
       </span>
     </div>
@@ -272,7 +272,7 @@ export default function SettingsView({
   return (
     <div className="min-h-screen bg-black" data-testid="settings-view">
       <main className="mx-auto w-full max-w-3xl space-y-4 px-3 pb-44 pt-4 sm:px-4">
-        <h1 className="text-2xl font-extrabold" data-testid="settings-title">
+        <h1 className="text-2xl font-medium" data-testid="settings-title">
           {t('settings.title')}
         </h1>
 
@@ -289,8 +289,8 @@ export default function SettingsView({
                 aria-label={t(pic ? 'company.logo.replace' : 'company.logo.add')}
                 className="group relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-xl bg-transparent p-1.5 transition disabled:opacity-60"
               >
-                {pic ? <img src={pic} alt="" className="max-h-full max-w-full object-contain" /> : <span className="text-[10px] font-bold text-[#E0E0E0]/40">LOGO</span>}
-                <span aria-hidden="true" className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-black/70 py-1 text-[10px] font-bold text-[#E0E0E0] opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+                {pic ? <img src={pic} alt="" className="max-h-full max-w-full object-contain" /> : <span className="text-[10px] font-medium text-[#E0E0E0]/40">LOGO</span>}
+                <span aria-hidden="true" className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-black/70 py-1 text-[10px] font-medium text-[#E0E0E0] opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 20h9" />
                     <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
@@ -300,7 +300,7 @@ export default function SettingsView({
               </button>
               <input ref={logoRef} type="file" accept={LOGO_LIMITS.types.join(',')} className="sr-only" tabIndex={-1} aria-hidden="true" data-testid="settings-logo-input" onChange={onLogoFile} />
               {logoError && (
-                <p role="alert" className="mt-1.5 max-w-[5rem] text-xs font-semibold text-red-400">
+                <p role="alert" className="mt-1.5 max-w-[5rem] text-xs font-medium text-red-400">
                   {logoError}
                 </p>
               )}
@@ -316,7 +316,7 @@ export default function SettingsView({
             <div>
               <TextField label={t('company.email')} value={form.email} onChange={setField('email')} onBlur={commitField} testId="settings-company-email" maxLength={120} optional={t('common.optional')} sanitize={sanitizeEmailInput} placeholder="name@company.com" />
               {emailError && (
-                <p role="alert" className="mt-1.5 text-sm font-semibold text-red-400">
+                <p role="alert" className="mt-1.5 text-sm font-medium text-red-400">
                   {t('company.emailInvalid')}
                 </p>
               )}
@@ -359,11 +359,11 @@ export default function SettingsView({
             type="button"
             onClick={() => setSigning(true)}
             data-testid="settings-signature"
-            className="flex min-h-[64px] w-full items-center gap-3 py-4 text-left transition hover:text-white"
+            className="flex min-h-[64px] w-full items-center gap-3 py-4 text-left transition hover:text-neutral-200"
           >
             <FileSignatureIcon size={22} className="text-neutral-400" />
             <span className="min-w-0 flex-1">
-              <span className="block text-lg font-bold">{t('settings.sign')}</span>
+              <span className="block text-lg font-medium">{t('settings.sign')}</span>
               <span className="block truncate text-xs text-neutral-400">{t(form.signature ? 'sign.pro.change' : 'sign.pro.empty')}</span>
             </span>
             {form.signature ? (
@@ -401,7 +401,7 @@ export default function SettingsView({
                   onClick={connect}
                   disabled={Boolean(working)}
                   data-testid="backup-connect"
-                  className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-black px-3 text-sm font-bold text-brand hover:border-brand disabled:opacity-50"
+                  className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-black px-3 text-sm font-medium text-brand hover:border-brand disabled:opacity-50"
                 >
                   <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11.5 4.4" />
@@ -413,9 +413,9 @@ export default function SettingsView({
                 <>
                   <div className="flex items-center gap-2" data-testid="backup-connected">
                     <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-brand" />
-                    <p className="min-w-0 flex-1 truncate font-semibold">{t('backup.connected')}</p>
+                    <p className="min-w-0 flex-1 truncate font-medium">{t('backup.connected')}</p>
                     {st?.status === 'synced' && (
-                      <span className="shrink-0 text-xs font-semibold text-brand" data-testid="backup-synced-tag">
+                      <span className="shrink-0 text-xs font-medium text-brand" data-testid="backup-synced-tag">
                         {t('backup.synced.short')}
                       </span>
                     )}
@@ -435,10 +435,10 @@ export default function SettingsView({
                     {st?.status === 'synced' && st.at ? t('backup.last', { when: agoText(st.at) }) : statusText}
                   </p>
                   <div className="grid grid-cols-2 gap-3">
-                    <button type="button" onClick={backupNow} disabled={Boolean(working)} data-testid="backup-now" className="min-h-[44px] rounded-lg bg-brand px-3 text-sm font-bold text-black hover:bg-brand-light disabled:opacity-50">
+                    <button type="button" onClick={backupNow} disabled={Boolean(working)} data-testid="backup-now" className="min-h-[44px] rounded-lg bg-brand px-3 text-sm font-medium text-black hover:bg-brand-light disabled:opacity-50">
                       {working === 'backup' ? t('backup.status.syncing') : t('backup.now')}
                     </button>
-                    <button type="button" onClick={restore} disabled={Boolean(working)} data-testid="backup-restore" className="min-h-[44px] rounded-lg border border-white/10 px-3 text-sm font-bold hover:border-brand disabled:opacity-50">
+                    <button type="button" onClick={restore} disabled={Boolean(working)} data-testid="backup-restore" className="min-h-[44px] rounded-lg border border-white/10 px-3 text-sm font-medium hover:border-brand disabled:opacity-50">
                       {working === 'restore' ? t('restore.title') : t('backup.restore')}
                     </button>
                   </div>
@@ -448,7 +448,7 @@ export default function SettingsView({
                 <div data-testid="backup-held">
                   <p className="text-xs leading-snug text-[#e8c35f]">{t('backup.held')}</p>
                   {!(backup.enabled && backup.linked) && (
-                    <button type="button" onClick={restore} disabled={Boolean(working)} data-testid="backup-restore" className="mt-2 min-h-[44px] w-full rounded-lg border border-white/10 px-3 text-sm font-bold hover:border-brand disabled:opacity-50">
+                    <button type="button" onClick={restore} disabled={Boolean(working)} data-testid="backup-restore" className="mt-2 min-h-[44px] w-full rounded-lg border border-white/10 px-3 text-sm font-medium hover:border-brand disabled:opacity-50">
                       {working === 'restore' ? t('restore.title') : t('backup.restore')}
                     </button>
                   )}
@@ -474,7 +474,7 @@ export default function SettingsView({
               {onConfirmRegion ? (
                 <RegionCombobox value={regionCode || detectCurrentRegion()} onChange={onConfirmRegion} />
               ) : (
-                <button type="button" onClick={onChangeRegion} className="flex min-h-[52px] w-full items-center justify-between gap-2 rounded-xl border-2 border-neutral-700 px-4 text-left font-bold hover:border-brand">
+                <button type="button" onClick={onChangeRegion} className="flex min-h-[52px] w-full items-center justify-between gap-2 rounded-xl border-2 border-neutral-700 px-4 text-left font-medium hover:border-brand">
                   <span className="truncate">{t('settings.region.change')}</span>
                   <span aria-hidden="true">›</span>
                 </button>
@@ -488,7 +488,7 @@ export default function SettingsView({
         {/* Local account (Google account lives inside the Drive card when connected) */}
         {!googleUser && (
           <section className="card space-y-3" aria-labelledby="settings-account-title">
-            <h2 id="settings-account-title" className="text-sm font-bold text-[#E0E0E0]/70">
+            <h2 id="settings-account-title" className="text-sm font-medium text-[#E0E0E0]/70">
               {t('settings.account')}
             </h2>
             {accountRow}
@@ -522,7 +522,7 @@ export default function SettingsView({
                 </button>
               </div>
               {phase === 'failed' && (
-                <button type="button" onClick={() => leave({ force: true })} data-testid="logout-force" className="min-h-[44px] w-full rounded-xl border border-red-500/60 px-3 text-sm font-bold text-red-300 hover:bg-red-500/10">
+                <button type="button" onClick={() => leave({ force: true })} data-testid="logout-force" className="min-h-[44px] w-full rounded-xl border border-red-500/60 px-3 text-sm font-semibold text-red-300 hover:bg-red-500/10">
                   {t('settings.logout.force')}
                 </button>
               )}

@@ -94,7 +94,7 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro, 
           aria-label={t('ws.alerts.title')}
           data-testid="dash-bell"
           data-alerts={alerts.length || undefined}
-          className="relative flex min-h-[52px] min-w-[52px] items-center justify-center rounded-xl border border-white/15 text-white/60 transition active:border-white/50 active:text-white"
+          className="relative flex min-h-[52px] min-w-[52px] items-center justify-center rounded-xl border border-white/15 text-white/60 transition active:border-white/50 active:text-neutral-200"
         >
           <BellIcon size={26} />
           {alerts.length > 0 && <span aria-hidden="true" data-testid="dash-bell-dot" className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-amber-500" />}
@@ -111,7 +111,7 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro, 
           }`}
         >
           <HelmetIcon size={28} />
-          <span className="text-[11px] font-extrabold leading-none tracking-widest">PRO</span>
+          <span className="text-[11px] font-semibold leading-none tracking-widest">PRO</span>
         </button>
       </header>
       {/* no visible title and no "MODO PRO (Prueba)" tag: top bar (logo + PRO) and, right below, the four triangles. The heading stays for screen readers. */}
@@ -131,7 +131,7 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro, 
                   <polygon points="30,3 57,51 3,51" fill="none" stroke={stroke} strokeWidth="2" strokeOpacity={n > 0 ? 1 : 0.28} strokeLinejoin="round" data-testid={`tri-${level}`} />
                 </svg>
                 {n > 0 && (
-                  <span aria-hidden="true" className="absolute inset-x-0 top-[25px] text-center text-xl font-black leading-none tabular-nums" style={{ color }}>
+                  <span aria-hidden="true" className="absolute inset-x-0 top-[25px] text-center text-xl font-medium leading-none tabular-nums" style={{ color }}>
                     {n}
                   </span>
                 )}
@@ -153,9 +153,9 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro, 
             aria-selected={tab === id}
             data-testid={`tab-${id}`}
             onClick={() => onTab(id)}
-            className={`min-h-[48px] border-b-2 text-base font-bold transition ${
+            className={`min-h-[48px] border-b-2 text-base font-semibold transition ${
               tab === id
-                ? `text-white ${id === 'history' ? 'border-neutral-500' : 'border-brand'}` // Activos: green; Historial: cement grey (closed work is not "go")
+                ? `text-neutral-200 ${id === 'history' ? 'border-neutral-500' : 'border-brand'}` // Activos: green; Historial: cement grey (closed work is not "go")
                 : 'border-transparent text-neutral-500 hover:text-neutral-300' // the section you are NOT in is dimmed
             }`}
           >

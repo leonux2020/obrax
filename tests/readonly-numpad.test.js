@@ -54,7 +54,7 @@ describe('locked sliders are cement grey, never a dimmed green', () => {
     expect(q('s-input').disabled).toBe(true);
     expect(q('s-input').className).toContain('slider-locked');
     expect(q('s-input').className).not.toMatch(/opacity/);
-    expect(q('s-value').className).toContain('text-white');
+    expect(q('s-value').className).toContain('text-neutral-200');
     expect(q('s-value').className).not.toContain('bg-brand');
     await mount(false);
     expect(q('s-input').disabled).toBe(false);

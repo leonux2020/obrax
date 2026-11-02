@@ -59,7 +59,7 @@ export function Wordmark({ height = 28, className = '' }) {
 const VARIANTS = {
   primary: 'bg-brand text-black hover:bg-brand-light',
   secondary: 'border-2 border-brand text-brand hover:bg-brand/10',
-  ghost: 'border border-white/10 text-white hover:border-white/40',
+  ghost: 'border border-white/10 text-neutral-200 hover:border-white/40',
   danger: 'border-2 border-red-500 text-red-400 hover:bg-red-500/10',
 };
 
@@ -67,7 +67,7 @@ export function Button({ variant = 'primary', className = '', type = 'button', .
   return (
     <button
       type={type}
-      className={`inline-flex min-h-[52px] select-none items-center justify-center gap-2 rounded-xl px-5 text-base font-bold transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 ${VARIANTS[variant]} ${className}`}
+      className={`inline-flex min-h-[52px] select-none items-center justify-center gap-2 rounded-xl px-5 text-base font-semibold transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 ${VARIANTS[variant]} ${className}`}
       {...props}
     />
   );
@@ -227,8 +227,8 @@ export function Segmented({ label, value, options, onChange }) {
             role="radio"
             aria-checked={value === o.value}
             onClick={() => onChange(o.value)}
-            className={`min-h-[52px] rounded-xl border-2 px-3 font-bold transition ${
-              value === o.value ? 'border-brand bg-brand text-black' : 'border-neutral-700 text-white hover:border-neutral-500'
+            className={`min-h-[52px] rounded-xl border-2 px-3 font-semibold transition ${
+              value === o.value ? 'border-brand bg-brand text-black' : 'border-neutral-700 text-neutral-200 hover:border-neutral-500'
             }`}
           >
             {o.label}
@@ -247,12 +247,12 @@ export function Slider({ label, description, value, min, max, step = 1, suffix =
     <div className="card">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <label htmlFor={id} className="text-lg font-bold">
+          <label htmlFor={id} className="text-lg font-medium">
             {label}
           </label>
           {description && <p className="text-sm text-neutral-400">{description}</p>}
         </div>
-        <span className="rounded-lg bg-brand px-3 py-1 text-xl font-extrabold tabular-nums text-black">
+        <span className="rounded-lg bg-brand px-3 py-1 text-xl font-medium tabular-nums text-black">
           {value}
           {suffix}
         </span>
@@ -262,7 +262,7 @@ export function Slider({ label, description, value, min, max, step = 1, suffix =
           type="button"
           aria-label={`${label} -${step}`}
           onClick={() => onChange(clamp(value - step))}
-          className="h-12 w-12 shrink-0 rounded-xl border-2 border-neutral-700 text-2xl font-bold hover:border-brand"
+          className="h-12 w-12 shrink-0 rounded-xl border-2 border-neutral-700 text-2xl font-medium hover:border-brand"
         >
           −
         </button>
@@ -281,7 +281,7 @@ export function Slider({ label, description, value, min, max, step = 1, suffix =
           type="button"
           aria-label={`${label} +${step}`}
           onClick={() => onChange(clamp(value + step))}
-          className="h-12 w-12 shrink-0 rounded-xl border-2 border-neutral-700 text-2xl font-bold hover:border-brand"
+          className="h-12 w-12 shrink-0 rounded-xl border-2 border-neutral-700 text-2xl font-medium hover:border-brand"
         >
           +
         </button>
@@ -308,7 +308,7 @@ export function Switch({ checked, onChange, label, description, className = '', 
       {...rest}
     >
       <span className="min-w-0 flex-1">
-        <span id={`${id}-l`} className="block font-bold">
+        <span id={`${id}-l`} className="block font-semibold">
           {label}
         </span>
         {description && (
@@ -332,7 +332,7 @@ export function Switch({ checked, onChange, label, description, className = '', 
 export function Badge({ children, tone = 'green' }) {
   const tones = {
     green: 'bg-brand/15 text-brand-light border-brand/40',
-    white: 'bg-white/10 text-white border-white/30',
+    white: 'bg-white/10 text-neutral-200 border-white/30',
   };
-  return <span className={`rounded-md border px-2 py-0.5 text-xs font-bold ${tones[tone]}`}>{children}</span>;
+  return <span className={`rounded-md border px-2 py-0.5 text-xs font-semibold ${tones[tone]}`}>{children}</span>;
 }

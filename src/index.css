@@ -17,10 +17,12 @@
   body,
   #root {
     background-color: #000000;
-    color: #fff;
+    color: #e5e5e5; /* neutral-200: never pure white on pure black (halation / bloom on OLED) */
     min-height: 100%;
   }
   body {
+    /* off-white text, grayscale antialiasing and fixed-width digits (money and dates do not dance when they change) */
+    @apply antialiased text-neutral-200 tabular-nums;
     font-family: theme('fontFamily.sans');
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
@@ -46,7 +48,7 @@
     @apply rounded-2xl border border-white/10 bg-black p-4 sm:p-5;
   }
   .field-input {
-    @apply w-full min-h-[52px] rounded-xl border-2 border-neutral-700 bg-black px-4 text-lg font-medium text-white placeholder:text-neutral-500 focus:border-brand focus:outline-none;
+    @apply w-full min-h-[52px] rounded-xl border-2 border-neutral-700 bg-black px-4 text-lg font-medium text-neutral-200 placeholder:text-neutral-500 focus:border-brand focus:outline-none;
   }
   /* Date fields: no browser calendar icon; the whole field opens the calendar (DateInput in ui.jsx). */
   .date-input::-webkit-calendar-picker-indicator {

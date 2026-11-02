@@ -72,16 +72,16 @@ export default function HeaderZone({ project, model, title, client, region, offl
           data-level={model.level}
           aria-label={`${t('ws.state')}: ${detail}`}
           style={{ borderLeftColor: model.tone, color: model.tone }}
-          className={`border-l-2 pl-2 text-sm leading-tight ${model.info.level === 'red' ? 'font-medium' : 'font-extrabold'}`}
+          className={`border-l-2 pl-2 text-sm leading-tight ${model.info.level === 'red' ? 'font-medium' : 'font-semibold'}`}
         >
           {/* late: ONLY "Ritardo di X g" (the state word "In ritardo" said the same thing twice) */}
           {model.info.level !== 'red' && t(`light.${model.info.level}`)}
           <span className={model.info.level === 'red' ? 'text-base' : 'block text-base'}>{detail}</span>
         </p>
         <button type="button" onClick={onCash} aria-label={t('cash.title')} data-testid="ws-total" className="text-right">
-          <span className="block text-3xl font-semibold tabular-nums leading-none text-brand">{model.total === null ? '—' : money(model.total)}</span>
+          <span className="block text-3xl font-medium tracking-tight tabular-nums leading-none text-brand">{model.total === null ? '—' : money(model.total)}</span>
           {model.locked && (
-            <span data-testid="ws-lock-chip" className="mt-1 block text-[11px] font-bold text-[#e8c35f]">
+            <span data-testid="ws-lock-chip" className="mt-1 block text-[11px] font-medium text-[#e8c35f]">
               🔒 {t(model.locked === 'signed' ? 'ws.lock.signed' : 'ws.lock.frozen')}
             </span>
           )}
@@ -112,7 +112,7 @@ export default function HeaderZone({ project, model, title, client, region, offl
       ) : null}
 
       {model.locked && (
-        <button type="button" onClick={onUnlock} data-testid="ws-unlock" className="mt-2 min-h-[40px] w-full rounded-lg border border-[#d4af37]/60 px-3 text-xs font-bold text-[#e8c35f] active:border-[#d4af37]">
+        <button type="button" onClick={onUnlock} data-testid="ws-unlock" className="mt-2 min-h-[40px] w-full rounded-lg border border-[#d4af37]/60 px-3 text-xs font-semibold text-[#e8c35f] active:border-[#d4af37]">
           {t('ws.unlock')}
         </button>
       )}

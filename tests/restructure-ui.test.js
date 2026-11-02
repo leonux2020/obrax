@@ -166,13 +166,13 @@ describe('Dashboard: counters instead of sentences, tabs, full-width clickable c
     await render(React.createElement(Harness, { onOpen: () => {}, onNew: () => {} }));
     const cls = (id) => q(id).className;
     expect(cls('tab-active')).toContain('border-brand');
-    expect(cls('tab-active')).toContain('text-white');
+    expect(cls('tab-active')).toContain('text-neutral-200');
     expect(cls('tab-history')).toContain('border-transparent');
     expect(cls('tab-history')).toContain('text-neutral-500'); // inactive: dimmed
     await click(q('tab-history'));
     expect(cls('tab-history')).toContain('border-neutral-500'); // NOT green
     expect(cls('tab-history')).not.toContain('border-brand');
-    expect(cls('tab-history')).toContain('text-white');
+    expect(cls('tab-history')).toContain('text-neutral-200');
     expect(cls('tab-active')).toContain('border-transparent');
     expect(cls('tab-active')).toContain('text-neutral-500');
     expect(cls('tab-active')).not.toContain('border-brand');

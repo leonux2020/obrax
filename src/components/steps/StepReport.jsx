@@ -12,7 +12,7 @@ function PhotoGrid({ title, photos }) {
   if (!photos.length) return null;
   return (
     <section className="mt-6 break-inside-avoid">
-      <h3 className="mb-2 text-lg font-bold text-brand">{title}</h3>
+      <h3 className="mb-2 text-lg font-medium text-brand">{title}</h3>
       <ul className="grid grid-cols-2 gap-3">
         {photos.map((p) => (
           <li key={p.slot}>
@@ -46,7 +46,7 @@ function CompanyBlock({ company }) {
         </span>
       )}
       <div className="min-w-0">
-        {company.name && <p className="break-words text-lg font-extrabold">{company.name}</p>}
+        {company.name && <p className="break-words text-lg font-semibold">{company.name}</p>}
         {company.details.length > 0 && (
           <p className="break-words text-sm text-neutral-300">
             {company.details.map((d, i) => (
@@ -69,8 +69,8 @@ function Heading({ model }) {
       <header className="mb-5 flex items-start gap-4 border-b border-neutral-700 pb-4">
         {!model.company.logo && <Logo size={56} className="shrink-0" />}
         <div className="min-w-0 flex-1">
-          <h2 className="text-xl font-extrabold leading-tight sm:text-2xl">{model.heading}</h2>
-          <p className="break-words text-lg font-semibold text-brand">{model.project}</p>
+          <h2 className="text-xl font-semibold leading-tight sm:text-2xl">{model.heading}</h2>
+          <p className="break-words text-lg font-medium text-brand">{model.project}</p>
           <p className="text-sm text-neutral-300">{model.date}</p>
         </div>
       </header>
@@ -80,9 +80,9 @@ function Heading({ model }) {
 
 function Row({ label, value, strong, muted }) {
   return (
-    <div className={`flex items-baseline justify-between gap-3 border-b border-neutral-800 py-2.5 ${strong ? 'text-lg font-bold' : ''}`}>
+    <div className={`flex items-baseline justify-between gap-3 border-b border-neutral-800 py-2.5 ${strong ? 'text-lg font-semibold' : ''}`}>
       <span className={muted ? 'text-neutral-300' : ''}>{label}</span>
-      <span className="font-bold tabular-nums">{value}</span>
+      <span className="font-medium tabular-nums">{value}</span>
     </div>
   );
 }
@@ -99,13 +99,13 @@ function ClientView({ model, photos, signatureProps }) {
           <b>{model.client}</b>
         </p>
       )}
-      <h3 className="mb-1 text-lg font-bold text-brand">{model.chaptersLabel}</h3>
+      <h3 className="mb-1 text-lg font-medium text-brand">{model.chaptersLabel}</h3>
       <ul>
         {model.chapters.map((c) => (
           <li key={c.n} className="border-b border-neutral-800 py-3">
             <div className="flex items-baseline justify-between gap-3">
-              <p className="font-bold">{c.title}</p>
-              <p className="shrink-0 text-lg font-bold tabular-nums">{money(c.amount)}</p>
+              <p className="font-medium">{c.title}</p>
+              <p className="shrink-0 text-lg font-medium tabular-nums">{money(c.amount)}</p>
             </div>
             <p className="text-sm text-neutral-300">{c.description}</p>
           </li>
@@ -113,19 +113,19 @@ function ClientView({ model, photos, signatureProps }) {
       </ul>
       {model.breakdown && (
         <section className="mt-4" aria-label={model.breakdown.title} data-testid="client-breakdown">
-          <h3 className="mb-1 text-lg font-bold text-brand">{model.breakdown.title}</h3>
+          <h3 className="mb-1 text-lg font-medium text-brand tabular-nums">{model.breakdown.title}</h3>
           {model.breakdown.rows.map((r) => (
             <Row key={r.label} label={r.label} value={money(r.amount)} muted />
           ))}
         </section>
       )}
-      <div className="mt-2">
+      <div className="mt-2 tabular-nums">
         <Row label={model.subtotalLabel} value={money(model.subtotal)} muted />
         <Row label={model.taxLabel} value={money(model.tax)} muted />
       </div>
       <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-brand px-4 py-4 text-black">
-        <span className="text-lg font-bold">{model.totalLabel}</span>
-        <span className="text-3xl font-black tabular-nums">{money(model.total)}</span>
+        <span className="text-lg font-medium">{model.totalLabel}</span>
+        <span className="text-3xl font-medium tracking-tight tabular-nums">{money(model.total)}</span>
       </div>
       <p className="mt-4 text-sm text-neutral-300">{model.validity}</p>
       <PhotoGrid title={t('photo.pdfClientTitle')} photos={photos} />
@@ -153,7 +153,7 @@ function ClientView({ model, photos, signatureProps }) {
             {model.signCompanyData.length > 0 && (
               <span className="mt-1 block text-xs">
                 {model.signCompanyData.map((line, i) => (
-                  <span key={line} className={`block ${i === 0 ? 'font-bold text-white' : ''}`}>
+                  <span key={line} className={`block ${i === 0 ? 'font-semibold text-neutral-200' : ''}`}>
                     {line}
                   </span>
                 ))}
@@ -175,34 +175,34 @@ function TechView({ model, photos }) {
     <article className="report-sheet card" aria-label={model.heading}>
       <Heading model={model} />
       <p className="mb-4 text-sm text-neutral-300">
-        {model.modeLabel} · {t('tech.chain')}: <b className="text-white">{model.chainLabel}</b>
+        {model.modeLabel} · {t('tech.chain')}: <b className="text-neutral-200">{model.chainLabel}</b>
         {model.client && (
           <>
             {' '}
-            · {model.clientLabel}: <b className="text-white">{model.client}</b>
+            · {model.clientLabel}: <b className="text-neutral-200">{model.client}</b>
           </>
         )}
       </p>
 
       {model.partidas.map((p) => (
         <section key={p.n} className="mb-5">
-          <h3 className="mb-2 text-lg font-bold text-brand">{p.title}</h3>
+          <h3 className="mb-2 text-lg font-medium text-brand">{p.title}</h3>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
             {[...p.measures, ...p.metrics].map(([k, v]) => (
               <div key={k}>
                 <dt className="text-neutral-400">{k}</dt>
-                <dd className="font-bold tabular-nums">{v}</dd>
+                <dd className="font-medium tabular-nums">{v}</dd>
               </div>
             ))}
             <div>
               <dt className="text-neutral-400">{t('fin.waste')}</dt>
-              <dd className="font-bold">{p.waste}</dd>
+              <dd className="font-medium">{p.waste}</dd>
             </div>
           </dl>
         </section>
       ))}
 
-      <h3 className="mb-1 text-lg font-bold text-brand">{t('pdf.purchasePlan')}</h3>
+      <h3 className="mb-1 text-lg font-medium text-brand">{t('pdf.purchasePlan')}</h3>
       <p className="mb-2 text-sm text-neutral-300">{t('tech.materials.hint')}</p>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-left text-sm">
@@ -221,11 +221,11 @@ function TechView({ model, photos }) {
           <tbody>
             {model.materials.map((m) => (
               <tr key={m.name} className="border-b border-neutral-800 align-top">
-                <td className="py-2 pr-2 font-semibold">{m.name}</td>
+                <td className="py-2 pr-2 font-medium">{m.name}</td>
                 <td className="py-2 pr-2">{m.store}</td>
                 <td className="py-2 pr-2 tabular-nums">{m.need}</td>
                 <td className="py-2 pr-2 tabular-nums">{m.needWaste}</td>
-                <td className="py-2 pr-2 font-bold tabular-nums text-brand">
+                <td className="py-2 pr-2 font-medium tabular-nums text-brand">
                   {m.buy}
                   {m.buyDetail && <span className="block text-xs font-normal text-neutral-400">({m.buyDetail})</span>}
                 </td>
@@ -234,14 +234,14 @@ function TechView({ model, photos }) {
                   {m.unitPrice}
                   {m.manual && <span className="block text-xs text-neutral-400">{t('tech.manualPrice')}</span>}
                 </td>
-                <td className="py-2 text-right font-bold tabular-nums">{money(m.total)}</td>
+                <td className="py-2 text-right font-medium tabular-nums">{money(m.total)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      <h3 className="mb-1 mt-6 text-lg font-bold text-brand">{t('pdf.stores')}</h3>
+      <h3 className="mb-1 mt-6 text-lg font-medium text-brand">{t('pdf.stores')}</h3>
       <ul>
         {model.stores.map((s) => (
           <li key={s.store} className="flex justify-between gap-3 border-b border-neutral-800 py-2">
@@ -253,7 +253,7 @@ function TechView({ model, photos }) {
         ))}
       </ul>
 
-      <h3 className="mb-1 mt-6 text-lg font-bold text-brand">{t('tech.leftover.title')}</h3>
+      <h3 className="mb-1 mt-6 text-lg font-medium text-brand">{t('tech.leftover.title')}</h3>
       {model.leftovers.rows.length === 0 ? (
         <p className="text-sm text-neutral-300">{t('tech.leftover.none')}</p>
       ) : (
@@ -269,19 +269,19 @@ function TechView({ model, photos }) {
             ))}
           </ul>
           <p className="mt-2 text-sm text-neutral-300">
-            {t('tech.leftover.value')}: <b className="text-white">{money(model.leftovers.total)}</b> · {t('tech.leftover.tip')}
+            {t('tech.leftover.value')}: <b className="text-neutral-200 tabular-nums">{money(model.leftovers.total)}</b> · {t('tech.leftover.tip')}
           </p>
         </>
       )}
 
       {model.machinery.some((m) => m.included) && (
         <section data-testid="tech-machinery">
-          <h3 className="mb-1 mt-6 text-lg font-bold text-brand">{t('mach.title')}</h3>
+          <h3 className="mb-1 mt-6 text-lg font-medium text-brand">{t('mach.title')}</h3>
           <ul>
             {model.machinery.filter((m) => m.included).map((m) => (
               <li key={`${m.name}-${m.partida}`} className="flex justify-between gap-3 border-b border-neutral-800 py-2">
                 <span>
-                  {m.name} <span className="text-sm text-neutral-400">· {m.partida} · {t('mach.line', { qty: num(m.qty, 0), days: num(m.days, 0), rate: money(m.rate) })}</span>
+                  {m.name} <span className="text-sm text-neutral-400 tabular-nums">· {m.partida} · {t('mach.line', { qty: num(m.qty, 0), days: num(m.days, 0), rate: money(m.rate) })}</span>
                 </span>
                 <b className="tabular-nums">{money(m.total)}</b>
               </li>
@@ -291,7 +291,7 @@ function TechView({ model, photos }) {
         </section>
       )}
 
-      <h3 className="mb-1 mt-6 text-lg font-bold text-brand">{t('pdf.costs')}</h3>
+      <h3 className="mb-1 mt-6 text-lg font-medium text-brand tabular-nums">{t('pdf.costs')}</h3>
       <Row label={t('fin.materials')} value={money(model.costs.materials)} muted />
       <Row label={`${t('fin.laborLine')} (${model.costs.laborPct}%)`} value={money(model.costs.labor)} muted />
       <Row label={`${t('fin.transportLine')} (${model.costs.transportPct}%)`} value={money(model.costs.transport)} muted />
@@ -310,7 +310,7 @@ function TechView({ model, photos }) {
 
       {model.notes.length > 0 && (
         <section className="mt-6">
-          <h3 className="mb-1 text-lg font-bold text-brand">{t('tech.assumptions')}</h3>
+          <h3 className="mb-1 text-lg font-medium text-brand">{t('tech.assumptions')}</h3>
           <ul className="list-disc space-y-1 pl-5 text-sm text-neutral-300">
             {model.notes.map((n) => (
               <li key={n}>{n}</li>
@@ -409,7 +409,7 @@ export default function StepReport({ draft, setDraft, result, pricedAt, photos, 
             type="button"
             aria-selected={view === v}
             onClick={() => setView(v)}
-            className={`min-h-[52px] rounded-xl border-2 font-bold transition ${
+            className={`min-h-[52px] rounded-xl border-2 font-semibold transition ${
               view === v ? 'border-brand bg-brand text-black' : 'border-white/10 hover:border-white/30'
             }`}
           >

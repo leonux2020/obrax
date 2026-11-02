@@ -94,7 +94,7 @@ export default function BottomSheet({ title, subtitle, onClose, fullscreen = fal
       >
         {swipeToClose && <div aria-hidden="true" className="mx-auto -mt-2 mb-2 h-1 w-10 rounded-full bg-white/20" />}
         <div className="mb-1 flex items-start justify-between gap-3">
-          <h2 id={titleId} className="text-2xl font-bold">
+          <h2 id={titleId} className="text-2xl font-medium tracking-tight">
             {title}
           </h2>
           <button

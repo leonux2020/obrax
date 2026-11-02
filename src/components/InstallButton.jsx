@@ -24,7 +24,7 @@ export default function InstallButton({ pwa, className = '', quiet = false }) {
         data-native={pwa.canInstall ? 'true' : 'false'}
         data-quiet={quiet ? 'true' : undefined}
         className={`flex w-full items-center justify-center gap-2 rounded-xl px-5 transition active:scale-[0.98] ${
-          quiet ? 'min-h-[48px] border border-white/10 text-sm font-medium text-neutral-400 hover:text-neutral-200' : 'min-h-[52px] border-2 border-brand text-base font-bold text-brand hover:bg-brand/10'
+          quiet ? 'min-h-[48px] border border-white/10 text-sm font-medium text-neutral-400 hover:text-neutral-200' : 'min-h-[52px] border-2 border-brand text-base font-medium text-brand hover:bg-brand/10'
         }`}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

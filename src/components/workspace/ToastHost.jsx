@@ -18,7 +18,7 @@ export default function ToastHost() {
           data-testid="toast"
           data-tone={x.tone}
           style={{ borderLeftColor: TONE[x.tone] ?? TONE.info, color: TONE[x.tone] ?? TONE.info }}
-          className="pointer-events-auto max-w-md rounded-lg border border-l-2 border-white/15 bg-black px-4 py-3 text-left text-sm font-bold shadow-lg"
+          className="pointer-events-auto max-w-md rounded-lg border border-l-2 border-white/15 bg-black px-4 py-3 text-left text-sm font-semibold shadow-lg"
         >
           {t(x.key, x.params)}
         </button>

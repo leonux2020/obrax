@@ -40,7 +40,7 @@ export default function PartidaMachinery({ draft, result, index, regionCode, pro
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className={`block truncate text-base font-normal ${on ? '' : 'text-neutral-500'}`}>{t(`mach.${m.id}`)}</span>
-                    <span className="block truncate text-sm font-normal text-neutral-400">{t('mach.line', { qty: num(m.qty, 0), days: num(m.days, 0), rate: money(m.rate) })}</span>
+                    <span className="block truncate text-sm font-normal text-neutral-400 tabular-nums">{t('mach.line', { qty: num(m.qty, 0), days: num(m.days, 0), rate: money(m.rate) })}</span>
                     {row?.supplier && (
                       <span data-testid={`partida-machine-supplier-${index}-${m.id}`} className="block truncate text-xs font-normal text-neutral-500">
                         {priceCaption(t, { origin: m.source === 'saved' ? 'user' : m.source === 'ai' ? 'ai' : 'base', meta: row.supplier, regionCode })}

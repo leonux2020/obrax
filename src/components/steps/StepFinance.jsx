@@ -15,7 +15,7 @@ export default function StepFinance({ draft, setDraft, result }) {
 
   return (
     <section aria-labelledby="fin-title" className="space-y-4">
-      <h2 id="fin-title" className="text-2xl font-bold">
+      <h2 id="fin-title" className="text-2xl font-medium tracking-tight">
         {t('fin.title')}
       </h2>
 
@@ -68,7 +68,7 @@ export default function StepFinance({ draft, setDraft, result }) {
 
       {result.valid && (
         <div className="card border-brand/50" aria-live="polite">
-          <h3 className="mb-3 text-lg font-bold text-brand">{t('fin.summary')}</h3>
+          <h3 className="mb-3 text-lg font-medium text-brand">{t('fin.summary')}</h3>
           <dl className="space-y-2 text-lg">
             {[
               [t('fin.materials'), result.quote.materials],
@@ -80,22 +80,22 @@ export default function StepFinance({ draft, setDraft, result }) {
             ].map(([label, v]) => (
               <div key={label} className="flex justify-between gap-3">
                 <dt className="text-neutral-300">{label}</dt>
-                <dd className="font-bold tabular-nums">{money(v)}</dd>
+                <dd className="font-medium tabular-nums">{money(v)}</dd>
               </div>
             ))}
             <div className="flex justify-between gap-3 border-t border-neutral-700 pt-2">
               <dt className="text-neutral-300">{t('com.subtotalNet')}</dt>
-              <dd className="font-bold tabular-nums">{money(result.quote.subtotal)}</dd>
+              <dd className="font-medium tabular-nums">{money(result.quote.subtotal)}</dd>
             </div>
             <div className="flex justify-between gap-3">
-              <dt className="text-neutral-300">
+              <dt className="text-neutral-300 tabular-nums">
                 {t('fin.taxLine', { name: region.taxName, rate: num(result.quote.taxRate * 100) })}
               </dt>
-              <dd className="font-bold tabular-nums">{money(result.quote.tax)}</dd>
+              <dd className="font-medium tabular-nums">{money(result.quote.tax)}</dd>
             </div>
             <div className="flex justify-between gap-3 border-t border-neutral-700 pt-2 text-xl">
-              <dt className="font-bold">{t('fin.totalWithTax')}</dt>
-              <dd className="font-extrabold tabular-nums text-brand">{money(result.quote.total)}</dd>
+              <dt className="font-semibold">{t('fin.totalWithTax')}</dt>
+              <dd className="font-medium tabular-nums text-brand">{money(result.quote.total)}</dd>
             </div>
           </dl>
         </div>

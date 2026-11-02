@@ -18,7 +18,7 @@ export default function RegionSelect({ initial, onConfirm, onCancel, onChangeLan
       <header className="mb-6 flex items-center gap-4">
         <Logo size={56} />
         <div className="mr-auto">
-          <h1 className="text-2xl font-extrabold tracking-tight">{t('app.name')}</h1>
+          <h1 className="text-2xl font-medium tracking-tight">{t('app.name')}</h1>
           <p className="text-neutral-300">{t('app.tagline')}</p>
         </div>
         {onChangeLang && <LangSelect onChange={onChangeLang} />}
@@ -34,16 +34,16 @@ export default function RegionSelect({ initial, onConfirm, onCancel, onChangeLan
               {region.flag}
             </span>
             <div className="min-w-0">
-              <p className="truncate text-xl font-bold">{regionName(region, lang)}</p>
+              <p className="truncate text-xl font-semibold">{regionName(region, lang)}</p>
               <p className="text-sm text-neutral-300">
-                {t('region.currency')}: <b className="text-white">{region.currency}</b> ({region.symbol}) ·{' '}
-                {t('region.vat')} {region.taxName}: <b className="text-white">{pct(region.taxRate)}</b>
+                {t('region.currency')}: <b className="text-neutral-200">{region.currency}</b> ({region.symbol}) ·{' '}
+                {t('region.vat')} {region.taxName}: <b className="text-neutral-200 tabular-nums">{pct(region.taxRate)}</b>
                 {region.taxEditable && <span className="text-brand"> · {t('region.taxEditable')}</span>}
               </p>
             </div>
           </div>
           <p className="mt-3 text-sm text-neutral-300">
-            <span className="font-semibold text-white">{t('region.chains')}:</span>{' '}
+            <span className="font-semibold text-neutral-200">{t('region.chains')}:</span>{' '}
             {region.chains.map((c) => chainLabel(c, t)).join(' · ')}
           </p>
           {region.generic && <p className="mt-1 text-xs text-neutral-400">{t('region.genericChains')}</p>}

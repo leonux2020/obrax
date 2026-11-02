@@ -92,7 +92,7 @@ export default function InvoiceSheet({ quoteItems, taxRate = 0, onApply, onClose
         {phase === 'reading' && (
           <div className="flex flex-col items-center gap-5 py-16 text-center" role="status" data-testid="invoice-reading">
             <span className="h-10 w-10 animate-spin rounded-full border-4 border-white/10 border-t-[#e8c35f]" aria-hidden="true" />
-            <p className="text-lg font-bold">{t('inv.reading')}</p>
+            <p className="text-lg font-semibold">{t('inv.reading')}</p>
             <Button variant="ghost" onClick={cancel} data-testid="invoice-cancel">
               {t('inv.cancel')}
             </Button>
@@ -101,7 +101,7 @@ export default function InvoiceSheet({ quoteItems, taxRate = 0, onApply, onClose
 
         {phase === 'review' && extraction && (
           <div className="space-y-4 pb-28" data-testid="invoice-review">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400">{t('inv.results')}</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">{t('inv.results')}</h3>
             {extraction.supplier && <p className="text-sm text-neutral-300">{t('inv.supplier', { name: extraction.supplier })}</p>}
             {extraction.currencyMismatch && (
               <p role="alert" data-testid="invoice-currency" className="rounded-xl border border-red-500/60 px-4 py-3 text-sm font-semibold text-red-400">
@@ -130,9 +130,9 @@ export default function InvoiceSheet({ quoteItems, taxRate = 0, onApply, onClose
                         aria-label={t(`mat.${r.id}`)}
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="block font-bold leading-snug">{t(`mat.${r.id}`)}</span>
+                        <span className="block font-semibold leading-snug">{t(`mat.${r.id}`)}</span>
                         {r.description && <span className="block truncate text-xs text-neutral-400">{r.description}</span>}
-                        <span className="mt-1 block text-sm text-neutral-300">{t('inv.was', { price: money(r.refPrice) })}</span>
+                        <span className="mt-1 block text-sm text-neutral-300 tabular-nums">{t('inv.was', { price: money(r.refPrice) })}</span>
                         {r.suspicious && (
                           <span className="mt-1 block text-xs font-semibold text-[#e8c35f]" role="note">
                             {t('inv.suspicious')}
@@ -140,7 +140,7 @@ export default function InvoiceSheet({ quoteItems, taxRate = 0, onApply, onClose
                         )}
                       </span>
                       <span className="shrink-0 text-right">
-                        <span className="block text-lg font-extrabold tabular-nums text-[#e8c35f]">{money(r.price)}</span>
+                        <span className="block text-lg font-medium tabular-nums text-[#e8c35f]">{money(r.price)}</span>
                         {saleUnitOf(r.id) && <span className="block text-xs text-neutral-400">/ {unit(saleUnitOf(r.id))}</span>}
                         {r.lines > 1 && <Badge tone="white">×{r.lines}</Badge>}
                       </span>

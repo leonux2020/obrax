@@ -18,7 +18,7 @@ export default function ProfileFields({ form, setForm, logo, setLogo, onBusy, dr
   return (
     <div className="space-y-4">
       <section aria-labelledby="pf-company" className="card space-y-4">
-        <h2 id="pf-company" className="text-lg font-bold">
+        <h2 id="pf-company" className="text-lg font-semibold">
           {t('setup.company')}
         </h2>
         <LogoField value={logo} onChange={setLogo} onBusy={onBusy} externalError={logoError} />
@@ -41,7 +41,7 @@ export default function ProfileFields({ form, setForm, logo, setLogo, onBusy, dr
       </section>
 
       <section aria-labelledby="pf-pro" className="card space-y-4">
-        <h2 id="pf-pro" className="text-lg font-bold">
+        <h2 id="pf-pro" className="text-lg font-semibold">
           {t('setup.pro')}
         </h2>
         <TextField label={t('setup.pro.name')} value={form.proName} onChange={set('proName')} maxLength={60} sanitize={(v) => sanitizeText(v, 60)} placeholder={t('setup.pro.namePh')} />

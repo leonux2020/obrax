@@ -130,20 +130,20 @@ function NoteRow({ entry, store, editing, setEditing, onDelete, onOpenPhoto, onS
               data-testid="wlog-mic"
               data-listening={mic.listening ? 'true' : 'false'}
               className={`absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full border text-xl leading-none transition active:scale-95 ${
-                mic.listening ? 'animate-pulse border-red-500 bg-red-500 text-white' : 'border-white/15 text-[#E0E0E0] hover:border-brand'
+                mic.listening ? 'animate-pulse border-red-500 bg-red-500 text-neutral-200' : 'border-white/15 text-[#E0E0E0] hover:border-brand'
               }`}
             >
               <span aria-hidden="true">🎙️</span>
             </button>
           </div>
           {mic.listening && (
-            <p role="status" className="flex items-center gap-2 text-xs font-semibold text-red-400" data-testid="wlog-listening">
+            <p role="status" className="flex items-center gap-2 text-xs font-medium text-red-400" data-testid="wlog-listening">
               <span aria-hidden="true" className="inline-block h-2 w-2 animate-pulse rounded-full bg-red-500" />
               {t('log.listening')}
             </p>
           )}
           {micIssue && (
-            <p role="alert" className="rounded-xl border border-red-500/60 px-3 py-2 text-sm font-semibold text-red-400" data-testid="wlog-mic-issue">
+            <p role="alert" className="rounded-xl border border-red-500/60 px-3 py-2 text-sm font-medium text-red-400" data-testid="wlog-mic-issue">
               {t(micIssue)}
             </p>
           )}
@@ -155,7 +155,7 @@ function NoteRow({ entry, store, editing, setEditing, onDelete, onOpenPhoto, onS
               onClick={() => fileRef.current?.click()}
               disabled={busy}
               data-testid="wlog-photo"
-              className="flex min-h-[44px] min-w-[44px] items-center gap-2 rounded-xl border border-white/15 px-3 text-sm font-bold active:border-white/50 disabled:opacity-60"
+              className="flex min-h-[44px] min-w-[44px] items-center gap-2 rounded-xl border border-white/15 px-3 text-sm font-medium active:border-white/50 disabled:opacity-60"
             >
               <span aria-hidden="true" className="text-xl leading-none">
                 📸
@@ -172,16 +172,16 @@ function NoteRow({ entry, store, editing, setEditing, onDelete, onOpenPhoto, onS
             )}
           </div>
           {(pickError || saveError) && (
-            <p role="alert" className="text-sm font-semibold text-red-400" data-testid="wlog-error">
+            <p role="alert" className="text-sm font-medium text-red-400" data-testid="wlog-error">
               {t(pickError || saveError)}
             </p>
           )}
 
           <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={finish(() => setEditing(null))} data-testid="wlog-cancel" className="min-h-[44px] rounded-xl border border-white/15 text-sm font-bold active:border-white/50">
+            <button type="button" onClick={finish(() => setEditing(null))} data-testid="wlog-cancel" className="min-h-[44px] rounded-xl border border-white/15 text-sm font-medium active:border-white/50">
               {t('common.cancel')}
             </button>
-            <button type="button" onClick={finish(onSave)} disabled={!editing.text.trim() || busy} data-testid="wlog-save" className="min-h-[44px] rounded-xl border-2 border-brand text-sm font-extrabold text-brand disabled:opacity-40">
+            <button type="button" onClick={finish(onSave)} disabled={!editing.text.trim() || busy} data-testid="wlog-save" className="min-h-[44px] rounded-xl border-2 border-brand text-sm font-medium text-brand disabled:opacity-40">
               {t('ws.log.save')}
             </button>
           </div>

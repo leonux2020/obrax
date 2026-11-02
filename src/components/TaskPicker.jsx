@@ -50,7 +50,7 @@ export default function TaskPicker({ value, onChange, labelledBy, compact = fals
               <TaskIcon id={id} size={compact ? 26 : 34} />
             </span>
             <span className="min-w-0">
-              <span className={`block font-bold leading-tight ${compact ? 'text-sm' : 'text-lg'}`}>{t(`task.${id}`)}</span>
+              <span className={`block font-semibold leading-tight ${compact ? 'text-sm' : 'text-lg'}`}>{t(`task.${id}`)}</span>
               {!compact && <span className="block text-sm text-neutral-300">{t(`task.${id}.desc`)}</span>}
             </span>
           </button>

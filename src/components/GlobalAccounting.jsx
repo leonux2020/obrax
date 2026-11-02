@@ -37,7 +37,7 @@ function HudColumn({ id, label, lines, fmtOf, warn = false }) {
     <span data-testid={id} className="block min-w-0 text-center">
       <span className="block whitespace-nowrap text-xs font-semibold uppercase tracking-wider text-white/50">{label}</span>
       {lines.length === 0 ? (
-        <span className="mt-1 block text-3xl font-extrabold tabular-nums text-[#E0E0E0]/50">—</span>
+        <span className="mt-1 block text-3xl font-medium tabular-nums text-[#E0E0E0]/50 tracking-tight">—</span>
       ) : (
         lines.map((l) => {
           const text = fmtOf(l.regionCode)(l.amount);
@@ -45,7 +45,7 @@ function HudColumn({ id, label, lines, fmtOf, warn = false }) {
             <span
               key={l.currency}
               data-testid={`${id}-${l.currency}`}
-              className={`mt-1 block whitespace-nowrap font-extrabold tabular-nums ${sizeFor(text)} ${warn && l.amount < 0 ? AMBER : 'text-[#E0E0E0]'}`}
+              className={`mt-1 block whitespace-nowrap font-medium tracking-tight tabular-nums ${sizeFor(text)} ${warn && l.amount < 0 ? AMBER : 'text-[#E0E0E0]'}`}
             >
               {text}
             </span>
@@ -117,13 +117,13 @@ export default function GlobalAccounting({ projects, onOpenProject = null, onExp
     <main className="mx-auto w-full max-w-3xl px-3 pb-44 pt-3 sm:px-4" data-testid="accounting">
       <header className="mb-3 flex items-center gap-3">
         <Logo size={32} />
-        <h1 className="min-w-0 flex-1 truncate text-2xl font-extrabold tracking-tight">{t('nav.accountingShort')}</h1>
+        <h1 className="min-w-0 flex-1 truncate text-2xl font-medium tracking-tight">{t('nav.accountingShort')}</h1>
         {projects.length > 0 && (
           <button
             type="button"
             onClick={() => setSelected(all ? [] : projects.map((p) => p.id))}
             data-testid="acc-all"
-            className="min-h-[44px] rounded-lg border border-white/10 px-3 text-sm font-bold hover:border-brand"
+            className="min-h-[44px] rounded-lg border border-white/10 px-3 text-sm font-medium hover:border-brand"
           >
             {t(all ? 'acc.none' : 'acc.all')}
           </button>
@@ -180,7 +180,7 @@ export default function GlobalAccounting({ projects, onOpenProject = null, onExp
                       className="flex min-w-0 flex-1 items-center gap-3 rounded-r-2xl py-3 pr-4 text-left active:opacity-80"
                     >
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate font-bold">{projectTitle(p) || t('proj.untitled')}</span>
+                        <span className="block truncate font-semibold">{projectTitle(p) || t('proj.untitled')}</span>
                         <span className="block truncate text-xs text-neutral-400">{projectClient(p) || t('proj.noClient')}</span>
                         <span data-testid={`acc-timeline-${p.id}`} className="mt-0.5 block truncate text-xs text-[#E0E0E0]/50">
                           {[datesOf(p), pulseOf(p)].filter(Boolean).join(' · ')}
@@ -194,8 +194,8 @@ export default function GlobalAccounting({ projects, onOpenProject = null, onExp
                           </span>
                         )}
                       </span>
-                      <span className="shrink-0 text-right">
-                        <span className={`block font-extrabold tabular-nums ${b.balance < 0 ? 'text-red-400' : 'text-brand'}`}>{fmt(b.balance)}</span>
+                      <span className="shrink-0 text-right tabular-nums">
+                        <span className={`block font-medium tabular-nums ${b.balance < 0 ? 'text-red-400' : 'text-brand'}`}>{fmt(b.balance)}</span>
                         <span className="block text-[11px] text-neutral-400">{t('xl.balance')}</span>
                       </span>
                     </button>
