@@ -87,14 +87,14 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro, 
         <span className="flex min-w-0 flex-1 items-center">
           <Wordmark height={16} />
         </span>
-        {/* global alerts (Action Center): bell, 1.5 px outline, just left of PRO; an amber dot only when something needs attention */}
+        {/* global alerts (Action Center): bell, 1.5 px outline, just left of PRO, floating (no box, no border, no background: only an invisible 52 px touch area); an amber dot only when something needs attention */}
         <button
           type="button"
           onClick={() => setAlertsOpen(true)}
           aria-label={t('ws.alerts.title')}
           data-testid="dash-bell"
           data-alerts={alerts.length || undefined}
-          className="relative flex min-h-[52px] min-w-[52px] items-center justify-center rounded-xl border border-white/15 text-white/60 transition active:border-white/50 active:text-neutral-200"
+          className="relative flex min-h-[52px] min-w-[52px] items-center justify-center bg-transparent p-3 text-white/60 transition active:scale-95 active:text-neutral-200 active:opacity-50"
         >
           <BellIcon size={26} />
           {alerts.length > 0 && <span aria-hidden="true" data-testid="dash-bell-dot" className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-amber-500" />}

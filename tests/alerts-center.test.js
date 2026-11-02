@@ -128,6 +128,13 @@ describe('Dashboard bell + GlobalAlerts', () => {
     expect(svg.getAttribute('stroke')).toBe('currentColor');
     expect(svg.getAttribute('fill')).toBe('none');
     expect(bell.className).toContain('min-h-[52px]');
+    expect(bell.className).toContain('min-w-[52px]'); // the invisible touch area stays generous
+    expect(bell.className).toMatch(/(^|\s)p-3(\s|$)/);
+    expect(bell.className).toContain('bg-transparent');
+    // floating: nothing that draws a box around the icon
+    expect(bell.className).not.toMatch(/(^|\s)(border|ring|shadow|rounded)(-\S+)?(\s|$)/);
+    expect(bell.className).not.toMatch(/(^|\s)bg-(?!transparent)/);
+    expect(bell.className).toMatch(/active:(opacity-50|scale-95)/); // subtle tactile feedback
     expect(q('dash-bell-dot')).toBeNull(); // nothing to report: no dot
   });
 
