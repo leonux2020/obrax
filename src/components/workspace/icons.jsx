@@ -174,16 +174,86 @@ export const HardHatIcon = (props) => (
   </Outline>
 );
 
+export const PickaxeIcon = (props) => (
+  <Outline {...props}>
+    <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
+    <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024" />
+    <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069" />
+    <path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z" />
+  </Outline>
+);
+
+export const RulerIcon = (props) => (
+  <Outline {...props}>
+    <path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.4 2.4 0 0 1 0-3.4l2.6-2.6a2.4 2.4 0 0 1 3.4 0Z" />
+    <path d="m14.5 12.5 2-2" />
+    <path d="m11.5 9.5 2-2" />
+    <path d="m8.5 6.5 2-2" />
+    <path d="m17.5 15.5 2-2" />
+  </Outline>
+);
+
+export const PaintRollerIcon = (props) => (
+  <Outline {...props}>
+    <rect width="16" height="6" x="2" y="2" rx="2" />
+    <path d="M10 16v-2a2 2 0 0 1 2-2h8a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+    <rect width="4" height="6" x="8" y="16" rx="1" />
+  </Outline>
+);
+
+export const TilesIcon = (props) => (
+  <Outline {...props}>
+    <rect width="18" height="18" x="3" y="3" rx="2" />
+    <path d="M3 12h18" />
+    <path d="M12 3v18" />
+  </Outline>
+);
+
+export const LayersIcon = (props) => (
+  <Outline {...props}>
+    <path d="m12 2 10 5-10 5L2 7z" />
+    <path d="m2 12 10 5 10-5" />
+    <path d="m2 17 10 5 10-5" />
+  </Outline>
+);
+
+export const DoorIcon = (props) => (
+  <Outline {...props}>
+    <path d="M13 4h3a2 2 0 0 1 2 2v14" />
+    <path d="M2 20h3" />
+    <path d="M13 20h9" />
+    <path d="M10 12v.01" />
+    <path d="M13 4.562v16.157a1 1 0 0 1-1.242.97L5 20V5.562a2 2 0 0 1 1.515-1.94l4-1A2 2 0 0 1 13 4.561Z" />
+  </Outline>
+);
+
+export const TruckIcon = (props) => (
+  <Outline {...props}>
+    <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" />
+    <path d="M15 18H9" />
+    <path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14" />
+    <circle cx="17" cy="18" r="2" />
+    <circle cx="7" cy="18" r="2" />
+  </Outline>
+);
+
 /** specialty -> icon: Zap = electrician, Wrench = plumber, User = generic (multi-skilled / other). */
 export const SPECIALTY_ICON = Object.freeze({
   multi: UserIcon,
-  laborer: HardHatIcon,
+  foreman: HardHatIcon, // capocantiere
+  laborer: PickaxeIcon, // manovale
+  mason: BrickWallIcon, // muratore
+  carpenter: RulerIcon, // carpentiere
+  painter: PaintRollerIcon, // pittore
+  tiler: TilesIcon, // piastrellista
+  drywaller: LayersIcon, // cartongessista
   electrician: ZapIcon,
   plumber: WrenchIcon,
-  carpenter: HammerIcon,
+  smith: HammerIcon, // fabbro
   welder: FlameIcon,
-  finishing: BrushIcon,
+  glazier: DoorIcon, // serramentista
   gardener: LeafIcon,
-  mason: BrickWallIcon,
+  operator: TruckIcon, // autista / macchinista
+  finishing: BrushIcon,
   other: UserIcon,
 });

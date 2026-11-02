@@ -9,8 +9,9 @@ import path from 'node:path';
 import { I18nProvider } from '../src/lib/i18n.jsx';
 import ProjectWorkspace from '../src/components/ProjectWorkspace.jsx';
 import ToastHost from '../src/components/workspace/ToastHost.jsx';
+import { SPECIALTY_ICON } from '../src/components/workspace/icons.jsx';
 import { newProject, normalizeProject, toDayString } from '../src/lib/projects.js';
-import { advancesByWorker, laborPool, liquidity, projectLiquidity } from '../src/lib/ledger.js';
+import { WORKER_SPECIALTIES, advancesByWorker, laborPool, liquidity, projectLiquidity } from '../src/lib/ledger.js';
 import { computeAll } from '../src/lib/engine.js';
 import { currentBook, resetRegistry } from '../src/lib/priceRegistry.js';
 import { flushUserPrices } from '../src/lib/priceFeed.js';
@@ -268,7 +269,7 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(q('crew-empty')).not.toBeNull();
     await click(q('crew-add'));
     expect(q('worker-form')).not.toBeNull();
-    expect([...q('crew-specialty').options].map((o) => o.value)).toEqual(['multi', 'laborer', 'electrician', 'plumber', 'carpenter', 'welder', 'finishing', 'gardener', 'mason', 'other']);
+    expect([...q('crew-specialty').options].map((o) => o.value)).toEqual(WORKER_SPECIALTIES);
     expect(q('crew-save').disabled).toBe(true); // a name is required
     await typeInto(q('crew-name'), 'Luca Rossi');
     expect(q('crew-save').disabled).toBe(false);
@@ -294,6 +295,62 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(q(`worker-${plumber.id}`).querySelector('svg path[d^="M14.7 6.3"]')).not.toBeNull(); // Wrench
     expect(generic.specialty).toBe('multi');
     expect(q(`worker-${generic.id}`).querySelector('svg path[d^="M19 21v-2"]')).not.toBeNull(); // generic User
+  });
+
+  it('the pay / advance button is the main action on the FRONT of every card: big, green, with a banknote icon, no menu to open', async () => {
+    await mount(mk());
+    await openCrew();
+    await addWorker('Luca', 'electrician');
+    const id = spy.project.crew[0].id;
+    const btn = q(`worker-adv-${id}`);
+    expect(btn.closest(`[data-testid="worker-${id}"]`)).not.toBeNull(); // inside the card itself
+    expect(btn.closest('details[data-testid="ws-crew"]')).not.toBeNull();
+    expect(btn.closest('details:not([data-testid="ws-crew"])')).toBeNull(); // no hidden accordion / menu of its own
+    expect(btn.textContent).toBe('+ Pagar / Anticipo'); // the Italian one reads "+ Paga / Anticipo"
+    expect(btn.className).toContain('border-emerald-500');
+    expect(btn.className).toContain('text-emerald-400');
+    expect(btn.className).toContain('border-2');
+    expect(btn.className).not.toMatch(/\bbg-(?!black)/); // OLED: black ground
+    expect(btn.className).toMatch(/min-h-\[(5[6-9]|[6-9]\d)px\]/);
+    expect(btn.querySelector('svg[data-outline-icon="true"] rect[width="20"][height="12"]')).not.toBeNull(); // Banknote
+    expect(DICT.it['ws.crew.advance']).toBe('+ Paga / Anticipo');
+    // it comes right after the header of the card, before the history
+    const card = q(`worker-${id}`);
+    const order = [...card.querySelectorAll('button')].map((b) => b.dataset.testid);
+    expect(order.slice(0, 2)).toEqual([`worker-edit-${id}`, `worker-adv-${id}`]);
+  });
+
+  it('the specialty list covers the trades of the job site, each with its own icon and a translation in the six languages', async () => {
+    for (const s2 of ['painter', 'tiler', 'drywaller', 'smith', 'operator', 'glazier', 'foreman']) expect(WORKER_SPECIALTIES, s2).toContain(s2);
+    expect(WORKER_SPECIALTIES[0]).toBe('multi');
+    expect(WORKER_SPECIALTIES.at(-1)).toBe('other');
+    for (const l of ['es', 'en', 'pt', 'fr', 'it', 'de']) for (const sp of WORKER_SPECIALTIES) expect(DICT[l][`ws.spec.${sp}`], `${l}:${sp}`).toBeTruthy();
+    expect(['Pittore', 'Piastrellista', 'Cartongessista', 'Fabbro', 'Autista / Macchinista', 'Serramentista', 'Capocantiere'].every((n) => Object.values(DICT.it).includes(n))).toBe(true);
+    // every trade draws a different icon, except the two generic ones
+    const icons = WORKER_SPECIALTIES.map((sp) => SPECIALTY_ICON[sp]);
+    expect(icons.every(Boolean)).toBe(true);
+    expect(new Set(icons).size).toBe(WORKER_SPECIALTIES.length - 1); // multi and other share the generic User
+    expect(SPECIALTY_ICON.multi).toBe(SPECIALTY_ICON.other);
+    // the model accepts them all; an unknown one is still "multi"
+    const p0 = { ...mk(), crew: [] };
+    let p = p0;
+    for (const sp of WORKER_SPECIALTIES) p = withWorker(p, { name: `W ${sp}`, specialty: sp });
+    expect(p.crew.map((w) => w.specialty)).toEqual(WORKER_SPECIALTIES);
+    expect(withWorker(p0, { name: 'X', specialty: 'astronaut' }).crew[0].specialty).toBe('multi');
+    // the select lists them all and the card shows the icon + the label of a new trade
+    await mount(mk());
+    await openCrew();
+    await click(q('crew-add'));
+    expect([...q('crew-specialty').options].map((o) => o.value)).toEqual(WORKER_SPECIALTIES);
+    await click(q('sheet-backdrop'));
+    await addWorker('Pía', 'painter');
+    await addWorker('Tito', 'operator');
+    await addWorker('Jefe', 'foreman');
+    const [pia, tito, jefe] = spy.project.crew;
+    expect(q(`worker-spec-${pia.id}`).textContent).toBe('Pintor');
+    expect(q(`worker-${pia.id}`).querySelector('svg path[d^="M10 16v-2a2 2 0"]')).not.toBeNull(); // paint roller
+    expect(q(`worker-${tito.id}`).querySelector('svg circle[cx="17"][cy="18"]')).not.toBeNull(); // truck
+    expect(q(`worker-${jefe.id}`).querySelector('svg path[d^="M10 10V5a1"]')).not.toBeNull(); // hard hat
   });
 
   it('a worker is edited and deleted from their card; their advances stay in the book as unassigned', async () => {

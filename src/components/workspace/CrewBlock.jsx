@@ -8,7 +8,7 @@ import { DateInput, TextField } from '../ui.jsx';
 import Block from './Block.jsx';
 import LockedZone from './LockedZone.jsx';
 import NumberPad from './NumberPad.jsx';
-import { SPECIALTY_ICON, UsersIcon } from './icons.jsx';
+import { BanknoteIcon, SPECIALTY_ICON, UsersIcon } from './icons.jsx';
 
 /** The two job dates, typed by hand, and the days between them (a plain subtraction, no estimate). */
 function Dates({ project, setProject }) {
@@ -111,6 +111,18 @@ function WorkerCard({ row, onEdit, onAdvance, onRemoveAdvance }) {
           ›
         </span>
       </button>
+      {/* the main action of the card, on its front face: always visible, big, green (OLED: black ground, coloured border + text) */}
+      <div className="px-3 pb-2">
+        <button
+          type="button"
+          onClick={onAdvance}
+          data-testid={`worker-adv-${w.id}`}
+          className="flex min-h-[60px] w-full items-center justify-center gap-3 rounded-xl border-2 border-emerald-500 bg-black px-3 text-lg font-extrabold text-emerald-400 transition active:scale-[0.98] active:border-emerald-300"
+        >
+          <BanknoteIcon size={28} />
+          <span>{t('ws.crew.advance')}</span>
+        </button>
+      </div>
       <div className="border-t border-white/10 px-3 py-2">
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-[#E0E0E0]/70">{t('ws.crew.advanced')}</p>
@@ -131,9 +143,6 @@ function WorkerCard({ row, onEdit, onAdvance, onRemoveAdvance }) {
             ))}
           </ul>
         )}
-        <button type="button" onClick={onAdvance} data-testid={`worker-adv-${w.id}`} className="mt-2 min-h-[52px] w-full rounded-xl border border-brand px-3 text-base font-extrabold text-brand active:scale-[0.99]">
-          {t('ws.crew.advance')}
-        </button>
       </div>
     </li>
   );

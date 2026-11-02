@@ -79,7 +79,9 @@ export const normalizeAdvances = (raw) =>
   });
 
 // ---- the crew: the people physically on the job ---------------------------------------------------------------------------
-export const WORKER_SPECIALTIES = Object.freeze(['multi', 'laborer', 'electrician', 'plumber', 'carpenter', 'welder', 'finishing', 'gardener', 'mason', 'other']);
+// "other" stays last; the order is the one of the select. IT labels: Multifunzione, Capocantiere, Manovale, Muratore, Carpentiere, Pittore,
+// Piastrellista, Cartongessista, Elettricista, Idraulico, Fabbro, Saldatore, Serramentista, Giardiniere, Autista / Macchinista, Finiture, Altro.
+export const WORKER_SPECIALTIES = Object.freeze(['multi', 'foreman', 'laborer', 'mason', 'carpenter', 'painter', 'tiler', 'drywaller', 'electrician', 'plumber', 'smith', 'welder', 'glazier', 'gardener', 'operator', 'finishing', 'other']);
 export const CREW_LIMIT = 60;
 
 /** `project.crew`: [{ id, name, specialty, notes }]. A worker without a name is dropped; an unknown specialty becomes "multi". */
