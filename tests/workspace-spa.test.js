@@ -218,7 +218,7 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
   });
 
   const openCrew = async () => {
-    await click(q('ws-crew').querySelector('summary'));
+    await click(q('ws-crew'));
   };
   const addWorker = async (name, specialty = null, notes = '') => {
     await click(q('crew-add'));
@@ -273,7 +273,7 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(q('crew-save').disabled).toBe(true); // a name is required
     await typeInto(q('crew-name'), 'Luca Rossi');
     expect(q('crew-save').disabled).toBe(false);
-    await click(q('sheet-backdrop')); // closing without saving adds nobody
+    await click(qa('sheet-backdrop').at(-1)); // closing without saving adds nobody
     expect(spy.project.crew).toHaveLength(0);
     await addWorker('Luca Rossi', 'electrician', 'Tablero general');
     expect(q('worker-form')).toBeNull();
@@ -286,10 +286,10 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(q(`worker-spec-${w.id}`).textContent).toBe('Electricista · Tablero general');
     expect(card.querySelector('svg[data-outline-icon="true"] path[d^="M13 2 3 14"]')).not.toBeNull(); // Zap = electrician
     expect(q('crew-empty')).toBeNull();
-    expect(q('ws-crew').querySelector('summary').textContent).toContain('1 trabajador');
-    expect(q('ws-crew').querySelector('summary').textContent).not.toContain('1 trabajadores');
+    expect(q('ws-crew').textContent).toContain('1 trabajador');
+    expect(q('ws-crew').textContent).not.toContain('1 trabajadores');
     await addWorker('Pía', 'plumber');
-    expect(q('ws-crew').querySelector('summary').textContent).toContain('2 trabajadores');
+    expect(q('ws-crew').textContent).toContain('2 trabajadores');
     await addWorker('Nico');
     const [, plumber, generic] = spy.project.crew;
     expect(q(`worker-${plumber.id}`).querySelector('svg path[d^="M14.7 6.3"]')).not.toBeNull(); // Wrench
@@ -304,8 +304,8 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     const id = spy.project.crew[0].id;
     const btn = q(`worker-adv-${id}`);
     expect(btn.closest(`[data-testid="worker-${id}"]`)).not.toBeNull(); // inside the card itself
-    expect(btn.closest('details[data-testid="ws-crew"]')).not.toBeNull();
-    expect(btn.closest('details:not([data-testid="ws-crew"])')).toBeNull(); // no hidden accordion / menu of its own
+    expect(btn.closest('[data-testid="ws-crew-sheet"]')).not.toBeNull();
+    expect(btn.closest('details')).toBeNull(); // no hidden accordion / menu of its own
     expect(btn.textContent).toBe('+ Pagar / Anticipo'); // the Italian one reads "+ Paga / Anticipo"
     expect(btn.className).toContain('border-emerald-500');
     expect(btn.className).toContain('text-emerald-400');
@@ -342,7 +342,7 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     await openCrew();
     await click(q('crew-add'));
     expect([...q('crew-specialty').options].map((o) => o.value)).toEqual(WORKER_SPECIALTIES);
-    await click(q('sheet-backdrop'));
+    await click(qa('sheet-backdrop').at(-1));
     await addWorker('Pía', 'painter');
     await addWorker('Tito', 'operator');
     await addWorker('Jefe', 'foreman');
@@ -511,6 +511,7 @@ describe('finance + expenses inside the same screen', () => {
     const p = mk({ expenses: [{ id: 'e1', description: 'Taladro', category: 'tool_rental', supplier: 'Easy', amount: 25000, returnDate: day(3), returned: false }] });
     await mount(p);
     const total0 = q('ws-total').textContent;
+    await click(q('ws-finance'));
     await click(q('finance-lock')); // the parameters start locked
     const slider = q('slider-profit-input');
     await act(async () => {
@@ -520,6 +521,8 @@ describe('finance + expenses inside the same screen', () => {
     });
     expect(spy.project.draft.finance.profit).toBe(20);
     expect(q('ws-total').textContent).not.toBe(total0);
+    await click(qa('sheet-backdrop').at(-1)); // close the Parámetros sheet
+    await click(q('ws-expenses'));
     await click(q('expense-return-e1'));
     expect(spy.project.expenses[0].returned).toBe(true);
   });
@@ -530,6 +533,7 @@ describe('Parametri del preventivo: error-prevention lock', () => {
 
   it('starts locked: inputs disabled, dimmed, numbers still high-contrast, grey toggle with a closed padlock', async () => {
     await mount(mk());
+    await click(q('ws-finance'));
     const params = q('finance-params');
     expect(params.disabled).toBe(true);
     expect(params.dataset.safe).toBe('true');
@@ -553,6 +557,7 @@ describe('Parametri del preventivo: error-prevention lock', () => {
 
   it('unlocking enables the controls and turns the button amber with an open padlock; locking again restores it', async () => {
     await mount(mk());
+    await click(q('ws-finance'));
     await click(q('finance-lock'));
     const btn = q('finance-lock');
     expect(q('finance-params').disabled).toBe(false);
@@ -569,11 +574,11 @@ describe('Parametri del preventivo: error-prevention lock', () => {
 
   it('closing and reopening the section locks it again', async () => {
     await mount(mk());
+    await click(q('ws-finance'));
     await click(q('finance-lock'));
     expect(q('finance-params').disabled).toBe(false);
-    const summary = q('ws-finance').querySelector('summary');
-    await click(summary); // collapse
-    await click(summary); // enter again
+    await click(q('ws-finance-sheet').closest('[role="dialog"]').querySelector('[data-sheet-close]')); // close the sheet
+    await click(q('ws-finance')); // enter again
     expect(q('finance-params').disabled).toBe(true);
     expect(q('finance-lock').dataset.state).toBe('locked');
   });
@@ -587,6 +592,7 @@ describe('read-only while locked', () => {
 
   it('every editor of the quote is a disabled fieldset with a shield: a tap answers "Precios bloqueados" and nothing changes', async () => {
     await mount(lockedProject());
+    await click(q('ws-finance')); // the finance parameters live in their sheet
     expect(qa('locked-shield').length).toBeGreaterThanOrEqual(2); // partida, finance (the crew is operational, not part of the quote)
     expect(q('slider-profit-input').closest('fieldset').disabled).toBe(true);
     expect(q('partida-0').querySelector('fieldset').disabled).toBe(true);
@@ -601,7 +607,7 @@ describe('read-only while locked', () => {
 
   it('the Start / Delivery dates are read-only behind the shield while locked; the people and their advances stay editable', async () => {
     await mount(lockedProject());
-    await click(q('ws-crew').querySelector('summary'));
+    await click(q('ws-crew'));
     const dates = q('crew-dates');
     expect(dates.closest('fieldset').disabled).toBe(true);
     expect(q('crew-start').closest('fieldset').disabled).toBe(true); // the inputs sit inside the disabled fieldset: no focus, no keyboard
@@ -633,7 +639,7 @@ describe('read-only while locked', () => {
     await click(q('ws-unlock'));
     await click(q('unlock-confirm'));
     expect(qa('locked-shield')).toHaveLength(0);
-    await click(q('ws-crew').querySelector('summary'));
+    await click(q('ws-crew'));
     expect(q('crew-start').closest('fieldset')).toBeNull();
     await typeInto(q('crew-end'), day(24));
     expect(spy.project.endDate).toBe(day(24));

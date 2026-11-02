@@ -213,7 +213,8 @@ describe('📸 photo notes', () => {
     await typeIntoArea(q('log-input'), 'Material dañado en la entrega');
     await click(q('log-save'));
     expect(q('log-input')).toBeNull(); // sheet closed
-    expect(q('ws-log').open).toBe(true);
+    expect(!!q('ws-log-sheet')).toBe(false);
+    await click(q('ws-log')); // the Diario tile opens the notes
     const first = qa('wlog-note')[0];
     expect(first.querySelector('[data-testid="wlog-text"]').textContent).toBe('Material dañado en la entrega');
     await flush(30);
@@ -248,6 +249,7 @@ describe('📸 photo notes', () => {
     expect(q('log-save')).toBeNull();
     await pickFile(q('log-photo-input'));
     await click(q('log-save'));
+    await click(q('ws-log'));
     expect(qa('wlog-note')[0].querySelector('[data-testid="wlog-text"]').textContent).toBe('Foto adjunta');
     const saved = await stored();
     expect((await notePhotosFor(p.id).get(saved.logbook[0].id)).blob).toBeInstanceOf(Blob);
@@ -268,7 +270,7 @@ describe('📸 photo notes', () => {
 
   it('edit mode: add a photo to a note, change it, remove it (persisted each time)', async () => {
     const p = await open(active());
-    await click(q('ws-log').querySelector('summary'));
+    await click(q('ws-log'));
     await click(q('wlog-edit-log001'));
     expect(q('wlog-edit-thumb')).toBeNull();
     expect(q('wlog-photo').className).toContain('min-h-[44px]');
@@ -305,7 +307,7 @@ describe('📸 photo notes', () => {
     const p = active({ logbook: [{ id: 'log001', at: at(2026, 3, 3), text: 'Marco roto', photo: true }] });
     await notePhotosFor(p.id).put('log001', { dataUrl: JPEG, width: 10, height: 10 });
     await open(p);
-    await click(q('ws-log').querySelector('summary'));
+    await click(q('ws-log'));
     await flush(30);
     expect(q('wlog-thumb-log001')).not.toBeNull(); // read back from the store
     vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -319,7 +321,7 @@ describe('📸 photo notes', () => {
 describe('🎙️ voice while editing a note', () => {
   it('a 44px mic inside the editor: clean engine, the words are appended with a space; no keyboard needed', async () => {
     await open(active());
-    await click(q('ws-log').querySelector('summary'));
+    await click(q('ws-log'));
     await click(q('wlog-edit-log001'));
     const mic = q('wlog-mic');
     expect(mic.className).toContain('h-11');
@@ -342,7 +344,7 @@ describe('🎙️ voice while editing a note', () => {
 
   it('without Web Speech the editor says so, and cancelling stops a listening mic', async () => {
     await open(active());
-    await click(q('ws-log').querySelector('summary'));
+    await click(q('ws-log'));
     await click(q('wlog-edit-log001'));
     delete window.webkitSpeechRecognition;
     await click(q('wlog-mic'));
@@ -353,7 +355,7 @@ describe('🎙️ voice while editing a note', () => {
     await click(q('wlog-cancel'));
     await flush(20);
     expect(q('wlog-input')).toBeNull();
-    expect(q('ws-log').textContent).toContain('Comprar clavos');
+    expect(q('ws-log-sheet').textContent).toContain('Comprar clavos');
   });
 
   it('the new texts exist in the six languages', () => {

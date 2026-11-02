@@ -9,7 +9,7 @@ const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([di
  * Bottom sheet (one-hand ergonomics): anchored to the bottom of the screen, pure #000 with an ultra
  * thin border. Focus is trapped inside, Escape / backdrop close it and focus returns to the opener.
  */
-export default function BottomSheet({ title, subtitle, onClose, fullscreen = false, swipeToClose = false, children }) {
+export default function BottomSheet({ title, subtitle, onClose, fullscreen = false, swipeToClose = false, autoFocus = true, children }) {
   const { t } = useI18n();
   const titleId = useId();
   const ref = useRef(null);
@@ -46,8 +46,11 @@ export default function BottomSheet({ title, subtitle, onClose, fullscreen = fal
 
   useEffect(() => {
     const previous = document.activeElement;
-    ref.current?.querySelector('input, select, button:not([data-sheet-close])')?.focus({ preventScroll: true });
+    // menu sheets (autoFocus={false}) focus the dialog itself: no field grabs the focus (and the on-screen keyboard) just by opening one
+    (autoFocus ? ref.current?.querySelector('input, select, button:not([data-sheet-close])') : ref.current)?.focus({ preventScroll: true });
     const onKey = (e) => {
+      // sheets can be stacked (a form sheet over a menu sheet): only the topmost one (the last dialog in the document) answers the keyboard
+      if ([...document.querySelectorAll('[role="dialog"]')].at(-1) !== ref.current) return;
       if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
@@ -86,9 +89,10 @@ export default function BottomSheet({ title, subtitle, onClose, fullscreen = fal
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        tabIndex={-1}
         data-swipe-close={swipeToClose ? 'true' : undefined}
         {...swipe}
-        className={`${swipeToClose ? 'sheet-slide ' : ''}relative w-full overflow-y-auto overscroll-contain border border-white/10 bg-black p-5 [padding-bottom:max(1.25rem,env(safe-area-inset-bottom))] ${
+        className={`${swipeToClose ? 'sheet-slide ' : ''}relative w-full outline-none overflow-y-auto overscroll-contain border border-white/10 bg-black p-5 [padding-bottom:max(1.25rem,env(safe-area-inset-bottom))] ${
           fullscreen ? 'h-[100dvh] max-w-none border-0 sm:mx-auto sm:max-w-3xl sm:border' : 'max-h-[92vh] max-w-lg rounded-t-3xl border-b-0'
         }`}
       >

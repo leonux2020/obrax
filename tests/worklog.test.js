@@ -122,16 +122,16 @@ describe('Bitácora de obra accordion (Zone B)', () => {
 
   it('lists the notes of the running project, newest first, closed until opened; counts them', async () => {
     await open(active());
-    const block = q('ws-log');
-    expect(block).not.toBeNull();
-    expect(block.tagName).toBe('DETAILS');
-    expect(block.open).toBe(false);
-    expect(block.textContent).toContain('Bitácora de obra');
-    await click(block.querySelector('summary'));
-    expect(block.open).toBe(true);
+    const tile = q('ws-log');
+    expect(tile).not.toBeNull();
+    expect(tile.tagName).toBe('BUTTON');
+    expect(q('ws-log-sheet')).toBeNull(); // closed until tapped
+    expect(tile.textContent).toContain('Diario');
+    await click(tile);
+    expect(q('ws-log-sheet').closest('[role="dialog"]').textContent).toContain('Bitácora de obra');
     const notes = qa('wlog-note');
     expect(notes.map((n) => n.querySelector('[data-testid="wlog-text"]').textContent)).toEqual(['Traer la comida al perro.', 'Comprar clavos']);
-    expect(block.querySelector('summary').textContent).toContain('2');
+    expect(tile.textContent).toContain('2');
     // it sits in Zone B, before the expenses, and the dock is still the way to dictate
     expect(q('ws-zone-c')).not.toBeNull();
     expect(q('dock-log')).not.toBeNull();
@@ -139,13 +139,13 @@ describe('Bitácora de obra accordion (Zone B)', () => {
 
   it('empty project: a hint that points at the dock microphone', async () => {
     await open(active({ logbook: [] }));
-    await click(q('ws-log').querySelector('summary'));
+    await click(q('ws-log'));
     expect(q('wlog-empty').textContent).toContain('🎙️');
   });
 
   it('edit: a plain textarea in place; saving persists the corrected text (IndexedDB); cancel changes nothing', async () => {
     await open(active());
-    await click(q('ws-log').querySelector('summary'));
+    await click(q('ws-log'));
     await click(q('wlog-edit-log001'));
     const input = q('wlog-input');
     expect(input.tagName).toBe('TEXTAREA');
@@ -153,13 +153,13 @@ describe('Bitácora de obra accordion (Zone B)', () => {
     await typeIntoArea(input, 'Comprar clavos de 3 pulgadas');
     await click(q('wlog-cancel'));
     expect(q('wlog-input')).toBeNull();
-    expect(q('ws-log').textContent).toContain('Comprar clavos');
-    expect(q('ws-log').textContent).not.toContain('3 pulgadas');
+    expect(q('ws-log-sheet').textContent).toContain('Comprar clavos');
+    expect(q('ws-log-sheet').textContent).not.toContain('3 pulgadas');
     await click(q('wlog-edit-log001'));
     await typeIntoArea(q('wlog-input'), 'Comprar clavos de 3 pulgadas');
     await click(q('wlog-save'));
     expect(q('wlog-input')).toBeNull();
-    expect(q('ws-log').textContent).toContain('Comprar clavos de 3 pulgadas');
+    expect(q('ws-log-sheet').textContent).toContain('Comprar clavos de 3 pulgadas');
     const stored = await saved();
     expect(stored.logbook.map((e) => e.text)).toEqual(['Comprar clavos de 3 pulgadas', 'Traer la comida al perro.']);
     expect(stored.logbook.find((e) => e.id === 'log001')).toMatchObject({ at: at(2026, 3, 3), text: 'Comprar clavos de 3 pulgadas' });
@@ -168,7 +168,7 @@ describe('Bitácora de obra accordion (Zone B)', () => {
 
   it('delete: asks first; confirmed it leaves the list and the stored project; declined it stays', async () => {
     await open(active());
-    await click(q('ws-log').querySelector('summary'));
+    await click(q('ws-log'));
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
     await click(q('wlog-del-log002'));
     expect(qa('wlog-note')).toHaveLength(2);
@@ -179,11 +179,11 @@ describe('Bitácora de obra accordion (Zone B)', () => {
     expect(stored.logbook.map((e) => e.id)).toEqual(['log001']);
   });
 
-  it('the dock 🎙️ dictates; the new note is saved, the sheet closes and the accordion OPENS by itself with the note in it', async () => {
+  it('the dock 🎙️ dictates; the new note is saved and the sheet closes; the Diario sheet has the note when opened', async () => {
     window.webkitSpeechRecognition = FakeRecognition;
     FakeRecognition.all = [];
     await open(active());
-    expect(q('ws-log').open).toBe(false);
+    expect(!!q('ws-log-sheet')).toBe(false);
     await click(q('dock-log'));
     expect(q('log-input')).not.toBeNull();
     expect(q('log-list')).toBeNull(); // the notes are not repeated inside the sheet: they live in the accordion
@@ -192,7 +192,8 @@ describe('Bitácora de obra accordion (Zone B)', () => {
     await click(q('log-mic')); // stop -> end of the dictation -> saved
     await flush(20);
     expect(q('log-input')).toBeNull(); // sheet closed
-    expect(q('ws-log').open).toBe(true);
+    expect(q('ws-log-sheet')).toBeNull(); // no second sheet pops up by itself
+    await click(q('ws-log'));
     const first = qa('wlog-note')[0];
     expect(first.querySelector('[data-testid="wlog-text"]').textContent).toBe('pedir cemento para mañana.');
     expect(qa('wlog-note')).toHaveLength(3);
@@ -203,10 +204,10 @@ describe('Bitácora de obra accordion (Zone B)', () => {
 
   it('the accordion opens and closes by hand (nothing re-opens it)', async () => {
     await open(active());
-    const block = q('ws-log');
-    await click(block.querySelector('summary'));
-    await click(block.querySelector('summary'));
-    expect(block.open).toBe(false);
+    await click(q('ws-log'));
+    expect(q('ws-log-sheet')).not.toBeNull();
+    await click(q('ws-log-sheet').closest('[role="dialog"]').querySelector('[data-sheet-close]'));
+    expect(q('ws-log-sheet')).toBeNull();
   });
 
   it('the texts exist in the six languages', async () => {

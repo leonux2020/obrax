@@ -117,12 +117,15 @@ describe('1. no back arrow: the device back gesture leaves the project', () => {
 });
 
 describe('2. Anticipos y pagos del cliente', () => {
-  it('is an accordion (<details>) in Zone B, after the finance block, with its own title', async () => {
+  it('is a circular tile of the Zone B grid, after the finance one, that opens its own titled sheet', async () => {
     await mount(mk());
     const block = q('ws-cash');
-    expect(block.tagName).toBe('DETAILS');
+    expect(block.tagName).toBe('BUTTON');
     expect(q('ws-zone-a').contains(block)).toBe(false);
-    expect(block.textContent).toContain('Anticipos y pagos del cliente');
+    expect(block.textContent).toContain('Anticipos');
+    await click(block);
+    expect(q('ws-cash-sheet').closest('[role="dialog"]').textContent).toContain('Anticipos y pagos del cliente');
+    await click(q('ws-cash-sheet').closest('[role="dialog"]').querySelector('[data-sheet-close]'));
     expect(block.compareDocumentPosition(q('ws-finance') ?? q('ws-crew')) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
   });
 
@@ -131,7 +134,7 @@ describe('2. Anticipos y pagos del cliente', () => {
     const total = spy.project && computeAll(spy.project.draft, Date.now(), { timeline: { startDate: day(-5), endDate: day(20) }, chains: false }).quote.total;
     expect(total).toBeGreaterThan(0);
     expect(q('ws-progress').dataset.pct).toBe('0');
-    await click(q('ws-cash').querySelector('summary'));
+    await click(q('ws-cash'));
     expect(q('cash-add').disabled).toBe(true); // nothing typed
     await click(q('cash-amount'));
     expect(q('cash-pad')).not.toBeNull(); // the custom pad, never the OS keyboard
@@ -163,7 +166,7 @@ describe('2. Anticipos y pagos del cliente', () => {
   it('"Resto" completes the budget (100 %), a payment above it is flagged, and the header total opens the accordion', async () => {
     await mount(mk());
     await click(q('ws-total')); // header -> Zone B accordion
-    expect(q('ws-cash').open).toBe(true);
+    expect(!!q('ws-cash-sheet')).toBe(true);
     await click(q('cash-quick-1'));
     await click(q('cash-add'));
     expect(q('ws-progress').dataset.pct).toBe('100');
@@ -179,7 +182,7 @@ describe('2. Anticipos y pagos del cliente', () => {
   it('payments are not part of the quote: they can be registered while it is LOCKED', async () => {
     const p = mk();
     await mount({ ...p, draft: freezeQuote(p.draft, { pricedAt: Date.now(), total: 1, live: p }) });
-    await click(q('ws-cash').querySelector('summary'));
+    await click(q('ws-cash'));
     await click(q('cash-amount'));
     await keys('2500');
     await click(q('pad-done'));
@@ -251,14 +254,14 @@ describe('3. new project: the closing button', () => {
     await click(q('fab-new'));
     await typeInto(document.querySelector('[role="dialog"] input'), 'Casa Soto');
     await click(q('project-save'));
-    await click(q('ws-cash').querySelector('summary'));
+    await click(q('ws-cash'));
     await click(q('cash-amount'));
     await keys('7500');
     await click(q('pad-done'));
     await click(q('cash-add'));
     expect(q('cash-paid').textContent).toMatch(/7\.500/);
     await deviceBack(); // the first Back only closes the open Anticipos accordion
-    expect(q('ws-cash').open).toBe(false);
+    expect(!!q('ws-cash-sheet')).toBe(false);
     expect(q('project-workspace')).not.toBeNull();
     await deviceBack(); // the second leaves the project
     expect(q('project-workspace')).toBeNull();
@@ -270,7 +273,7 @@ describe('3. new project: the closing button', () => {
     expect(saved.payments[0].amount).toBe(7500);
     // reopen: the payment is still there
     await click(q('project-card'));
-    await click(q('ws-cash').querySelector('summary'));
+    await click(q('ws-cash'));
     expect(q('cash-panel').dataset.paid).toBe('7500');
   });
 

@@ -1,25 +1,40 @@
+import BottomSheet from '../BottomSheet.jsx';
+
 /**
- * A titled accordion (<details>/<summary>) for the secondary blocks of Zone B: crew, finance, cash, logbook, expenses. `icon` = a thin outline icon
- * drawn with currentColor, to the left of the (UPPERCASE) title. Same
- * language as the partidas: a 2 px left border and quiet lettering, no solid fills. `meta` is the short figure on the right.
+ * The secondary blocks of the project (crew, parameters, advances, journal, expenses) as a tile of the quick-control grid, Android settings
+ * style: a big dark circle with its thin outline icon (`icon`, 32 px) and a short label under it (`label`, falling back to `title`). `meta` is the
+ * short figure (a %, a count) in small type under the label.
+ *
+ * Tapping the tile opens its content in a Bottom Sheet over the screen (nothing is pushed down the page). The sheet is a back-stack layer
+ * (BottomSheet -> lib/backStack.js): the device's Back closes ONLY the sheet and the user stays in the project; closing it with the x, the
+ * backdrop or Escape drops its history entry again. `open` / `onToggle(id, open)` keep the same contract the accordions had.
  */
-export default function Block({ id, title, icon = null, meta = '', open, onToggle, children, testId }) {
+export default function Block({ id, title, label, icon = null, meta = '', open, onToggle, children, testId }) {
   return (
-    <details
-      open={Boolean(open)}
-      onToggle={(e) => e.currentTarget.open !== Boolean(open) && onToggle(id, e.currentTarget.open)}
-      className="group rounded-xl border border-l-2 border-white/10 border-l-white/30"
-      data-testid={testId}
-    >
-      <summary className="flex min-h-[56px] cursor-pointer list-none items-center gap-3 px-3 text-sm font-semibold uppercase tracking-wider text-[#E0E0E0]/80 [&::-webkit-details-marker]:hidden">
-        {icon}
-        <span className="min-w-0 flex-1 truncate">{title}</span>
-        {meta && <span className="shrink-0 text-xs font-medium normal-case tracking-normal tabular-nums text-[#E0E0E0]/70">{meta}</span>}
-        <span aria-hidden="true" className="text-lg text-[#E0E0E0]/50 transition-transform group-open:rotate-90">
-          ›
+    <>
+      <button
+        type="button"
+        onClick={() => onToggle(id, true)}
+        aria-haspopup="dialog"
+        aria-expanded={Boolean(open)}
+        aria-label={title}
+        data-testid={testId}
+        data-open={open ? 'true' : undefined}
+        className="flex min-h-[44px] min-w-0 flex-col items-center rounded-2xl p-2 transition active:scale-95"
+      >
+        <span data-testid={`${testId}-circle`} className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-white/5 bg-neutral-900 text-neutral-200">
+          {icon}
         </span>
-      </summary>
-      <div className="border-t border-white/10 px-3 py-4">{children}</div>
-    </details>
+        <span className="mt-2 w-full truncate text-center text-xs text-neutral-400">{label || title}</span>
+        {meta && <span className="mt-0.5 w-full truncate text-center text-[11px] tabular-nums text-neutral-500">{meta}</span>}
+      </button>
+      {open && (
+        <BottomSheet title={title} autoFocus={false} onClose={() => onToggle(id, false)}>
+          <div className="mt-3" data-testid={`${testId}-sheet`}>
+            {children}
+          </div>
+        </BottomSheet>
+      )}
+    </>
   );
 }

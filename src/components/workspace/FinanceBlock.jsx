@@ -29,7 +29,7 @@ export default function FinanceBlock({ draft, locked, onBlocked, setDraft, open,
   const official = num(region.taxRate * 100);
 
   return (
-    <Block icon={<CalculatorIcon />} id="finance" title={t('pv.selectors')} open={open} onToggle={onToggle} testId="ws-finance">
+    <Block icon={<CalculatorIcon size={32} />} label={t('ws.menu.finance')} id="finance" title={t('pv.selectors')} open={open} onToggle={onToggle} testId="ws-finance">
       <LockedZone locked={locked} onBlocked={onBlocked} className="space-y-4">
         <fieldset disabled={safe} data-testid="finance-params" data-safe={safe ? 'true' : 'false'} className="m-0 min-w-0 space-y-4 border-0 p-0">
           {KEYS.map((k) => (

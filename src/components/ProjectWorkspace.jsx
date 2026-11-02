@@ -52,6 +52,8 @@ import PartidaList from './workspace/PartidaList.jsx';
  * Locked (PDF generated or client signature): Zone B is read-only and a tap answers "Precios bloqueados" until the user
  * unlocks it. Offline-first: nothing here needs the network (see the receipt queue, the base catalog and Blob photos).
  */
+const MENU_BLOCKS = ['crew', 'finance', 'cash', 'log', 'expenses']; // the grid tiles that open a bottom sheet
+
 export default function ProjectWorkspace({ project, setProject, setDraft, photos, setPhotos, company, receipts, enqueueReceipt, onEdit, onPro, onSyncDossier = null, dossierBusy = false }) {
   const i18n = useI18n();
   const { t, region } = i18n;
@@ -84,8 +86,10 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
     return { ...initialWorkspaceState(), open: first ? { [first.id]: true } : {} };
   });
   const toggle = (id, open) => dispatch({ type: 'toggle', id, open });
-  // the device's Back closes the last opened accordion (Parámetros, Diario, Anticipos, Gastos...) instead of leaving the project
-  useAccordionBack(ui.open, (id) => dispatch({ type: 'toggle', id, open: false }));
+  // the device's Back closes the last opened partida accordion instead of leaving the project (the grid menus are bottom sheets: they are
+  // back-stack layers by themselves, see Block.jsx)
+  const partidaOpen = useMemo(() => Object.fromEntries(Object.entries(ui.open).filter(([id]) => !MENU_BLOCKS.includes(id))), [ui.open]);
+  useAccordionBack(partidaOpen, (id) => dispatch({ type: 'toggle', id, open: false }));
   const closeSheet = () => dispatch({ type: 'closeSheet' });
 
   useEffect(() => {
@@ -105,21 +109,7 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
   // ---- Caja: the header total / bar take the user to the payments accordion (Zone B) instead of a separate sheet ----------------
   const openCash = () => {
     dispatch({ type: 'toggle', id: 'cash', open: true });
-    setTimeout(() => document.querySelector('[data-testid="ws-cash"]')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' }), 60);
   };
-
-  // ---- Bitácora: a NEW note (dictated from the dock or typed) opens its accordion by itself, as the visual confirmation ----------------
-  const newestNote = project.logbook[0]?.id ?? '';
-  const noteCount = project.logbook.length;
-  const seenNotes = useRef({ id: newestNote, count: noteCount });
-  useEffect(() => {
-    const seen = seenNotes.current;
-    seenNotes.current = { id: newestNote, count: noteCount };
-    if (newestNote && newestNote !== seen.id && noteCount > seen.count) {
-      dispatch({ type: 'toggle', id: 'log', open: true });
-      setTimeout(() => document.querySelector('[data-testid="ws-log"]')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' }), 60);
-    }
-  }, [newestNote, noteCount]);
 
   // ---- partidas ---------------------------------------------------------------------------------------------------------
   const updatePartida = (id, fn) => edit((d) => ({ ...d, partidas: d.partidas.map((p) => (p.id === id ? fn(p) : p)) }));
@@ -208,11 +198,14 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
 
       <div className="space-y-3 px-3 pt-3">
         <PartidaList draft={draft} groups={groups} open={ui.open} locked={Boolean(locked)} onBlocked={blocked} showErrors onToggle={toggle} onUpdate={updatePartida} onTask={changeTask} onAdd={addPartida} onRemove={removePartida} onPrice={openPrice} result={result} setDraft={setDraft} projectLocation={location} />
+        {/* the quick-control grid (Android settings style): each circle opens its content in a bottom sheet */}
+        <div className="grid grid-cols-3 gap-4 p-4" data-testid="ws-menu">
         <CrewBlock project={project} result={result} locked={Boolean(locked)} onBlocked={blocked} setProject={setProject} open={ui.open.crew} onToggle={toggle} />
         <FinanceBlock draft={draft} locked={Boolean(locked)} onBlocked={blocked} setDraft={edit} open={ui.open.finance} onToggle={toggle} />
         <CashBlock projectId={project.id} total={total} payments={project.payments} onChange={setList('payments')} open={ui.open.cash} onToggle={toggle} />
         <LogBlock entries={project.logbook} onChange={setList('logbook')} open={ui.open.log} onToggle={toggle} projectId={project.id} />
         <ExpensesBlock expenses={project.expenses} queued={queued} receipts={receipts} onChange={setList('expenses')} open={ui.open.expenses} onToggle={toggle} />
+        </div>
         {/* machinery has no module of its own: each task lists the machines it uses; exceptions surface in the tray */}
         <AlertTray alerts={projectAlerts(project, t, { now: Date.now(), budget: result.valid ? total : null, queue: queued, money: (n) => i18n.moneyIn(n, projectMarket(project).currency) })} />
       </div>

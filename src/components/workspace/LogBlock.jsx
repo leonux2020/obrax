@@ -236,7 +236,7 @@ export default function LogBlock({ entries, onChange, open, onToggle, projectId 
   };
 
   return (
-    <Block icon={<BookOpenIcon />} id="log" title={t('ws.log.title')} meta={entries.length ? String(entries.length) : ''} open={open} onToggle={onToggle} testId="ws-log">
+    <Block icon={<BookOpenIcon size={32} />} label={t('ws.menu.log')} id="log" title={t('ws.log.title')} meta={entries.length ? String(entries.length) : ''} open={open} onToggle={onToggle} testId="ws-log">
       {list.length === 0 ? (
         <p className="text-sm text-[#E0E0E0]/60" data-testid="wlog-empty">
           {t('ws.log.empty')}

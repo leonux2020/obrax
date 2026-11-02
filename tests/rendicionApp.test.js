@@ -112,7 +112,7 @@ describe('Contabilidad -> financial command center', () => {
     await flush(100);
     // add a payment where it belongs: the project
     await click(h.host.querySelector(`[data-testid="project-card"]`));
-    await click(q('ws-cash').querySelector('summary'));
+    await click(q('ws-cash'));
     await click(q('cash-amount'));
     for (const k of '20000') await click(q(`pad-${k}`));
     await click(q('pad-done'));

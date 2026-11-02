@@ -203,7 +203,7 @@ describe('the number follows the money booked in the app', () => {
   it('adding a client payment in Zone B lowers what is left to collect at once and moves the line', async () => {
     await open(job({ payments: [], expenses: [], advances: [] }));
     const before = Number(q('ws-due').textContent.replace(/[^\d.]/g, ''));
-    await click(q('ws-cash').querySelector('summary'));
+    await click(q('ws-cash'));
     await click(q('cash-amount'));
     for (const k of ['1', '0', '0', '0']) await click(q(`pad-${k}`));
     await click(q('pad-done'));

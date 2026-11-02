@@ -16,7 +16,7 @@ export default function ExpensesBlock({ expenses, queued, receipts, onChange, op
   const toggleReturned = (id) => onChange(expenses.map((e) => (e.id === id ? { ...e, returned: !e.returned } : e)));
 
   return (
-    <Block icon={<ReceiptIcon />} id="expenses" title={t('ws.expenses')} open={open} onToggle={onToggle} testId="ws-expenses">
+    <Block icon={<ReceiptIcon size={32} />} label={t('ws.menu.expenses')} id="expenses" title={t('ws.expenses')} open={open} onToggle={onToggle} testId="ws-expenses">
       <QueueList rows={queued} onRetry={receipts?.retry} onDiscard={receipts?.discard} onAccept={receipts?.accept} />
       {expenses.length === 0 && queued.length === 0 && <p className="text-sm text-[#E0E0E0]/60">{t('ws.noExpenses')}</p>}
       {expenses.length > 0 && <SupplierTotals expenses={expenses} />}

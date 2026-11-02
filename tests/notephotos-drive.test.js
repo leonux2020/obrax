@@ -112,7 +112,7 @@ describe('Drive cycle of the logbook photos', () => {
     // the Bitácora accordion reads the restored Blob
     await click(h.tab('Proyectos'));
     await click(h.host.querySelector('[data-testid="project-card"]'));
-    await click(q('ws-log').querySelector('summary'));
+    await click(q('ws-log'));
     await flush(60);
     const thumb = q('wlog-thumb-nota0001');
     expect(thumb).not.toBeNull();

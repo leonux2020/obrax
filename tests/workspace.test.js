@@ -361,25 +361,41 @@ describe('no way out to the old editor + queue list', () => {
     expect(q('partida-machinery-0')).not.toBeNull(); // it lives inside the task now
   });
 
-  it('Zone B: every module carries a thin outline icon (currentColor) left of its title, and the titles stay UPPERCASE', async () => {
+  it('Zone B: every module is a circle with a thin outline icon (currentColor) and a short label under it', async () => {
     await mount({ initial: mk() });
     for (const id of ['ws-crew', 'ws-finance', 'ws-cash', 'ws-log', 'ws-expenses']) {
-      const summary = q(id).querySelector('summary');
-      const icon = summary.querySelector('svg[data-outline-icon="true"]');
+      const summary = q(id); // the grid tile
+      const circle = q(`${id}-circle`);
+      const icon = circle.querySelector('svg[data-outline-icon="true"]');
       expect(icon, id).not.toBeNull();
       expect(icon.getAttribute('stroke')).toBe('currentColor'); // inherits the text colour
       expect(icon.getAttribute('fill')).toBe('none');
       expect(Number(icon.getAttribute('stroke-width'))).toBeLessThanOrEqual(1.75);
       expect(icon.getAttribute('aria-hidden')).toBe('true');
       // icon first, then the title
-      expect(icon.compareDocumentPosition(summary.querySelector('span.truncate')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(summary.className).toContain('uppercase'); // the casing is untouched
+      expect(icon.getAttribute('width')).toBe('32'); // w-8 h-8
+      expect(circle.className).toMatch(/h-16.*w-16|w-16.*h-16/);
+      expect(circle.className).toContain('rounded-full');
+      expect(circle.className).toContain('bg-neutral-900');
+      expect(circle.className).toContain('border-white/5');
+      expect(summary.className).toContain('active:scale-95'); // tactile feedback
+      expect(summary.className).toContain('flex-col'); // the label sits UNDER the circle
+      const label = [...summary.children].find((c) => c !== circle);
+      expect(label.className).toContain('text-xs');
+      expect(label.className).toContain('text-neutral-400');
+      expect(label.className).toContain('mt-2');
+      expect(label.className).toContain('text-center');
     }
     // the partidas keep their task icon, same size family
     expect(q('partida-summary-0').querySelector('svg')).not.toBeNull();
     // the modules appear in this order
     const order = [...document.querySelectorAll('[data-testid="ws-zone-b"], [data-testid="ws-crew"], [data-testid="ws-finance"], [data-testid="ws-cash"], [data-testid="ws-log"], [data-testid="ws-expenses"], [data-testid="ws-alerts"]')].map((n) => n.dataset.testid);
     expect(order).toEqual(['ws-zone-b', 'ws-crew', 'ws-finance', 'ws-cash', 'ws-log', 'ws-expenses']); // no exceptions => no tray
+    // a 3-column grid of tiles
+    expect(q('ws-menu').className).toContain('grid-cols-3');
+    expect(q('ws-menu').className).toContain('gap-4');
+    expect(q('ws-menu').className).toContain('p-4');
+    expect(q('ws-menu').children).toHaveLength(5);
   });
 
   it('no exceptions: the alert tray is not rendered at all (absolute visual silence)', async () => {
@@ -393,7 +409,7 @@ describe('no way out to the old editor + queue list', () => {
     await mount({ initial: mk({ expenses: [rental] }) });
     const tray = q('ws-alerts');
     expect(tray).not.toBeNull();
-    expect(tray.previousElementSibling.dataset.testid).toBe('ws-expenses'); // directly under the last module
+    expect(tray.previousElementSibling.dataset.testid).toBe('ws-menu'); // directly under the grid of modules
     expect(tray.nextElementSibling).toBeNull(); // and last in the list
     const alert = q('ws-alert');
     expect(alert.textContent).toBe('Devolución de Excavadora: vence hoy');
@@ -403,6 +419,7 @@ describe('no way out to the old editor + queue list', () => {
     expect(alert.className).toContain('bg-black');
     expect(alert.querySelector('svg[data-outline-icon="true"]')).not.toBeNull(); // the warning triangle
     expect(alert.querySelector('svg').getAttribute('stroke')).toBe('currentColor');
+    await click(q('ws-expenses')); // the rental is returned from the Gastos sheet
     await click(q('expense-return-r1')); // returned
     expect(q('ws-alerts')).toBeNull();
   });
@@ -414,7 +431,7 @@ describe('no way out to the old editor + queue list', () => {
     const receipts = { rows, retry: vi.fn(), discard: vi.fn(), accept: vi.fn() };
     await mount({ initial: p, receipts });
     expect(q('dock-queued').textContent).toBe('1'); // only this project's pending one
-    await click(q('ws-expenses').querySelector('summary'));
+    await click(q('ws-expenses'));
     expect(qa('queue-list')).toHaveLength(1);
     expect(q('queued-abcd1').textContent).toContain('Pendiente de conexión');
     expect(q('queued-abcd2').textContent).toContain('No se pudo leer');

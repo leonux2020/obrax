@@ -126,7 +126,7 @@ describe('App with the workspace (default)', () => {
     });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(q('toast')?.textContent).toMatch(/Boletas leídas: 1/);
-    await click(q('ws-expenses').querySelector('summary'));
+    await click(q('ws-expenses'));
     expect(q('expense-list').textContent).toContain('Taladro');
     expect(q('expense-list').textContent).toContain('25.000');
     expect(receiptQueue.peek()).toHaveLength(0);

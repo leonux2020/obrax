@@ -333,7 +333,7 @@ describe('global styles: no pull-to-refresh', () => {
 });
 
 describe('device Back and the accordions of a project (Parámetros, Diario, Anticipos, Gastos)', () => {
-  const summary = (id) => q(id).querySelector('summary');
+  const summary = (id) => q(id); // the grid tile that opens the bottom sheet
   const openProject = async () => {
     await click(q('project-card'));
     expect(q('ws-title')).not.toBeNull();
@@ -343,10 +343,10 @@ describe('device Back and the accordions of a project (Parámetros, Diario, Anti
     await openProject();
     const base = window.history.state;
     await click(summary('ws-cash'));
-    expect(q('ws-cash').open).toBe(true);
+    expect(!!q('ws-cash-sheet')).toBe(true);
     expect(window.history.state).toMatchObject({ modalOpen: true }); // the "fake" entry
     await deviceBack();
-    expect(q('ws-cash').open).toBe(false);
+    expect(!!q('ws-cash-sheet')).toBe(false);
     expect(q('ws-title')).not.toBeNull(); // NOT thrown out to the list
     expect(window.history.state).toEqual(base);
     await deviceBack();
@@ -359,9 +359,9 @@ describe('device Back and the accordions of a project (Parámetros, Diario, Anti
     for (const id of ['ws-finance', 'ws-log', 'ws-cash', 'ws-expenses']) {
       expect(q(id), id).not.toBeNull();
       await click(summary(id));
-      expect(q(id).open, id).toBe(true);
+      expect(!!q(`${id}-sheet`), id).toBe(true);
       await deviceBack();
-      expect(q(id).open, id).toBe(false);
+      expect(!!q(`${id}-sheet`), id).toBe(false);
       expect(q('ws-title'), id).not.toBeNull();
     }
   });
@@ -371,21 +371,34 @@ describe('device Back and the accordions of a project (Parámetros, Diario, Anti
     await click(summary('ws-log'));
     await click(summary('ws-cash'));
     await deviceBack();
-    expect(q('ws-cash').open).toBe(false);
-    expect(q('ws-log').open).toBe(true);
+    expect(!!q('ws-cash-sheet')).toBe(false);
+    expect(!!q('ws-log-sheet')).toBe(true);
     await deviceBack();
-    expect(q('ws-log').open).toBe(false);
+    expect(!!q('ws-log-sheet')).toBe(false);
     expect(q('ws-title')).not.toBeNull();
     await deviceBack();
     expect(q('ws-title')).toBeNull();
   });
 
+  it('stacked sheets: Escape closes only the topmost (the form over the Personal sheet), then the menu sheet', async () => {
+    await openProject();
+    await click(summary('ws-crew'));
+    await click(q('crew-add'));
+    expect(q('worker-form')).not.toBeNull();
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(q('worker-form')).toBeNull();
+    expect(!!q('ws-crew-sheet')).toBe(true);
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(!!q('ws-crew-sheet')).toBe(false);
+    expect(q('ws-title')).not.toBeNull();
+  });
+
   it('closing it by hand cleans the fake entry: ONE Back leaves the project (never twice)', async () => {
     await openProject();
     await click(summary('ws-cash'));
-    await click(summary('ws-cash')); // closed by the user
+    await click(q('ws-cash-sheet').closest('[role="dialog"]').querySelector('[data-sheet-close]')); // closed by the user (x)
     await flush(30);
-    expect(q('ws-cash').open).toBe(false);
+    expect(!!q('ws-cash-sheet')).toBe(false);
     expect(window.history.state?.modalOpen).toBeUndefined();
     await deviceBack();
     expect(q('ws-title')).toBeNull();
@@ -399,9 +412,9 @@ describe('device Back and the accordions of a project (Parámetros, Diario, Anti
     expect(q('cash-pad')).not.toBeNull();
     await deviceBack();
     expect(q('cash-pad')).toBeNull();
-    expect(q('ws-cash').open).toBe(true);
+    expect(!!q('ws-cash-sheet')).toBe(true);
     await deviceBack();
-    expect(q('ws-cash').open).toBe(false);
+    expect(!!q('ws-cash-sheet')).toBe(false);
     expect(q('ws-title')).not.toBeNull();
     await deviceBack();
     expect(q('ws-title')).toBeNull();
@@ -410,7 +423,7 @@ describe('device Back and the accordions of a project (Parámetros, Diario, Anti
   it('leaving the project with the arrow-less header total + accordion open leaves no garbage entries', async () => {
     await openProject();
     await click(q('ws-total')); // opens Anticipos
-    expect(q('ws-cash').open).toBe(true);
+    expect(!!q('ws-cash-sheet')).toBe(true);
     await deviceBack();
     await deviceBack();
     expect(q('project-card')).not.toBeNull();

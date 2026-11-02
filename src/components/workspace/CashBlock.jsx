@@ -132,7 +132,7 @@ export default function CashBlock({ total, payments, onChange, open, onToggle, p
   };
 
   return (
-    <Block icon={<BanknoteIcon />} id="cash" title={t('ws.cash.title')} meta={total > 0 ? pctText(summary.pct) : ''} open={open} onToggle={onToggle} testId="ws-cash">
+    <Block icon={<BanknoteIcon size={32} />} label={t('ws.menu.cash')} id="cash" title={t('ws.cash.title')} meta={total > 0 ? pctText(summary.pct) : ''} open={open} onToggle={onToggle} testId="ws-cash">
       <div className="space-y-3" data-testid="cash-panel" data-paid={summary.paid} data-pct={Math.round(summary.pct)}>
         <dl className="grid grid-cols-3 gap-2 text-center">
           {[
