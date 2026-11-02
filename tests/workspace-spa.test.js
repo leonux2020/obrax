@@ -9,14 +9,15 @@ import path from 'node:path';
 import { I18nProvider } from '../src/lib/i18n.jsx';
 import ProjectWorkspace from '../src/components/ProjectWorkspace.jsx';
 import ToastHost from '../src/components/workspace/ToastHost.jsx';
-import { newProject, toDayString } from '../src/lib/projects.js';
+import { newProject, normalizeProject, toDayString } from '../src/lib/projects.js';
+import { advancesByWorker, laborPool, liquidity, projectLiquidity } from '../src/lib/ledger.js';
 import { computeAll } from '../src/lib/engine.js';
 import { currentBook, resetRegistry } from '../src/lib/priceRegistry.js';
 import { flushUserPrices } from '../src/lib/priceFeed.js';
 import { resetToasts } from '../src/lib/notify.js';
 import { freezeQuote } from '../src/lib/signature.js';
 import { runExport } from '../src/lib/exportActions.js';
-import { crewModel, partidaMachines, rentRows, setMachineOn, toggleMachine, withCrew, withCrewAuto, withDeadlineDays, withMachinery } from '../src/lib/workspaceModel.js';
+import { calendarDays, partidaMachines, rentRows, setMachineOn, toggleMachine, withAdvance, withMachinery, withProjectDates, withWorker, withWorkerEdited, withoutAdvance, withoutWorker } from '../src/lib/workspaceModel.js';
 import { MACHINE_IDS } from '../src/lib/machinery.js';
 import { DICT } from '../src/lib/dict.js';
 
@@ -50,15 +51,9 @@ const read = (f) => fs.readFileSync(path.resolve(__dirname, '..', f), 'utf8');
 
 // ---- pure model --------------------------------------------------------------------------------------------------------
 describe('model: crew, machinery, deadline', () => {
-  it('withCrew takes manual control (clamped), withCrewAuto gives it back; both REFUSE while locked', () => {
+  it('a locked (frozen) quote still refuses machinery edits', () => {
     const d = mk().draft;
-    expect(withCrew(d, 5)).toMatchObject({ crew: 5, crewAuto: false });
-    expect(withCrew(d, 99).crew).toBe(30);
-    expect(withCrew(d, 0)).toBe(d);
-    expect(withCrewAuto(withCrew(d, 5)).crewAuto).toBe(true);
-    expect(withCrewAuto(d)).toBe(d); // already automatic
     const frozen = freezeQuote(d, { pricedAt: 1000, total: 5, live: {} });
-    expect(withCrew(frozen, 5)).toBe(frozen);
     expect(withMachinery(frozen, { include: false })).toBe(frozen);
   });
 
@@ -70,26 +65,81 @@ describe('model: crew, machinery, deadline', () => {
     expect(toggleMachine(['scaffold'], 'compactor', false)).toEqual(MACHINE_IDS.filter((x) => ['compactor', 'scaffold'].includes(x)));
   });
 
-  it('withDeadlineDays: end = start + (days - 1); no start date = today; junk and a locked quote change nothing', () => {
+  it('withProjectDates: two manual dates; the start dragging the end, an end before the start and junk are refused', () => {
     const p = mk();
-    expect(withDeadlineDays(p, 10)).toMatchObject({ startDate: day(-5), endDate: day(4) });
-    expect(withDeadlineDays({ ...p, startDate: '', endDate: '' }, 3)).toMatchObject({ startDate: day(0), endDate: day(2) });
-    expect(withDeadlineDays(p, 0)).toBe(p);
-    expect(withDeadlineDays(p, 99999)).toBe(p);
-    const locked = { ...p, draft: freezeQuote(p.draft, { pricedAt: 1000, total: 5, live: p }) };
-    expect(withDeadlineDays(locked, 10)).toBe(locked);
+    expect(withProjectDates(p, { endDate: day(10) })).toMatchObject({ startDate: day(-5), endDate: day(10) });
+    expect(withProjectDates(p, { startDate: day(30) })).toMatchObject({ startDate: day(30), endDate: day(30) }); // the end follows
+    expect(withProjectDates(p, { endDate: day(-9) })).toBe(p); // before the start: refused
+    expect(withProjectDates(p, { endDate: 'ayer' })).toBe(p);
+    expect(withProjectDates(p, { endDate: p.endDate })).toBe(p); // no change
+    expect(withProjectDates(p, { endDate: '' })).toMatchObject({ startDate: day(-5), endDate: '' });
   });
 
-  it('crewModel / rentRows read the engine result; an incomplete quote has neither', () => {
+  it('calendarDays is a plain subtraction of the two dates (null while one is missing)', () => {
+    expect(calendarDays(mk())).toBe(25); // -5 .. +20
+    expect(calendarDays({ startDate: day(0), endDate: day(0) })).toBe(0);
+    expect(calendarDays({ startDate: day(0), endDate: day(1) })).toBe(1);
+    expect(calendarDays({ startDate: '', endDate: day(1) })).toBeNull();
+    expect(calendarDays({ startDate: day(0), endDate: '' })).toBeNull();
+  });
+
+  it('the crew is a nominal list: add / edit / remove, name required, unknown specialty = multi', () => {
+    const p0 = { ...mk(), crew: [] };
+    expect(withWorker(p0, { name: '  ', specialty: 'mason' })).toBe(p0);
+    const p1 = withWorker(p0, { name: 'Luca Rossi', specialty: 'electrician', notes: 'Tablero' });
+    expect(p1.crew).toHaveLength(1);
+    expect(p1.crew[0]).toMatchObject({ name: 'Luca Rossi', specialty: 'electrician', notes: 'Tablero' });
+    expect(withWorker(p1, { name: 'X', specialty: 'astronaut' }).crew[1].specialty).toBe('multi');
+    const id = p1.crew[0].id;
+    expect(withWorkerEdited(p1, id, { name: 'Luca R.', specialty: 'plumber', notes: '' }).crew[0]).toMatchObject({ id, name: 'Luca R.', specialty: 'plumber' });
+    expect(withWorkerEdited(p1, 'nope', { name: 'Y' })).toBe(p1);
+    expect(withoutWorker(p1, id).crew).toEqual([]);
+    expect(withoutWorker(p1, 'nope')).toBe(p1);
+  });
+
+  it('advances are linked to a worker (workerId) and keep adding up in the ledger: pool, liquidity and the project cash', () => {
+    const p0 = withWorker({ ...mk(), crew: [], payments: [{ id: 'pay1', amount: 10000, at: 1 }] }, { name: 'Ana', specialty: 'mason' });
+    const p1 = withWorker(p0, { name: 'Beto', specialty: 'plumber' });
+    const [ana, beto] = p1.crew;
+    const p2 = withAdvance(withAdvance(withAdvance(p1, ana.id, 1500), beto.id, 700), ana.id, 300);
+    expect(p2.advances.map((a) => [a.workerId, a.worker, a.amount])).toEqual([[ana.id, 'Ana', 300], [beto.id, 'Beto', 700], [ana.id, 'Ana', 1500]]);
+    expect(withAdvance(p1, 'nadie', 100)).toBe(p1); // not a person of the crew
+    expect(withAdvance(p1, ana.id, 0)).toBe(p1); // not an amount
+    const split = advancesByWorker(p2.crew, p2.advances);
+    expect(split.rows.map((r) => [r.worker.name, r.total])).toEqual([['Ana', 1800], ['Beto', 700]]);
+    expect(split.loose).toEqual([]);
+    // the cash book keeps summing EVERY advance, whoever got it
+    expect(laborPool(5000, p2.advances)).toEqual({ pool: 5000, advanced: 2500, available: 2500 });
+    expect(liquidity(p2.payments, [], p2.advances)).toBe(7500);
+    expect(projectLiquidity(p2)).toBe(7500);
+    // removing a person keeps the money in the book, as unassigned
+    const p3 = withoutWorker(p2, ana.id);
+    expect(projectLiquidity(p3)).toBe(7500);
+    const split3 = advancesByWorker(p3.crew, p3.advances);
+    expect(split3.looseTotal).toBe(1800);
+    expect(split3.rows.reduce((s2, r) => s2 + r.total, 0) + split3.looseTotal).toBe(2500);
+    expect(withoutAdvance(p2, p2.advances[0].id).advances).toHaveLength(2);
+  });
+
+  it('normalizeProject keeps crew and workerId (and an old project without them still loads)', () => {
+    const w = withWorker({ ...mk(), crew: [] }, { name: 'Ana', specialty: 'mason' });
+    const withAdv = withAdvance(w, w.crew[0].id, 900);
+    const back = normalizeProject(JSON.parse(JSON.stringify(withAdv)));
+    expect(back.crew).toEqual(withAdv.crew);
+    expect(back.advances[0]).toMatchObject({ workerId: w.crew[0].id, worker: 'Ana', amount: 900 });
+    const old = JSON.parse(JSON.stringify(mk()));
+    delete old.crew;
+    old.advances = [{ id: 'adv1abc', worker: 'Juan', amount: 50, at: 5 }];
+    const loaded = normalizeProject(old);
+    expect(loaded.crew).toEqual([]);
+    expect(loaded.advances[0].workerId).toBeUndefined();
+  });
+
+  it('rentRows read the engine result; an incomplete quote has none (the engine still prices the machinery rental)', () => {
     const p = mk();
     const r = computeAll(p.draft, Date.now(), { timeline: { startDate: p.startDate, endDate: p.endDate }, chains: false });
-    const m = crewModel(r);
-    expect(m.crew).toBeGreaterThanOrEqual(1);
-    expect(m.plan.hasDeadline).toBe(true);
-    expect(m.rows.length).toBe(1);
     expect(rentRows(r).map((x) => x.id)).toContain('mixer');
     const empty = computeAll(newProject({ regionCode: 'CL' }).draft, Date.now(), { chains: false });
-    expect(crewModel(empty)).toBeNull();
     expect(rentRows(empty)).toEqual([]);
   });
 });
@@ -152,65 +202,160 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('Cuadrilla y cronograma (numpad, no OS keyboard)', () => {
-  it('shows the plan; + / − and the pad set the crew by hand, the schedule and the quote follow', async () => {
+describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
+  const openCrew = async () => {
+    await click(q('ws-crew').querySelector('summary'));
+  };
+  const addWorker = async (name, specialty = null, notes = '') => {
+    await click(q('crew-add'));
+    await typeInto(q('crew-name'), name);
+    if (specialty) {
+      const sel = q('crew-specialty');
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, specialty);
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    }
+    if (notes) await typeInto(q('crew-notes'), notes);
+    await click(q('crew-save'));
+  };
+
+  it('the theoretical engine is gone from the screen: no HH, dead days, timeline bars, recalculate button or [-] [+] counter', async () => {
     await mount(mk());
-    expect(q('ws-crew').tagName).toBe('DETAILS');
-    expect(q('sched-window')).not.toBeNull();
-    expect(q('sched-timeline').children).toHaveLength(1);
-    const total0 = q('ws-total').textContent;
-    await click(q('crew-plus'));
-    expect(spy.project.draft.crewAuto).toBe(false); // touching the crew = manual control
-    const crew1 = spy.project.draft.crew;
-    await click(q('crew-plus'));
-    expect(spy.project.draft.crew).toBe(crew1 + 1);
-    await click(q('crew-minus'));
-    expect(spy.project.draft.crew).toBe(crew1);
-    await click(q('crew-count'));
-    expect(q('crew-pad')).not.toBeNull();
-    expect(host.querySelector('input:focus')).toBeNull();
-    await keys('1');
-    expect(spy.project.draft.crew).toBe(1);
-    await keys('9'); // 19 people: allowed
-    expect(spy.project.draft.crew).toBe(19);
-    await keys('9'); // 199 would go over the maximum (30): the digit is refused
-    expect(spy.project.draft.crew).toBe(19);
-    await click(q('pad-done'));
-    expect(q('crew-pad')).toBeNull();
-    expect(q('ws-total').textContent).not.toBe(''); // the header keeps its live total
-    expect(typeof total0).toBe('string');
-    await click(q('crew-auto')); // back to the deadline-driven crew
-    expect(spy.project.draft.crewAuto).toBe(true);
+    const crew = q('ws-crew');
+    for (const id of ['sched-window', 'sched-timeline', 'sched-deadline', 'crew-auto', 'crew-plus', 'crew-minus', 'crew-count', 'crew-deadline', 'crew-pad', 'days-pad']) expect(q(id), id).toBeNull();
+    expect(crew.textContent).not.toMatch(/\bHH\b/);
+    expect(crew.querySelector('[aria-hidden="true"].bg-brand')).toBeNull();
   });
 
-  it('the deadline in days is typed on the pad and moves the project end date (start stays)', async () => {
+  it('two plain date fields (inicio / entrega) edit the project and the duration is the subtraction, shown statically', async () => {
     await mount(mk());
-    expect(q('crew-deadline').textContent).toContain('26');
-    await click(q('crew-deadline'));
-    expect(q('days-pad')).not.toBeNull();
-    await keys('40');
-    expect(spy.project.startDate).toBe(day(-5));
-    expect(spy.project.endDate).toBe(day(34)); // -5 + 40 - 1
-    expect(q('crew-deadline').textContent).toContain('40');
-    await click(q('pad-done'));
+    await openCrew();
+    expect(q('crew-start').type).toBe('date');
+    expect(q('crew-start').value).toBe(day(-5));
+    expect(q('crew-end').value).toBe(day(20));
+    expect(q('crew-duration').dataset.days).toBe('25');
+    expect(q('crew-duration').textContent).toContain('25 días');
+    await typeInto(q('crew-end'), day(24));
+    expect(spy.project.endDate).toBe(day(24));
+    expect(q('crew-duration').dataset.days).toBe('29');
+    await typeInto(q('crew-start'), day(-4));
+    expect(spy.project.startDate).toBe(day(-4));
+    expect(q('crew-duration').dataset.days).toBe('28');
+    await typeInto(q('crew-end'), day(-4));
+    expect(q('crew-duration').textContent).toContain('0 días');
+    await typeInto(q('crew-end'), '');
+    expect(spy.project.endDate).toBe('');
+    expect(q('crew-duration').textContent).toContain('—');
   });
 
-  it('advances to workers: the name is text, the AMOUNT is typed on the pad and discounts the labour pool', async () => {
+  it('"+ Añadir trabajador" opens a sheet (name, specialty list, optional notes); the person shows up as a card with the icon of the role', async () => {
     await mount(mk());
+    await openCrew();
+    expect(q('crew-empty')).not.toBeNull();
+    await click(q('crew-add'));
+    expect(q('worker-form')).not.toBeNull();
+    expect([...q('crew-specialty').options].map((o) => o.value)).toEqual(['multi', 'laborer', 'electrician', 'plumber', 'carpenter', 'welder', 'finishing', 'gardener', 'mason', 'other']);
+    expect(q('crew-save').disabled).toBe(true); // a name is required
+    await typeInto(q('crew-name'), 'Luca Rossi');
+    expect(q('crew-save').disabled).toBe(false);
+    await click(q('sheet-backdrop')); // closing without saving adds nobody
+    expect(spy.project.crew).toHaveLength(0);
+    await addWorker('Luca Rossi', 'electrician', 'Tablero general');
+    expect(q('worker-form')).toBeNull();
+    expect(spy.project.crew).toHaveLength(1);
+    const w = spy.project.crew[0];
+    expect(w).toMatchObject({ name: 'Luca Rossi', specialty: 'electrician', notes: 'Tablero general' });
+    const card = q(`worker-${w.id}`);
+    expect(card.dataset.specialty).toBe('electrician');
+    expect(q(`worker-name-${w.id}`).textContent).toBe('Luca Rossi');
+    expect(q(`worker-spec-${w.id}`).textContent).toBe('Electricista · Tablero general');
+    expect(card.querySelector('svg[data-outline-icon="true"] path[d^="M13 2 3 14"]')).not.toBeNull(); // Zap = electrician
+    expect(q('crew-empty')).toBeNull();
+    expect(q('ws-crew').querySelector('summary').textContent).toContain('1 trabajadores');
+    await addWorker('Pía', 'plumber');
+    await addWorker('Nico');
+    const [, plumber, generic] = spy.project.crew;
+    expect(q(`worker-${plumber.id}`).querySelector('svg path[d^="M14.7 6.3"]')).not.toBeNull(); // Wrench
+    expect(generic.specialty).toBe('multi');
+    expect(q(`worker-${generic.id}`).querySelector('svg path[d^="M19 21v-2"]')).not.toBeNull(); // generic User
+  });
+
+  it('a worker is edited and deleted from their card; their advances stay in the book as unassigned', async () => {
+    await mount(mk());
+    await openCrew();
+    await addWorker('Ana', 'mason');
+    const id = spy.project.crew[0].id;
+    await click(q(`worker-edit-${id}`));
+    expect(q('crew-name').value).toBe('Ana');
+    await typeInto(q('crew-name'), 'Ana María');
+    await click(q('crew-save'));
+    expect(spy.project.crew[0]).toMatchObject({ id, name: 'Ana María', specialty: 'mason' });
+    await click(q(`worker-adv-${id}`));
+    await keys('800');
+    await click(q('pad-done'));
+    expect(spy.project.advances).toHaveLength(1);
+    await click(q(`worker-edit-${id}`));
+    await click(q('crew-delete'));
+    expect(spy.project.crew).toHaveLength(0);
+    expect(spy.project.advances).toHaveLength(1); // the money already handed over stays
+    expect(q('advances-loose').dataset.total).toBe('800');
+    await click(q('advances-loose').querySelector('button'));
+    expect(spy.project.advances).toHaveLength(0);
+  });
+
+  it('"+ Anticipo" on a card opens the app numpad (no OS keyboard); the advance is linked to that person, shown in their card and discounts the labour pool', async () => {
+    await mount(mk());
+    await openCrew();
+    await addWorker('Juan');
+    await addWorker('Marta');
+    const [juan, marta] = spy.project.crew;
     const pool0 = Number(q('labor-pool').dataset.available);
     expect(pool0).toBeGreaterThan(0);
-    await typeInto(host.querySelector('[data-testid="advances-panel"] input'), 'Juan');
-    expect(q('advance-add').disabled).toBe(true); // no amount yet
-    await click(q('advance-amount'));
+    expect(q(`worker-total-${juan.id}`).textContent).toBe('Sin anticipos');
+    await click(q(`worker-adv-${juan.id}`));
     expect(q('advance-pad')).not.toBeNull();
+    expect(host.querySelector('input:focus')).toBeNull();
     await keys('5000');
     await click(q('pad-done'));
-    await click(q('advance-add'));
+    expect(q('advance-pad')).toBeNull();
     expect(spy.project.advances).toHaveLength(1);
-    expect(spy.project.advances[0]).toMatchObject({ worker: 'Juan', amount: 5000 });
-    expect(Number(q('labor-pool').dataset.available)).toBe(pool0 - 5000);
-    await click(host.querySelector('[data-testid="advance-list"] button'));
+    expect(spy.project.advances[0]).toMatchObject({ workerId: juan.id, worker: 'Juan', amount: 5000 });
+    expect(q(`worker-total-${juan.id}`).dataset.total).toBe('5000');
+    expect(q(`worker-total-${marta.id}`).dataset.total).toBe('0');
+    await click(q(`worker-adv-${marta.id}`));
+    await keys('1200');
+    await click(q('pad-done'));
+    await click(q(`worker-adv-${juan.id}`));
+    await keys('300');
+    await click(q('pad-done'));
+    expect(q(`worker-total-${juan.id}`).dataset.total).toBe('5300'); // the card's history adds up
+    expect(q(`worker-advlist-${juan.id}`).children).toHaveLength(2);
+    expect(q(`worker-total-${marta.id}`).dataset.total).toBe('1200');
+    expect(Number(q('labor-pool').dataset.available)).toBe(pool0 - 6500); // the pool discounts EVERY advance
+    await click(q(`worker-advlist-${juan.id}`).querySelector('button'));
+    expect(Number(q('labor-pool').dataset.available)).toBe(pool0 - 6200);
+  });
+
+  it('a pad closed with nothing typed (or cleared back to nothing) registers no advance', async () => {
+    await mount(mk());
+    await openCrew();
+    await addWorker('Juan');
+    const id = spy.project.crew[0].id;
+    await click(q(`worker-adv-${id}`));
+    await click(q('pad-done'));
     expect(spy.project.advances).toHaveLength(0);
+    await click(q(`worker-adv-${id}`));
+    await keys('5');
+    await click(q('pad-back'));
+    await click(q('pad-done'));
+    expect(spy.project.advances).toHaveLength(0);
+    await click(q(`worker-adv-${id}`));
+    await keys('50');
+    await click(q('pad-back'));
+    await keys('0');
+    await click(q('pad-done'));
+    expect(spy.project.advances[0].amount).toBe(50);
   });
 });
 
@@ -370,13 +515,11 @@ describe('read-only while locked', () => {
 
   it('every editor of the quote is a disabled fieldset with a shield: a tap answers "Precios bloqueados" and nothing changes', async () => {
     await mount(lockedProject());
-    expect(qa('locked-shield').length).toBeGreaterThanOrEqual(3); // partida, crew, finance
-    expect(q('crew-plus').closest('fieldset').disabled).toBe(true);
+    expect(qa('locked-shield').length).toBeGreaterThanOrEqual(2); // partida, finance (the crew is operational, not part of the quote)
     expect(q('slider-profit-input').closest('fieldset').disabled).toBe(true);
     expect(q('partida-0').querySelector('fieldset').disabled).toBe(true);
     expect(q('partida-machine-rate-0-mixer').closest('fieldset').disabled).toBe(true); // the machines of the task too
     const before = spy.project.draft;
-    await click(q('crew-minus')); // disabled: nothing happens
     await click(qa('locked-shield')[1]);
     expect(q('toast').textContent).toBe('Precios bloqueados');
     expect(spy.project.draft).toBe(before);
@@ -389,9 +532,6 @@ describe('read-only while locked', () => {
     await click(q('ws-unlock'));
     await click(q('unlock-confirm'));
     expect(qa('locked-shield')).toHaveLength(0);
-    expect(q('crew-plus').closest('fieldset')).toBeNull();
-    await click(q('crew-plus'));
-    expect(spy.project.draft.crewAuto).toBe(false);
   });
 });
 

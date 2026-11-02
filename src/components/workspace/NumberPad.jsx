@@ -13,9 +13,11 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'dot', '0', 'back'];
  *
  *   title / unit   header line and the small "per m³" caption     foot   the line under the display (where the number goes)
  *   top            optional node above the title (the supplier tags of the price pads)
+ *   onEmpty        optional: called when what is typed is not an amount (cleared, or a lone zero)
  *   decimals       0 hides the decimal key                          onReset  optional "Restablecer" button
+ *   onEmpty        optional: called when what is typed is not an amount (cleared, or a lone zero)
  */
-export default function NumberPad({ title, unit = '', value, decimals = 2, max = null, foot = '', top = null, onChange, onReset = null, onClose, testId = 'price-numpad' }) {
+export default function NumberPad({ title, unit = '', value, decimals = 2, max = null, foot = '', top = null, onChange, onEmpty = null, onReset = null, onClose, testId = 'price-numpad' }) {
   const { t, locale } = useI18n();
   useBackLayer(onClose); // the device's Back closes the pad only
   const [state, dispatch] = useReducer(padReduce, undefined, () => padInit(value, decimals));
@@ -28,6 +30,7 @@ export default function NumberPad({ title, unit = '', value, decimals = 2, max =
     if (max !== null && v !== null && v > max) return; // that digit would go over the limit: ignored
     dispatch(action);
     if (v !== null) onChange(v);
+    else onEmpty?.(); // nothing applicable (empty / a lone zero): lets a caller that COMMITS on close know there is no amount
   };
 
   const key = (k) => {

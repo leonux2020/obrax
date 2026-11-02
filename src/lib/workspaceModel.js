@@ -4,7 +4,8 @@
 import { LEVEL_COLOR } from '../components/levelStyle.js';
 import { MAX_PRICE } from './pricing.js';
 import { dayDiff, isClosed, parseDay, projectLevel } from './projects.js';
-import { clampCrew, parseISODay, toISODay } from './schedule.js';
+import { parseISODay } from './schedule.js';
+import { CREW_LIMIT, LEDGER_LIMITS, newEntryId, normalizeAdvances, normalizeCrew } from './ledger.js';
 import { DEFAULT_MACHINERY, MACHINE_IDS } from './machinery.js';
 import { savedMeta } from './priceBook.js';
 import { aiRetailer } from './suppliers.js';
@@ -81,15 +82,6 @@ export function priceCaption(t, { origin, meta = null, regionCode }) {
   return t('ws.supplier.base');
 }
 
-/**
- * Crew size typed on the pad: manual mode from then on. Same contract as withPriceOverride: while the quote is locked the
- * SAME draft comes back (read-only), because the crew sets the days of the machinery rental and so the total.
- */
-export const withCrew = (draft, n) => (quoteLock(draft) || !(Number(n) >= 1) ? draft : { ...draft, crew: clampCrew(n), crewAuto: false });
-
-/** Back to the automatic crew (the smallest one that fits the project's deadline). */
-export const withCrewAuto = (draft) => (quoteLock(draft) || draft.crewAuto !== false ? draft : { ...draft, crewAuto: true });
-
 /** Machinery master switch / switched-off machines. Locked quote: the same draft. */
 export const withMachinery = (draft, patch) => (quoteLock(draft) ? draft : { ...draft, machinery: { ...(draft.machinery ?? DEFAULT_MACHINERY), ...patch } });
 
@@ -120,35 +112,62 @@ export function partidaMachines(result, index, regionCode = null) {
     .map((i) => ({ ...i, row: rows.find((r) => r.id === i.id) ?? null }));
 }
 
-export const DEADLINE_MAX_DAYS = 3650;
+// ---- the schedule is manual: two dates and the days between them ---------------------------------------------------------------
+const DAY_MS = 86400000;
+const validDay = (v) => v === '' || Boolean(parseISODay(v));
 
 /**
- * The job's deadline typed in days: the end date becomes start + (days - 1) (both ends count, as the planner does). A job
- * with no start date starts today. Returns the SAME project while the quote is locked or for an unusable number.
+ * The job's two dates, typed by the user ("Data di inizio" / "Data di consegna"). `patch` = { startDate?, endDate? } with ISO days or ''.
+ * Moving the start past the end drags the end to the same day; an end before the start is refused; junk changes nothing (the SAME
+ * project comes back). The dates stay editable on a locked quote: a locked quote plans with the dates it was frozen with.
  */
-export function withDeadlineDays(project, days, now = Date.now()) {
-  const n = Math.round(Number(days));
-  if (quoteLock(project.draft) || !(n >= 1 && n <= DEADLINE_MAX_DAYS)) return project;
-  const t = new Date(now);
-  const start = parseISODay(project.startDate) ?? new Date(t.getFullYear(), t.getMonth(), t.getDate());
-  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + n - 1);
-  return { ...project, startDate: toISODay(start), endDate: toISODay(end) };
+export function withProjectDates(project, patch) {
+  const startGiven = typeof patch?.startDate === 'string';
+  let start = startGiven ? patch.startDate : project.startDate;
+  let end = typeof patch?.endDate === 'string' ? patch.endDate : project.endDate;
+  if (!validDay(start) || !validDay(end)) return project;
+  if (start && end && parseISODay(end) < parseISODay(start)) {
+    if (!startGiven) return project;
+    end = start;
+  }
+  return start === project.startDate && end === project.endDate ? project : { ...project, startDate: start, endDate: end };
 }
 
-/** What the crew block draws, or null while there is no plan (no valid partida with labour). */
-export function crewModel(result) {
-  const s = result?.valid ? result.schedule : null;
-  if (!s || !(s.totals.hh > 0)) return null;
-  return {
-    crew: clampCrew(s.crew),
-    auto: Boolean(s.plan.auto && s.plan.hasDeadline), // the crew follows the deadline
-    canAuto: s.plan.hasDeadline && !s.plan.auto, // manual crew + a deadline: offer "back to automatic"
-    plan: s.plan,
-    totals: s.totals,
-    hoursPerDay: s.hoursPerDay,
-    rows: s.rows.filter((r) => r.hh > 0),
-  };
+/** Calendar days between the two dates (end - start, so same day = 0), or null while one of them is missing. Pure subtraction, no estimate. */
+export function calendarDays(project) {
+  const a = parseISODay(project?.startDate);
+  const b = parseISODay(project?.endDate);
+  return a && b ? Math.max(0, Math.round((b - a) / DAY_MS)) : null;
 }
+
+// ---- the crew: named people, and the cash advanced to each one ---------------------------------------------------------------------
+const cleanWorker = (w) => normalizeCrew([w])[0] ?? null;
+
+/** Adds a person to `project.crew` (name required). Returns the SAME project when it is refused (no name, or the crew is full). */
+export function withWorker(project, data) {
+  const crew = project.crew ?? [];
+  const w = cleanWorker({ ...data, id: newEntryId() });
+  return w && crew.length < CREW_LIMIT ? { ...project, crew: [...crew, w] } : project;
+}
+
+/** Edits a person (name / specialty / notes). Their advances stay linked: the link is the id, not the name. */
+export function withWorkerEdited(project, id, data) {
+  const crew = project.crew ?? [];
+  const w = cleanWorker({ ...data, id });
+  return w && crew.some((x) => x.id === id) ? { ...project, crew: crew.map((x) => (x.id === id ? w : x)) } : project;
+}
+
+/** Removes a person. The money already handed over is NOT erased: their advances stay in the cash book, unassigned. */
+export const withoutWorker = (project, id) => ((project.crew ?? []).some((x) => x.id === id) ? { ...project, crew: project.crew.filter((x) => x.id !== id) } : project);
+
+/** Gives `amount` to a person of the crew: a new advance linked by `workerId` (the name is stored too, as a snapshot). */
+export function withAdvance(project, workerId, amount, now = Date.now()) {
+  const w = (project.crew ?? []).find((x) => x.id === workerId);
+  const [adv] = w ? normalizeAdvances([{ id: newEntryId(), worker: w.name, workerId, amount, at: now }]) : [];
+  return adv && (project.advances ?? []).length < LEDGER_LIMITS.advances ? { ...project, advances: [adv, ...project.advances] } : project;
+}
+
+export const withoutAdvance = (project, id) => ({ ...project, advances: (project.advances ?? []).filter((a) => a.id !== id) });
 
 /** One editable daily rate per machine type the quote uses (a scaffold in two partidas is a single rate). */
 export function rentRows(result, regionCode = null) {

@@ -103,3 +103,87 @@ export const BellIcon = (props) => (
     <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
   </Outline>
 );
+
+// ---- the roles of the crew (one thin outline icon per specialty, same 1.5 px language) ----------------------------------------
+export const UserIcon = (props) => (
+  <Outline {...props}>
+    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </Outline>
+);
+
+export const ZapIcon = (props) => (
+  <Outline {...props}>
+    <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+  </Outline>
+);
+
+export const WrenchIcon = (props) => (
+  <Outline {...props}>
+    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+  </Outline>
+);
+
+export const HammerIcon = (props) => (
+  <Outline {...props}>
+    <path d="m15 12-8.37 8.37a1 1 0 1 1-3-3L12 9" />
+    <path d="m18 15 4-4" />
+    <path d="m21.5 11.5-1.91-1.91A2 2 0 0 1 19 8.17V7l-2.26-2.26a6 6 0 0 0-4.2-1.76L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.17a2 2 0 0 1 1.41.59L18.5 14.5" />
+  </Outline>
+);
+
+export const FlameIcon = (props) => (
+  <Outline {...props}>
+    <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+  </Outline>
+);
+
+export const BrushIcon = (props) => (
+  <Outline {...props}>
+    <path d="M18 3l3 3-9 9-3-3z" />
+    <path d="M9 12c-3 0-4 2-4 4s-1 4-3 5c4 1 9 0 9-5" />
+  </Outline>
+);
+
+export const LeafIcon = (props) => (
+  <Outline {...props}>
+    <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z" />
+    <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+  </Outline>
+);
+
+export const BrickWallIcon = (props) => (
+  <Outline {...props}>
+    <rect width="18" height="18" x="3" y="3" rx="2" />
+    <path d="M3 9h18" />
+    <path d="M3 15h18" />
+    <path d="M12 9v6" />
+    <path d="M8 3v6" />
+    <path d="M16 3v6" />
+    <path d="M8 15v6" />
+    <path d="M16 15v6" />
+  </Outline>
+);
+
+export const HardHatIcon = (props) => (
+  <Outline {...props}>
+    <path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5" />
+    <path d="M14 6a6 6 0 0 1 6 6v3" />
+    <path d="M4 15v-3a6 6 0 0 1 6-6" />
+    <rect x="2" y="15" width="20" height="4" rx="1" />
+  </Outline>
+);
+
+/** specialty -> icon: Zap = electrician, Wrench = plumber, User = generic (multi-skilled / other). */
+export const SPECIALTY_ICON = Object.freeze({
+  multi: UserIcon,
+  laborer: HardHatIcon,
+  electrician: ZapIcon,
+  plumber: WrenchIcon,
+  carpenter: HammerIcon,
+  welder: FlameIcon,
+  finishing: BrushIcon,
+  gardener: LeafIcon,
+  mason: BrickWallIcon,
+  other: UserIcon,
+});

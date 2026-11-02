@@ -5,7 +5,7 @@ import { getRegion } from './regions.js';
 import { normalizeDraft, normalizeCompany, newDraft, isCompanyEmpty } from './draft.js';
 import { sanitizeText } from './sanitize.js';
 import { normalizeLogo } from './logo.js';
-import { normalizeAdvances, normalizeExpenses, normalizeLocation, normalizeLogbook, normalizePayments } from './ledger.js';
+import { normalizeAdvances, normalizeCrew, normalizeExpenses, normalizeLocation, normalizeLogbook, normalizePayments } from './ledger.js';
 
 export const MAX_PROJECTS = 200;
 const ID_RE = /^[a-z0-9]{6,24}$/;
@@ -149,6 +149,7 @@ export function newProject({ regionCode, mode = 'quick', company = null, logo = 
     closedAt: 0,
     ...(parentId && ID_RE.test(parentId) ? { parentId } : {}),
     payments: [],
+    crew: [],
     advances: [],
     expenses: [],
     logbook: [],
@@ -209,6 +210,7 @@ export function normalizeProject(obj) {
     closedAt: Number.isFinite(Number(obj.closedAt)) && Number(obj.closedAt) > 0 ? Number(obj.closedAt) : 0,
     ...(typeof obj.parentId === 'string' && ID_RE.test(obj.parentId) ? { parentId: obj.parentId } : {}), // the job this one extends (older records have none)
     payments: normalizePayments(obj.payments),
+    crew: normalizeCrew(obj.crew), // the people on site (older records have none)
     advances: normalizeAdvances(obj.advances),
     expenses: normalizeExpenses(obj.expenses).map((e) => ({ ...e, projectId: obj.id })), // an expense always knows its project (old records get it here)
     logbook: normalizeLogbook(obj.logbook),

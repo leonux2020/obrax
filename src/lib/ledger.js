@@ -73,8 +73,36 @@ export const normalizeAdvances = (raw) =>
   listOf(raw, LEDGER_LIMITS.advances, (p, used) => {
     const a = amount(p.amount);
     const worker = sanitizeText(p.worker, 60).trim();
-    return a === null || !worker ? null : { id: idOf(p.id, used), worker, amount: a, at: stamp(p.at) };
+    // `workerId` links the advance to a person of the project's crew (older advances have none: they stay valid, just unassigned);
+    // `worker` is the name at the moment it was given, so the rendición still reads well if that person is later renamed or removed
+    return a === null || !worker ? null : { id: idOf(p.id, used), worker, amount: a, at: stamp(p.at), ...(typeof p.workerId === 'string' && ID_RE.test(p.workerId) ? { workerId: p.workerId } : {}) };
   });
+
+// ---- the crew: the people physically on the job ---------------------------------------------------------------------------
+export const WORKER_SPECIALTIES = Object.freeze(['multi', 'laborer', 'electrician', 'plumber', 'carpenter', 'welder', 'finishing', 'gardener', 'mason', 'other']);
+export const CREW_LIMIT = 60;
+
+/** `project.crew`: [{ id, name, specialty, notes }]. A worker without a name is dropped; an unknown specialty becomes "multi". */
+export const normalizeCrew = (raw) =>
+  listOf(raw, CREW_LIMIT, (w, used) => {
+    const name = sanitizeText(w.name, 60).trim();
+    if (!name) return null;
+    return { id: idOf(w.id, used), name, specialty: WORKER_SPECIALTIES.includes(w.specialty) ? w.specialty : 'multi', notes: sanitizeText(w.notes, 120).trim() };
+  });
+
+/**
+ * Splits the advances by person: `rows` = every crew member with the advances given to them and their total; `loose` = the advances
+ * that belong to nobody (legacy records, or a person removed later) with their total. Nothing is lost: Σ rows + loose = Σ advances.
+ */
+export function advancesByWorker(crew = [], advances = []) {
+  const ids = new Set(arr(crew).map((w) => w.id));
+  const rows = arr(crew).map((w) => {
+    const list = arr(advances).filter((a) => a.workerId === w.id);
+    return { worker: w, list, total: cents(sum(list)) };
+  });
+  const loose = arr(advances).filter((a) => !ids.has(a.workerId));
+  return { rows, loose, looseTotal: cents(sum(loose)) };
+}
 
 const RECEIPT_ID_RE = /^[a-z0-9]{4,24}$/;
 
