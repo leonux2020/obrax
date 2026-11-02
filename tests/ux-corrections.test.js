@@ -257,7 +257,10 @@ describe('3. new project: the closing button', () => {
     await click(q('pad-done'));
     await click(q('cash-add'));
     expect(q('cash-paid').textContent).toMatch(/7\.500/);
-    await deviceBack();
+    await deviceBack(); // the first Back only closes the open Anticipos accordion
+    expect(q('ws-cash').open).toBe(false);
+    expect(q('project-workspace')).not.toBeNull();
+    await deviceBack(); // the second leaves the project
     expect(q('project-workspace')).toBeNull();
     expect(q('project-card')).not.toBeNull();
     await flush(400);

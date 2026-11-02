@@ -331,3 +331,91 @@ describe('global styles: no pull-to-refresh', () => {
     expect(sheet).toContain('overscroll-contain');
   });
 });
+
+describe('device Back and the accordions of a project (Parámetros, Diario, Anticipos, Gastos)', () => {
+  const summary = (id) => q(id).querySelector('summary');
+  const openProject = async () => {
+    await click(q('project-card'));
+    expect(q('ws-title')).not.toBeNull();
+  };
+
+  it('Back closes the open accordion and the user stays in the project; the next Back leaves it', async () => {
+    await openProject();
+    const base = window.history.state;
+    await click(summary('ws-cash'));
+    expect(q('ws-cash').open).toBe(true);
+    expect(window.history.state).toMatchObject({ modalOpen: true }); // the "fake" entry
+    await deviceBack();
+    expect(q('ws-cash').open).toBe(false);
+    expect(q('ws-title')).not.toBeNull(); // NOT thrown out to the list
+    expect(window.history.state).toEqual(base);
+    await deviceBack();
+    expect(q('ws-title')).toBeNull();
+    expect(q('project-card')).not.toBeNull();
+  });
+
+  it('every main menu of the project works the same: Parámetros, Diario, Anticipos and Gastos', async () => {
+    await openProject();
+    for (const id of ['ws-finance', 'ws-log', 'ws-cash', 'ws-expenses']) {
+      expect(q(id), id).not.toBeNull();
+      await click(summary(id));
+      expect(q(id).open, id).toBe(true);
+      await deviceBack();
+      expect(q(id).open, id).toBe(false);
+      expect(q('ws-title'), id).not.toBeNull();
+    }
+  });
+
+  it('several open: Back closes them one per press, the last opened first, and only then leaves the project', async () => {
+    await openProject();
+    await click(summary('ws-log'));
+    await click(summary('ws-cash'));
+    await deviceBack();
+    expect(q('ws-cash').open).toBe(false);
+    expect(q('ws-log').open).toBe(true);
+    await deviceBack();
+    expect(q('ws-log').open).toBe(false);
+    expect(q('ws-title')).not.toBeNull();
+    await deviceBack();
+    expect(q('ws-title')).toBeNull();
+  });
+
+  it('closing it by hand cleans the fake entry: ONE Back leaves the project (never twice)', async () => {
+    await openProject();
+    await click(summary('ws-cash'));
+    await click(summary('ws-cash')); // closed by the user
+    await flush(30);
+    expect(q('ws-cash').open).toBe(false);
+    expect(window.history.state?.modalOpen).toBeUndefined();
+    await deviceBack();
+    expect(q('ws-title')).toBeNull();
+    expect(q('project-card')).not.toBeNull();
+  });
+
+  it('a sheet opened from an accordion closes first; then the accordion; then the project', async () => {
+    await openProject();
+    await click(summary('ws-cash'));
+    await click(q('cash-amount')); // the number pad: a layer above the accordion
+    expect(q('cash-pad')).not.toBeNull();
+    await deviceBack();
+    expect(q('cash-pad')).toBeNull();
+    expect(q('ws-cash').open).toBe(true);
+    await deviceBack();
+    expect(q('ws-cash').open).toBe(false);
+    expect(q('ws-title')).not.toBeNull();
+    await deviceBack();
+    expect(q('ws-title')).toBeNull();
+  });
+
+  it('leaving the project with the arrow-less header total + accordion open leaves no garbage entries', async () => {
+    await openProject();
+    await click(q('ws-total')); // opens Anticipos
+    expect(q('ws-cash').open).toBe(true);
+    await deviceBack();
+    await deviceBack();
+    expect(q('project-card')).not.toBeNull();
+    expect(window.history.state?.modalOpen).toBeUndefined();
+    expect(window.history.state?.cubraxProject).toBeUndefined();
+    expect(layerDepth()).toBe(0);
+  });
+});

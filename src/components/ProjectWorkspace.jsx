@@ -21,6 +21,7 @@ import BottomSheet from './BottomSheet.jsx';
 import Logbook from './Logbook.jsx';
 import { notePhotosFor } from '../lib/notePhotos.js';
 import { receiptPhotosFor } from '../lib/receiptPhotos.js';
+import { useAccordionBack } from '../lib/useAccordionBack.js';
 import ReceiptSheet from './ReceiptSheet.jsx';
 import SignatureSheet from './SignatureSheet.jsx';
 import SnapGrid from './SnapGrid.jsx';
@@ -83,6 +84,8 @@ export default function ProjectWorkspace({ project, setProject, setDraft, photos
     return { ...initialWorkspaceState(), open: first ? { [first.id]: true } : {} };
   });
   const toggle = (id, open) => dispatch({ type: 'toggle', id, open });
+  // the device's Back closes the last opened accordion (Parámetros, Diario, Anticipos, Gastos...) instead of leaving the project
+  useAccordionBack(ui.open, (id) => dispatch({ type: 'toggle', id, open: false }));
   const closeSheet = () => dispatch({ type: 'closeSheet' });
 
   useEffect(() => {

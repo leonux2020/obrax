@@ -33,6 +33,11 @@ function onPop(ev) {
     ev.stopImmediatePropagation(); // a layer consumed the Back press: the rest of the app does not react
     for (const layer of gone.reverse()) layer.popped();
   }
+  else if (id && at !== -1) {
+    // landed on a LIVE layer's entry with nothing above it: an upper layer was closed by the app (release -> history.back()). That pop is ours:
+    // the screen hooks underneath (project / tab) must not mistake it for the user leaving their entry
+    ev.stopImmediatePropagation();
+  }
   if (id && at === -1) {
     try {
       window.history.back(); // landed on a dead layer entry: skip it

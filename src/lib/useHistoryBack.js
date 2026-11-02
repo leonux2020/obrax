@@ -51,6 +51,7 @@ export function useHistoryBack(activeId, onLeave, key = KEY) {
         return;
       }
       if (active.current && ev?.state?.[key] === active.current) return; // a layer ABOVE ours was popped: ours is still there
+      if (active.current && ev?.state?.cubraxLayer) return; // landed on an overlay's entry (an upper overlay closed above it): ours is still below
       const mine = pushed.current;
       pushed.current = false;
       if (active.current) {
