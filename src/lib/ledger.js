@@ -271,15 +271,16 @@ export function groupExpensesBySupplier(expenses = []) {
 }
 
 /**
- * The "profitability x-ray" of ONE project (Audit mode): what was collected, what was spent, the operating margin between them (collected minus
- * expenses, NOT counting cash advanced to workers), the share of the budget already collected (null without a priced quote) and the `top`
+ * The "profitability x-ray" of ONE project (Audit mode): what was collected, what was spent, the cash advanced to the staff and the operating
+ * margin = the REAL cash flow: collected - (expenses + advances), the same figure as `liquidity()` (so Contabilidad and the audit agree). The share of the budget already collected (null without a priced quote) and the `top`
  * suppliers by what went to them as a share of the TOTAL spent. Suppliers are merged by trimmed, case-insensitive name; receipts with no
  * supplier are not a supplier: they only appear (as one nameless line) when nothing else was named, so the spending never vanishes.
  */
 export function profitability(project, budget = 0, top = 3) {
   const collected = cents(sum(arr(project?.payments)));
   const spent = cents(sum(arr(project?.expenses)));
-  const margin = cents(collected - spent);
+  const advanced = cents(sum(arr(project?.advances)));
+  const margin = cents(collected - (spent + advanced));
   const efficiency = num(budget) > 0 ? Math.max(0, (collected / num(budget)) * 100) : null;
   const shops = new Map();
   for (const e of arr(project?.expenses)) {
@@ -295,7 +296,7 @@ export function profitability(project, budget = 0, top = 3) {
   const named = all.filter((x) => x.name);
   const pool = (named.length ? named : all).slice(0, Math.max(1, top));
   const suppliers = spent > 0 ? pool.map((x) => ({ ...x, share: (x.total / spent) * 100 })) : [];
-  return { collected, spent, margin, efficiency, suppliers };
+  return { collected, spent, advanced, margin, efficiency, suppliers };
 }
 
 /** Expenses grouped by category: [{ category, total, count }], biggest first (the total of every line, any currency as the project's own). */

@@ -8,13 +8,14 @@ import { BACKUP_FOLDER } from '../lib/drive.js';
 import { backupAge } from '../lib/driveSync.js';
 import { compressLogo, LOGO_LIMITS } from '../lib/logo.js';
 import { PhotoError } from '../lib/photos.js';
-import { CloudUploadIcon, FileSignatureIcon, GlobeIcon, SmartphoneIcon, UserIcon } from './workspace/icons.jsx';
+import { CloudUploadIcon, FileSignatureIcon, GlobeIcon, SmartphoneIcon, UserIcon, UsersIcon } from './workspace/icons.jsx';
 import { Button, Switch, TextField } from './ui.jsx';
 import GoogleButton from './GoogleButton.jsx';
 import LangSelect from './LangSelect.jsx';
 import RegionCombobox from './RegionCombobox.jsx';
 import InstallButton from './InstallButton.jsx';
 import ContractorSignatureSheet from './ContractorSignatureSheet.jsx';
+import SquadraSheet from './squadra/SquadraSheet.jsx';
 
 /** One collapsible block of Ajustes (closed by default). `open` is kept by the parent so it survives the signature canvas (which swaps the screen). */
 function Accordion({ testId, titleId, icon: Icon, title, open, onToggle, children, bodyClassName = '' }) {
@@ -78,6 +79,7 @@ export default function SettingsView({
   const [openAcc, setOpenAcc] = useState({ profile: false, ops: false, locale: false }); // everything starts closed: a nearly empty screen
   const toggleAcc = (key) => (isOpen) => setOpenAcc((o) => ({ ...o, [key]: isOpen }));
   const [signing, setSigning] = useState(false); // only the signature canvas (never the old profile modal)
+  const [squadra, setSquadra] = useState(false); // the global directory of workers (full-screen sheet over Ajustes)
   const logoRef = useRef(null);
   const saving = useRef(null);
   const formRef = useRef(form);
@@ -501,6 +503,23 @@ export default function SettingsView({
           </section>
         )}
 
+        {/* ---- Squadra / Maestranze: the team directory. Its own card, clearly apart and ABOVE the logout, which stays the lowest thing of the menu ---- */}
+        <button
+          type="button"
+          onClick={() => setSquadra(true)}
+          data-testid="settings-squadra"
+          className="card !p-0 mt-8 flex min-h-[64px] w-full items-center gap-3 px-4 text-left transition active:border-white/40 sm:px-5"
+        >
+          <UsersIcon size={22} className="text-neutral-400" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-lg font-semibold">{t('squadra.title')}</span>
+            <span className="block truncate text-xs text-neutral-400">{t('squadra.subtitle')}</span>
+          </span>
+          <span aria-hidden="true" className="text-lg text-neutral-500">
+            ›
+          </span>
+        </button>
+
         <div className="mt-10 border-t border-white/10 pt-6" data-testid="settings-logout-zone">
           {phase !== 'idle' && (
             <p className={`mb-3 rounded-xl border px-4 py-3 text-sm ${phase === 'failed' ? 'border-amber-400/50 text-amber-200' : 'border-red-500/40 text-red-300'}`} role="alert" data-testid="logout-warning">
@@ -530,6 +549,7 @@ export default function SettingsView({
           )}
         </div>
       </main>
+      {squadra && <SquadraSheet onClose={() => setSquadra(false)} />}
     </div>
   );
 }

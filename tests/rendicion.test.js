@@ -439,6 +439,14 @@ describe('ProjectAudit (ledger) + RenditionBar + the Contabilidad card', () => {
     expect(q('audit-margin-value').textContent).toMatch(/-.*50\.000/); // 20.000 - 70.000
   });
 
+  it('MARGIN subtracts the cash advanced to the staff too (the real cash flow), and says so under the figure', async () => {
+    const p = project();
+    p.advances = [{ id: 'ant00001', worker: 'Juan', amount: 30000, at: 2 }];
+    await audit({}, p);
+    expect(q('audit-margin-value').textContent).toContain('50.000'); // 150.000 - (70.000 + 30.000)
+    expect(q('audit-margin').textContent).toContain('anticipos');
+  });
+
   it('MARGIN at zero (nothing collected, nothing spent) is neutral grey: neither profit nor loss', async () => {
     const p = project();
     p.payments = [];
@@ -523,14 +531,14 @@ describe('ProjectAudit (ledger) + RenditionBar + the Contabilidad card', () => {
     expect(q('project-audit').querySelector('details')).toBeNull();
   });
 
-  it('profitability(): the pure numbers (margin ignores advances to workers, no suppliers when nothing was spent, junk in = zeros out)', () => {
+  it('profitability(): the pure numbers (margin = collected - (expenses + advances), no suppliers when nothing was spent, junk in = zeros out)', () => {
     const p = project();
     p.advances = [{ id: 'a1', amount: 99999, workerId: 'x', at: 1 }];
     const x = profitability(p, 600000);
-    expect(x).toMatchObject({ collected: 150000, spent: 70000, margin: 80000, efficiency: 25 });
+    expect(x).toMatchObject({ collected: 150000, spent: 70000, advanced: 99999, margin: -19999, efficiency: 25 }); // the staff's advances are cash out too
     expect(x.suppliers.map((s) => [s.name, Math.round(s.share)])).toEqual([['Sodimac', 71], ['Copec', 21]]);
     expect(profitability(p, 0).efficiency).toBeNull();
-    expect(profitability({ payments: [], expenses: [] }, 0)).toEqual({ collected: 0, spent: 0, margin: 0, efficiency: null, suppliers: [] });
+    expect(profitability({ payments: [], expenses: [] }, 0)).toEqual({ collected: 0, spent: 0, advanced: 0, margin: 0, efficiency: null, suppliers: [] });
     expect(profitability(null, undefined)).toMatchObject({ collected: 0, spent: 0, margin: 0, suppliers: [] });
     expect(profitability({ expenses: [{ amount: -5, supplier: 'X' }, { amount: 'abc', supplier: 'Y' }] }, 10).suppliers).toEqual([]);
   });

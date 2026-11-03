@@ -352,9 +352,9 @@ describe('Ajustes loads almost empty: three closed accordions', () => {
     const hidden = (el) => [...view.querySelectorAll('details')].some((d) => !d.open && d.contains(el) && !el.closest('summary'));
     const visible = [...view.querySelectorAll('button, input, select, [role="switch"], summary')].filter((el) => !hidden(el));
     const ids = visible.map((el) => el.dataset.testid || el.tagName.toLowerCase());
-    expect(ids).toEqual(expect.arrayContaining(['settings-profile-summary', 'settings-ops-summary', 'settings-locale-summary', 'logout-button']));
+    expect(ids).toEqual(expect.arrayContaining(['settings-profile-summary', 'settings-ops-summary', 'settings-locale-summary', 'settings-squadra', 'logout-button']));
     expect(ids.some((i) => /^settings-(company|pro-name|logo|drive|signature|lang)/.test(i))).toBe(false);
-    expect(visible.length).toBeLessThanOrEqual(5); // 3 summaries + logout (+ install when the app is not installed)
+    expect(visible.length).toBeLessThanOrEqual(6); // 3 summaries + Squadra + logout (+ install when the app is not installed)
   });
 
   it('the open state of an accordion survives the signature canvas (it swaps the screen) and the content is reachable once opened', async () => {

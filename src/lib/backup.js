@@ -11,6 +11,7 @@ import { normalizeLogo } from './logo.js';
 import { MAX_PROJECTS, normalizeProjects } from './projects.js';
 import { normalizePhoto, normalizePhotos } from './photos.js';
 import { writeNotePhotos } from './notePhotos.js';
+import { loadWorkers, mergeWorkers, normalizeWorkers, saveWorkers } from './workers.js';
 
 export const BACKUP_APP = 'cubrax';
 export const BACKUP_VERSION = 1;
@@ -22,7 +23,7 @@ const ID_RE = /^[a-z0-9]{1,16}$/;
  * its logbook notes as { [noteId]: { dataUrl, width, height, at } } (Blobs on the device, base64 only inside this payload).
  * @returns {Promise<object>} plain JSON-able object
  */
-export async function collectBackup({ settings, company, meta, logo, projects, loadPhotos = async () => [], loadNotePhotos = async () => ({}), now = Date.now() }) {
+export async function collectBackup({ settings, company, meta, logo, projects, workers = loadWorkers(), loadPhotos = async () => [], loadNotePhotos = async () => ({}), now = Date.now() }) {
   const photos = {};
   const notePhotos = {};
   for (const p of projects || []) {
@@ -42,6 +43,7 @@ export async function collectBackup({ settings, company, meta, logo, projects, l
     projects: projects || [],
     photos,
     notePhotos,
+    ...(workers?.length ? { workers: normalizeWorkers(workers) } : {}), // the "Squadra" directory (health data included); absent when empty
   };
 }
 
@@ -83,6 +85,7 @@ export function parseBackup(text) {
       if (Object.keys(clean).length) notePhotos[p.id] = clean;
     }
   }
+  const workers = normalizeWorkers(raw.workers);
   return {
     app: BACKUP_APP,
     version,
@@ -94,6 +97,7 @@ export function parseBackup(text) {
     projects,
     photos,
     notePhotos,
+    ...(workers.length ? { workers } : {}),
   };
 }
 
@@ -109,6 +113,7 @@ export const isDeviceEmpty = ({ projects, company, meta }) => !(projects || []).
 /**
  * Pure merge of the local state with a backup.
  *  - projects: union by id; the newest `updatedAt` wins (ties keep the local one)
+ *  - workers (the Squadra directory) are merged apart in restoreBackup: union by id, newest `updatedAt` wins
  *  - profile (company, logo, settings, meta): taken from the backup ONLY when this device has no profile yet
  * @returns {{projects, company, logo, settings, meta, wonProjects: string[], profileRestored: boolean}}
  */
@@ -159,6 +164,7 @@ export async function restoreBackup(local, backup, { projectStore, photoStoreFor
       }
     }
   }
+  if (backup.workers?.length) saveWorkers(mergeWorkers(loadWorkers(), backup.workers)); // the Squadra directory: union by id, newest wins
   if (merged.profileRestored && merged.logo) await logoStore.save(merged.logo);
   return merged;
 }
