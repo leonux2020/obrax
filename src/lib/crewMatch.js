@@ -1,12 +1,14 @@
 // "Selector inteligente" of the project's crew: how the global directory of workers (workers.js) is filtered and ranked when a person is added
 // to a job. Pure functions, no React.
 //
-// There are no coordinates in a worker's file (only a free-text "Dirección base"), so the distance is EMULATED by place names: the job's
-// "Ciudad o Región" ("Valparaíso, Región Metropolitana": first part = city, the rest = region / province) is looked for in the worker's address.
-//   local     the address names the job's CITY                      (the default: ~ the 70 km that keep the trip short and sustainable)
-//   regional  the address names the city OR any other part of the place (region / province)
+// There are no coordinates in a worker's file, so the distance is EMULATED by place names: the job's "Ciudad o Región"
+// ("Valparaíso, Región Metropolitana": first part = city, the rest = region / province) against the worker's own "Ciudad / Localidad" field
+// (`city`), separate from the street address. Accents and case never matter ("Milán" = "milan").
+//   local     the worker's CITY is the job's city (exact match after normalising)   (the default: ~ the 70 km that keep the trip short)
+//   regional  the worker is in the city OR names another part of the place (region / province)
 //   all       the whole directory, nearest first
-// A worker with no address, or a job with no place, cannot be placed: they only show in "all" (and with no job place the range does not filter).
+// BACKWARDS COMPATIBILITY: an older file with no `city` falls back to the old way: the job's city is looked for inside the free-text address,
+// so nobody vanishes from the list overnight. A worker with neither, or a job with no place, cannot be placed: they only show in "all".
 
 import { hasHealthNotes, normalizeWorkers } from './workers.js';
 
@@ -36,15 +38,30 @@ export function projectPlaces(project) {
   return { city: unique[0] ?? '', others: unique.slice(1) };
 }
 
-/** 0 = local (names the city), 1 = regional (names another part of the place), 2 = elsewhere, 3 = cannot tell (no address / no job place). */
+/** The parts of a typed place ("Milán, MI" -> ['milan', 'mi']), normalised, without empty bits. */
+const placeParts = (v) =>
+  String(v ?? '')
+    .split(/[,;/\n]+/)
+    .map(norm)
+    .filter(Boolean);
+
+/** 0 = local (the city is the job's city), 1 = regional (names another part of the place), 2 = elsewhere, 3 = cannot tell (no city nor address / no job place). */
 export function proximity(project, worker) {
   const { city, others } = projectPlaces(project);
+  const own = placeParts(worker?.city ?? worker?.ciudad);
   const address = norm(worker?.address);
-  if (!city || !address) return 3;
+  if (!city || (!own.length && !address)) return 3;
+  const regionHit = (haystack) => others.some((o) => mentions(haystack, o) || o.split(' ').filter((w) => w.length >= 5 && !GENERIC.has(w)).some((w) => mentions(haystack, w)));
+
+  if (own.length) {
+    // the dedicated field decides: an EXACT city match (the street name of the address can no longer fake a "local")
+    if (own.includes(city)) return 0;
+    return regionHit(`${own.join(' ')} ${address}`) ? 1 : 2;
+  }
+  // older file, no city: look for the job's city inside the free-text address
   if (mentions(address, city)) return 0;
   // a region word that is part of a longer one ("Región Metropolitana") still counts when the address carries the distinctive word
-  if (others.some((o) => mentions(address, o) || o.split(' ').filter((w) => w.length >= 5 && !GENERIC.has(w)).some((w) => mentions(address, w)))) return 1;
-  return 2;
+  return regionHit(address) ? 1 : 2;
 }
 
 const matchesQuery = (worker, query) => {
@@ -56,7 +73,7 @@ const matchesQuery = (worker, query) => {
 /**
  * The directory for this job: [{ worker, near }] filtered by the typed text, the trade chip (`specialty` id or '') and the range, and ordered
  * NEAREST first, then best rated, then by name. `placed` tells whether the range could be applied (the job has a place); `hidden` counts the workers
- * left out only because they have no address.
+ * left out only because they have no city nor address.
  */
 export function rankWorkers(workers, { project, specialty = '', range = DEFAULT_RANGE, query = '' } = {}) {
   const placed = Boolean(projectPlaces(project).city);

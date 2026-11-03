@@ -238,7 +238,7 @@ describe('Squadra: the worker file', () => {
     const ids = [...document.querySelectorAll('[data-testid^="worker-block-"]')].map((b) => b.dataset.testid);
     expect(ids).toEqual(['worker-block-pro', 'worker-block-personal', 'worker-block-safety']);
     const pro = q('worker-block-pro');
-    for (const id of ['worker-name', 'worker-specialties', 'worker-rating', 'worker-phone', 'worker-address']) expect(pro.contains(q(id)), id).toBe(true);
+    for (const id of ['worker-name', 'worker-specialties', 'worker-rating', 'worker-phone', 'worker-city', 'worker-address']) expect(pro.contains(q(id)), id).toBe(true);
     const personal = q('worker-block-personal');
     for (const id of ['worker-document', 'worker-nationality', 'worker-sex', 'worker-birth']) expect(personal.contains(q(id)), id).toBe(true);
     const safety = q('worker-block-safety');
@@ -263,6 +263,9 @@ describe('Squadra: the worker file', () => {
     await click(q('worker-star-4'));
     expect(q('worker-rating').dataset.rating).toBe('4');
     await typeInto(q('worker-phone'), '+56 9 1234 5678');
+    expect(q('worker-city-hint')).not.toBeNull(); // strongly recommended, never blocking
+    await typeInto(q('worker-city'), 'Maipú');
+    expect(q('worker-city-hint')).toBeNull();
     await typeInto(q('worker-address'), 'Av. Pajaritos 1234');
     await typeInto(q('worker-document'), '12.345.678-9');
     await typeInto(q('worker-nationality'), 'Chilena');
@@ -280,6 +283,7 @@ describe('Squadra: the worker file', () => {
       specialties: ['mason', 'electrician'],
       rating: 4,
       phone: '+56 9 1234 5678',
+      city: 'Maipú',
       address: 'Av. Pajaritos 1234',
       document: '12.345.678-9',
       nationality: 'Chilena',

@@ -7,7 +7,7 @@ import BottomSheet from '../BottomSheet.jsx';
 import { Button, DateInput, TextField } from '../ui.jsx';
 import { StarPicker } from './Stars.jsx';
 
-const EMPTY = { name: '', specialties: [], rating: 0, phone: '', address: '', document: '', nationality: '', sex: '', birthDate: '', bloodType: '', limiting: '', allergies: '', emergencyName: '', emergencyPhone: '' };
+const EMPTY = { name: '', specialties: [], rating: 0, phone: '', city: '', address: '', document: '', nationality: '', sex: '', birthDate: '', bloodType: '', limiting: '', allergies: '', emergencyName: '', emergencyPhone: '' };
 
 const Block = ({ id, title, children, className = '', headingClass = 'text-neutral-200' }) => (
   <section data-testid={`worker-block-${id}`} aria-labelledby={`worker-block-${id}-title`} className={`space-y-4 rounded-2xl border px-4 py-4 ${className || 'border-white/10'}`}>
@@ -83,8 +83,17 @@ export default function WorkerSheet({ worker, onSave, onDelete, onClose }) {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <TextField label={t('squadra.phone')} value={form.phone} onChange={set('phone')} testId="worker-phone" type="tel" inputMode="tel" maxLength={32} sanitize={sanitizePhone} placeholder="+56 9 1234 5678" />
-            <TextField label={t('squadra.address')} value={form.address} onChange={set('address')} testId="worker-address" maxLength={120} sanitize={(v) => sanitizeTextInput(v, 120)} />
           </div>
+          {/* the Radar compares THIS field with the job's city: strongly recommended, never blocking */}
+          <div>
+            <TextField label={t('squadra.city')} value={form.city} onChange={set('city')} testId="worker-city" maxLength={60} sanitize={(v) => sanitizeTextInput(v, 60)} placeholder={t('squadra.city.ph')} />
+            {!form.city.trim() && (
+              <p data-testid="worker-city-hint" className="mt-1.5 text-xs text-orange-400">
+                {t('squadra.city.hint')}
+              </p>
+            )}
+          </div>
+          <TextField label={t('squadra.address')} value={form.address} onChange={set('address')} testId="worker-address" maxLength={120} sanitize={(v) => sanitizeTextInput(v, 120)} placeholder={t('squadra.address.ph')} />
         </Block>
 
         {/* ---- b) personal data ------------------------------------------------------------------------------------------- */}

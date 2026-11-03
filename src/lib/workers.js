@@ -44,6 +44,7 @@ export function normalizeWorker(raw, now = Date.now()) {
     specialties,
     rating: rating >= 1 && rating <= 5 ? rating : 0,
     phone: sanitizePhone(raw.phone, 32).trim(),
+    city: text(raw.city ?? raw.ciudad, 60), // "Ciudad / Localidad": the exact town the Radar compares with the job's city ('' in older files)
     address: text(raw.address, 120),
     document: text(raw.document, 40),
     nationality: text(raw.nationality, 40),
