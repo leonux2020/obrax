@@ -139,16 +139,6 @@ export default function GlobalAccounting({ projects, onOpenProject = null, onExp
       <header className="mb-2 flex min-h-[44px] items-center gap-2" data-testid="acc-header">
         <Logo size={24} />
         <h1 className="min-w-0 flex-1 truncate text-lg font-medium tracking-tight">{t('nav.accountingShort')}</h1>
-        {projects.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setSelected(all ? [] : projects.map((p) => p.id))}
-            data-testid="acc-all"
-            className="min-h-[44px] rounded-lg border border-white/10 px-3 text-sm font-medium hover:border-brand"
-          >
-            {t(all ? 'acc.none' : 'acc.all')}
-          </button>
-        )}
       </header>
 
       {projects.length === 0 ? (
@@ -163,7 +153,8 @@ export default function GlobalAccounting({ projects, onOpenProject = null, onExp
             onClick={() => setOpen(true)}
             aria-label={`${t('acc.sheet.open')}: ${t('acc.hud')}`}
             aria-haspopup="dialog"
-            className="mb-3 block w-full cursor-pointer rounded-2xl border border-white/10 bg-black px-3 py-5 text-center transition-opacity active:opacity-80"
+            // floating chart: NO box around it (no border, background, ring, shadow or rounded corners): the ring floats on the OLED black
+            className="mb-2 block w-full cursor-pointer px-3 py-3 text-center transition-opacity active:opacity-80"
           >
             <span data-testid="acc-liquid" className="block space-y-6">
               {breakdown.length === 0 ? (
@@ -178,6 +169,12 @@ export default function GlobalAccounting({ projects, onOpenProject = null, onExp
           {open && (
             <GlobalBreakdownSheet breakdown={breakdown} moneyOf={moneyOf} onClose={() => setOpen(false)} />
           )}
+          {/* "Tutti" / "Ninguno": a discreet chip right above the list it controls (the checkboxes), a 44 px invisible touch area around the pill */}
+          <button type="button" onClick={() => setSelected(all ? [] : projects.map((p) => p.id))} data-testid="acc-all" className="mb-0.5 flex min-h-[44px] items-center px-1 active:opacity-70">
+            <span data-testid="acc-all-chip" className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-neutral-400">
+              {t(all ? 'acc.none' : 'acc.all')}
+            </span>
+          </button>
           <ul className="space-y-2" aria-label={t('nav.accounting')}>
             {sorted.map(({ project: p, balance: b, fmt }) => {
               const on = selected.includes(p.id);

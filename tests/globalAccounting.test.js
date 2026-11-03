@@ -286,8 +286,7 @@ describe('Vista Contabilidad Global', () => {
     expect(q('acc-liquid-CLP').textContent).not.toMatch(/€/);
     for (const id of ['acc-tax', 'acc-tax-CLP', 'acc-receivable', 'acc-receivable-CLP', 'acc-late-badge']) expect(q(id), id).toBeNull();
     expect(hud.textContent.toUpperCase()).not.toMatch(/IVA|IMPUESTOS|POR COBRAR/);
-    expect(hud.className).toContain('border-white/10');
-    expect(hud.className).toContain('bg-black');
+    expect(hud.className).not.toMatch(/(^|\s)(border|bg-|ring|shadow|rounded)/); // the chart floats: no frame
   });
 
   it('caja negativa en ámbar suave; positiva en verde de marca', async () => {
@@ -343,7 +342,7 @@ describe('Vista Contabilidad Global', () => {
     expect(q('acc-late-badge')).toBeNull();
   });
 
-  it('el título es "Contabilidad" a secas (sin "Global") y el panel es UN solo rectángulo táctil, centrado y grande', async () => {
+  it('el título es "Contabilidad" a secas (sin "Global") y el panel es UN solo bloque táctil flotante, centrado y grande', async () => {
     const cl = sized(mk('CL', { payments: [pay(119000, back(1))] }));
     await render([cl]);
     expect(host.querySelector('h1').textContent).toBe('Contabilidad');
@@ -351,7 +350,7 @@ describe('Vista Contabilidad Global', () => {
     const hud = q('acc-hud');
     expect(hud.tagName).toBe('BUTTON');
     expect(host.querySelectorAll('[data-testid^="acc-hud"]')).toHaveLength(1);
-    for (const c of ['rounded-2xl', 'border', 'border-white/10', 'bg-black', 'cursor-pointer', 'active:opacity-80', 'text-center']) expect(hud.className).toContain(c);
+    for (const c of ['cursor-pointer', 'active:opacity-80', 'text-center']) expect(hud.className).toContain(c);
     expect(hud.contains(q('acc-liquid'))).toBe(true);
     expect(q('acc-liquid').className).not.toMatch(/border|rounded|bg-/); // floating: no per-column box or divider
     const label = q('acc-donut-CLP').querySelector('span'); // the label sits in the hollow centre of the ring, above the figure
@@ -652,5 +651,78 @@ describe('Donut OLED: gastos globales por proveedor y DISPONIBILE en el centro h
     expect(q('acc-legend-CLP').textContent).toContain('Sodimac');
     expect(q('acc-legend-EUR').textContent).toContain('Obramat');
     expect(q('acc-legend-CLP').textContent).not.toContain('Obramat');
+  });
+});
+
+
+describe('Contabilidad Fase 2: gráfico flotante y chip "Tutti" sobre su lista', () => {
+  let host;
+  let root;
+  const q = (id) => host.querySelector(`[data-testid="${id}"]`);
+  const render = async (projects) => {
+    await act(async () => {
+      root.render(React.createElement(I18nProvider, { lang: 'es', regionCode: 'CL' }, React.createElement(GlobalAccounting, { projects })));
+    });
+    await act(async () => new Promise((r) => setTimeout(r, 0)));
+  };
+  const click = async (el) => {
+    await act(async () => {
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+  };
+  beforeEach(() => {
+    localStorage.clear();
+    window.history.replaceState(null, '');
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+  });
+  afterEach(() => {
+    act(() => root.unmount());
+    host.remove();
+  });
+  const p1 = () => mk('CL', { name: 'Uno', payments: [pay(100, ago(1))], expenses: [{ id: 'e1', supplier: 'Sodimac', amount: 10, at: ago(1) }] });
+  const p2 = () => mk('CL', { name: 'Dos', payments: [pay(100, ago(2))] });
+
+  it('nada alrededor del anillo: ni el contenedor ni sus descendientes llevan border, bg-*, ring, shadow ni rounded', async () => {
+    await render([p1()]);
+    const nodes = [q('acc-hud'), ...q('acc-hud').querySelectorAll('*')];
+    for (const el of nodes) {
+      const cls = typeof el.className === 'string' ? el.className : el.getAttribute('class') || '';
+      expect(cls, el.tagName + ' ' + cls).not.toMatch(/(^|\s)(?:[a-z-]+:)*(border|bg-|ring|shadow|rounded)(?!-full)/);
+    }
+    // the only rounded things inside are the 8 px legend dots (rounded-full), which are part of the legend, not a frame
+    expect(q('acc-hud').querySelector('svg').parentElement.className).not.toMatch(/border|rounded|bg-|ring|shadow/);
+  });
+
+  it('"Tutti" es un chip sutil colocado justo ENCIMA de la lista de proyectos (ya no está en la cabecera)', async () => {
+    await render([p1(), p2()]);
+    const btn = q('acc-all');
+    const list = host.querySelector('ul.space-y-2'); // the project list (the legend is another ul)
+    expect(q('acc-header').contains(btn)).toBe(false); // no longer detached in the header
+    expect(btn.nextElementSibling).toBe(list); // exactly above the list it controls
+    expect(q('acc-hud').compareDocumentPosition(btn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // under the chart
+    const chip = q('acc-all-chip');
+    for (const c of ['text-xs', 'text-neutral-400', 'bg-white/5', 'border', 'border-white/10', 'rounded-full', 'px-3', 'py-1']) expect(chip.className, c).toContain(c);
+    expect(btn.className).toContain('min-h-[44px]'); // the touch area is still 44 px
+    expect(btn.className).not.toMatch(/border|bg-/); // the invisible area has no look of its own
+    expect(chip.textContent).toBe('Todos');
+  });
+
+  it('el chip selecciona / deselecciona todos los proyectos y cambia su texto', async () => {
+    await render([p1(), p2()]);
+    const a = host.querySelectorAll('input[type="checkbox"]');
+    expect([...a].every((c) => !c.checked)).toBe(true);
+    await click(q('acc-all'));
+    expect([...host.querySelectorAll('input[type="checkbox"]')].every((c) => c.checked)).toBe(true);
+    expect(q('acc-all-chip').textContent).toBe('Ninguno');
+    expect(q('acc-export').textContent).toContain('2');
+    await click(q('acc-all'));
+    expect([...host.querySelectorAll('input[type="checkbox"]')].every((c) => !c.checked)).toBe(true);
+  });
+
+  it('sin proyectos no hay chip', async () => {
+    await render([]);
+    expect(q('acc-all')).toBeNull();
   });
 });
