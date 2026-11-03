@@ -202,10 +202,12 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   projectsRef.current = projects ?? projectsRef.current;
   const wipingRef = useRef(false); // true while signing out: nothing may be written back to the (erased) device
   activeRef.current = active;
+  const restoreOfferRef = useRef(false); // true while the one-click restore sheet is on screen (the daemon leaves the held backup alone only then)
   const [restoreOffer, setRestoreOffer] = useState(false); // Drive holds a backup and this device has no work: the one-click restore sheet
   const latest = useRef(null); // the CURRENT state, read by the backup engine and the restore
   latest.current = { settings, company, meta, logo, projects };
   const backupOn = googleConfigured && meta.drive;
+  restoreOfferRef.current = restoreOffer;
   const backupOnRef = useRef(false);
   backupOnRef.current = backupOn && !wipingRef.current;
 
@@ -785,6 +787,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   const pullFromDrive = useCallback(
     ({ interactive = false, force = false, inRound = false } = {}) => {
       if (pullInflight.current) return pullInflight.current;
+      sync.beginPull(); // the header cloud spins while the daemon downloads (never a blocking screen)
       const job = (async () => {
         if (typeof navigator !== 'undefined' && navigator.onLine === false) return { ok: false, reason: 'offline' }; // no coverage: nothing to ask
         let token = null;
@@ -845,6 +848,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
         }
       })().finally(() => {
         pullInflight.current = null;
+        sync.endPull();
       });
       pullInflight.current = job;
       return job;
@@ -865,17 +869,18 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   // wrote) and what other devices did is merged in. Never opens a Google window: without a valid token it only lights the cloud. If this device has
   // changes waiting, the upload (which merges first) runs instead.
   const lastPull = useRef(0);
-  const autoPull = useCallback(() => {
+  const autoPull = useCallback(({ ignoreThrottle = false } = {}) => {
     if (!backupOnRef.current || wipingRef.current || !userRef.current || !Array.isArray(latest.current.projects)) return;
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
     if (!isDriveLinked() && !getDriveToken()) return; // this device never connected to Drive
     const st = sync.getState();
-    if (st.held) return; // an offered restore is waiting for the user
+    if (st.held && restoreOfferRef.current) return; // the one-click restore sheet is on screen: the user is answering it
+    // a held backup with no sheet (the user chose "later", or the app was reopened): the daemon completes the job itself, merging the cloud copy in
     const nowMs = Date.now();
-    if (nowMs - lastPull.current < 15_000) return;
+    if (!ignoreThrottle && nowMs - lastPull.current < 15_000) return;
     lastPull.current = nowMs;
-    if (st.dirty) {
-      sync.flush().catch(() => {});
+    if (st.dirty && !st.held) {
+      sync.flush().catch(() => {}); // this device has changes waiting: the upload merges (pulls) first anyway
       return;
     }
     pullFromDrive({ interactive: false })
@@ -884,15 +889,27 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   }, [pullFromDrive, sync]);
   const autoPullRef = useRef(autoPull);
   autoPullRef.current = autoPull;
+  // THE DAEMON'S EVENT TRIGGERS (no buttons: nothing here asks anything of the user)
+  //  a) the app comes back to the foreground (visibilitychange -> visible): pull what the other devices did; on the way OUT (hidden) whatever is
+  //     still waiting for its debounce goes up at once, so leaving the app never strands a change
+  //  b) the connection comes back ('online'): pull + push, without the 15 s throttle (the last attempt failed for lack of signal)
+  //  c) every local change (projects, photos, workers, profile...) -> sync.markDirty() -> debounced push (see the effect on `projects` above)
   useEffect(() => {
-    const wake = () => autoPullRef.current();
+    const wake = () => {
+      if (document.visibilityState === 'hidden') {
+        if (sync.getState().dirty && backupOnRef.current && !wipingRef.current) sync.flush().catch(() => {});
+        return;
+      }
+      autoPullRef.current();
+    };
+    const online = () => autoPullRef.current({ ignoreThrottle: true });
     document.addEventListener('visibilitychange', wake);
-    window.addEventListener('online', wake);
+    window.addEventListener('online', online);
     return () => {
       document.removeEventListener('visibilitychange', wake);
-      window.removeEventListener('online', wake);
+      window.removeEventListener('online', online);
     };
-  }, []);
+  }, [sync]);
   // ... and once when the app has opened and its data is loaded
   const bootPulled = useRef(false);
   useEffect(() => {
@@ -984,7 +1001,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     return setStage('setup');
   };
   const backupStatusValue = useMemo(
-    () => ({ enabled: backupOn && Boolean(user), status: backup.status, reason: backup.reason, pullError: backup.pullError, dirty: backup.dirty, at: backup.at, held: backup.held }),
+    () => ({ enabled: backupOn && Boolean(user), status: backup.status, reason: backup.reason, pullError: backup.pullError, dirty: backup.dirty, at: backup.at, held: backup.held, pulling: backup.pulling }),
     [backupOn, user, backup]
   );
   const editing = sheet?.type === 'edit' ? projects?.find((p) => p.id === sheet.id) : null;
@@ -1117,12 +1134,6 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
                   onConfirmRegion={(code) => confirmRegion(code)}
                   onChangeRegion={() => setPickingRegion(true)}
                   backup={{ configured: googleConfigured, configStatus: GOOGLE_CONFIG_STATUS, enabled: backupOn, linked: driveLinked, held: Boolean(backup.held), state: backup }}
-                  onBackupNow={async () => {
-                    const r = await sync.flush({ force: true, interactive: true, override: true }); // the user's explicit choice also lifts the hold
-                    if (r.ok) setMeta((m) => (m.drive ? m : { ...m, drive: true }));
-                    return r;
-                  }}
-                  onRestore={() => restoreFromDrive({ interactive: true })}
                   onLogout={logout}
                 />
               ) : tab === 'accounting' ? (

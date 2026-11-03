@@ -4,7 +4,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vite
 import { createFakeDrive } from './helpers/fakeDrive.js';
 import { CLIENT, backToDashboard, q, flush, click, typeInto, installFakeGoogle, createHost } from './helpers/appHarness.js';
 import { parseBackup } from '../src/lib/backup.js';
-import { clearDriveToken } from '../src/lib/driveToken.js';
+import { clearDriveToken, setDriveToken } from '../src/lib/driveToken.js';
 
 let App;
 let drive;
@@ -20,7 +20,8 @@ const seed = () => {
   localStorage.setItem('cp.user.v1', JSON.stringify({ provider: 'google', name: 'Ana', email: 'ana@example.com' }));
   localStorage.setItem('cp.company.v1', JSON.stringify({ name: 'Aurora' }));
   localStorage.setItem('cp.profile.v1', JSON.stringify({ onboarded: true, drive: true }));
-  localStorage.setItem('cp.drive.linked.v1', '1'); // this device was connected before: the card shows "Respaldar ahora"
+  localStorage.setItem('cp.drive.linked.v1', '1'); // this device was connected before: the daemon syncs silently
+  setDriveToken(drive.token, 3600); // ...with the session token of that connection
 };
 
 const backedUp = () => {
@@ -58,9 +59,9 @@ describe('Drive backup (device A)', () => {
     await h.mount();
     await createProject('Casa Norte');
     await click(h.tab('Ajustes'));
-    expect(q('backup-status').dataset.status).toBe('idle'); // nothing in Drive yet
-    await click(q('backup-now'));
-    await flush(60);
+    expect(q('backup-now')).toBeNull(); // no manual buttons any more
+    expect(q('backup-restore')).toBeNull();
+    await flush(5600); // no button: the daemon uploads by itself once its debounce passes
     expect(drive.folders().map((f) => f.name)).toEqual(['CUBRAX - Respaldos Obra']);
     expect(drive.backupFiles()).toHaveLength(1);
     const b = backedUp();
@@ -69,7 +70,8 @@ describe('Drive backup (device A)', () => {
     expect(b.settings.region).toBe('CL');
     expect(b.meta.onboarded).toBe(true);
     expect(q('backup-status').dataset.status).toBe('synced');
-    expect(q('backup-status').textContent).toBe('Último respaldo: Hace un momento');
+    expect(q('backup-auto').textContent).toContain('Sincronización automática activa en segundo plano');
+    expect(q('backup-last').textContent).toMatch(/^Última sincronización: .+/); // date and time of the last success
   });
 
   it('after the first connection every change is uploaded silently (debounced) to the SAME file', async () => {
@@ -78,13 +80,12 @@ describe('Drive backup (device A)', () => {
     await h.mount();
     await createProject('Uno');
     await click(h.tab('Ajustes'));
-    await click(q('backup-now'));
-    await flush(60);
+    await flush(5600); // no button: the daemon uploads by itself once its debounce passes
     await h.unmount(); // app restarted: the token survives in the session, the change after this is silent
     h = createHost(App);
     await h.mount();
     await createProject('Dos'); // no tap on any backup button
-    await flush(3500); // debounce window
+    await flush(5600); // debounce window (5 s)
     expect(drive.backupFiles()).toHaveLength(1);
     expect(names()).toContain('Dos');
   }, 20_000);
@@ -96,8 +97,7 @@ describe('Drive backup (device A)', () => {
     await h.mount();
     await createProject('Antigua');
     await click(h.tab('Ajustes'));
-    await click(q('backup-now'));
-    await flush(60);
+    await flush(5600); // no button: the daemon uploads by itself once its debounce passes
     await click(h.tab('Proyectos'));
     await createProject('Ultima obra'); // made right before leaving: not uploaded yet
     expect(names()).not.toContain('Ultima obra');
@@ -129,8 +129,7 @@ describe('Drive backup (device A)', () => {
     await h.mount();
     await createProject('Importante');
     await click(h.tab('Ajustes'));
-    await click(q('backup-now'));
-    await flush(60);
+    await flush(5600); // no button: the daemon uploads by itself once its debounce passes
     await click(h.tab('Proyectos'));
     await createProject('Sin subir');
     drive.state.offline = true;

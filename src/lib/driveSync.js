@@ -15,6 +15,13 @@
 
 import { serializeBackup } from './backup.js';
 
+/**
+ * The background daemon's timing. A change waits until the user has been quiet for `debounceMs` (a trailing debounce: every new change restarts
+ * the wait, so typing fast sends ONE upload, not one per key), but never longer than `maxWaitMs` since the first unsent change (a long burst
+ * still goes up). 5 s keeps the Drive API calm; the heavy work (pull + merge + upload) never runs under the user's thumbs.
+ */
+export const AUTO_SYNC = Object.freeze({ debounceMs: 5000, maxWaitMs: 30_000 });
+
 export const BACKUP_STATE_KEY = 'cp.backup.v1';
 export const SEEN_REMOTE_KEY = 'cp.backup.seen.v1';
 
@@ -62,14 +69,17 @@ export function createDriveSync({
   isEnabled = () => true,
   storage = typeof localStorage === 'undefined' ? null : localStorage,
   now = () => Date.now(),
-  debounceMs = 3000,
+  debounceMs = AUTO_SYNC.debounceMs,
+  maxWaitMs = AUTO_SYNC.maxWaitMs,
   silentRetryMs = 60_000,
   isOnline = () => typeof navigator === 'undefined' || navigator.onLine !== false, // false = airplane mode / no coverage
   setTimer = (fn, ms) => setTimeout(fn, ms),
   clearTimer = (id) => clearTimeout(id),
 }) {
   const persisted = readState(storage);
-  const state = { status: 'idle', reason: '', pullError: '', at: persisted.at, dirty: persisted.dirty, held: persisted.held };
+  const state = { status: 'idle', reason: '', pullError: '', at: persisted.at, dirty: persisted.dirty, held: persisted.held, pulling: false };
+  let pulls = 0; // downloads in flight (the header cloud spins while the daemon works, whether it pulls or pushes)
+  let firstChangeAt = 0;
   const listeners = new Set();
   let timer = null;
   let inflight = null;
@@ -159,7 +169,12 @@ export function createDriveSync({
   }
 
   function schedule() {
-    if (timer || !isEnabled() || state.held) return;
+    if (!isEnabled() || state.held) return;
+    if (timer) {
+      // trailing debounce: a new change pushes the upload back, up to `maxWaitMs` after the first unsent change
+      if (now() - firstChangeAt >= maxWaitMs) return;
+      clearTimer(timer);
+    } else firstChangeAt = now();
     timer = setTimer(() => {
       timer = null;
       flush().catch(() => emit({ status: 'pending', reason: 'error', dirty: true })); // never a silent death: the cloud turns amber / red
@@ -184,10 +199,21 @@ export function createDriveSync({
         return { ok: false, reason: 'error' };
       });
     },
+    /** The daemon starts / ends a download from Drive (the header cloud spins while any of them runs; never a blocking screen). */
+    beginPull() {
+      pulls += 1;
+      if (!state.pulling) emit({ pulling: true });
+    },
+    endPull() {
+      pulls = Math.max(0, pulls - 1);
+      if (pulls === 0 && state.pulling) emit({ pulling: false });
+    },
     /** The result of a download / merge ({ ok, reason }) from outside the upload loop: a failure lights the cloud, a success clears it. */
     reportPull(result) {
       const pullError = result && result.ok === false ? result.reason || 'error' : '';
-      if (pullError !== state.pullError) emit({ pullError });
+      // a download that worked (merged something, or found everything already identical) is a successful sync too: it moves "last sync" forward
+      const patch = result && result.ok ? { pullError, at: now(), ...(state.status === 'idle' ? { status: 'synced' } : {}) } : { pullError };
+      if (patch.at || pullError !== state.pullError) emit(patch);
     },
     flush,
     /** The cloud has a backup this device has not restored: uploads wait (persisted) until it is restored or overridden. */

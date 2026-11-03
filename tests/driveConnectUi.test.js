@@ -58,7 +58,7 @@ describe('Google Drive card in Ajustes', () => {
     expect(drive.calls).toHaveLength(0);
   });
 
-  it('click on "Conectar cuenta": Google asks for consent; then "Conectado a Google Drive" with the account, the exclusive folder, "Respaldar ahora" and the first backup', async () => {
+  it('click on "Conectar cuenta": Google asks for consent; then "Conectado a Google Drive" with the account, the exclusive folder, the passive "sincronización automática" line and the first backup', async () => {
     requests = installFakeGoogle(drive, { silentOk: false });
     seed({ drive: true });
     h = createHost(App);
@@ -71,14 +71,15 @@ describe('Google Drive card in Ajustes', () => {
     expect(q('backup-connected').textContent).toContain('Conectado a Google Drive');
     expect(q('backup-account').textContent).toBe('Leo · leo@example.com');
     expect(q('backup-folder').textContent).toBe('Carpeta exclusiva: CUBRAX - Respaldos Obra');
-    expect(q('backup-now').className).toContain('min-h-[44px]');
-    expect(q('backup-now').className).toContain('bg-brand');
+    expect(q('backup-now')).toBeNull(); // Zero Stress: no manual save button, the daemon syncs in the background
+    expect(q('backup-restore')).toBeNull();
     expect(q('backup-connect')).toBeNull();
     expect(drive.folders()).toHaveLength(1); // created in the background
     expect(drive.folders()[0].name).toBe('CUBRAX - Respaldos Obra');
     expect(drive.backupFiles()).toHaveLength(1); // and the first backup is up
     expect(parseBackup(drive.backupFiles()[0].body)).not.toBeNull();
-    expect(q('backup-status').textContent).toBe('Último respaldo: Hace un momento');
+    expect(q('backup-auto').textContent).toContain('Sincronización automática activa en segundo plano');
+    expect(q('backup-last').textContent).toMatch(/^Última sincronización: /);
     expect(q('backup-synced-tag').textContent).toBe('Sincronizado');
   }, 20_000);
 

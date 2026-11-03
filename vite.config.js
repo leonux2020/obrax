@@ -27,6 +27,7 @@ export default defineConfig(({ mode }) => ({
     environment: 'node',
     // Tests must not depend on a developer's .env.local: Google is unconfigured unless a test stubs it.
     env: { VITE_GOOGLE_CLIENT_ID: '' },
+    testTimeout: 20_000, // the background sync waits for its 5 s debounce in the App tests
     pool: 'threads', // the default forks pool is unstable on some Node 18 setups
     include: ['tests/**/*.test.js'],
     setupFiles: ['tests/setup/no-icon-fetch.js', 'tests/setup/device-env.js'],

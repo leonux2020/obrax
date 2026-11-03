@@ -6,7 +6,6 @@ import { EMPTY_COMPANY, normalizeCompany } from '../lib/draft.js';
 import { googleConfigured } from '../lib/auth.js';
 import { detectCurrentRegion } from '../lib/geo.js';
 import { BACKUP_FOLDER } from '../lib/drive.js';
-import { backupAge } from '../lib/driveSync.js';
 import { compressLogo, LOGO_LIMITS } from '../lib/logo.js';
 import { PhotoError } from '../lib/photos.js';
 import { CloudUploadIcon, FileSignatureIcon, GlobeIcon, SmartphoneIcon, UserIcon, UsersIcon } from './workspace/icons.jsx';
@@ -65,12 +64,10 @@ export default function SettingsView({
   onConfirmRegion = null, // preferred: change country in place without leaving Ajustes
   onLogout,
   backup = null,
-  onBackupNow = null,
-  onRestore = null,
 }) {
   const { t, lang, region } = useI18n();
   const [phase, setPhase] = useState('idle'); // idle | confirming | syncing | failed (sign-out)
-  const [working, setWorking] = useState(''); // '' | 'backup' | 'restore' | 'connect'
+  const [working, setWorking] = useState(''); // '' | 'connect'
   const [note, setNote] = useState('');
   const [form, setForm] = useState(() => ({ ...EMPTY_COMPANY, ...company }));
   const [pic, setPic] = useState(logo || '');
@@ -113,24 +110,13 @@ export default function SettingsView({
     }
   };
   const st = backup?.state;
-  const statusText = !st
-    ? ''
-    : st.status === 'syncing'
-      ? t('backup.status.syncing')
-      : st.status === 'pending'
-        ? t(`backup.status.pending.${st.reason || 'error'}`)
-        : st.at
-          ? t('backup.status.synced', { date: when(st.at) })
-          : t('backup.status.idle');
+  // why the cloud waits (an upload that could not go, or a download that could not run): 'offline' | 'auth' | 'quota' | 'error' | ''
+  const waitReason = st?.status === 'pending' ? st.reason || 'error' : st?.pullError || '';
 
   const leave = async (opts) => {
     setPhase('syncing');
     const r = await onLogout(opts);
     if (r && r.ok === false) setPhase('failed');
-  };
-  const agoText = (at) => {
-    const age = backupAge(at);
-    return age ? t(age.key, { n: age.n }) : '';
   };
   const connect = async () => {
     setWorking('connect');
@@ -147,22 +133,6 @@ export default function SettingsView({
     setWorking('');
     if (on && r && r.ok === false && r.reason !== 'redirect') setNote(connectError(r.reason));
   };
-  const backupNow = async () => {
-    setWorking('backup');
-    setNote('');
-    const r = await onBackupNow();
-    setWorking('');
-    setNote(r.ok ? '' : t(`backup.status.pending.${r.reason || 'error'}`));
-  };
-  const restore = async () => {
-    setWorking('restore');
-    setNote('');
-    const r = await onRestore();
-    setWorking('');
-    // what happened, in words: couldn't (no signal / Google asks again / other), nothing in Drive, already identical, or merged
-    setNote(!r.ok ? t(r.reason === 'offline' || r.reason === 'auth' ? `backup.status.pending.${r.reason}` : 'backup.restore.err') : !r.restored ? t('backup.restore.none') : r.changed > 0 || r.profile ? t('backup.restore.done') : t('backup.restore.uptodate'));
-  };
-
   // persist: trim free-text ONLY here (never while typing). The local inputs keep trailing spaces so "Nombre Apellido" works.
   const persist = async (nextForm, nextLogo) => {
     if (!onSaveProfile) return;
@@ -438,27 +408,43 @@ export default function SettingsView({
                   <p className="truncate text-[11px] text-[#E0E0E0]/50" data-testid="backup-folder">
                     {t('backup.folder', { name: BACKUP_FOLDER })}
                   </p>
-                  <p className={`text-sm ${st?.status === 'pending' ? 'text-[#e8c35f]' : 'text-[#E0E0E0]/70'}`} role="status" data-testid="backup-status" data-status={st?.status}>
-                    {st?.status === 'synced' && st.at ? t('backup.last', { when: agoText(st.at) }) : statusText}
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button type="button" onClick={backupNow} disabled={Boolean(working)} data-testid="backup-now" className="min-h-[44px] rounded-lg bg-brand px-3 text-sm font-medium text-black hover:bg-brand-light disabled:opacity-50">
-                      {working === 'backup' ? t('backup.status.syncing') : t('backup.now')}
-                    </button>
-                    <button type="button" onClick={restore} disabled={Boolean(working)} data-testid="backup-restore" className="min-h-[44px] rounded-lg border border-white/10 px-3 text-sm font-medium hover:border-brand disabled:opacity-50">
-                      {working === 'restore' ? t('restore.title') : t('backup.restore')}
-                    </button>
+                  {/* ZERO STRESS: no "save now" / "restore" buttons. The daemon syncs by itself (app comes back, signal returns, every change, debounced);
+                      the only things to read here are that it is on and when it last succeeded. */}
+                  <div role="status" data-testid="backup-status" data-status={st?.status}>
+                    {waitReason && (
+                      <p className="mb-1 text-sm text-[#e8c35f]" data-testid="backup-pending">
+                        {t(`backup.status.pending.${waitReason}`)}
+                      </p>
+                    )}
+                    <p className="text-xs leading-snug text-[#E0E0E0]/50" data-testid="backup-auto">
+                      {t('backup.auto')}
+                      {st?.at ? (
+                        <>
+                          {' · '}
+                          <span data-testid="backup-last" data-at={st.at}>
+                            {t('backup.auto.last', { when: when(st.at) })}
+                          </span>
+                        </>
+                      ) : null}
+                    </p>
                   </div>
+                  {/* the ONE case where the daemon needs the user: Google asks for a fresh consent (amber cloud). The way back is a single tap, shown only then. */}
+                  {waitReason === 'auth' && (
+                    <button
+                      type="button"
+                      onClick={connect}
+                      disabled={Boolean(working)}
+                      data-testid="backup-reconnect"
+                      className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-black px-3 text-sm font-medium text-brand hover:border-brand disabled:opacity-50"
+                    >
+                      {working === 'connect' ? t('backup.connecting') : t('backup.connect')}
+                    </button>
+                  )}
                 </>
               )}
               {backup.configured && backup.held && (
                 <div data-testid="backup-held">
                   <p className="text-xs leading-snug text-[#e8c35f]">{t('backup.held')}</p>
-                  {!(backup.enabled && backup.linked) && (
-                    <button type="button" onClick={restore} disabled={Boolean(working)} data-testid="backup-restore" className="mt-2 min-h-[44px] w-full rounded-lg border border-white/10 px-3 text-sm font-medium hover:border-brand disabled:opacity-50">
-                      {working === 'restore' ? t('restore.title') : t('backup.restore')}
-                    </button>
-                  )}
                 </div>
               )}
               {note && (

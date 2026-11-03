@@ -182,7 +182,7 @@ describe('app: photo changes stamp the project and Drive keeps the phone\'s phot
     await flush(400);
     const local = (await photoStoreFor(p.id).load()).filter(Boolean);
     expect(local.map((x) => x.slot).sort()).toEqual([0, 1, 2, 3]); // the tablet now has all four
-    await flush(3600);
+    await flush(5600);
     expect(cloud().photos[p.id].map((x) => x.slot).sort()).toEqual([0, 1, 2, 3]); // and Drive was never reduced to two
   });
 

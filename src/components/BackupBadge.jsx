@@ -1,5 +1,5 @@
 import { useI18n } from '../lib/i18n.jsx';
-import { backupBadgeReason, backupBadgeState, backupBadgeTone, useBackupStatus } from '../lib/backupStatus.jsx';
+import { backupBadgeBusy, backupBadgeReason, backupBadgeState, backupBadgeTone, useBackupStatus } from '../lib/backupStatus.jsx';
 
 const Cloud = ({ children, size }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
@@ -17,12 +17,13 @@ export default function BackupBadge({ size = 18, className = '' }) {
   const { t } = useI18n();
   const status = useBackupStatus();
   const state = backupBadgeState(status);
+  const busy = backupBadgeBusy(status); // the daemon is uploading / downloading right now
   if (!state) return null;
   const reason = state === 'pending' ? backupBadgeReason(status) : '';
   const label = state === 'synced' ? t('backup.badge.synced') : state === 'syncing' ? t('backup.badge.syncing') : t(`backup.badge.pending.${reason === 'offline' || reason === 'auth' ? reason : 'error'}`);
-  const tone = state === 'synced' ? 'text-brand-500' : state === 'syncing' ? 'animate-pulse text-neutral-400' : backupBadgeTone(reason) === 'amber' ? 'text-amber-500' : 'text-red-500';
+  const tone = state === 'synced' ? 'text-brand-500' : state === 'syncing' ? (busy ? 'animate-spin text-neutral-300' : 'animate-pulse text-neutral-400') : backupBadgeTone(reason) === 'amber' ? 'text-amber-500' : 'text-red-500';
   return (
-    <span role="img" aria-label={label} title={label} data-testid="backup-badge" data-state={state} data-reason={reason || undefined} className={`pointer-events-none inline-flex shrink-0 items-center justify-center ${tone} ${className}`}>
+    <span role="img" aria-label={label} title={label} data-testid="backup-badge" data-state={state} data-busy={busy ? 'true' : undefined} data-reason={reason || undefined} className={`pointer-events-none inline-flex shrink-0 items-center justify-center ${tone} ${className}`}>
       <Cloud size={size}>
         {state === 'synced' && <path d="m9.2 14.2 2.1 2.1 3.9-4.1" />}
         {state === 'syncing' && <path d="M12 17v-5m0 0-2 2m2-2 2 2" />}

@@ -27,9 +27,16 @@ function harness(over = {}) {
     isEnabled: over.isEnabled || (() => true),
     storage,
     now: () => (clock += 10),
-    setTimer: (fn) => timers.push(fn) && timers.length,
-    clearTimer: () => {},
+    setTimer: (fn) => {
+      timers.push(fn);
+      return fn;
+    },
+    clearTimer: (fn) => {
+      const i = timers.indexOf(fn);
+      if (i >= 0) timers.splice(i, 1); // a restarted debounce drops the timer it replaces
+    },
     debounceMs: 3000,
+    maxWaitMs: over.maxWaitMs ?? 30_000,
   });
   return { sync, store, client, timers, storage, gate, fire: async () => { const fn = timers.shift(); await fn?.(); await tick(); } };
 }
@@ -50,6 +57,47 @@ describe('silent Drive backup engine', () => {
     expect(h.store.uploaded).toEqual([{ rev: 3 }]);
     expect(h.sync.getState()).toMatchObject({ status: 'synced', dirty: false, reason: '' });
     expect(h.sync.getState().at).toBeGreaterThan(0);
+  });
+
+  it('the debounce is a TRAILING one with a ceiling: every change restarts the wait, but a long burst still goes up after maxWaitMs', async () => {
+    let at = 0;
+    const timers = [];
+    const sync = createDriveSync({
+      client: { saveBackup: async () => ({}) },
+      collect: async () => ({}),
+      ensureToken: async () => 'tok-1234567890',
+      storage: memStorage(),
+      now: () => at,
+      setTimer: (fn) => (timers.push(fn), fn),
+      clearTimer: (fn) => timers.splice(timers.indexOf(fn), 1),
+      debounceMs: 5000,
+      maxWaitMs: 12_000,
+    });
+    sync.markDirty(); // t = 0: timer A
+    at = 4000;
+    sync.markDirty(); // restarts: still ONE pending timer, pushed back
+    expect(timers).toHaveLength(1);
+    at = 11_000;
+    sync.markDirty(); // 11 s after the first change: still restarts
+    expect(timers).toHaveLength(1);
+    const last = timers[0];
+    at = 12_500;
+    sync.markDirty(); // past the ceiling: the timer already waiting is kept (not pushed back again), so the burst goes up
+    expect(timers).toEqual([last]);
+  });
+
+  it('the pulling flag follows the downloads in flight (the header cloud spins while the daemon works)', () => {
+    const h = harness();
+    const seen = [];
+    h.sync.subscribe((st) => seen.push(st.pulling));
+    h.sync.beginPull();
+    h.sync.beginPull(); // two overlapping pulls
+    expect(h.sync.getState().pulling).toBe(true);
+    h.sync.endPull();
+    expect(h.sync.getState().pulling).toBe(true); // one still running
+    h.sync.endPull();
+    expect(h.sync.getState().pulling).toBe(false);
+    expect(seen).toEqual([true, false]);
   });
 
   it('a change made DURING an upload is not lost: a second round uploads it, never two at once', async () => {

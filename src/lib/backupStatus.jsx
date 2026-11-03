@@ -12,9 +12,12 @@ export const useBackupStatus = () => useContext(BackupStatusContext);
  * 'synced' (everything is in Drive) | 'syncing' (a change is on its way up) | 'pending' (it could not go up yet: offline / needs Google / error)
  * | null (nothing to say: backup is off, held for a restore, or no copy was ever made).
  */
+/** True while the daemon is actually working (uploading or downloading): the cloud spins. Waiting for the debounce is not "working". */
+export const backupBadgeBusy = (s) => Boolean(s?.enabled && !s.held && (s.status === 'syncing' || s.pulling));
+
 export function backupBadgeState(s) {
   if (!s || !s.enabled || s.held) return null;
-  if (s.status === 'syncing' || (s.dirty && s.status !== 'pending' && !s.pullError)) return 'syncing';
+  if (s.status === 'syncing' || s.pulling || (s.dirty && s.status !== 'pending' && !s.pullError)) return 'syncing';
   if (s.status === 'pending' || s.pullError) return 'pending'; // an upload that waits OR a download / merge that could not run: never silent
   if (s.status === 'synced' || Number(s.at) > 0) return 'synced';
   return null;

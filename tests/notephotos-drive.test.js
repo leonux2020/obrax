@@ -7,7 +7,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vite
 import { createFakeDrive } from './helpers/fakeDrive.js';
 import { CLIENT, q, flush, click, installFakeGoogle, createHost } from './helpers/appHarness.js';
 import { parseBackup } from '../src/lib/backup.js';
-import { clearDriveToken } from '../src/lib/driveToken.js';
+import { clearDriveToken, setDriveToken } from '../src/lib/driveToken.js';
 import { projectStore } from '../src/lib/projectStore.js';
 import { notePhotosFor } from '../src/lib/notePhotos.js';
 import { newProject } from '../src/lib/projects.js';
@@ -34,7 +34,8 @@ const profile = () => {
   localStorage.setItem('cp.user.v1', JSON.stringify({ provider: 'google', name: 'Ana', email: 'ana@example.com' }));
   localStorage.setItem('cp.company.v1', JSON.stringify({ name: 'Aurora' }));
   localStorage.setItem('cp.profile.v1', JSON.stringify({ onboarded: true, drive: true }));
-  localStorage.setItem('cp.drive.linked.v1', '1'); // this device was connected before: the card shows "Respaldar ahora"
+  localStorage.setItem('cp.drive.linked.v1', '1'); // this device was connected before: the daemon syncs silently
+  setDriveToken(drive.token, 3600); // ...with the session token of that connection
 };
 const wipe = async () => {
   for (const p of await projectStore.load()) {
@@ -68,7 +69,7 @@ afterEach(async () => {
 });
 
 describe('Drive cycle of the logbook photos', () => {
-  it('A: "Respaldar ahora" uploads the note photo (base64 inside the JSON only); B: restore brings the Blob back and the thumbnail reads it', async () => {
+  it('A: the daemon uploads the note photo (base64 inside the JSON only); B: the auto-pull brings the Blob back and the thumbnail reads it', async () => {
     // ---- device A
     profile();
     project = {
@@ -77,10 +78,9 @@ describe('Drive cycle of the logbook photos', () => {
     };
     await projectStore.save(project);
     await notePhotosFor(project.id).put('nota0001', { dataUrl: JPEG, width: 800, height: 600, at: 9 });
+    localStorage.setItem('cp.backup.v1', JSON.stringify({ at: 0, dirty: true, held: false })); // a change waiting from before: the daemon uploads it by itself
     await mount();
-    await click(h.tab('Ajustes'));
-    await click(q('backup-now'));
-    await flush(300);
+    await flush(5600); // the 5 s debounce, then the upload
     const [file] = drive.backupFiles();
     expect(file).toBeTruthy();
     const raw = JSON.parse(file.body);
@@ -94,12 +94,10 @@ describe('Drive cycle of the logbook photos', () => {
     await wipe();
     expect(await notePhotosFor(project.id).get('nota0001')).toBeNull();
     await mount();
-    expect(document.querySelectorAll('[data-testid="project-card"]')).toHaveLength(0);
+    await flush(600); // no button: opening the app pulls the backup by itself (auto-pull + merge)
+    expect(document.querySelectorAll('[data-testid="project-card"]')).toHaveLength(1);
     await click(h.tab('Ajustes'));
-    await click(q('backup-restore'));
-    await flush(300);
-    // the invisible auto-pull may have restored the backup a moment earlier: then the manual restore just reports that all is up to date
-    expect(q('backup-note').textContent).toMatch(/Respaldo restaurado|Todo al día/);
+    expect(q('backup-restore')).toBeNull();
 
     // IndexedDB: a Blob row (never base64), the same bytes, the link in the project
     const rows = await createRunner(indexedDB)(STORE_PHOTOS, 'readonly', (s) => s.getAll());

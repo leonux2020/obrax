@@ -3,6 +3,7 @@
 // has no work, a sheet offers "Restaurar ahora" / "Ahora no". Nothing is downloaded until the user accepts, and nothing is uploaded
 // (the cloud copy is never overwritten) until the backup is restored or the user explicitly backs up.
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { act } from 'react';
 import { createFakeDrive } from './helpers/fakeDrive.js';
 import { CLIENT, q, flush, click, typeInto, installFakeGoogle, createHost, backToDashboard } from './helpers/appHarness.js';
 import { collectBackup, serializeBackup, hasNoProjects } from '../src/lib/backup.js';
@@ -120,7 +121,7 @@ describe('the one-click restore sheet', () => {
     expect(q('restore-offer-now').className).toMatch(/min-h-\[44px\].*bg-brand|bg-brand.*min-h-\[44px\]/);
     expect(q('restore-offer-later').textContent).toBe('Ahora no');
     expect(offer.closest('[role="dialog"]').className).toContain('bg-black');
-    await flush(3500); // longer than the upload debounce
+    await flush(5600); // longer than the upload debounce
     expect(downloads()).toHaveLength(0); // nothing downloaded until the user accepts
     expect(uploads()).toHaveLength(0); // and the cloud copy is never overwritten by an empty device
     expect(drive.backupFiles()[0].body).toBe(original);
@@ -153,11 +154,11 @@ describe('the one-click restore sheet', () => {
     expect(q('settings-backup')).toBeNull(); // the Settings sheet is gone: the Dashboard shows
     expect(cards()).toContain('Obra Norte');
     expect(JSON.parse(localStorage.getItem('cp.backup.v1')).held).toBe(false); // uploads resume...
-    await flush(3600);
+    await flush(5600);
     expect(uploads()).toHaveLength(0); // ...and nothing is re-uploaded: the device now holds exactly what Drive has (an upload happens only when the merge leaves this device ahead)
   }, 20_000);
 
-  it('"Ahora no" closes without downloading anything; the manual "Restaurar" stays in Ajustes and still works', async () => {
+  it('"Ahora no" closes without downloading anything; there is no manual button: the daemon completes the restore by itself on its next trigger', async () => {
     seed();
     const original = await cloudBackup('Obra Sur');
     h = createHost(App);
@@ -166,16 +167,19 @@ describe('the one-click restore sheet', () => {
     await click(q('restore-offer-later'));
     expect(q('restore-offer')).toBeNull();
     expect(downloads()).toHaveLength(0);
-    expect(q('backup-restore')).not.toBeNull(); // the conventional button is still there
-    expect(q('backup-held').textContent).toContain('respaldo en tu nube sin restaurar');
-    await flush(3500);
-    expect(uploads()).toHaveLength(0); // still protected after declining
+    expect(q('backup-restore')).toBeNull(); // Zero Stress: no "Ripristina" button any more
+    expect(q('backup-held').textContent).toContain('respaldo en tu nube sin traer');
+    await flush(5600);
+    expect(uploads()).toHaveLength(0); // still protected after declining: nothing overwrites the cloud copy meanwhile
     expect(drive.backupFiles()[0].body).toBe(original);
-    await click(q('backup-restore'));
-    await flush(300);
-    expect((await projectStore.load()).map((p) => p.draft.project.name)).toEqual(['Obra Sur']);
-    expect(q('backup-held')).toBeNull(); // restored: nothing left to protect
-  }, 20_000);
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange')); // the app comes back to the foreground...
+      window.dispatchEvent(new Event('online')); // ...or the signal returns: either wakes the daemon (no throttle on 'online')
+    });
+    await flush(400);
+    expect((await projectStore.load()).map((p) => p.draft.project.name)).toEqual(['Obra Sur']); // merged in, never discarded
+    expect(q('backup-held')).toBeNull(); // nothing left to protect
+  }, 25_000);
 
   it('no offer when the device already has work, or when Drive has no backup (the first backup simply goes up)', async () => {
     seed();

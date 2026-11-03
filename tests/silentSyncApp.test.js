@@ -48,8 +48,11 @@ describe('invisible sync', () => {
     expect(q('backup-badge')?.dataset.state).toBe('pending');
     expect(q('backup-badge').dataset.reason).toBe('auth');
     await click(h.tab('Ajustes'));
-    await click(q('backup-now'));
-    await flush(60);
+    expect(q('backup-now')).toBeNull(); // no manual save / restore buttons...
+    expect(q('backup-restore')).toBeNull();
+    await click(q('backup-reconnect')); // ...only, when Google really asks again (amber cloud), the one way back: a single reconnect tap
+    await flush(200);
+    expect(q('backup-reconnect')).toBeNull();
     await click(h.tab('Proyectos'));
     expect(q('backup-badge')?.dataset.state).toBe('synced');
     expect(q('backup-badge').className).toContain('text-brand-500');
@@ -59,7 +62,7 @@ describe('invisible sync', () => {
     });
     expect(JSON.parse(localStorage.getItem('cp.workers.v1'))).toHaveLength(1);
     expect(q('backup-badge')?.dataset.state).toBe('syncing'); // on its way up, nothing to tap
-    await flush(3600);
+    await flush(5600);
     const [f] = drive.backupFiles();
     expect(parseBackup(f.body).workers.map((w) => w.name)).toEqual(['Luca Bianchi']);
     expect(q('backup-badge')?.dataset.state).toBe('synced');

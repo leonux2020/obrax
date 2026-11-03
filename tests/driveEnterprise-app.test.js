@@ -23,7 +23,7 @@ const seed = () => {
   localStorage.setItem('cp.user.v1', JSON.stringify({ provider: 'google', name: 'Ana', email: 'ana@example.com' }));
   localStorage.setItem('cp.company.v1', JSON.stringify({ name: 'Aurora' }));
   localStorage.setItem('cp.profile.v1', JSON.stringify({ onboarded: true, drive: true }));
-  localStorage.setItem('cp.drive.linked.v1', '1'); // this device was connected before: the card shows "Respaldar ahora"
+  localStorage.setItem('cp.drive.linked.v1', '1'); // this device was connected before: the daemon syncs silently
 };
 const names = () => {
   const [f] = drive.backupFiles();
@@ -60,15 +60,13 @@ describe('Drive in the app', () => {
     h = createHost(App);
     await h.mount();
     await createProject('Uno');
-    await click(h.tab('Ajustes'));
-    await click(q('backup-now'));
-    await flush(60);
+    await flush(5600); // the daemon uploads by itself (silent token, no button)
     expect(names()).toEqual(['Uno']);
     requests.length = 0;
     drive.rotate('tok-renewed-9999999'); // Google expired the token the app is holding
     await click(h.tab('Proyectos'));
     await createProject('Dos'); // the user keeps working
-    await flush(3600); // debounce -> upload -> 401 -> silent renewal -> same upload again
+    await flush(5600); // debounce -> upload -> 401 -> silent renewal -> same upload again
     expect(requests).toEqual(['none']); // ONE silent request, never the consent screen
     expect(names()).toContain('Dos');
     expect(drive.calls.some((c) => c.method !== 'GET' && c.url.includes('/upload/'))).toBe(true);
@@ -80,17 +78,14 @@ describe('Drive in the app', () => {
     h = createHost(App);
     await h.mount();
     await createProject('Casa Norte');
-    await click(h.tab('Ajustes'));
-    await click(q('backup-now')); // the device is connected to Drive once (first and only consent)
-    await flush(60);
+    await flush(5600); // connected before: the daemon uploads by itself
     expect(names()).toEqual(['Casa Norte']);
     await click(h.tab('Proyectos'));
     await createProject('Casa Sur'); // work in the field...
     setOnline(false); // ...without coverage
     await click(h.tab('Ajustes'));
     drive.calls.length = 0;
-    await click(q('backup-now'));
-    await flush(60);
+    await flush(5600); // the daemon's round finds no signal: nothing is sent
     const toast = q('toast');
     expect(toast).not.toBeNull();
     expect(toast.textContent).toBe('Sin conexión. El respaldo se intentará cuando recupere la señal');
@@ -99,13 +94,15 @@ describe('Drive in the app', () => {
     expect(drive.calls).toHaveLength(0);
     expect(q('backup-status').dataset.status).toBe('pending');
     expect(q('backup-status').textContent).toContain('sin conexión');
-    await click(q('backup-now')); // trying again offline does not pile up toasts
-    await flush(30);
-    expect(document.querySelectorAll('[data-testid="toast"]')).toHaveLength(1);
+    await click(h.tab('Proyectos'));
+    await createProject('Casa Oeste'); // another change offline does not pile up toasts
+    await flush(5600);
+    expect(document.querySelectorAll('[data-testid="toast"]').length).toBeLessThanOrEqual(1); // (the first one may have faded already)
     setOnline(true);
     await act_online();
     await flush(120);
-    expect(names()).toContain('Casa Sur'); // uploaded on its own
+    expect(names()).toEqual(expect.arrayContaining(['Casa Sur', 'Casa Oeste'])); // uploaded on its own
+    await click(h.tab('Ajustes'));
     expect(q('backup-status').dataset.status).toBe('synced');
   }, 20_000);
 
@@ -116,8 +113,7 @@ describe('Drive in the app', () => {
     await createProject('Obra');
     await click(h.tab('Ajustes'));
     drive.state.offline = true;
-    await click(q('backup-now'));
-    await flush(60);
+    await flush(5600);
     expect(q('toast').textContent).toContain('Sin conexión');
     expect(q('backup-status').dataset.status).toBe('pending');
     drive.state.offline = false;

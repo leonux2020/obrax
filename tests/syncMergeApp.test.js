@@ -76,7 +76,7 @@ describe('auto-pull + granular merge', () => {
     const local = await stored();
     expect(local.expenses.map((e) => e.id).sort()).toEqual(['e1aaaa', 'e2bbbb']); // IndexedDB has both
     expect(document.querySelectorAll('[data-testid="project-card"]')).toHaveLength(1); // the screen is up to date, no manual refresh
-    await flush(3600); // this device was ahead (its project differs from Drive's): the merged whole is uploaded, once
+    await flush(5600); // this device was ahead (its project differs from Drive's): the merged whole is uploaded, once
     expect(cloud().projects[0].expenses.map((e) => e.id).sort()).toEqual(['e1aaaa', 'e2bbbb']);
     expect(uploads().length).toBeGreaterThan(0);
     expect(q('backup-badge')?.dataset.state).toBe('synced');
@@ -101,8 +101,7 @@ describe('auto-pull + granular merge', () => {
       await new Promise((r) => setTimeout(r, 300));
     });
     expect((await stored()).expenses.map((e) => e.id).sort()).toEqual(['e1aaaa', 'e2bbbb']);
-    await flush(3600);
-    console.log('DBG', JSON.stringify(drive.calls.map((c) => [c.method, c.url.slice(-60)])), JSON.parse(localStorage.getItem('cp.backup.v1')));
+    await flush(5600);
     expect(uploads()).toHaveLength(0); // the device holds exactly what Drive has: no redundant upload
   }, 25_000);
 
@@ -121,8 +120,8 @@ describe('auto-pull + granular merge', () => {
   }, 25_000);
 });
 
-describe('manual "Ripristina da Drive"', () => {
-  it('merges, says what happened, and a second press on identical data says it is up to date', async () => {
+describe('automatic merge in the background (no "Ripristina da Drive" button)', () => {
+  it('merges by itself, uploads the merged whole, and a second wake on identical data downloads nothing (up to date, silently)', async () => {
     const shared = newProject({ regionCode: 'CL', name: 'Casa Compartida', now: 100, company: { name: 'Aurora' } });
     await projectStore.save(withExpenses(shared, [exp('e1aaaa', 100, 300)], 900));
     await putCloud([withExpenses(shared, [exp('e1aaaa', 100, 300), exp('e2bbbb', 250, 500)], 500)]);
@@ -130,12 +129,19 @@ describe('manual "Ripristina da Drive"', () => {
     await h.mount();
     await flush(300);
     await click(h.tab('Ajustes'));
-    await click(q('backup-restore'));
-    await flush(200);
-    await flush(3600); // the merged state is uploaded
-    await click(q('backup-restore'));
-    await flush(200);
-    expect(q('backup-note').textContent).toContain('Todo al día'); // nothing left to merge: said in words, not a silent "nothing changed"
+    expect(q('backup-restore')).toBeNull(); // nothing to tap: the merge already happened on open
+    expect(q('backup-now')).toBeNull();
+    expect((await stored()).expenses.map((e) => e.id).sort()).toEqual(['e1aaaa', 'e2bbbb']);
+    await flush(5600); // the merged state is uploaded
+    expect(cloud().projects[0].expenses.map((e) => e.id).sort()).toEqual(['e1aaaa', 'e2bbbb']);
+    drive.calls.length = 0;
+    await act(async () => {
+      window.dispatchEvent(new Event('online')); // the signal comes back / any other wake-up
+      await new Promise((r) => setTimeout(r, 300));
+    });
+    expect(drive.calls.some((c) => c.url.includes('alt=media'))).toBe(false); // Drive still shows what this device wrote: nothing to download
+    expect(uploads()).toHaveLength(0);
+    expect(q('backup-last')).not.toBeNull(); // and Settings shows when the last successful sync happened
   }, 30_000);
 
   it('without a usable token the failure is named and the header cloud turns amber', async () => {

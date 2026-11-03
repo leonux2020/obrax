@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 // Data life cycle, device B / after signing out: the Drive backup is found and restored BEFORE the Dashboard shows.
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { act } from 'react';
 import { createFakeDrive } from './helpers/fakeDrive.js';
 import { CLIENT, q, flush, click, installFakeGoogle, createHost } from './helpers/appHarness.js';
 import { collectBackup, serializeBackup } from '../src/lib/backup.js';
@@ -116,40 +117,41 @@ describe('Restore from Drive on a new device (setup screen)', () => {
   });
 });
 
-describe('Restore from Ajustes on a device that already has data', () => {
-  it('adds what is missing and never overwrites the existing profile', async () => {
-    await putBackup(await legitBackup('Obra de Drive'));
+describe('Automatic sync on a device that already has data (no manual restore button)', () => {
+  const linked = (company) => {
     localStorage.setItem('cp.user.v1', JSON.stringify({ provider: 'google', name: 'Ana', email: 'a@x.com' }));
-    localStorage.setItem('cp.company.v1', JSON.stringify({ name: 'Mi empresa local' }));
+    localStorage.setItem('cp.company.v1', JSON.stringify({ name: company }));
     localStorage.setItem('cp.profile.v1', JSON.stringify({ onboarded: true, drive: true }));
     localStorage.setItem('cp.drive.linked.v1', '1');
+    setDriveToken(drive.token, 3600);
+  };
+
+  it('opening the app pulls what is missing by itself and never overwrites the existing profile', async () => {
+    await putBackup(await legitBackup('Obra de Drive'));
+    linked('Mi empresa local');
     h = createHost(App);
     await h.mount();
-    expect(cards()).toHaveLength(0);
+    await flush(400); // the daemon pulls on open: nothing to tap
     await click(h.tab('Ajustes'));
-    await click(q('backup-restore'));
-    await flush(150);
-    expect(q('backup-note').textContent).toContain('Respaldo restaurado');
+    expect(q('backup-restore')).toBeNull();
+    expect(q('backup-now')).toBeNull();
     expect(JSON.parse(localStorage.getItem('cp.company.v1')).name).toBe('Mi empresa local'); // untouched
     await click(h.tab('Proyectos'));
     expect(cards().join('|')).toContain('Obra de Drive'); // the missing project came back
   });
 
-  it('says so when Drive has no backup, and when the connection fails', async () => {
-    localStorage.setItem('cp.user.v1', JSON.stringify({ provider: 'google', name: 'Ana', email: 'a@x.com' }));
-    localStorage.setItem('cp.company.v1', JSON.stringify({ name: 'Mi empresa' }));
-    localStorage.setItem('cp.profile.v1', JSON.stringify({ onboarded: true, drive: true }));
-    localStorage.setItem('cp.drive.linked.v1', '1');
+  it('with no backup in Drive nothing is said or broken; when the connection fails the header cloud turns amber, never silent', async () => {
+    linked('Mi empresa');
     h = createHost(App);
     await h.mount();
-    await click(h.tab('Ajustes'));
-    await click(q('backup-restore'));
-    await flush(100);
-    expect(q('backup-note').textContent).toContain('No hay ningún respaldo');
+    await flush(300);
+    expect(q('toast')).toBeNull();
     drive.state.offline = true;
-    await click(q('backup-restore'));
-    await flush(100);
-    expect(q('backup-note').textContent).toContain('sin conexión'); // the failure is named, never silent
-    expect(q('backup-badge')?.dataset.state).toBe('pending'); // ...and the cloud of the header says so too
+    await act(async () => {
+      window.dispatchEvent(new Event('online')); // the signal "returns" but Drive cannot be reached: the daemon tries, and says so
+    });
+    await flush(200);
+    expect(q('backup-badge')?.dataset.state).toBe('pending');
+    expect(q('backup-badge').dataset.reason).toBe('offline');
   });
 });
