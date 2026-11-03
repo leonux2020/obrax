@@ -154,7 +154,7 @@ describe('the one-click restore sheet', () => {
     expect(cards()).toContain('Obra Norte');
     expect(JSON.parse(localStorage.getItem('cp.backup.v1')).held).toBe(false); // uploads resume...
     await flush(3600);
-    expect(uploads().length).toBeGreaterThan(0); // ...and the merged state goes up on its own
+    expect(uploads()).toHaveLength(0); // ...and nothing is re-uploaded: the device now holds exactly what Drive has (an upload happens only when the merge leaves this device ahead)
   }, 20_000);
 
   it('"Ahora no" closes without downloading anything; the manual "Restaurar" stays in Ajustes and still works', async () => {

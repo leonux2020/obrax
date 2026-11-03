@@ -35,7 +35,9 @@ import {
 import { ensureDriveToken, googleConfigured, GOOGLE_CONFIG_STATUS, localUser } from './lib/auth.js';
 import { clearDriveToken, getDriveToken, isDriveLinked, needsDriveInteraction, subscribeDriveAuth } from './lib/driveToken.js';
 import { createDriveClient } from './lib/drive.js';
-import { createDriveSync } from './lib/driveSync.js';
+import { createDriveSync, getSeenRemote, setSeenRemote } from './lib/driveSync.js';
+import { mergeProjectLists, stampProject, stampProjects } from './lib/merge.js';
+import { markDeleted } from './lib/tombstones.js';
 import { collectBackup, hasNoProjects, parseBackup, restoreBackup } from './lib/backup.js';
 import { projectLimitReached } from './lib/pro.js';
 import { usePro } from './lib/usePro.js';
@@ -148,7 +150,17 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   const [user, setUser] = useState(loadUser);
   const [company, setCompany] = useState(loadCompany); // global profile (text); the logo lives in IndexedDB
   const [logo, setLogo] = useState('');
-  const [projects, setProjects] = useState(null); // null while loading from IndexedDB
+  const [projects, setProjectsRaw] = useState(null); // null while loading from IndexedDB
+  // Every change of the projects goes through here: the records that changed are stamped (`updatedAt`) and the deleted ones remembered (`tomb`),
+  // which is what lets the Drive merge go record by record instead of "the newest project wins as a whole". Restores use the raw setter (already merged).
+  const setProjects = useCallback(
+    (update) =>
+      setProjectsRaw((prev) => {
+        const next = typeof update === 'function' ? update(prev) : update;
+        return prev ? stampProjects(prev, next) : next;
+      }),
+    []
+  );
   const [activeId, setActiveId] = useState(null); // null = dashboard
   // Google's answer after a full-page redirect (Drive consent), already validated and stripped of its token in main.jsx.
   const [oauth] = useState(peekOAuthResult);
@@ -208,6 +220,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
       }),
     []
   );
+  const pullRef = useRef(null); // pullFromDrive (defined with the restore code below)
   const sync = useMemo(
     () =>
       createDriveSync({
@@ -215,6 +228,11 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
         collect: () => collectBackup({ ...latest.current, projects: latest.current.projects || [], loadPhotos: (id) => photoStoreFor(id).load().catch(() => []), loadNotePhotos: (p) => readNotePhotos(notePhotosFor(p.id), p.logbook) }),
         // in the background Google is only asked (silently) when this device has been connected before
         ensureToken: ({ interactive }) => (interactive || isDriveLinked() ? ensureDriveToken({ interactive, hint: userRef.current?.email || '' }) : Promise.resolve(getDriveToken())),
+        // BEFORE this device's copy replaces the Drive file, what other devices uploaded is pulled and merged in (a stale tablet can never crush the phone)
+        beforePush: async ({ interactive }) => {
+          const r = await pullRef.current?.({ interactive, inRound: true });
+          if (r && !r.ok) throw Object.assign(new Error(`pull:${r.reason}`), { code: r.reason });
+        },
         isEnabled: () => backupOnRef.current,
       }),
     [driveClient]
@@ -286,7 +304,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   }, [sync]);
 
   // The Squadra directory lives in localStorage, outside React state: its writes tell the backup engine too (a worker edited = a change to protect)
-  useEffect(() => onWorkersChanged(() => !wipingRef.current && backupOnRef.current && sync.markDirty()), [sync]);
+  useEffect(() => onWorkersChanged(() => !wipingRef.current && !applyingPull.current && backupOnRef.current && sync.markDirty()), [sync]);
   useEffect(() => saveSettings(settings), [settings]);
   useEffect(() => saveUser(user), [user]);
   useEffect(() => saveCompany(company), [company]);
@@ -294,11 +312,17 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   useEffect(() => clearOAuthResult(), []); // the answer is consumed once
   // Every change of projects / profile / settings / backup preference queues a silent Drive backup.
   const syncReady = useRef(false);
+  const skipDirty = useRef(false); // the next change of `projects` is a pull from Drive: it does not mark the state dirty
+  const applyingPull = useRef(false); // while a pull writes the Squadra directory, those writes are not "changes to upload"
   useEffect(() => {
     if (projects === null) return;
     if (!syncReady.current) {
       syncReady.current = true; // the first load is not a change; just resume anything left pending
       sync.resume();
+      return;
+    }
+    if (skipDirty.current) {
+      skipDirty.current = false; // the change is the merge with Drive itself (nothing new to upload by this alone)
       return;
     }
     if (!wipingRef.current) sync.markDirty();
@@ -355,9 +379,10 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
 
   // ---- project actions -------------------------------------------------------------------------------------
   const commit = useCallback((project) => {
-    setProjects((list) => (list.some((p) => p.id === project.id) ? list.map((p) => (p.id === project.id ? project : p)) : [project, ...list]));
-    projectStore.save(project).catch(() => {});
-  }, []);
+    const stamped = stampProject(projectsRef.current?.find((p) => p.id === project.id), project); // records changed / deleted by this commit are marked for the merge
+    setProjects((list) => (list.some((p) => p.id === stamped.id) ? list.map((p) => (p.id === stamped.id ? stamped : p)) : [stamped, ...list]));
+    projectStore.save(stamped).catch(() => {});
+  }, [setProjects]);
 
   // ---- deferred receipts (offline scanner) ---------------------------------------------------------------------
   // A receipt photographed without a connection waits in IndexedDB (receiptQueue). This global sync sends it to the AI
@@ -522,6 +547,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   };
 
   const deleteProject = (id) => {
+    markDeleted('projects', id); // so another device does not bring it back from the Drive backup
     projectStore.remove(id).catch(() => {});
     photoStoreFor(id).clear().catch(() => {});
     notePhotosFor(id).clear().catch(() => {}); // the photos of its logbook notes go with it
@@ -724,37 +750,126 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     return token;
   }, [exportSync]);
 
-  // ---- restore from Drive --------------------------------------------------------------------------------------
-  // Reads the newest backup of the CUBRAX folder and merges it into the device (projects: newest wins; profile and
-  // settings only fill an empty device), writes IndexedDB and then updates the screen state.
-  const restoreFromDrive = useCallback(
-    async ({ interactive = false } = {}) => {
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) return { ok: false, reason: 'offline' }; // no coverage: nothing to ask
-      const token = await ensureDriveToken({ interactive, hint: userRef.current?.email || '' });
-      if (!token) return { ok: false, reason: 'auth' };
-      try {
-        const found = await driveClient.latestBackup(parseBackup);
-        if (!found) {
-          sync.release(); // nothing usable in the cloud: there is nothing to protect
-          return { ok: true, restored: false };
+  // ---- pull from Drive: download + MERGE (never overwrite) ---------------------------------------------------------
+  // Reads the newest backup of the CUBRAX folder and merges it into the device record by record (merge.js: projects and, inside them,
+  // payments / advances / expenses / crew / logbook by id, newest `updatedAt` wins; workers the same; deletions respected; the profile and
+  // settings only fill an empty device). IndexedDB is written first, then the screen state is merged against the CURRENT list, so what the user
+  // typed while the file was downloading is never lost. If this device holds something the backup lacks, the merged state goes back up.
+  //   force: download even if Drive still shows the file this device last uploaded / merged (the manual button);
+  //   inRound: called by the upload engine just before it uploads (it uploads right after, so nothing is queued here).
+  // Never throws: { ok: false, reason } with 'offline' | 'auth' | 'quota' | 'error'.
+  const pullInflight = useRef(null);
+  const [, setSyncRev] = useState(0); // bumped when a pull changed something: a global re-render
+  const pullFromDrive = useCallback(
+    ({ interactive = false, force = false, inRound = false } = {}) => {
+      if (pullInflight.current) return pullInflight.current;
+      const job = (async () => {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) return { ok: false, reason: 'offline' }; // no coverage: nothing to ask
+        let token = null;
+        try {
+          token = await ensureDriveToken({ interactive, hint: userRef.current?.email || '' });
+        } catch {
+          token = null;
         }
-        const local = latest.current;
-        const merged = await restoreBackup({ ...local, projects: local.projects || [] }, found.value, { projectStore, photoStoreFor, notePhotosFor, logoStore });
-        setProjects(merged.projects);
-        if (merged.profileRestored) {
-          setCompany(merged.company);
-          setLogo(merged.logo);
-          setSettings(merged.settings);
-          setMeta(merged.meta);
-        } else setMeta((m) => (m.drive ? m : { ...m, drive: true }));
-        sync.release(); // the cloud copy is now part of this device: uploads resume
-        return { ok: true, restored: true, profile: merged.profileRestored, company: merged.company, projects: merged.wonProjects.length };
-      } catch (err) {
-        return { ok: false, reason: err?.code || 'error' };
-      }
+        if (!token) return { ok: false, reason: 'auth' };
+        try {
+          const peek = await driveClient.peekBackup(); // metadata only
+          if (!peek) {
+            sync.release(); // nothing usable in the cloud: there is nothing to protect
+            return { ok: true, restored: false, changed: 0 };
+          }
+          if (!force && peek.modifiedTime && peek.modifiedTime === getSeenRemote()) return { ok: true, restored: false, changed: 0, upToDate: true }; // nobody wrote since
+          const found = await driveClient.latestBackup(parseBackup);
+          if (!found) {
+            sync.release();
+            return { ok: true, restored: false, changed: 0 };
+          }
+          const local = latest.current;
+          applyingPull.current = true;
+          let merged;
+          try {
+            merged = await restoreBackup({ ...local, projects: local.projects || [] }, found.value, { projectStore, photoStoreFor, notePhotosFor, logoStore });
+          } finally {
+            applyingPull.current = false;
+          }
+          const changed = merged.wonProjects.length + merged.removedProjects.length + (merged.workersChanged ? 1 : 0);
+          if (merged.wonProjects.length || merged.removedProjects.length) {
+            skipDirty.current = true;
+            latest.current = { ...latest.current, projects: merged.projects }; // an upload that starts right now already sees the merge
+            setProjectsRaw((list) => mergeProjectLists(list || [], found.value.projects, merged.tombs.projects).projects); // against the CURRENT list
+          }
+          if (merged.profileRestored) {
+            setCompany(merged.company);
+            setLogo(merged.logo);
+            setSettings(merged.settings);
+            setMeta(merged.meta);
+          } else setMeta((m) => (m.drive ? m : { ...m, drive: true }));
+          if (changed || merged.profileRestored) setSyncRev((n) => n + 1);
+          setSeenRemote(peek.modifiedTime);
+          sync.release(); // the cloud copy is now part of this device: uploads resume
+          if (merged.needsPush && !inRound) sync.markDirty(); // this device has something Drive lacks: the merged whole goes back up
+          return { ok: true, restored: true, changed, profile: merged.profileRestored, company: merged.company, projects: merged.wonProjects.length };
+        } catch (err) {
+          const code = err?.code;
+          return { ok: false, reason: code === 'auth' || code === 'offline' || code === 'quota' ? code : 'error' };
+        }
+      })().finally(() => {
+        pullInflight.current = null;
+      });
+      pullInflight.current = job;
+      return job;
     },
     [driveClient, sync]
   );
+  pullRef.current = pullFromDrive;
+  // The manual "Restaurar" / the one-click offer: always downloads; a failure is reported to the header cloud as well as to the caller
+  const restoreFromDrive = useCallback(
+    async ({ interactive = false } = {}) => {
+      const r = await pullFromDrive({ interactive, force: true });
+      sync.reportPull(r);
+      return r;
+    },
+    [pullFromDrive, sync]
+  );
+  // AUTO-PULL: when the app opens or comes back to the foreground (visibilitychange), Drive is checked silently (one metadata request when nobody else
+  // wrote) and what other devices did is merged in. Never opens a Google window: without a valid token it only lights the cloud. If this device has
+  // changes waiting, the upload (which merges first) runs instead.
+  const lastPull = useRef(0);
+  const autoPull = useCallback(() => {
+    if (!backupOnRef.current || wipingRef.current || !userRef.current || !Array.isArray(latest.current.projects)) return;
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+    if (!isDriveLinked() && !getDriveToken()) return; // this device never connected to Drive
+    const st = sync.getState();
+    if (st.held) return; // an offered restore is waiting for the user
+    const nowMs = Date.now();
+    if (nowMs - lastPull.current < 15_000) return;
+    lastPull.current = nowMs;
+    if (st.dirty) {
+      sync.flush().catch(() => {});
+      return;
+    }
+    pullFromDrive({ interactive: false })
+      .then((r) => sync.reportPull(r))
+      .catch(() => sync.reportPull({ ok: false, reason: 'error' }));
+  }, [pullFromDrive, sync]);
+  const autoPullRef = useRef(autoPull);
+  autoPullRef.current = autoPull;
+  useEffect(() => {
+    const wake = () => autoPullRef.current();
+    document.addEventListener('visibilitychange', wake);
+    window.addEventListener('online', wake);
+    return () => {
+      document.removeEventListener('visibilitychange', wake);
+      window.removeEventListener('online', wake);
+    };
+  }, []);
+  // ... and once when the app has opened and its data is loaded
+  const bootPulled = useRef(false);
+  useEffect(() => {
+    if (bootPulled.current || projects === null || !user || !backupOn) return;
+    bootPulled.current = true;
+    autoPullRef.current();
+  }, [projects, user, backupOn]);
   // Light detection after a login: ONLY the metadata of cubrax-backup.json is requested (never its content). When the file exists and this
   // device has no work, the one-click restore sheet opens and uploads are held so the cloud copy cannot be overwritten meanwhile.
   const offerRestore = useCallback(
@@ -839,7 +954,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     return setStage('setup');
   };
   const backupStatusValue = useMemo(
-    () => ({ enabled: backupOn && Boolean(user), status: backup.status, reason: backup.reason, dirty: backup.dirty, at: backup.at, held: backup.held }),
+    () => ({ enabled: backupOn && Boolean(user), status: backup.status, reason: backup.reason, pullError: backup.pullError, dirty: backup.dirty, at: backup.at, held: backup.held }),
     [backupOn, user, backup]
   );
   const editing = sheet?.type === 'edit' ? projects?.find((p) => p.id === sheet.id) : null;

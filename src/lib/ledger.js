@@ -58,7 +58,8 @@ function listOf(raw, max, one) {
   for (const item of raw.slice(0, max)) {
     if (!item || typeof item !== 'object') continue;
     const clean = one(item, used);
-    if (clean) out.push(clean);
+    // `updatedAt`: when this record last changed (set by the app on every edit; the Drive merge keeps the newest). Older records have none.
+    if (clean) out.push(Number(item.updatedAt) > 0 && Number.isFinite(Number(item.updatedAt)) ? { ...clean, updatedAt: Number(item.updatedAt) } : clean);
   }
   return out;
 }

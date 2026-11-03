@@ -6,12 +6,34 @@
 // still uploaded later. `flush({ force, interactive })` is what Cerrar sesión waits for: it resolves ok only when the
 // CURRENT state is safely in Drive.
 //
+// BEFORE every upload the engine asks `beforePush` to pull and MERGE what other devices put in Drive (so this device can never crush
+// them with a stale copy). Nothing here dies silently: every failure (network, token, quota, a pull that could not run) ends in
+// status 'pending' + `reason` (or `pullError`), which the header cloud shows in amber / red.
+//
 // status: 'idle' (nothing to do / not enabled) | 'syncing' | 'synced' | 'pending' (waiting: no token / offline /
 //         Drive refused) -> see `reason`: 'auth' | 'offline' | 'quota' | 'error'
 
 import { serializeBackup } from './backup.js';
 
 export const BACKUP_STATE_KEY = 'cp.backup.v1';
+export const SEEN_REMOTE_KEY = 'cp.backup.seen.v1';
+
+/** The `modifiedTime` of the Drive file this device last uploaded or merged: if Drive still shows it, nobody else wrote since and nothing needs downloading. */
+export const getSeenRemote = (storage = typeof localStorage === 'undefined' ? null : localStorage) => {
+  try {
+    return storage?.getItem(SEEN_REMOTE_KEY) || '';
+  } catch {
+    return '';
+  }
+};
+export const setSeenRemote = (value, storage = typeof localStorage === 'undefined' ? null : localStorage) => {
+  try {
+    if (value) storage?.setItem(SEEN_REMOTE_KEY, String(value));
+    else storage?.removeItem(SEEN_REMOTE_KEY);
+  } catch {
+    /* storage blocked: the next check simply downloads once more */
+  }
+};
 
 const readState = (storage) => {
   try {
@@ -36,6 +58,7 @@ export function createDriveSync({
   client, // createDriveClient(...)
   collect, // () => Promise<backup object> : the CURRENT state of the app
   ensureToken, // ({interactive}) => Promise<string|null>
+  beforePush = null, // async ({interactive}) => void : pull + merge what other devices uploaded; throws { code } when it cannot
   isEnabled = () => true,
   storage = typeof localStorage === 'undefined' ? null : localStorage,
   now = () => Date.now(),
@@ -46,7 +69,7 @@ export function createDriveSync({
   clearTimer = (id) => clearTimeout(id),
 }) {
   const persisted = readState(storage);
-  const state = { status: 'idle', reason: '', at: persisted.at, dirty: persisted.dirty, held: persisted.held };
+  const state = { status: 'idle', reason: '', pullError: '', at: persisted.at, dirty: persisted.dirty, held: persisted.held };
   const listeners = new Set();
   let timer = null;
   let inflight = null;
@@ -73,7 +96,12 @@ export function createDriveSync({
       return { ok: false, reason: 'offline' };
     }
     const silentBlocked = !interactive && lastSilentFail && now() - lastSilentFail < silentRetryMs;
-    const token = silentBlocked ? null : await ensureToken({ interactive });
+    let token = null;
+    try {
+      token = silentBlocked ? null : await ensureToken({ interactive });
+    } catch {
+      token = null; // a failing renewal is "needs Google", never a crashed round
+    }
     if (!token) {
       if (!interactive) lastSilentFail = now();
       emit({ status: 'pending', reason: 'auth', dirty: true });
@@ -83,9 +111,12 @@ export function createDriveSync({
     // changes made from now on set `dirty` again and trigger another round of the loop
     emit({ status: 'syncing', reason: '', dirty: false });
     try {
+      // merge first: what other devices uploaded is brought in BEFORE this device's copy replaces the file
+      if (beforePush) await beforePush({ interactive });
       const text = serializeBackup(await collect());
-      await client.saveBackup(text);
-      emit({ at: now(), status: state.dirty ? 'syncing' : 'synced', reason: '' });
+      const saved = await client.saveBackup(text);
+      if (saved?.modifiedTime) setSeenRemote(saved.modifiedTime, storage);
+      emit({ at: now(), status: state.dirty ? 'syncing' : 'synced', reason: '', pullError: '' });
       return { ok: true };
     } catch (err) {
       const code = err?.code;
@@ -131,7 +162,7 @@ export function createDriveSync({
     if (timer || !isEnabled() || state.held) return;
     timer = setTimer(() => {
       timer = null;
-      flush().catch(() => {});
+      flush().catch(() => emit({ status: 'pending', reason: 'error', dirty: true })); // never a silent death: the cloud turns amber / red
     }, debounceMs);
   }
 
@@ -148,7 +179,15 @@ export function createDriveSync({
     /** The signal came back (browser 'online' event): upload what was left pending, silently. */
     retryNow() {
       if (!state.dirty || !isEnabled() || state.held) return Promise.resolve({ ok: true });
-      return flush();
+      return flush().catch(() => {
+        emit({ status: 'pending', reason: 'error', dirty: true });
+        return { ok: false, reason: 'error' };
+      });
+    },
+    /** The result of a download / merge ({ ok, reason }) from outside the upload loop: a failure lights the cloud, a success clears it. */
+    reportPull(result) {
+      const pullError = result && result.ok === false ? result.reason || 'error' : '';
+      if (pullError !== state.pullError) emit({ pullError });
     },
     flush,
     /** The cloud has a backup this device has not restored: uploads wait (persisted) until it is restored or overridden. */

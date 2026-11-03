@@ -149,6 +149,7 @@ describe('Restore from Ajustes on a device that already has data', () => {
     drive.state.offline = true;
     await click(q('backup-restore'));
     await flush(100);
-    expect(q('backup-note').textContent).toContain('No se pudo leer');
+    expect(q('backup-note').textContent).toContain('sin conexión'); // the failure is named, never silent
+    expect(q('backup-badge')?.dataset.state).toBe('pending'); // ...and the cloud of the header says so too
   });
 });

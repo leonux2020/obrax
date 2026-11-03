@@ -43,7 +43,7 @@ export function createFakeDrive({ token: initialToken = 'tok-valid-123456' } = {
       n += 1;
       const f = { id: `fld${n}xxxxxx`, name: meta.name, mimeType: meta.mimeType, parents: meta.parents || [], body: '', modifiedTime: (clock += 1) };
       files.set(f.id, f);
-      return res({ id: f.id });
+      return res({ id: f.id, modifiedTime: new Date(f.modifiedTime).toISOString() });
     }
     if (method === 'POST' && mediaUpload && u.searchParams.get('uploadType') === 'multipart') {
       const parts = String(init.body).split(/--cubrax[a-z0-9]+/).filter((p) => p.includes('Content-Type'));
@@ -60,7 +60,7 @@ export function createFakeDrive({ token: initialToken = 'tok-valid-123456' } = {
       if (!f) return res({ error: 'not found' }, 404);
       f.body = String(init.body);
       f.modifiedTime = clock += 1;
-      return res({ id: f.id });
+      return res({ id: f.id, modifiedTime: new Date(f.modifiedTime).toISOString() });
     }
     if (method === 'GET' && u.searchParams.get('alt') === 'media') {
       const f = files.get(id);

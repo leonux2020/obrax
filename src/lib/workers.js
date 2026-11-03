@@ -2,6 +2,7 @@
 // One list kept on the device in localStorage (`cp.workers.v1`) and carried by the Drive backup. Everything read back (storage, backup file) is
 // UNTRUSTED and goes through normalizeWorker, which also validates the sensitive part of the file (health and emergency data).
 
+import { markDeleted } from './tombstones.js';
 import { WORKER_SPECIALTIES, newEntryId } from './ledger.js';
 import { sanitizePhone, sanitizeText } from './sanitize.js';
 
@@ -77,14 +78,14 @@ export function normalizeWorkers(raw, now = Date.now()) {
 /** True when the file carries something a first-aider needs to know (a limiting condition or an allergy). */
 export const hasHealthNotes = (w) => Boolean(w?.limiting || w?.allergies);
 
-/** Union by id; the newest `updatedAt` wins (ties keep the local one). */
-export function mergeWorkers(local, incoming) {
+/** Union by id; the newest `updatedAt` wins (a tie is broken by the content: the same result on every device). `tombs` = { id: deletedAt }: a file deleted after its last change stays deleted. */
+export function mergeWorkers(local, incoming, tombs = {}) {
   const byId = new Map(normalizeWorkers(local).map((w) => [w.id, w]));
   for (const w of normalizeWorkers(incoming)) {
     const mine = byId.get(w.id);
-    if (!mine || w.updatedAt > mine.updatedAt) byId.set(w.id, w);
+    if (!mine || w.updatedAt > mine.updatedAt || (w.updatedAt === mine.updatedAt && JSON.stringify(w) > JSON.stringify(mine))) byId.set(w.id, w);
   }
-  return [...byId.values()].sort(byName).slice(0, WORKER_LIMIT);
+  return [...byId.values()].filter((w) => !(tombs[w.id] > 0 && tombs[w.id] >= w.updatedAt)).sort(byName).slice(0, WORKER_LIMIT);
 }
 
 // ---- change notifications: the invisible backup engine listens, so a worker edited in Ajustes goes up to Drive like any other change ----
@@ -129,4 +130,7 @@ export function upsertWorker(raw, now = Date.now()) {
   return { list: saveWorkers([...current.filter((w) => w.id !== worker.id), worker]), worker };
 }
 
-export const removeWorker = (id) => saveWorkers(loadWorkers().filter((w) => w.id !== id));
+export const removeWorker = (id) => {
+  markDeleted('workers', id); // so the other devices do not bring the file back from the Drive backup
+  return saveWorkers(loadWorkers().filter((w) => w.id !== id));
+};

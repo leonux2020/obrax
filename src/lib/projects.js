@@ -1,6 +1,7 @@
 // Projects (one per client job): model, normalisation, company snapshot and the time traffic light.
 // Everything here is pure so the rules are unit-testable in Node.
 
+import { normalizeTomb } from './tombstones.js';
 import { getRegion } from './regions.js';
 import { normalizeDraft, normalizeCompany, newDraft, isCompanyEmpty } from './draft.js';
 import { sanitizeText } from './sanitize.js';
@@ -214,6 +215,7 @@ export function normalizeProject(obj) {
     advances: normalizeAdvances(obj.advances),
     expenses: normalizeExpenses(obj.expenses).map((e) => ({ ...e, projectId: obj.id })), // an expense always knows its project (old records get it here)
     logbook: normalizeLogbook(obj.logbook),
+    ...(Object.keys(normalizeTomb(obj.tomb, 200)).length ? { tomb: normalizeTomb(obj.tomb, 200) } : {}), // ids of records deleted here (so a merge with another device does not bring them back)
     draft: normalizeDraft(obj.draft, regionCode),
   };
 }

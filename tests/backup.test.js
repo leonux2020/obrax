@@ -64,8 +64,11 @@ describe('merging a backup into a device (never destructive)', () => {
     const keepLocal = mergeBackup(base([shared]), parseBackup(serializeBackup(await collectBackup({ ...base([sharedOld]) }))));
     expect(keepLocal.projects[0].updatedAt).toBe(100);
     expect(keepLocal.wonProjects).toEqual([]);
-    const tie = mergeBackup(base([shared]), parseBackup(serializeBackup(await collectBackup({ ...base([{ ...shared, draft: { ...shared.draft, project: { name: 'otro', client: '' } } }]) }))));
-    expect(tie.projects[0].draft.project.name).toBe('Compartida');
+    // same updatedAt, different content: the tie is broken by the CONTENT, so both devices pick the same one (no endless ping-pong)
+    const other = { ...shared, draft: { ...shared.draft, project: { name: 'otro', client: '' } } };
+    const onA = mergeBackup(base([shared]), parseBackup(serializeBackup(await collectBackup({ ...base([other]) }))));
+    const onB = mergeBackup(base([other]), parseBackup(serializeBackup(await collectBackup({ ...base([shared]) }))));
+    expect(onA.projects[0].draft.project.name).toBe(onB.projects[0].draft.project.name);
   });
 
   it('the profile, signature and settings fill an EMPTY device only; an existing profile is never overwritten', async () => {

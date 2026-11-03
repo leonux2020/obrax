@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import BackupBadge from './BackupBadge.jsx';
 import { useI18n } from '../lib/i18n.jsx';
 import { sanitizeEmail, sanitizeEmailInput, sanitizePhone, sanitizeTaxId, sanitizeText, sanitizeTextInput } from '../lib/sanitize.js';
 import { EMPTY_COMPANY, normalizeCompany } from '../lib/draft.js';
@@ -158,7 +159,8 @@ export default function SettingsView({
     setNote('');
     const r = await onRestore();
     setWorking('');
-    setNote(!r.ok ? t('backup.restore.err') : r.restored ? t('backup.restore.done') : t('backup.restore.none'));
+    // what happened, in words: couldn't (no signal / Google asks again / other), nothing in Drive, already identical, or merged
+    setNote(!r.ok ? t(r.reason === 'offline' || r.reason === 'auth' ? `backup.status.pending.${r.reason}` : 'backup.restore.err') : !r.restored ? t('backup.restore.none') : r.changed > 0 || r.profile ? t('backup.restore.done') : t('backup.restore.uptodate'));
   };
 
   // persist: trim free-text ONLY here (never while typing). The local inputs keep trailing spaces so "Nombre Apellido" works.
@@ -274,9 +276,12 @@ export default function SettingsView({
   return (
     <div className="min-h-screen bg-black" data-testid="settings-view">
       <main className="mx-auto w-full max-w-3xl space-y-4 px-3 pb-44 pt-4 sm:px-4">
-        <h1 className="text-2xl font-medium" data-testid="settings-title">
-          {t('settings.title')}
-        </h1>
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-2xl font-medium" data-testid="settings-title">
+            {t('settings.title')}
+          </h1>
+          <BackupBadge size={22} />
+        </div>
 
         {/* ---- 1. Perfil de Empresa ---------------------------------------------------------------------------------- */}
         <Accordion testId="settings-profile" titleId="settings-profile-title" icon={UserIcon} title={t('settings.profile')} open={openAcc.profile} onToggle={toggleAcc('profile')}>

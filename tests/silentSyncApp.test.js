@@ -44,7 +44,9 @@ describe('invisible sync', () => {
     seed();
     h = createHost(App);
     await h.mount();
-    expect(q('backup-badge')).toBeNull(); // no copy yet: the badge says nothing
+    // the app opened with no valid Google token (it lasts ~1 h): the silent look at Drive could not run, and the cloud says so (amber), never silence
+    expect(q('backup-badge')?.dataset.state).toBe('pending');
+    expect(q('backup-badge').dataset.reason).toBe('auth');
     await click(h.tab('Ajustes'));
     await click(q('backup-now'));
     await flush(60);

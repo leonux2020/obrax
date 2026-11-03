@@ -3,12 +3,15 @@
 // driveSync.js) and read back on a new device or after signing out.
 //
 // Everything that comes back is UNTRUSTED: it is validated with the same normalizers used for local storage.
-// Restoring never destroys anything: projects are merged (the newest `updatedAt` of each id wins) and the
-// profile / settings only fill in an empty device.
+// Restoring never destroys anything: everything is MERGED record by record (merge.js: projects, and inside them payments, advances,
+// expenses, crew and logbook by id, the newest `updatedAt` wins, tombstones keep deleted things deleted) and the profile / settings
+// only fill in an empty device.
 
 import { normalizeCompany, normalizeProfileMeta, normalizeSettings, isCompanyEmpty } from './draft.js';
 import { normalizeLogo } from './logo.js';
-import { MAX_PROJECTS, normalizeProjects } from './projects.js';
+import { normalizeProjects } from './projects.js';
+import { canon, canonById, mergeProjectLists } from './merge.js';
+import { hasTombs, loadTombs, mergeTombs, normalizeTombs, saveTombs } from './tombstones.js';
 import { normalizePhoto, normalizePhotos } from './photos.js';
 import { writeNotePhotos } from './notePhotos.js';
 import { loadWorkers, mergeWorkers, normalizeWorkers, saveWorkers } from './workers.js';
@@ -23,7 +26,7 @@ const ID_RE = /^[a-z0-9]{1,16}$/;
  * its logbook notes as { [noteId]: { dataUrl, width, height, at } } (Blobs on the device, base64 only inside this payload).
  * @returns {Promise<object>} plain JSON-able object
  */
-export async function collectBackup({ settings, company, meta, logo, projects, workers = loadWorkers(), loadPhotos = async () => [], loadNotePhotos = async () => ({}), now = Date.now() }) {
+export async function collectBackup({ settings, company, meta, logo, projects, workers = loadWorkers(), tombs = loadTombs(), loadPhotos = async () => [], loadNotePhotos = async () => ({}), now = Date.now() }) {
   const photos = {};
   const notePhotos = {};
   for (const p of projects || []) {
@@ -44,6 +47,7 @@ export async function collectBackup({ settings, company, meta, logo, projects, w
     photos,
     notePhotos,
     ...(workers?.length ? { workers: normalizeWorkers(workers) } : {}), // the "Squadra" directory (health data included); absent when empty
+    ...(hasTombs(tombs) ? { tombs: normalizeTombs(tombs) } : {}), // what was deleted (so other devices do not bring it back)
   };
 }
 
@@ -86,6 +90,7 @@ export function parseBackup(text) {
     }
   }
   const workers = normalizeWorkers(raw.workers);
+  const tombs = normalizeTombs(raw.tombs);
   return {
     app: BACKUP_APP,
     version,
@@ -98,6 +103,7 @@ export function parseBackup(text) {
     photos,
     notePhotos,
     ...(workers.length ? { workers } : {}),
+    ...(hasTombs(tombs) ? { tombs } : {}),
   };
 }
 
@@ -111,23 +117,31 @@ export const hasNoProjects = ({ projects }) => Array.isArray(projects) && projec
 export const isDeviceEmpty = ({ projects, company, meta }) => !(projects || []).length && isCompanyEmpty(company) && !meta?.onboarded;
 
 /**
- * Pure merge of the local state with a backup.
- *  - projects: union by id; the newest `updatedAt` wins (ties keep the local one)
+ * Pure merge of the local state with a backup (see merge.js: granular and symmetric).
+ *  - projects: union by id; inside a project payments / advances / expenses / crew / logbook are merged by id (newest `updatedAt` wins);
+ *    a project or record deleted AFTER its last change (tombstone) stays deleted
  *  - workers (the Squadra directory) are merged apart in restoreBackup: union by id, newest `updatedAt` wins
  *  - profile (company, logo, settings, meta): taken from the backup ONLY when this device has no profile yet
- * @returns {{projects, company, logo, settings, meta, wonProjects: string[], profileRestored: boolean}}
+ * @returns {{projects, company, logo, settings, meta, wonProjects: string[], remoteWon: string[], removedProjects: string[], tombs, needsPush: boolean, profileRestored: boolean}}
+ *   `wonProjects`: the projects whose content changed on this device (new, or with something from the backup);
+ *   `remoteWon`: those where the backup's version of the project itself is the newer one;
+ *   `needsPush`: this device holds something the backup lacks, so the merged state should go back up.
  */
 export function mergeBackup(local, backup) {
-  const byId = new Map((local.projects || []).map((p) => [p.id, p]));
+  const tombs = mergeTombs(local.tombs, backup.tombs);
+  const { projects, removed } = mergeProjectLists(local.projects || [], backup.projects, tombs.projects);
+  const mine = new Map((local.projects || []).map((p) => [p.id, p]));
+  const theirs = new Map(backup.projects.map((p) => [p.id, p]));
   const won = [];
-  for (const p of backup.projects) {
-    const mine = byId.get(p.id);
-    if (!mine || p.updatedAt > mine.updatedAt) {
-      byId.set(p.id, p);
-      won.push(p.id);
-    }
+  const remoteWon = [];
+  let needsPush = canon(tombs) !== canon(normalizeTombs(backup.tombs));
+  for (const p of projects) {
+    const before = mine.get(p.id);
+    const remote = theirs.get(p.id);
+    if (!before || canon(before) !== canon(p)) won.push(p.id);
+    if (remote && (!before || remote.updatedAt > before.updatedAt)) remoteWon.push(p.id);
+    if (!remote || canon(remote) !== canon(p)) needsPush = true;
   }
-  const projects = [...byId.values()].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, MAX_PROJECTS);
   const profileRestored = isCompanyEmpty(local.company) && !local.meta?.onboarded && (!isCompanyEmpty(backup.company) || backup.meta.onboarded);
   return {
     projects,
@@ -135,7 +149,11 @@ export function mergeBackup(local, backup) {
     logo: profileRestored ? backup.logo || local.logo || '' : local.logo || '',
     settings: profileRestored || !local.settings?.region ? backup.settings : local.settings,
     meta: profileRestored ? { ...backup.meta, drive: true } : local.meta,
-    wonProjects: won.filter((id) => projects.some((p) => p.id === id)),
+    wonProjects: won,
+    remoteWon,
+    removedProjects: removed,
+    tombs,
+    needsPush,
     profileRestored,
   };
 }
@@ -146,16 +164,30 @@ export function mergeBackup(local, backup) {
  * @returns the merged state (the caller then updates React state / localStorage with it)
  */
 export async function restoreBackup(local, backup, { projectStore, photoStoreFor, notePhotosFor = null, logoStore }) {
-  const merged = mergeBackup(local, backup);
+  const merged = mergeBackup({ ...local, tombs: local.tombs ?? loadTombs() }, backup);
+  const remoteWon = new Set(merged.remoteWon);
+  for (const id of merged.removedProjects) {
+    // deleted on another device after its last change here: it goes away here too
+    await projectStore.remove(id).catch(() => {});
+    await Promise.resolve(photoStoreFor(id).clear?.()).catch(() => {});
+    await Promise.resolve(notePhotosFor?.(id).clear?.()).catch(() => {});
+  }
   for (const id of merged.wonProjects) {
     const project = merged.projects.find((p) => p.id === id);
+    if (!project) continue;
     await projectStore.save(project);
     const store = photoStoreFor(id);
-    for (const photo of backup.photos[id] || []) await store.save(photo);
+    if (remoteWon.has(id)) {
+      for (const photo of backup.photos[id] || []) await store.save(photo);
+    } else if (backup.photos[id]?.length) {
+      // this device's project is the newer one: its own camera photos stay; only the slots it lacks are filled from the backup
+      const have = new Set(((await store.load().catch(() => [])) || []).filter(Boolean).map((ph) => ph.slot));
+      for (const photo of backup.photos[id]) if (!have.has(photo.slot)) await store.save(photo);
+    }
     // the photos of its notes go back to IndexedDB as Blobs BEFORE the screen shows the project (the `photo: true` links keep working)
-    if (notePhotosFor && backup.notePhotos?.[id]) await writeNotePhotos(notePhotosFor(id), backup.notePhotos[id]);
+    if (notePhotosFor && backup.notePhotos?.[id]) await writeNotePhotos(notePhotosFor(id), backup.notePhotos[id], { overwrite: remoteWon.has(id) });
   }
-  // projects kept from this device (newer) that lost the Blob of a note photo: fill only what is missing
+  // projects kept as they were (nothing new in them) that lost the Blob of a note photo: fill only what is missing
   if (notePhotosFor) {
     for (const p of merged.projects) {
       if (!merged.wonProjects.includes(p.id) && backup.notePhotos?.[p.id]) {
@@ -164,7 +196,13 @@ export async function restoreBackup(local, backup, { projectStore, photoStoreFor
       }
     }
   }
-  if (backup.workers?.length) saveWorkers(mergeWorkers(loadWorkers(), backup.workers)); // the Squadra directory: union by id, newest wins
+  // the Squadra directory: union by id, newest wins, deletions respected
+  const mineWorkers = loadWorkers();
+  const workers = mergeWorkers(mineWorkers, backup.workers || [], merged.tombs.workers);
+  const workersChanged = canonById(workers) !== canonById(mineWorkers);
+  if (workersChanged) saveWorkers(workers);
+  const workersAhead = canonById(workers) !== canonById(backup.workers || []);
+  saveTombs(merged.tombs);
   if (merged.profileRestored && merged.logo) await logoStore.save(merged.logo);
-  return merged;
+  return { ...merged, workers, workersChanged, needsPush: merged.needsPush || workersAhead };
 }

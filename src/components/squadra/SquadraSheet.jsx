@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useI18n } from '../../lib/i18n.jsx';
-import { WORKER_LIMIT, hasHealthNotes, loadWorkers, removeWorker, upsertWorker } from '../../lib/workers.js';
+import { WORKER_LIMIT, hasHealthNotes, loadWorkers, onWorkersChanged, removeWorker, upsertWorker } from '../../lib/workers.js';
 import BottomSheet from '../BottomSheet.jsx';
 import { Button } from '../ui.jsx';
 import { Stars } from './Stars.jsx';
@@ -55,6 +55,7 @@ function Row({ worker, onOpen }) {
 export default function SquadraSheet({ onClose }) {
   const { t } = useI18n();
   const [workers, setWorkers] = useState(() => loadWorkers());
+  useEffect(() => onWorkersChanged(() => setWorkers(loadWorkers())), []); // a pull from Drive (another device) refreshes the open list
   const [editing, setEditing] = useState(null); // null | { worker: object | null }
   const full = workers.length >= WORKER_LIMIT;
 

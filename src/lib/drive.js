@@ -126,22 +126,22 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
     const folder = await ensureFolder();
     const [existing] = await backupsIn(folder);
     if (existing) {
-      const res = await json(`${UPLOAD}/files/${existing.id}?uploadType=media&fields=id`, {
+      const res = await json(`${UPLOAD}/files/${existing.id}?uploadType=media&fields=id,modifiedTime`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: text,
       });
-      return { id: res?.id ?? existing.id, folderId: folder };
+      return { id: res?.id ?? existing.id, folderId: folder, modifiedTime: typeof res?.modifiedTime === 'string' ? res.modifiedTime : '' };
     }
     const boundary = `cubrax${Math.random().toString(36).slice(2)}`;
     const meta = JSON.stringify({ name: BACKUP_FILE, parents: [folder], mimeType: 'application/json' });
     const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${text}\r\n--${boundary}--`;
-    const res = await json(`${UPLOAD}/files?uploadType=multipart&fields=id`, {
+    const res = await json(`${UPLOAD}/files?uploadType=multipart&fields=id,modifiedTime`, {
       method: 'POST',
       headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
       body,
     });
-    return { id: res?.id, folderId: folder };
+    return { id: res?.id, folderId: folder, modifiedTime: typeof res?.modifiedTime === 'string' ? res.modifiedTime : '' };
   }
 
   async function saveBackup(text) {
