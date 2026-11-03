@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { emptySlots } from './lib/photos.js';
+import { diffPhotos, emptySlots } from './lib/photos.js';
 import { migrateLegacyPhotos, photoStoreFor } from './lib/photoStore.js';
 import { notePhotosFor, readNotePhotos } from './lib/notePhotos.js';
 import { receiptPhotosFor } from './lib/receiptPhotos.js';
@@ -37,7 +37,7 @@ import { clearDriveToken, getDriveToken, isDriveLinked, needsDriveInteraction, s
 import { createDriveClient } from './lib/drive.js';
 import { createDriveSync, getSeenRemote, setSeenRemote } from './lib/driveSync.js';
 import { mergeProjectLists, stampProject, stampProjects } from './lib/merge.js';
-import { markDeleted } from './lib/tombstones.js';
+import { markDeleted, mergeTomb } from './lib/tombstones.js';
 import { collectBackup, hasNoProjects, parseBackup, restoreBackup } from './lib/backup.js';
 import { projectLimitReached } from './lib/pro.js';
 import { usePro } from './lib/usePro.js';
@@ -329,12 +329,28 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     }
     if (!wipingRef.current) sync.markDirty();
   }, [projects, company, settings, meta, logo, sync]);
+  // The camera photos live in IndexedDB, outside the project record, so adding / replacing / deleting one would leave the project looking
+  // untouched to the sync engine. Every real change therefore STAMPS the open project (`updatedAt` = now), and a deletion also leaves a
+  // `photoTomb` entry for its slot, so the other devices neither miss the change nor bring a deleted photo back.
+  const photosRef = useRef(null);
+  photosRef.current = photos;
   const changePhotos = useCallback(
-    (next) => {
+    (update) => {
+      const prev = photosRef.current ?? emptySlots();
+      const next = typeof update === 'function' ? update(prev) : update;
+      photosRef.current = next; // successive updates in the same tick build on each other
       setPhotos(next);
+      const { changed, removed } = diffPhotos(prev, next);
+      const id = activeRef.current?.id;
+      if (changed && id && !wipingRef.current) {
+        const now = Date.now();
+        setProjects((list) =>
+          (list || []).map((p) => (p.id !== id ? p : { ...p, ...(removed.length ? { photoTomb: mergeTomb(p.photoTomb, Object.fromEntries(removed.map((slot) => [String(slot), now])), 12) } : {}), updatedAt: Math.max(now, (p.updatedAt || 0) + 1) }))
+        );
+      }
       if (!wipingRef.current) sync.markDirty();
     },
-    [sync]
+    [sync, setProjects]
   );
   useEffect(() => {
     document.documentElement.lang = settings.lang;
@@ -430,20 +446,23 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
 
   // Navigation context of the detail view: opened from Proyectos = tactical mode; from Contabilidad (`{ fromAccounting: true }`) = audit mode (ledger)
   const [fromAccounting, setFromAccounting] = useState(false);
+  const openedId = useRef(null); // the project whose photos are being loaded: a fast IndexedDB answer can arrive before the screen has re-rendered
   const openProject = useCallback((id, context = null) => {
+    openedId.current = id;
     setFromAccounting(context?.fromAccounting === true);
     setActiveId(id);
     setEditor(false);
     setPhotos(emptySlots());
     photoStoreFor(id)
       .load()
-      .then((p) => activeRef.current?.id === id && setPhotos(p))
+      .then((p) => openedId.current === id && setPhotos(p))
       .catch(() => {});
     window.scrollTo({ top: 0 });
   }, []);
 
   const closeProject = useCallback(() => {
     if (activeRef.current) projectStore.save(activeRef.current).catch(() => {});
+    openedId.current = null;
     setActiveId(null);
     setFromAccounting(false);
     setEditor(false);
@@ -559,6 +578,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     exportQueue.removeProject(id).catch(() => {});
     setProjects((list) => list.filter((p) => p.id !== id));
     if (activeRef.current?.id === id) {
+      openedId.current = null;
       setActiveId(null);
       setFromAccounting(false);
       setPhotos(emptySlots());
@@ -794,7 +814,15 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
           } finally {
             applyingPull.current = false;
           }
-          const changed = merged.wonProjects.length + merged.removedProjects.length + (merged.workersChanged ? 1 : 0);
+          const changed = merged.wonProjects.length + merged.removedProjects.length + merged.photosChanged.length + (merged.workersChanged ? 1 : 0);
+          const openId = activeRef.current?.id;
+          if (openId && merged.photosChanged.includes(openId)) {
+            // the photos of the project on screen were completed from Drive: show them (straight state, not a user change)
+            photoStoreFor(openId)
+              .load()
+              .then((p) => activeRef.current?.id === openId && setPhotos(p))
+              .catch(() => {});
+          }
           if (merged.wonProjects.length || merged.removedProjects.length) {
             skipDirty.current = true;
             latest.current = { ...latest.current, projects: merged.projects }; // an upload that starts right now already sees the merge

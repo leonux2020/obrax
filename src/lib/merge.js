@@ -11,6 +11,7 @@
 // two devices that merge each other's answer converge instead of overwriting each other forever.
 
 import { mergeTomb, normalizeTomb } from './tombstones.js';
+import { MAX_PHOTOS } from './photos.js';
 
 export const RECORD_COLLECTIONS = Object.freeze(['payments', 'advances', 'expenses', 'crew', 'logbook']);
 const RECORD_TOMB_LIMIT = 200;
@@ -84,6 +85,10 @@ export function mergeProject(a, b) {
   const merged = { ...base, ...lists, updatedAt: Math.max(projectStamp(a), projectStamp(b)) };
   if (Object.keys(tomb).length) merged.tomb = tomb;
   else delete merged.tomb;
+  // photo deletions ({ slot: deletedAt }) are unioned like any tombstone: the newest deletion of each slot survives the merge
+  const photoTomb = mergeTomb(a.photoTomb, b.photoTomb, MAX_PHOTOS);
+  if (Object.keys(photoTomb).length) merged.photoTomb = photoTomb;
+  else delete merged.photoTomb;
   return merged;
 }
 
@@ -152,4 +157,51 @@ export function stampProjects(prevList, nextList, now = Date.now()) {
     return s;
   });
   return changed ? out : nextList;
+}
+
+/**
+ * DEEP, per-slot merge of the camera photos of ONE project (this device vs. the backup). The photos do not live inside the project record,
+ * so the project's `updatedAt` says nothing about them: each slot is reconciled on its own.
+ *   - a photo on ONE side only is kept (never lost because the other device is older / stale): the union of both devices;
+ *   - on both sides with different content, the NEWEST capture (`at`) wins; a tie is broken by the content, so both devices pick the same;
+ *   - `photoTomb` ({ slot: deletedAt }) remembers deletions: a photo captured before its slot was deleted is gone, one taken after stays.
+ * @param local   fixed slots of this device (null = empty)
+ * @param remote  fixed slots of the backup
+ * @param photoTomb the merged tombstones of the project
+ * @returns {{ slots: (object|null)[], fromRemote: object[], dropLocal: number[], localAhead: boolean }}
+ *   `fromRemote`: photos to write on this device; `dropLocal`: slots to clear here (deleted elsewhere); `localAhead`: this device holds
+ *   something the backup lacks (or has newer), so the merged result should go back up.
+ */
+export function mergePhotoSlots(local, remote, photoTomb = {}) {
+  const tomb = normalizeTomb(photoTomb, Infinity);
+  const slots = Array(MAX_PHOTOS).fill(null);
+  const fromRemote = [];
+  const dropLocal = [];
+  let localAhead = false;
+  const dead = (photo, slot) => Boolean(photo) && tomb[slot] > 0 && Number(photo.at || 0) <= tomb[slot];
+  for (let slot = 0; slot < MAX_PHOTOS; slot += 1) {
+    const l0 = Array.isArray(local) ? local[slot] || null : null;
+    const r0 = Array.isArray(remote) ? remote[slot] || null : null;
+    const l = dead(l0, slot) ? null : l0;
+    const r = dead(r0, slot) ? null : r0;
+    if (l0 && !l) dropLocal.push(slot); // deleted on another device after this one was taken
+    if (l && r) {
+      if (l.dataUrl === r.dataUrl) slots[slot] = l;
+      else {
+        const lt = Number(l.at || 0);
+        const rt = Number(r.at || 0);
+        const remoteWins = rt !== lt ? rt > lt : r.dataUrl > l.dataUrl;
+        slots[slot] = remoteWins ? r : l;
+        if (remoteWins) fromRemote.push({ ...r, slot });
+        else localAhead = true;
+      }
+    } else if (r) {
+      slots[slot] = r;
+      fromRemote.push({ ...r, slot });
+    } else if (l) {
+      slots[slot] = l;
+      localAhead = true; // the backup does not have it yet
+    }
+  }
+  return { slots, fromRemote, dropLocal, localAhead };
 }

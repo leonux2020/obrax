@@ -105,7 +105,8 @@ describe('merging a backup into a device (never destructive)', () => {
     const empty = { settings: { region: null, lang: 'es' }, company: normalizeCompany({}), meta: { onboarded: false, drive: true }, logo: '' };
     const merged = await restoreBackup({ ...empty, projects: [b] }, remote, stores);
     expect(saved).toEqual([a.id]); // b is newer locally: untouched
-    expect(photos).toEqual({ [a.id]: [1] });
+    // the record of b stays untouched (newer here), but the photos are reconciled apart: the backup's photo that this device lacks is kept too
+    expect(photos).toEqual({ [a.id]: [1], [b.id]: [0] });
     expect(merged.projects).toHaveLength(2);
   });
 });

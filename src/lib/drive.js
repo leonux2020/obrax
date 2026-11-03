@@ -13,6 +13,14 @@ const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
 const ID_RE = /^[A-Za-z0-9_-]{5,200}$/;
 
+/**
+ * Time limits per request (ms). A request that exceeds its limit is aborted and counts as "offline" (the sync keeps the change pending and
+ * tries again later). Metadata calls get 30 s; the calls that CARRY the backup (upload, download, binary files) get 90 s, because a backup
+ * with a dozen base64 photos per project can weigh several MB and the signal on a job site is often weak: a short limit would abort a slow
+ * but healthy upload over and over and the copy would never get up. (Before, a stalled connection hung forever.)
+ */
+export const DRIVE_TIMEOUTS = Object.freeze({ api: 30_000, transfer: 90_000 });
+
 /** code: 'auth' (no / rejected token) | 'offline' | 'quota' | 'http' | 'bad_response' */
 export class DriveError extends Error {
   constructor(code, status = 0) {
@@ -29,7 +37,7 @@ export class DriveError extends Error {
  *                        transparently; only when it gives nothing does the error 'auth' reach the caller.
  * @param onAuthRejected  called with the token Drive refused (the app forgets it)
  */
-export function createDriveClient({ getToken, refreshToken = null, onAuthRejected = () => {}, fetchImpl = (...a) => fetch(...a) }) {
+export function createDriveClient({ getToken, refreshToken = null, onAuthRejected = () => {}, fetchImpl = (...a) => fetch(...a), timeouts = DRIVE_TIMEOUTS }) {
   let folderId = null;
   let creating = null; // the folder creation in flight: two parallel saves must not create it twice
   let refreshing = null; // single flight: several requests that fail with 401 together share ONE silent renewal
@@ -45,23 +53,27 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
     return refreshing;
   };
 
-  async function send(url, init, token) {
+  async function send(url, init, token, limitMs) {
+    const abort = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = abort && limitMs > 0 ? setTimeout(() => abort.abort(), limitMs) : null;
     try {
-      return await fetchImpl(url, { ...init, headers: { ...(init.headers || {}), Authorization: `Bearer ${token}` } });
+      return await fetchImpl(url, { ...init, ...(abort ? { signal: abort.signal } : {}), headers: { ...(init.headers || {}), Authorization: `Bearer ${token}` } });
     } catch {
-      throw new DriveError('offline');
+      throw new DriveError('offline'); // no network, or the request took longer than its limit
+    } finally {
+      if (timer) clearTimeout(timer); // the answer arrived: the limit guards the wait for it
     }
   }
 
-  async function call(url, init = {}) {
+  async function call(url, init = {}, limitMs = timeouts.api) {
     const token = await getToken();
     if (!token) throw new DriveError('auth');
-    let res = await send(url, init, token);
+    let res = await send(url, init, token, limitMs);
     if (res.status === 401) {
       onAuthRejected(token);
       const fresh = await renew();
       if (!fresh || fresh === token) throw new DriveError('auth', 401);
-      res = await send(url, init, fresh); // the same request, with the new token: the user never notices
+      res = await send(url, init, fresh, limitMs); // the same request, with the new token: the user never notices
       if (res.status === 401) {
         onAuthRejected(fresh);
         throw new DriveError('auth', 401);
@@ -72,8 +84,8 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
     return res;
   }
 
-  const json = async (url, init) => {
-    const res = await call(url, init);
+  const json = async (url, init, limitMs) => {
+    const res = await call(url, init, limitMs);
     try {
       return await res.json();
     } catch {
@@ -130,7 +142,7 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: text,
-      });
+      }, timeouts.transfer);
       return { id: res?.id ?? existing.id, folderId: folder, modifiedTime: typeof res?.modifiedTime === 'string' ? res.modifiedTime : '' };
     }
     const boundary = `cubrax${Math.random().toString(36).slice(2)}`;
@@ -140,7 +152,7 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
       method: 'POST',
       headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
       body,
-    });
+    }, timeouts.transfer);
     return { id: res?.id, folderId: folder, modifiedTime: typeof res?.modifiedTime === 'string' ? res.modifiedTime : '' };
   }
 
@@ -160,7 +172,7 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
    */
   async function readFrom(folder, accept) {
     for (const file of await backupsIn(folder)) {
-      const res = await call(`${API}/files/${file.id}?alt=media`);
+      const res = await call(`${API}/files/${file.id}?alt=media`, {}, timeouts.transfer);
       const value = accept(await res.text());
       if (value) return { value, modifiedTime: file.modifiedTime || '' };
     }
@@ -246,7 +258,7 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
   /** Create (or overwrite, when `existingId` is given) a binary file. `bytes` is a Uint8Array. Resolves { id }. */
   async function uploadFile(parentId, { name, mimeType = 'application/octet-stream', bytes, existingId = '' }) {
     if (existingId) {
-      const res = await json(`${UPLOAD}/files/${existingId}?uploadType=media&fields=id`, { method: 'PATCH', headers: { 'Content-Type': mimeType }, body: bytes });
+      const res = await json(`${UPLOAD}/files/${existingId}?uploadType=media&fields=id`, { method: 'PATCH', headers: { 'Content-Type': mimeType }, body: bytes }, timeouts.transfer);
       return { id: res?.id ?? existingId };
     }
     const boundary = `cubrax${Math.random().toString(36).slice(2)}`;
@@ -257,7 +269,7 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
     body.set(head, 0);
     body.set(bytes, head.length);
     body.set(tail, head.length + bytes.length);
-    const res = await json(`${UPLOAD}/files?uploadType=multipart&fields=id`, { method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body });
+    const res = await json(`${UPLOAD}/files?uploadType=multipart&fields=id`, { method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body }, timeouts.transfer);
     if (!ID_RE.test(String(res?.id))) throw new DriveError('bad_response');
     return { id: res.id };
   }

@@ -10,7 +10,7 @@
 import { normalizeCompany, normalizeProfileMeta, normalizeSettings, isCompanyEmpty } from './draft.js';
 import { normalizeLogo } from './logo.js';
 import { normalizeProjects } from './projects.js';
-import { canon, canonById, mergeProjectLists } from './merge.js';
+import { canon, canonById, mergePhotoSlots, mergeProjectLists } from './merge.js';
 import { hasTombs, loadTombs, mergeTombs, normalizeTombs, saveTombs } from './tombstones.js';
 import { normalizePhoto, normalizePhotos } from './photos.js';
 import { writeNotePhotos } from './notePhotos.js';
@@ -49,6 +49,12 @@ export async function collectBackup({ settings, company, meta, logo, projects, w
     ...(workers?.length ? { workers: normalizeWorkers(workers) } : {}), // the "Squadra" directory (health data included); absent when empty
     ...(hasTombs(tombs) ? { tombs: normalizeTombs(tombs) } : {}), // what was deleted (so other devices do not bring it back)
   };
+}
+
+/** True when the backup still carries a photo that a deletion of ours (photoTomb) already killed: the backup has to be rewritten without it. */
+function hasPhotoGap(photoTomb, remote) {
+  if (!photoTomb || !Array.isArray(remote)) return false;
+  return remote.some((p) => p && Number(photoTomb[p.slot]) > 0 && Number(p.at || 0) <= Number(photoTomb[p.slot]));
 }
 
 export const serializeBackup = (backup) => JSON.stringify(backup);
@@ -176,16 +182,26 @@ export async function restoreBackup(local, backup, { projectStore, photoStoreFor
     const project = merged.projects.find((p) => p.id === id);
     if (!project) continue;
     await projectStore.save(project);
-    const store = photoStoreFor(id);
-    if (remoteWon.has(id)) {
-      for (const photo of backup.photos[id] || []) await store.save(photo);
-    } else if (backup.photos[id]?.length) {
-      // this device's project is the newer one: its own camera photos stay; only the slots it lacks are filled from the backup
-      const have = new Set(((await store.load().catch(() => [])) || []).filter(Boolean).map((ph) => ph.slot));
-      for (const photo of backup.photos[id]) if (!have.has(photo.slot)) await store.save(photo);
-    }
     // the photos of its notes go back to IndexedDB as Blobs BEFORE the screen shows the project (the `photo: true` links keep working)
     if (notePhotosFor && backup.notePhotos?.[id]) await writeNotePhotos(notePhotosFor(id), backup.notePhotos[id], { overwrite: remoteWon.has(id) });
+  }
+  // CAMERA PHOTOS: reconciled slot by slot for EVERY project that exists on both sides, not only for the ones whose record changed. The photos
+  // do not live inside the project, so a phone that took two more pictures leaves the project record identical: judging by the project alone
+  // made a tablet keep its old pair AND upload it over the phone's four. Now the union is kept, the newest capture of a slot wins and deleted
+  // slots (`photoTomb`) stay deleted; whatever this device holds that Drive lacks makes the merged whole go back up.
+  const photosChanged = [];
+  let photosAhead = false;
+  for (const project of merged.projects) {
+    const remote = backup.photos?.[project.id];
+    const hasTomb = project.photoTomb && Object.keys(project.photoTomb).length > 0;
+    if (!remote?.length && !hasTomb) continue; // nothing to reconcile (local-only photos are uploaded by the normal dirty flag)
+    const store = photoStoreFor(project.id);
+    const mine = normalizePhotos(await Promise.resolve(store.load?.()).catch(() => []));
+    const result = mergePhotoSlots(mine, normalizePhotos(remote), project.photoTomb);
+    for (const slot of result.dropLocal) await Promise.resolve(store.remove(slot)).catch(() => {});
+    for (const photo of result.fromRemote) await store.save(photo);
+    if (result.dropLocal.length || result.fromRemote.length) photosChanged.push(project.id);
+    if (result.localAhead || result.dropLocal.length || hasPhotoGap(project.photoTomb, remote)) photosAhead = true;
   }
   // projects kept as they were (nothing new in them) that lost the Blob of a note photo: fill only what is missing
   if (notePhotosFor) {
@@ -204,5 +220,5 @@ export async function restoreBackup(local, backup, { projectStore, photoStoreFor
   const workersAhead = canonById(workers) !== canonById(backup.workers || []);
   saveTombs(merged.tombs);
   if (merged.profileRestored && merged.logo) await logoStore.save(merged.logo);
-  return { ...merged, workers, workersChanged, needsPush: merged.needsPush || workersAhead };
+  return { ...merged, workers, workersChanged, photosChanged, needsPush: merged.needsPush || workersAhead || photosAhead };
 }

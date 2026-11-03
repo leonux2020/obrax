@@ -216,6 +216,7 @@ export function normalizeProject(obj) {
     expenses: normalizeExpenses(obj.expenses).map((e) => ({ ...e, projectId: obj.id })), // an expense always knows its project (old records get it here)
     logbook: normalizeLogbook(obj.logbook),
     ...(Object.keys(normalizeTomb(obj.tomb, 200)).length ? { tomb: normalizeTomb(obj.tomb, 200) } : {}), // ids of records deleted here (so a merge with another device does not bring them back)
+    ...(Object.keys(normalizeTomb(obj.photoTomb, 12)).length ? { photoTomb: normalizeTomb(obj.photoTomb, 12) } : {}), // slots of the camera photos deleted here ({ slot: deletedAt })
     draft: normalizeDraft(obj.draft, regionCode),
   };
 }

@@ -91,6 +91,24 @@ export function normalizePhotos(list) {
   return slots;
 }
 
+/**
+ * What changed between two versions of a project's slots: `changed` (a photo was added, replaced or removed) and `removed` (the slots that
+ * went from a photo to empty). The app stamps the project (updatedAt) on any change and writes a tombstone for every removed slot.
+ */
+export function diffPhotos(prev, next) {
+  const a = normalizeSlots(prev);
+  const b = normalizeSlots(next);
+  const removed = [];
+  let changed = false;
+  for (let i = 0; i < MAX_PHOTOS; i += 1) {
+    if (a[i] && !b[i]) {
+      removed.push(i);
+      changed = true;
+    } else if (b[i] && (!a[i] || a[i].dataUrl !== b[i].dataUrl)) changed = true;
+  }
+  return { changed, removed };
+}
+
 export const countPhotos = (slots) => (Array.isArray(slots) ? slots.filter(Boolean).length : 0);
 
 /** Next empty slot index, or -1 when the project already holds the maximum. */
