@@ -199,21 +199,33 @@ export function normalizeLocation(obj) {
 export const locationLabel = (loc) => (loc ? loc.label || `${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}` : '');
 
 // ---- derived numbers ------------------------------------------------------------------------------------------
-const sum = (list) => list.reduce((s, x) => s + x.amount, 0);
+/**
+ * Type-safe money: a number that arrived as a string from Drive / a form ("100", "1250,50") must never concatenate ("100" + 20 = "10020") or
+ * poison a total with NaN. Anything that is not a finite number counts as 0.
+ */
+export const toAmount = (v) => {
+  const n = typeof v === 'string' ? Number(v.trim().replace(',', '.')) : Number(v);
+  if (Number.isFinite(n)) return n;
+  const f = typeof v === 'string' ? parseFloat(v.replace(',', '.')) : NaN;
+  return Number.isFinite(f) ? f : 0;
+};
+const sum = (list) => (Array.isArray(list) ? list : []).reduce((s, x) => s + toAmount(x?.amount), 0);
 const cents = (n) => Math.round(n * 100) / 100;
 
 /** Cash control: what the client paid against the budget. `pct` is clamped to 0..100 for the bar. */
 export function cashSummary(total, payments = []) {
+  const budget = toAmount(total);
   const paid = cents(sum(payments));
-  const pending = cents(Math.max(0, (total || 0) - paid));
-  const pct = total > 0 ? Math.min(100, Math.max(0, (paid / total) * 100)) : 0;
-  return { total: total || 0, paid, pending, pct, overpaid: total > 0 && paid > total + 0.005 };
+  const pending = cents(Math.max(0, budget - paid));
+  const pct = budget > 0 ? Math.min(100, Math.max(0, (paid / budget) * 100)) : 0;
+  return { total: budget, paid, pending, pct, overpaid: budget > 0 && paid > budget + 0.005 };
 }
 
 /** Labour pool (what the labour line of the quote allows) minus the cash already advanced to workers. */
 export function laborPool(laborAmount, advances = []) {
   const advanced = cents(sum(advances));
-  return { pool: laborAmount || 0, advanced, available: cents((laborAmount || 0) - advanced) };
+  const pool = toAmount(laborAmount);
+  return { pool, advanced, available: cents(pool - advanced) };
 }
 
 export const expensesTotal = (expenses = []) => cents(sum(expenses));

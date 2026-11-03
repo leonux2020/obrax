@@ -14,6 +14,20 @@ import { mergeTomb, normalizeTomb } from './tombstones.js';
 import { MAX_PHOTOS } from './photos.js';
 
 export const RECORD_COLLECTIONS = Object.freeze(['payments', 'advances', 'expenses', 'crew', 'logbook']);
+/** The money vectors: cobros (payments), anticipos (advances) and gastos (expenses). Their `amount` is forced to a real number on every merge. */
+export const FINANCIAL_COLLECTIONS = Object.freeze(['payments', 'advances', 'expenses']);
+
+/** A top-level list of records with ids (the known collections, or any future one such as invoices): merged BY ID like the rest. */
+const isRecordList = (key, value) =>
+  RECORD_COLLECTIONS.includes(key) || (key !== 'draft' && Array.isArray(value) && value.length > 0 && value.every((r) => r && typeof r === 'object' && typeof r.id === 'string'));
+
+/** A financial record with its amount as a finite NUMBER ("1250,50" / "100" from a backup would otherwise concatenate: "100" + 20 = "10020"). */
+function sanitizeAmount(record) {
+  if (!record || typeof record !== 'object' || typeof record.amount === 'number') return record;
+  const raw = record.amount;
+  const n = typeof raw === 'string' ? Number(raw.trim().replace(',', '.')) : Number(raw);
+  return { ...record, amount: Number.isFinite(n) ? n : 0 };
+}
 const RECORD_TOMB_LIMIT = 200;
 
 /** Deterministic JSON: object keys sorted; the collections of a project are sorted by id (their order is not data). */
@@ -23,7 +37,7 @@ function canonical(value, sortLists) {
     const out = {};
     for (const k of Object.keys(value).sort()) {
       const v = value[k];
-      out[k] = sortLists && RECORD_COLLECTIONS.includes(k) && Array.isArray(v) ? [...v].map((r) => canonical(r, false)).sort((a, b) => String(a?.id).localeCompare(String(b?.id))) : canonical(v, false);
+      out[k] = sortLists && isRecordList(k, v) ? [...v].map((r) => canonical(r, false)).sort((a, b) => String(a?.id).localeCompare(String(b?.id))) : canonical(v, false);
     }
     return out;
   }
@@ -43,8 +57,9 @@ const preferFirst = (a, b) => {
 };
 
 function mergeRecords(aList, bList, aFirst, tomb) {
-  const A = Array.isArray(aList) ? aList : [];
-  const B = Array.isArray(bList) ? bList : [];
+  const usable = (list) => (Array.isArray(list) ? list.filter((r) => r && typeof r === 'object' && r.id !== undefined && r.id !== null) : []);
+  const A = usable(aList);
+  const B = usable(bList);
   const bMap = new Map(B.map((r) => [r.id, r]));
   const aMap = new Map(A.map((r) => [r.id, r]));
   const lead = aFirst ? A : B;
@@ -77,9 +92,12 @@ export function mergeProject(a, b) {
   const base = aFirst ? a : b;
   const tomb = mergeTomb(a.tomb, b.tomb, RECORD_TOMB_LIMIT);
   const lists = {};
-  for (const key of RECORD_COLLECTIONS) {
-    if (!(key in a) && !(key in b)) continue;
-    lists[key] = mergeRecords(a[key], b[key], aFirst, tomb);
+  // every record list of either side: the known collections plus any other list of records with ids (invoices, future ledgers...)
+  const keys = new Set(RECORD_COLLECTIONS.filter((k) => k in a || k in b));
+  for (const side of [a, b]) for (const [k, v] of Object.entries(side)) if (!keys.has(k) && isRecordList(k, v)) keys.add(k);
+  for (const key of [...keys].sort()) {
+    const clean = (list) => (FINANCIAL_COLLECTIONS.includes(key) && Array.isArray(list) ? list.map(sanitizeAmount) : list);
+    lists[key] = mergeRecords(clean(a[key]), clean(b[key]), aFirst, tomb);
     if (key === 'expenses') lists[key] = lists[key].map((e) => (e.projectId === base.id ? e : { ...e, projectId: base.id }));
   }
   const merged = { ...base, ...lists, updatedAt: Math.max(projectStamp(a), projectStamp(b)) };

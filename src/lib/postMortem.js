@@ -6,7 +6,7 @@
 //   Tiempos:  Días estimados (the plan: the dates the contractor typed)  vs  Días reales según la bitácora
 //             (first to last logbook day, both included). Without logbook entries: from the start date to the closing day.
 
-import { LEDGER_LIMITS, cashSummary, dayOf, expensesTotal } from './ledger.js';
+import { LEDGER_LIMITS, cashSummary, dayOf, expensesTotal, toAmount } from './ledger.js';
 import { dayDiff, parseDay } from './projects.js';
 
 const cents = (n) => Math.round(n * 100) / 100;
@@ -41,7 +41,7 @@ export function postMortem(project, { total = 0, result = null, timeline = null 
   const budget = Number.isFinite(total) && total > 0 ? cents(total) : 0;
   const cash = cashSummary(budget, project.payments);
   const expenses = expensesTotal(project.expenses);
-  const advances = cents((project.advances ?? []).reduce((s, a) => s + a.amount, 0));
+  const advances = cents((project.advances ?? []).reduce((s, a) => s + toAmount(a?.amount), 0));
   const spent = cents(expenses + advances);
   const profit = cents(cash.paid - spent);
   const estimated = estimatedDays(project, result, timeline);

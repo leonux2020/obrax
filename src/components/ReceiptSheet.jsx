@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { InvoiceError } from '../lib/invoice.js';
-import { EXPENSE_CATEGORIES, RENTAL_CATEGORIES } from '../lib/ledger.js';
+import { EXPENSE_CATEGORIES, RENTAL_CATEGORIES, toAmount } from '../lib/ledger.js';
 import { PhotoError, compressInvoiceImage } from '../lib/photos.js';
 import { pushToast } from '../lib/notify.js';
 import { dropDuplicateReceipts, expensesFromRows, receiptMeta, receiptSumCheck, requestReceipt } from '../lib/receipt.js';
@@ -95,7 +95,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
   const setBranch = (doc, value) => setReceipts((list) => list.map((r, i) => (i === doc ? { ...r, sucursal: value } : r)));
   const patch = (key, change) => setRows((list) => list.map((r) => (r.key === key ? { ...r, ...change } : r)));
   const chosen = rows.filter((r) => r.selected && r.amount !== 0); // a negative line (global discount) counts: it lowers the total
-  const total = chosen.reduce((s, r) => s + r.amount, 0);
+  const total = chosen.reduce((s, r) => s + toAmount(r.amount), 0);
 
   const save = () => {
     const now = typeof today === 'function' ? today() : today;

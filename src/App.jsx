@@ -831,6 +831,14 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
             latest.current = { ...latest.current, projects: merged.projects }; // an upload that starts right now already sees the merge
             setProjectsRaw((list) => mergeProjectLists(list || [], found.value.projects, merged.tombs.projects).projects); // against the CURRENT list
           }
+          if (merged.wonProjects.length || merged.photosChanged.length) {
+            // tell the open screens that the background pull changed projects (their derived amounts recompute from the new state at once; no F5)
+            try {
+              window.dispatchEvent(new CustomEvent('cubrax:synced', { detail: { projects: merged.wonProjects, photos: merged.photosChanged, open: openedId.current } }));
+            } catch {
+              /* no CustomEvent (very old WebView): the state update below still refreshes the screen */
+            }
+          }
           if (merged.profileRestored) {
             setCompany(merged.company);
             setLogo(merged.logo);
