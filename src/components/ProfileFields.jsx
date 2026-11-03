@@ -26,7 +26,7 @@ export default function ProfileFields({ form, setForm, logo, setLogo, onBusy, dr
         <TextField label={idLabel} value={form.taxId} onChange={set('taxId')} maxLength={20} sanitize={sanitizeTaxId} placeholder={idPh} />
         {extended && (
           <>
-            <TextField label={t('company.phone')} value={form.phone} onChange={set('phone')} maxLength={24} sanitize={sanitizePhone} placeholder="+00 000 000 000" />
+            <TextField label={t('company.phone')} value={form.phone} onChange={set('phone')} type="tel" inputMode="tel" maxLength={24} sanitize={sanitizePhone} placeholder="+00 000 000 000" />
             <div>
               <TextField label={t('company.email')} value={form.email} onChange={set('email')} maxLength={120} sanitize={sanitizeEmailInput} placeholder="name@company.com" />
               {emailError && (

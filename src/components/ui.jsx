@@ -248,7 +248,7 @@ export function TextField({ label, value, onChange, onBlur, placeholder, maxLeng
       <input
         id={id}
         type={type}
-        inputMode={inputMode}
+        inputMode={inputMode || (type === 'tel' ? 'tel' : undefined)}
         autoComplete="off"
         maxLength={maxLength}
         value={value}

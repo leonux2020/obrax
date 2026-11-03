@@ -73,6 +73,7 @@ import ProjectSheet from './components/ProjectSheet.jsx';
 import SettingsView from './components/SettingsView.jsx';
 import { clearOAuthResult, clearSignInResult, connectDrive, peekOAuthResult, peekSignInResult } from './lib/oauthCallback.js';
 import { BackupStatusContext } from './lib/backupStatus.jsx';
+import { EcoContext, useEcoBattery } from './lib/useEcoMode.jsx';
 import { onWorkersChanged } from './lib/workers.js';
 import SplashScreen from './components/SplashScreen.jsx';
 import ProfileSetup from './components/ProfileSetup.jsx';
@@ -135,6 +136,7 @@ const projectCompany = (project, company) => documentCompany(project.company, co
 export default function App({ onSignedOut = goToStart, installed = isStandalone() }) {
   const pwa = usePWA();
   const pro = usePro();
+  const isEcoMode = useEcoBattery(); // battery <= 20 % and unplugged: animations off (class on <body>)
   // The interface follows the device's language (an Italian phone gets Italian) unless the user locked a language in the settings.
   const [settings, setSettings] = useState(() => {
     const stored = loadSettings();
@@ -962,6 +964,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
 
   return (
     <I18nProvider lang={settings.lang} regionCode={active ? active.draft.regionCode : settings.region}>
+     <EcoContext.Provider value={isEcoMode}>
      <BackupStatusContext.Provider value={backupStatusValue}>
       {stage === 'splash' ? (
         <SplashScreen onStart={start} auto={Boolean(oauth)} pwa={pwa} />
@@ -1118,6 +1121,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
       )}
       {restoreOffer && <RestorePrompt onRestore={restoreOffered} onLater={() => setRestoreOffer(false)} onDone={finishOffer} />}
      </BackupStatusContext.Provider>
+     </EcoContext.Provider>
     </I18nProvider>
   );
 }

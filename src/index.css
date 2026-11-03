@@ -184,6 +184,15 @@ input[type='range'].slider-min:focus-visible {
   }
 }
 
+/* Eco-OLED: battery at 20 % or less and not charging (useEcoMode) -> nothing moves, the phone lasts the whole day on site */
+body.eco-mode *,
+body.eco-mode *::before,
+body.eco-mode *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
 /* Printing: ink-friendly white sheet with only the report */
 /* Signatures are stored as black ink on transparent (they are printed on white paper):
    invert them on screen so they read on the pure-black background. */

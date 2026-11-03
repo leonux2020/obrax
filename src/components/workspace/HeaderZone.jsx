@@ -1,6 +1,7 @@
 import { useI18n } from '../../lib/i18n.jsx';
 import { levelDetail } from '../levelStyle.js';
 import BackupBadge from '../BackupBadge.jsx';
+import WeatherChip from './WeatherChip.jsx';
 
 const Check = () => (
   <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" data-testid="ws-settled-check">
@@ -64,6 +65,7 @@ export default function HeaderZone({ project, model, title, client, region, offl
             )}
           </p>
         </div>
+        <WeatherChip project={project} regionCode={region.code} />
         <BackupBadge />
         {!audit && (
           <button type="button" onClick={onEdit} aria-label={t('proj.edit')} data-testid="ws-edit" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 active:border-white/40">
