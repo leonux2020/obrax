@@ -6,11 +6,11 @@ import React, { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { I18nProvider } from '../src/lib/i18n.jsx';
 import ProjectWorkspace from '../src/components/ProjectWorkspace.jsx';
-import { newProject } from '../src/lib/projects.js';
+import { newProject, normalizeProject } from '../src/lib/projects.js';
 import { resetRegistry } from '../src/lib/priceRegistry.js';
 import { resetToasts } from '../src/lib/notify.js';
 import { WORKER_SPECIALTIES, normalizeCrew } from '../src/lib/ledger.js';
-import { DEFAULT_RANGE, LOCAL_KM, findByName, norm, projectPlaces, proximity, rankWorkers } from '../src/lib/crewMatch.js';
+import { DEFAULT_RANGE, LOCAL_KM, crewHealth, findByName, norm, projectPlaces, proximity, rankWorkers } from '../src/lib/crewMatch.js';
 import { loadWorkers, saveWorkers } from '../src/lib/workers.js';
 import { DICT } from '../src/lib/dict.js';
 
@@ -291,5 +291,95 @@ describe('CrewPicker: the hybrid selector', () => {
     await typeInto(q('crew-notes'), 'Tablero');
     await click(q('crew-save'));
     expect(spy.project.crew[0]).toMatchObject({ id, ref: 'wk000001', notes: 'Tablero' });
+  });
+});
+
+describe('safety: the ⚠ of the file follows the worker onto the job', () => {
+  const card = (id) => q(`worker-health-${id}`);
+  const idOf = (name) => spy.project.crew.find((w) => w.name === name).id;
+
+  it('a worker picked from the directory with health notes carries the ⚠ on his / her card (orange, always visible); one without notes does not', async () => {
+    await mount();
+    await click(q('crew-pick-wk000001')); // Ana: allergy
+    await click(q('crew-add'));
+    await click(q('crew-pick-wk000002')); // Beto: nothing to warn about
+    const ana = idOf('Ana Ruiz');
+    const beto = idOf('Beto Soto');
+    expect(spy.project.crew.find((w) => w.id === ana)).toMatchObject({ ref: 'wk000001', health: true });
+    expect(spy.project.crew.find((w) => w.id === beto)).not.toHaveProperty('health');
+    const flag = card(ana);
+    expect(flag).not.toBeNull();
+    expect(flag.textContent).toBe('⚠');
+    expect(flag.className).toContain('text-orange-500');
+    expect(flag.getAttribute('aria-label')).toBe('Tiene datos de salud');
+    expect(q(`worker-${ana}`).contains(flag)).toBe(true); // on the card itself, not behind a tap
+    expect(card(beto)).toBeNull();
+    expect(q(`worker-edit-${ana}`).getAttribute('aria-label')).toContain('⚠'); // announced with the name by a screen reader
+    expect(q(`worker-edit-${beto}`).getAttribute('aria-label')).not.toContain('⚠');
+  });
+
+  it('a limiting condition alone is enough to raise it', async () => {
+    saveWorkers([{ id: 'wk000009', name: 'Fito Vega', specialties: ['mason'], rating: 2, address: 'Maipú', limiting: 'Vértigo: no trabajar en altura' }]);
+    await mount();
+    await click(q('crew-pick-wk000009'));
+    expect(card(spy.project.crew[0].id)).not.toBeNull();
+  });
+
+  it('typed as plain text there is no file and no ⚠ (nothing is invented)', async () => {
+    await mount();
+    await typeInto(q('crew-name'), 'Pedro Urgente');
+    await click(q('crew-save'));
+    expect(card(spy.project.crew[0].id)).toBeNull();
+  });
+
+  it('the file is read LIVE: someone already on the job (added before this fix, no snapshot) shows it too, and clearing the notes of the file clears it', async () => {
+    await mount({ ...place, crew: normalizeCrew([{ id: 'crew0001', name: 'Ana Ruiz', specialty: 'electrician', ref: 'wk000001' }]) });
+    expect(card('crew0001')).not.toBeNull();
+    act(() => root.unmount());
+    root = createRoot(host);
+    saveWorkers(DIRECTORY.map((w) => (w.id === 'wk000001' ? { ...w, allergies: '' } : w))); // the notes were cleared in the file
+    await mount({ ...place, crew: normalizeCrew([{ id: 'crew0001', name: 'Ana Ruiz', specialty: 'electrician', ref: 'wk000001', health: true }]) });
+    expect(card('crew0001')).toBeNull();
+  });
+
+  it('a deleted file NEVER silences the warning recorded when the person was added', async () => {
+    await mount({ ...place, crew: normalizeCrew([{ id: 'crew0001', name: 'Ana Ruiz', specialty: 'electrician', ref: 'wk000001', health: true }]) });
+    act(() => root.unmount());
+    root = createRoot(host);
+    saveWorkers(DIRECTORY.filter((w) => w.id !== 'wk000001'));
+    await mount({ ...place, crew: normalizeCrew([{ id: 'crew0001', name: 'Ana Ruiz', specialty: 'electrician', ref: 'wk000001', health: true }]) });
+    expect(card('crew0001')).not.toBeNull();
+  });
+
+  it('it survives editing the person on the job, saving the project and loading it again, and the advance flow does not hide it', async () => {
+    await mount();
+    await click(q('crew-pick-wk000001'));
+    const id = spy.project.crew[0].id;
+    await click(q(`worker-edit-${id}`));
+    await typeInto(q('crew-notes'), 'Tablero');
+    await click(q('crew-save'));
+    expect(spy.project.crew[0]).toMatchObject({ ref: 'wk000001', health: true, notes: 'Tablero' });
+    expect(card(id)).not.toBeNull();
+    const reloaded = normalizeProject(JSON.parse(JSON.stringify(spy.project)));
+    expect(reloaded.crew[0]).toMatchObject({ ref: 'wk000001', health: true });
+    expect(q(`worker-${id}`).contains(card(id))).toBe(true);
+    expect(q(`worker-adv-${id}`)).not.toBeNull(); // the card keeps its own actions next to the warning
+  });
+
+  it('crewHealth: live file wins; a deleted file falls back to the snapshot; no ref, no warning', () => {
+    const ana = { ref: 'wk000001' };
+    expect(crewHealth(ana, DIRECTORY)).toBe(true);
+    expect(crewHealth({ ref: 'wk000002' }, DIRECTORY)).toBe(false);
+    expect(crewHealth({ ref: 'wk000002', health: true }, DIRECTORY)).toBe(false); // the file says there is nothing now
+    expect(crewHealth({ ref: 'wk000001', health: true }, [])).toBe(true); // file gone
+    expect(crewHealth({ ref: 'wk000001' }, [])).toBe(false);
+    expect(crewHealth({ name: 'texto', health: true }, DIRECTORY)).toBe(false);
+    expect(crewHealth(null, DIRECTORY)).toBe(false);
+  });
+
+  it('`health` only lives on people linked to a file (a stray flag with no ref is dropped); invalid values too', () => {
+    expect(normalizeCrew([{ name: 'A', health: true }])[0]).not.toHaveProperty('health');
+    expect(normalizeCrew([{ name: 'A', ref: 'wk000001', health: 'yes' }])[0]).not.toHaveProperty('health');
+    expect(normalizeCrew([{ name: 'A', ref: 'wk000001', health: true }])[0]).toMatchObject({ ref: 'wk000001', health: true });
   });
 });

@@ -28,13 +28,13 @@ export default function CrewPicker({ project, crew, onAdd, onClose }) {
 
   const addDirectory = (w) => {
     if (inProject(w)) return;
-    onAdd({ name: w.name, specialty: specialty || w.specialties[0] || 'multi', ref: w.id });
+    onAdd({ name: w.name, specialty: specialty || w.specialties[0] || 'multi', ref: w.id, health: hasHealthNotes(w) });
   };
   const addText = (e) => {
     e.preventDefault();
     if (!typed) return;
     const match = findByName(workers, typed); // typing the exact name of someone in the directory links their file
-    if (match && !inProject(match)) onAdd({ name: match.name, specialty: specialty || match.specialties[0] || 'multi', ref: match.id });
+    if (match && !inProject(match)) onAdd({ name: match.name, specialty: specialty || match.specialties[0] || 'multi', ref: match.id, health: hasHealthNotes(match) });
     else onAdd({ name: typed, specialty: specialty || 'multi' }); // simple text, like always
   };
 

@@ -1,11 +1,13 @@
-import { useId, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { CREW_LIMIT, LEDGER_LIMITS, WORKER_SPECIALTIES, advancesByWorker, laborPool } from '../../lib/ledger.js';
 import { sanitizeText } from '../../lib/sanitize.js';
+import { hasHealthNotes, loadWorkers } from '../../lib/workers.js';
 import { calendarDays, withAdvance, withProjectDates, withWorker, withWorkerEdited, withoutAdvance, withoutWorker } from '../../lib/workspaceModel.js';
 import BottomSheet from '../BottomSheet.jsx';
 import { DateInput, TextField } from '../ui.jsx';
 import Block from './Block.jsx';
+import { crewHealth } from '../../lib/crewMatch.js';
 import CrewPicker from './CrewPicker.jsx';
 import LockedZone from './LockedZone.jsx';
 import NumberPad from './NumberPad.jsx';
@@ -90,18 +92,26 @@ function WorkerSheet({ worker, onSave, onDelete, onClose }) {
 }
 
 /** One person: icon of the role, name, specialty, notes, the cash advanced to them and the button that hands over a new advance. */
-function WorkerCard({ row, onEdit, onAdvance, onRemoveAdvance }) {
+function WorkerCard({ row, health = false, onEdit, onAdvance, onRemoveAdvance }) {
   const { t, money, locale } = useI18n();
   const { worker: w, list, total } = row;
   const Icon = SPECIALTY_ICON[w.specialty] ?? SPECIALTY_ICON.other;
   const stamp = (ms) => (ms ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(ms)) : '');
   return (
     <li className="rounded-xl border border-white/10 bg-black" data-testid={`worker-${w.id}`} data-specialty={w.specialty}>
-      <button type="button" onClick={onEdit} data-testid={`worker-edit-${w.id}`} aria-label={`${t('ws.crew.sheetEdit')}: ${w.name}`} className="flex min-h-[64px] w-full items-center gap-3 px-3 py-2 text-left active:bg-black">
+      <button type="button" onClick={onEdit} data-testid={`worker-edit-${w.id}`} aria-label={`${t('ws.crew.sheetEdit')}: ${w.name}${health ? ` · ⚠ ${t('squadra.healthFlag')}` : ''}`} className="flex min-h-[64px] w-full items-center gap-3 px-3 py-2 text-left active:bg-black">
         <Icon size={26} className="text-brand" />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-base font-medium" data-testid={`worker-name-${w.id}`}>
-            {w.name}
+          <span className="flex items-center gap-2">
+            <span className="min-w-0 truncate text-base font-medium" data-testid={`worker-name-${w.id}`}>
+              {w.name}
+            </span>
+            {/* safety: the warning of the worker's file (limiting condition / allergy) stays on the card for as long as they are on the job */}
+            {health && (
+              <span role="img" aria-label={t('squadra.healthFlag')} title={t('squadra.healthFlag')} data-testid={`worker-health-${w.id}`} className="shrink-0 text-lg leading-none text-orange-500">
+                ⚠
+              </span>
+            )}
           </span>
           <span className="block truncate text-xs text-[#E0E0E0]/70" data-testid={`worker-spec-${w.id}`}>
             {t(`ws.spec.${w.specialty}`)}
@@ -165,6 +175,9 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
   const pool = laborPool(result.valid ? result.quote.labor : 0, project.advances);
   const days = calendarDays(project);
   const editing = sheet && sheet !== 'new' ? crew.find((w) => w.id === sheet) : null;
+  // the directory is read again whenever a sheet opens or closes (its file may have just been edited)
+  const directory = useMemo(() => loadWorkers(), [sheet]); // eslint-disable-line react-hooks/exhaustive-deps
+  const healthOf = (w) => crewHealth(w, directory);
 
   const closeAdvance = () => {
     const n = amount.current;
@@ -194,6 +207,7 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
                 <WorkerCard
                   key={row.worker.id}
                   row={row}
+                  health={healthOf(row.worker)}
                   onEdit={() => setSheet(row.worker.id)}
                   onAdvance={() => {
                     if (advanceFull) return;
@@ -253,7 +267,7 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
           worker={editing}
           onClose={() => setSheet(null)}
           onSave={(data) => {
-            setProject((p) => withWorkerEdited(p, editing.id, { ...data, ref: editing.ref }));
+            setProject((p) => withWorkerEdited(p, editing.id, { ...data, ref: editing.ref, health: editing.health }));
             setSheet(null);
           }}
           onDelete={() => {

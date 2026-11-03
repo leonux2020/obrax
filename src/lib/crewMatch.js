@@ -8,7 +8,7 @@
 //   all       the whole directory, nearest first
 // A worker with no address, or a job with no place, cannot be placed: they only show in "all" (and with no job place the range does not filter).
 
-import { normalizeWorkers } from './workers.js';
+import { hasHealthNotes, normalizeWorkers } from './workers.js';
 
 export const CREW_RANGES = Object.freeze(['local', 'regional', 'all']);
 export const DEFAULT_RANGE = 'local';
@@ -84,3 +84,14 @@ export const findByName = (workers, name) => {
   const n = norm(name);
   return n ? normalizeWorkers(workers).find((w) => norm(w.name) === n) ?? null : null;
 };
+
+/**
+ * Does this person of the crew carry a SAFETY warning (a limiting condition or an allergy)? The file of the directory they were picked from is
+ * read live, so an edit of the file shows up on the job. If that file was deleted, the warning recorded when they were added stays: a delete
+ * never silences a risk. A person typed as plain text has no file and no warning.
+ */
+export function crewHealth(member, workers) {
+  if (!member?.ref) return false;
+  const file = normalizeWorkers(workers).find((w) => w.id === member.ref);
+  return file ? hasHealthNotes(file) : member.health === true;
+}
