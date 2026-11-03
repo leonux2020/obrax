@@ -23,7 +23,7 @@ import { createExportQueue } from '../src/lib/exportQueue.js';
 import { deliverRendition, drainExportQueue } from '../src/lib/exportSync.js';
 import { I18nProvider } from '../src/lib/i18n.jsx';
 import { newProject } from '../src/lib/projects.js';
-import ProjectFinancialDashboard from '../src/components/ProjectFinancialDashboard.jsx';
+import RenditionBar from '../src/components/workspace/RenditionBar.jsx';
 
 globalThis.Blob = NodeBlob;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -161,7 +161,7 @@ describe('who may ask visibly: the offline queue', () => {
   });
 });
 
-describe('ProjectFinancialDashboard: "Reconectar Drive" is the user-driven way back', () => {
+describe('RenditionBar (audit ledger): "Reconectar Drive" is the user-driven way back', () => {
   let host;
   let root;
   const q = (id) => host.querySelector(`[data-testid="${id}"]`);
@@ -178,7 +178,7 @@ describe('ProjectFinancialDashboard: "Reconectar Drive" is the user-driven way b
   const mount = async (props) => {
     const queue = createExportQueue();
     await queue.enqueue({ projectId: props.project.id, title: 'Casa', fileName: 'Rendicion_2026-10-30.xlsx', blob: new Blob([Uint8Array.from([80, 75, 3, 4])]), now: 1 });
-    await act(async () => root.render(React.createElement(I18nProvider, { lang: 'es', regionCode: 'CL' }, React.createElement(ProjectFinancialDashboard, { onChange: () => {}, onBack: () => {}, onCloseRendition: async () => {}, queue, ...props }))));
+    await act(async () => root.render(React.createElement(I18nProvider, { lang: 'es', regionCode: 'CL' }, React.createElement(RenditionBar, { projectId: props.project.id, onClose: async () => {}, queue, ...Object.fromEntries(Object.entries(props).filter(([k]) => k !== 'project')) }))));
     await flush(20);
   };
   const project = newProject({ regionCode: 'CL', name: 'Casa', now: 1000 });

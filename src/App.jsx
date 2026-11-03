@@ -65,7 +65,6 @@ import { dropDuplicateExpenses } from './lib/receipt.js';
 import { useReceiptSync } from './lib/useReceiptSync.js';
 import GlobalAccounting from './components/GlobalAccounting.jsx';
 import AppShell from './components/AppShell.jsx';
-import ProjectFinancialDashboard from './components/ProjectFinancialDashboard.jsx';
 import Dashboard from './components/Dashboard.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import ProjectSheet from './components/ProjectSheet.jsx';
@@ -397,7 +396,10 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     return row;
   }, []);
 
-  const openProject = useCallback((id) => {
+  // Navigation context of the detail view: opened from Proyectos = tactical mode; from Contabilidad (`{ fromAccounting: true }`) = audit mode (ledger)
+  const [fromAccounting, setFromAccounting] = useState(false);
+  const openProject = useCallback((id, context = null) => {
+    setFromAccounting(context?.fromAccounting === true);
     setActiveId(id);
     setEditor(false);
     setPhotos(emptySlots());
@@ -411,6 +413,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   const closeProject = useCallback(() => {
     if (activeRef.current) projectStore.save(activeRef.current).catch(() => {});
     setActiveId(null);
+    setFromAccounting(false);
     setEditor(false);
     setPhotos(emptySlots());
   }, []);
@@ -524,6 +527,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     setProjects((list) => list.filter((p) => p.id !== id));
     if (activeRef.current?.id === id) {
       setActiveId(null);
+      setFromAccounting(false);
       setPhotos(emptySlots());
     }
     setSheet(null);
@@ -650,12 +654,9 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   );
 
   // ---- Contabilidad: the financial command center of ONE project + "Cerrar Rendición" -----------------------------------------
-  // The card of Contabilidad opens a full-screen view (its checkbox only picks the project for the consolidated Excel). "Cerrar Rendición"
+  // The card of Contabilidad opens the project in AUDIT mode (its checkbox only picks the project for the consolidated Excel). "Cerrar Rendición"
   // builds the Excel and sends it straight to Drive with the app's own Drive client / token; with no connection (or when Drive fails) the file is
   // parked in IndexedDB (exportQueue) and uploaded by the background sync below. Nothing is ever downloaded to the phone.
-  const [financeId, setFinanceId] = useState(null);
-  const financeProject = financeId ? projects?.find((p) => p.id === financeId) ?? null : null;
-  useHistoryBack(financeProject ? financeId : null, () => setFinanceId(null), 'cubraxFinance');
   const renditionUpload = useCallback(({ kind, title, fileName, bytes }) => uploadRendition({ client: driveClient, kind, title, fileName, bytes }), [driveClient]);
   const renditionRef = useRef(false);
   // The one way a rendición (of a project or the global one) leaves the app: Drive or the offline queue, never a download. `run` builds + delivers;
@@ -684,10 +685,10 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     }
   }, [renditionUpload]);
   const submitRendition = useCallback(async () => {
-    const project = projectsRef.current.find((p) => p.id === financeId);
+    const project = projectsRef.current.find((p) => p.id === activeRef.current?.id); // the project open in audit mode
     if (!project) return null;
     return sendRendition((deps) => closeRendition({ project, totals: projectTotals([project], Date.now()), i18n: makeI18n(settings.lang, project.draft.regionCode), ...deps }));
-  }, [financeId, settings.lang, sendRendition]);
+  }, [settings.lang, sendRendition]);
   // the consolidated Excel of the chosen projects -> CUBRAX - Respaldos Obra / Rendiciones_Globales (or the same offline queue)
   const submitGlobalRendition = useCallback(
     async (ids) => {
@@ -829,7 +830,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   const navActive = tab;
 
   return (
-    <I18nProvider lang={settings.lang} regionCode={active ? active.draft.regionCode : financeProject ? financeProject.draft.regionCode : settings.region}>
+    <I18nProvider lang={settings.lang} regionCode={active ? active.draft.regionCode : settings.region}>
       {stage === 'splash' ? (
         <SplashScreen onStart={start} auto={Boolean(oauth)} pwa={pwa} />
       ) : stage === 'setup' ? (
@@ -861,6 +862,14 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
               <AppShell />
               <BottomNav active={navActive} onProjects={() => setTab('projects')} onAccounting={() => setTab('accounting')} onSettings={() => setTab('settings')} />
             </>
+          ) : active && fromAccounting ? (
+            // opened from Contabilidad: AUDIT mode, the pure ledger (cockpit + receipt stack + "Cerrar Rendición"), also for finished projects
+            <ProjectWorkspace
+              key={active.id}
+              fromAccounting
+              project={active}
+              rendition={{ onClose: submitRendition, onRetry: exportSync.retry, onReconnect: reconnectDrive, needsReconnect: driveNeedsReconnect }}
+            />
           ) : active ? (
             wsOn ? (
               isClosed(active) ? (
@@ -954,7 +963,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
                   onLogout={logout}
                 />
               ) : tab === 'accounting' ? (
-                <GlobalAccounting projects={projects} onOpenProject={setFinanceId} onExportGlobal={submitGlobalRendition} />
+                <GlobalAccounting projects={projects} onOpenProject={openProject} onExportGlobal={submitGlobalRendition} />
               ) : (
                 <Dashboard projects={projects} receiptRows={receipts.rows} tab={dashTab} onTab={setDashTab} onNew={requestNewProject} onOpen={openProject} onPro={() => openPaywall('promo')} />
               )}
@@ -967,9 +976,6 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
             </>
           )}
 
-          {financeProject && !active && (
-            <ProjectFinancialDashboard project={financeProject} onCloseRendition={submitRendition} onRetryQueue={exportSync.retry} onReconnect={reconnectDrive} needsReconnect={driveNeedsReconnect} />
-          )}
           {sheet?.type === 'new' && <ProjectSheet defaultRegion={settings.region} onSave={createProject} onClose={() => setSheet(null)} />}
           {editing && (
             <ProjectSheet project={editing} onSave={(f) => editProject(editing, f)} onDelete={() => deleteProject(editing.id)} onClose={() => setSheet(null)} />

@@ -200,7 +200,7 @@ export default function GlobalAccounting({ projects, onOpenProject = null, onExp
                     </label>
                     <button
                       type="button"
-                      onClick={() => onOpenProject?.(p.id)}
+                      onClick={() => onOpenProject?.(p.id, { fromAccounting: true })}
                       aria-label={t('fin.open', { name: projectTitle(p) || t('proj.untitled') })}
                       data-testid={`acc-open-${p.id}`}
                       className="flex min-w-0 flex-1 items-center gap-3 rounded-r-2xl py-3 pr-4 text-left active:opacity-80"

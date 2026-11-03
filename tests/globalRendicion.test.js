@@ -17,7 +17,7 @@ import { newProject } from '../src/lib/projects.js';
 import { normalizeExpenses } from '../src/lib/ledger.js';
 import { createDriveClient } from '../src/lib/drive.js';
 import { createFakeDrive } from './helpers/fakeDrive.js';
-import ProjectFinancialDashboard from '../src/components/ProjectFinancialDashboard.jsx';
+import RenditionBar from '../src/components/workspace/RenditionBar.jsx';
 import GlobalAccounting from '../src/components/GlobalAccounting.jsx';
 
 globalThis.Blob = NodeBlob;
@@ -48,7 +48,7 @@ describe('1. Anti-flicker OLED: html, body and #root are solid #000000', () => {
     expect(html).not.toMatch(/background(-color)?:\s*(#fff|white)/i);
   });
   it('no component paints a loader / overlay white or light grey', () => {
-    for (const f of ['components/BottomSheet.jsx', 'components/ProjectFinancialDashboard.jsx', 'components/GlobalAccounting.jsx', 'components/SplashScreen.jsx']) {
+    for (const f of ['components/BottomSheet.jsx', 'components/ProjectAudit.jsx', 'components/GlobalAccounting.jsx', 'components/SplashScreen.jsx']) {
       let src = '';
       try { src = readFileSync(resolve(process.cwd(), 'src', f), 'utf8'); } catch { continue; }
       expect(src).not.toMatch(/bg-(white(?![/\w])|gray-\d+|neutral-[1-5]\d\d|slate-[1-5]\d\d)\b/);
@@ -123,7 +123,7 @@ describe('2. Offline never leaves the UI hanging', () => {
       host.remove();
     });
     const mount = (node) => act(async () => root.render(React.createElement(I18nProvider, { lang: 'es', regionCode: 'CL' }, node)));
-    const dash = (props) => React.createElement(ProjectFinancialDashboard, { project: mkProject('Casa'), onChange: () => {}, onBack: () => {}, queue: createExportQueue(), ...props });
+    const dash = ({ onCloseRendition, ...props }) => React.createElement(RenditionBar, { projectId: mkProject('Casa').id, onClose: onCloseRendition, queue: createExportQueue(), ...props });
 
     it('dashboard: a rejected delivery frees the button', async () => {
       await mount(dash({ onCloseRendition: async () => { throw new Error('network'); } }));

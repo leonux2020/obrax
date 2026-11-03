@@ -34,6 +34,7 @@ import ExportSheet from './workspace/ExportSheet.jsx';
 import FinanceBlock from './workspace/FinanceBlock.jsx';
 import LogBlock from './workspace/LogBlock.jsx';
 import HeaderZone from './workspace/HeaderZone.jsx';
+import ProjectAudit from './ProjectAudit.jsx';
 import AlertTray from './workspace/AlertTray.jsx';
 import { projectAlerts } from '../lib/alerts.js';
 import SupplierPad from './workspace/SupplierPad.jsx';
@@ -54,7 +55,18 @@ import PartidaList from './workspace/PartidaList.jsx';
  */
 const MENU_BLOCKS = ['crew', 'finance', 'cash', 'log', 'expenses']; // the grid tiles that open a bottom sheet
 
-export default function ProjectWorkspace({ project, setProject, setDraft, photos, setPhotos, company, receipts, enqueueReceipt, onEdit, onPro, onSyncDossier = null, dossierBusy = false }) {
+/**
+ * Navigation context of the detail view. The project opens in one of two modes:
+ *   TACTICAL  (default, from "Proyectos")           the operational workspace below;
+ *   AUDIT     (`fromAccounting`, from "Contabilidad") a pure financial ledger: cockpit + receipt stack, nothing operational (ProjectAudit).
+ * `rendition` ({ onClose, onRetry, onReconnect, needsReconnect, queue }) feeds the audit mode's "Cerrar Rendición" bar.
+ */
+export default function ProjectWorkspace({ fromAccounting = false, rendition = null, ...props }) {
+  if (fromAccounting) return <ProjectAudit project={props.project} rendition={rendition} />;
+  return <TacticalWorkspace {...props} />;
+}
+
+function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, company, receipts, enqueueReceipt, onEdit, onPro, onSyncDossier = null, dossierBusy = false }) {
   const i18n = useI18n();
   const { t, region } = i18n;
   const draft = project.draft;

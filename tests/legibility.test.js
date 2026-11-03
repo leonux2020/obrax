@@ -30,13 +30,13 @@ describe('legibility calibration', () => {
     expect(giants).toEqual([]);
   });
   it('the financial metrics (DISPONIBILE, totals, keypad display) are medium + tracking-tight + tabular-nums', () => {
-    for (const f of ['src/components/GlobalAccounting.jsx', 'src/components/ProjectFinancialDashboard.jsx']) {
+    for (const f of ['src/components/GlobalAccounting.jsx']) {
       expect(fs.readFileSync(f, 'utf8')).toMatch(/font-medium tracking-tight tabular-nums \$\{sizeFor/);
     }
     expect(fs.readFileSync('src/components/workspace/NumberPad.jsx', 'utf8')).toContain('text-5xl font-medium tracking-tight tabular-nums');
   });
   it('money and dates are rendered in tabular-nums components (CashBlock, Rendiconto, Dashboard...)', () => {
-    for (const f of ['src/components/workspace/CashBlock.jsx', 'src/components/ProjectFinancialDashboard.jsx', 'src/components/GlobalAccounting.jsx', 'src/components/Dashboard.jsx', 'src/components/ProjectCard.jsx']) {
+    for (const f of ['src/components/workspace/CashBlock.jsx', 'src/components/workspace/ReceiptStack.jsx', 'src/components/GlobalAccounting.jsx', 'src/components/Dashboard.jsx', 'src/components/ProjectCard.jsx']) {
       expect(fs.readFileSync(f, 'utf8'), f).toContain('tabular-nums');
     }
   });

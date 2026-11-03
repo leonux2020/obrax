@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// The real App: Contabilidad -> tap the BODY of a card -> the project's financial command center -> add an advance -> "Cerrar Rendición".
+// The real App: Contabilidad -> tap the BODY of a card -> the project in AUDIT mode (cockpit + receipt stack) -> "Cerrar Rendición".
 // The Excel goes to Drive (CUBRAX - Respaldos Obra / Proyectos / <name> / Rendicion_<date>.xlsx); offline it waits in IndexedDB and the background sync
 // uploads it when the connection returns. It is never downloaded.
 import 'fake-indexeddb/auto';
@@ -81,32 +81,76 @@ afterEach(async () => {
   await wipe();
 });
 
-describe('Contabilidad -> financial command center', () => {
-  it('the card body opens the full-screen view; the checkbox alone selects; the headers add up; back returns', async () => {
+describe('Contabilidad -> project in AUDIT mode (pure ledger)', () => {
+  it('the card body opens the project in audit mode; the checkbox alone selects; cockpit + expanded receipt stack; Back returns to Contabilidad', async () => {
     h = createHost(App);
     await h.mount();
     await flush(100);
     await click(h.tab('Contabilidad'));
     await click(q(`acc-check-${project.id}`));
-    expect(q('project-finance')).toBeNull();
+    expect(q('project-audit')).toBeNull();
     expect(q('acc-export').textContent).toContain('1');
     await click(q(`acc-open-${project.id}`));
-    expect(q('project-finance')).not.toBeNull();
-    expect(q('fin-title').textContent).toBe('Casa Soto');
-    expect(q('fin-fund-value').textContent).toContain('100.000');
-    expect(q('fin-spent-value').textContent).toContain('42.000');
-    expect(q('fin-balance-value').textContent).toContain('58.000');
-    expect(q('fin-back')).toBeNull(); // no arrow: only the phone's own Back leaves the view
-    expect(window.history.state?.cubraxFinance).toBe(project.id); // the view owns one history entry...
+    expect(q('project-audit')).not.toBeNull();
+    expect(q('project-audit').dataset.mode).toBe('audit');
+    expect(q('project-workspace')).toBeNull(); // not the tactical screen
+    expect(q('ws-title').textContent).toBe('Casa Soto');
+    // the cockpit: what is left to collect / collected
+    expect(q('ws-collected').textContent).toContain('100.000');
+    // the receipt stack is there with NO tap: every supplier expanded with its receipts
+    expect([...document.querySelectorAll('[data-testid="stack-shop-name"]')].map((n) => n.textContent)).toEqual(['Sodimac', 'Copec']);
+    expect(q('expense-gasto001')).not.toBeNull();
+    expect(q('expense-gasto002')).not.toBeNull();
+    expect(q('ws-edit')).toBeNull(); // no pencil: nothing is edited from the ledger
+    expect(q('fin-close')).not.toBeNull(); // the one audit action
+    expect(window.history.state?.cubraxProject).toBe(project.id); // the view owns one history entry...
     await act(async () => {
       window.history.back(); // ...so the device's Back closes it
     });
     await flush(60);
-    expect(q('project-finance')).toBeNull();
+    expect(q('project-audit')).toBeNull();
     expect(q('accounting')).not.toBeNull();
   });
 
-  it('what is registered in the project (CashBlock) appears in Contabilidad by itself; Contabilidad cannot add anything', async () => {
+  it('the same project opened from Proyectos is TACTICAL (grid, dock) and the context never leaks between the two', async () => {
+    h = createHost(App);
+    await h.mount();
+    await flush(100);
+    await click(h.host.querySelector('[data-testid="project-card"]'));
+    expect(q('project-workspace')).not.toBeNull();
+    expect(q('project-audit')).toBeNull();
+    expect(q('ws-menu')).not.toBeNull();
+    expect(q('ws-zone-c')).not.toBeNull();
+    await act(async () => {
+      window.history.back();
+    });
+    await flush(60);
+    await openFinance(); // Contabilidad -> audit
+    expect(q('project-audit')).not.toBeNull();
+    expect(q('project-workspace')).toBeNull();
+    await act(async () => {
+      window.history.back();
+    });
+    await flush(60);
+    await click(h.tab('Proyectos'));
+    await click(h.host.querySelector('[data-testid="project-card"]'));
+    expect(q('project-workspace')).not.toBeNull(); // tactical again
+    expect(q('project-audit')).toBeNull();
+  });
+
+  it('audit mode hides every operational tool: no grid, no capture (cash, receipt scanner, camera, logbook), no dock, no partidas', async () => {
+    h = createHost(App);
+    await h.mount();
+    await flush(100);
+    await openFinance();
+    for (const id of ['ws-menu', 'ws-crew', 'ws-finance', 'ws-cash', 'ws-log', 'ws-expenses', 'ws-zone-c', 'dock-log', 'dock-camera', 'dock-scan', 'dock-export', 'cash-amount', 'cash-add']) expect(q(id), id).toBeNull();
+    expect(q('project-audit').querySelector('input, textarea, select, form')).toBeNull();
+    expect(q('project-audit').querySelector('details')).toBeNull();
+    // the only buttons of the screen: the "Cerrar Rendición" one
+    expect([...q('project-audit').querySelectorAll('button')].map((b) => b.dataset.testid)).toEqual(['fin-close']);
+  });
+
+  it('what is registered in the project (CashBlock) appears in the audit cockpit by itself; the ledger cannot add anything', async () => {
     h = createHost(App);
     await h.mount();
     await flush(100);
@@ -124,11 +168,8 @@ describe('Contabilidad -> financial command center', () => {
     });
     await flush(60);
     await openFinance();
-    expect(q('fin-fund-value').textContent).toContain('120.000');
-    expect(q('fin-balance-value').textContent).toContain('78.000');
-    expect(q('fin-income-list').querySelectorAll('li')).toHaveLength(2);
-    expect(q('fin-income-list').textContent).toContain('Transferencia');
-    expect(q('project-finance').querySelector('input, form')).toBeNull();
+    expect(q('ws-collected').textContent).toContain('120.000');
+    expect(q('project-audit').querySelector('input, form')).toBeNull();
     const saved = (await projectStore.load()).find((p) => p.id === project.id);
     expect(saved.payments).toHaveLength(2); // viewing never writes
   });

@@ -15,13 +15,29 @@ const Pencil = () => (
   </svg>
 );
 
+/** The big figures of the header: a button that opens the payments (tactical mode) or plain text (audit mode). */
+function Total({ audit, onCash, label, settled, children }) {
+  if (audit) {
+    return (
+      <div data-testid="ws-total" data-settled={settled || undefined} className="ml-auto text-right">
+        {children}
+      </div>
+    );
+  }
+  return (
+    <button type="button" onClick={onCash} aria-label={label} data-testid="ws-total" data-settled={settled || undefined} className="ml-auto text-right">
+      {children}
+    </button>
+  );
+}
+
 /**
  * ZONE A: the header that never scrolls away. Name, client, place, the lock and ONE number: what is still to be collected (DA INCASSARE,
  * soft orange while there is debt, never red). The quote and what is already collected go under it, small and grey; when nothing is left
  * it says "Saldato" with a green check instead. ONE 2 px line at the base of the block shows the share collected of the budget.
  * No red late alert (the debt already says it), no back arrow (the device's back gesture leaves the project), no globe, no coordinates.
  */
-export default function HeaderZone({ project, model, title, client, region, offline, onEdit, onCash, onUnlock }) {
+export default function HeaderZone({ project, model, title, client, region, offline, onEdit, onCash, onUnlock, audit = false }) {
   const { t, money } = useI18n();
   // the place is shown only when it has a NAME; raw coordinates are data, not interface
   const where = project.location?.label || '';
@@ -47,9 +63,11 @@ export default function HeaderZone({ project, model, title, client, region, offl
             )}
           </p>
         </div>
-        <button type="button" onClick={onEdit} aria-label={t('proj.edit')} data-testid="ws-edit" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 active:border-white/40">
-          <Pencil />
-        </button>
+        {!audit && (
+          <button type="button" onClick={onEdit} aria-label={t('proj.edit')} data-testid="ws-edit" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 active:border-white/40">
+            <Pencil />
+          </button>
+        )}
       </div>
 
       <div className="mt-2 flex items-end justify-between gap-3">
@@ -65,7 +83,8 @@ export default function HeaderZone({ project, model, title, client, region, offl
             <span className="block text-base">{detail}</span>
           </p>
         )}
-        <button type="button" onClick={onCash} aria-label={t('cash.title')} data-testid="ws-total" data-settled={settled || undefined} className="ml-auto text-right">
+        {/* audit (ledger) mode: the figures are plain text, not a button that opens the payments */}
+        <Total audit={audit} onCash={onCash} label={t('cash.title')} settled={settled}>
           {settled ? (
             <span data-testid="ws-settled" className="flex items-center justify-end gap-2 text-3xl font-medium leading-none tracking-tight text-brand">
               <Check />
@@ -101,10 +120,10 @@ export default function HeaderZone({ project, model, title, client, region, offl
               🔒 {t(model.locked === 'signed' ? 'ws.lock.signed' : 'ws.lock.frozen')}
             </span>
           )}
-        </button>
+        </Total>
       </div>
 
-      {model.locked && (
+      {model.locked && !audit && (
         <button type="button" onClick={onUnlock} data-testid="ws-unlock" className="mt-2 min-h-[40px] w-full rounded-lg border border-[#d4af37]/60 px-3 text-xs font-semibold text-[#e8c35f] active:border-[#d4af37]">
           {t('ws.unlock')}
         </button>
