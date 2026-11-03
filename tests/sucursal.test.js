@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // Logistic traceability: the vision AI reads the shop's branch / street address ("sucursal"), it is stored with each expense (IndexedDB)
-// and Contabilidad shows it as grey micro-text, falling back to the product description.
+// and the project's receipt stack (Gastos) shows it as grey micro-text next to the date, the product description under it.
 import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import React, { act } from 'react';
@@ -11,8 +11,7 @@ import { normalizeExpenses } from '../src/lib/ledger.js';
 import { projectStore } from '../src/lib/projectStore.js';
 import { newProject } from '../src/lib/projects.js';
 import { I18nProvider } from '../src/lib/i18n.jsx';
-import ProjectFinancialDashboard from '../src/components/ProjectFinancialDashboard.jsx';
-import { createExportQueue } from '../src/lib/exportQueue.js';
+import ExpensesBlock from '../src/components/workspace/ExpensesBlock.jsx';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const RAW = (extra = {}) => ({
@@ -93,7 +92,7 @@ describe('normalize + save', () => {
   });
 });
 
-describe('Contabilidad micro-text priority', () => {
+describe('Receipt stack micro-text (project > Gastos)', () => {
   let host;
   let root;
   const q = (id) => host.querySelector(`[data-testid="${id}"]`);
@@ -107,34 +106,33 @@ describe('Contabilidad micro-text priority', () => {
     host.remove();
   });
   const show = async (expenses) => {
-    const p = newProject({ regionCode: 'CL', name: 'Casa', now: 1 });
-    p.expenses = normalizeExpenses(expenses);
     await act(async () => {
-      root.render(React.createElement(I18nProvider, { lang: 'es', regionCode: 'CL' }, React.createElement(ProjectFinancialDashboard, { project: p, onCloseRendition: async () => {}, queue: createExportQueue() })));
+      root.render(
+        React.createElement(I18nProvider, { lang: 'es', regionCode: 'CL' }, React.createElement(ExpensesBlock, { expenses: normalizeExpenses(expenses), queued: [], receipts: {}, onChange: () => {}, open: true, onToggle: () => {} })),
+      );
     });
   };
 
-  it('sucursal first; when empty, the product description; when both are empty, only the date', async () => {
+  it('the date and the sucursal share the first micro-line; the product description goes under it; no sucursal / description = only the date', async () => {
     await show([
       { id: 'gasto001', amount: 30000, supplier: 'Sodimac', description: 'Cemento 25 kg', sucursal: 'Via Roma 123', date: '2026-10-02' },
       { id: 'gasto002', amount: 20000, supplier: 'Sodimac', description: 'Clavos 2"', date: '2026-10-05' },
       { id: 'gasto003', amount: 9000, supplier: 'Sodimac', description: '', date: '2026-10-07' },
     ]);
-    const note = (id) => q(`fin-expense-${id}`).querySelector('[data-testid="fin-expense-note"]');
-    expect(note('gasto001').textContent).toBe('Via Roma 123'); // NOT "Cemento 25 kg"
-    expect(note('gasto001').dataset.source).toBe('sucursal');
-    expect(q('fin-expense-gasto001').textContent).not.toContain('Cemento');
-    expect(note('gasto002').textContent).toBe('Clavos 2"'); // fallback
-    expect(note('gasto002').dataset.source).toBe('description');
-    expect(note('gasto003')).toBeNull(); // date only
-    expect(q('fin-expense-gasto003').textContent).not.toContain('•');
-    // same micro-typography for both sources
-    for (const id of ['gasto001', 'gasto002']) for (const c of ['text-xs', 'text-neutral-500', 'truncate', 'max-w-[150px]']) expect(note(id).className).toContain(c);
-    expect(note('gasto001').getAttribute('title')).toBe('Via Roma 123');
+    const line = (id) => q(`expense-${id}`).querySelector('[data-testid="stack-line"]');
+    const desc = (id) => q(`expense-${id}`).querySelector('[data-testid="stack-desc"]');
+    expect(line('gasto001').textContent).toMatch(/2026 · Via Roma 123$/);
+    expect(desc('gasto001').textContent).toBe('Cemento 25 kg');
+    expect(line('gasto002').textContent).toMatch(/2026$/); // no branch: only the date
+    expect(desc('gasto002').textContent).toBe('Clavos 2"');
+    expect(desc('gasto003')).toBeNull(); // date only
+    expect(q('expense-gasto003').textContent).not.toContain('•');
+    for (const id of ['gasto001', 'gasto002', 'gasto003']) for (const c of ['text-xs', 'text-neutral-500', 'truncate']) expect(line(id).className).toContain(c);
   });
 
-  it('a ticket with only a sucursal (no description) still shows it', async () => {
+  it('a receipt with only a sucursal (no description) still shows it', async () => {
     await show([{ id: 'gasto001', amount: 100, supplier: 'Obi', sucursal: 'Sucursal Centro', date: '2026-10-02' }]);
-    expect(q('fin-expense-gasto001').querySelector('[data-testid="fin-expense-note"]').textContent).toBe('Sucursal Centro');
+    expect(q('expense-gasto001').querySelector('[data-testid="stack-line"]').textContent).toContain('Sucursal Centro');
+    expect(q('expense-gasto001').querySelector('[data-testid="stack-desc"]')).toBeNull();
   });
 });

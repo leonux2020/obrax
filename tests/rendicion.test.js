@@ -426,8 +426,8 @@ describe('ProjectFinancialDashboard + the Contabilidad card', () => {
     expect(q('fin-income-list').querySelectorAll('li')).toHaveLength(p.payments.length);
     expect(q('fin-income-adel0001').querySelector('button')).toBeNull();
     expect(q('fin-income-list').textContent).toContain('100.000');
-    // USCITE: every expense, read-only too
-    expect(q('fin-expenses-list').querySelectorAll('li')).toHaveLength(p.expenses.length); // one line per ticket, grouped under its shop
+    // USCITE: one read-only line per SHOP (never per ticket)
+    expect(q('fin-expenses-list').querySelectorAll('li')).toHaveLength(3);
     expect(q('fin-expenses-list').querySelector('button')).toBeNull();
     // the ONLY button on the screen is the one that closes / exports the rendición (no back arrow: the phone's Back does that)
     expect([...view.querySelectorAll('button')].map((b) => b.dataset.testid)).toEqual(['fin-close']);
@@ -465,59 +465,34 @@ describe('ProjectFinancialDashboard + the Contabilidad card', () => {
     expect(q('fin-balance-value').textContent).toContain('80.000');
   });
 
-  it('USCITE grouped by shop: the name appears ONCE as a heading; its tickets list date + amount underneath', async () => {
+  it('USCITE: ONE line per shop with its total; Contabilidad never lists loose tickets (the receipts live in the project)', async () => {
     await mount(React.createElement(ProjectFinancialDashboard, { project: project(), onCloseRendition: async () => {}, queue: createExportQueue() }));
     const names = [...q('fin-expenses').querySelectorAll('[data-testid="fin-shop-name"]')].map((n) => n.textContent);
     expect(names).toEqual(['Sodimac', 'Copec', 'Sin proveedor']); // "sodimac " and "Sodimac" are ONE shop
     expect(q('fin-expenses').textContent.match(/Sodimac/gi)).toHaveLength(1);
-    const sodimac = q('fin-shop-0');
-    expect(sodimac.querySelector('[data-testid="fin-shop-total"]').textContent).toContain('50.000');
-    const rows = [...sodimac.querySelectorAll('li')];
-    expect(rows).toHaveLength(2);
-    expect(rows.map((r) => r.dataset.testid).sort()).toEqual(['fin-expense-gasto001', 'fin-expense-gasto002']);
-    expect(q('fin-expense-gasto001').textContent).toContain('30.000');
-    expect(q('fin-expense-gasto001').textContent).toMatch(/2026/); // the printed receipt date
-    expect(q('fin-expense-gasto002').textContent).toContain('20.000');
-    // a ticket is only a date and an amount: no repeated shop, no card per ticket, no supplier chips strip
-    expect(sodimac.querySelectorAll('li')[0].textContent).not.toMatch(/Sodimac/i);
-    expect(q('supplier-totals')).toBeNull();
+    expect(q('fin-shop-0').querySelector('[data-testid="fin-shop-total"]').textContent).toContain('50.000');
     expect(q('fin-shop-2').querySelector('[data-testid="fin-shop-name"]').textContent).toBe('Sin proveedor');
     expect(q('fin-expenses-total').textContent).toContain('70.000');
+    // purged: no individual ticket, no date, no branch / description micro-text, no supplier chips strip
+    expect(q('fin-expenses').querySelectorAll('li')).toHaveLength(3);
+    expect(q('fin-expenses').querySelector('[data-testid^="fin-expense-"]')).toBeNull();
+    expect(q('fin-expenses').textContent).not.toMatch(/2026|•/);
+    expect(q('supplier-totals')).toBeNull();
   });
 
-  it('"Receipt stack": each ticket shows its description / branch as grey micro-text after the date, separated by a bullet; no description = only the date', async () => {
+  it('the descriptions / branches / dates of the receipts never reach Contabilidad', async () => {
     const p = project();
     p.expenses = normalizeExpenses([
-      { id: 'gasto01', amount: 30000, category: 'material', supplier: 'Sodimac', description: 'Sodimac Maipú · Av. Pajaritos 1234', date: '2026-10-02' },
-      { id: 'gasto02', amount: 20000, category: 'material', supplier: 'Sodimac', description: '', date: '2026-10-05' },
-      { id: 'gasto03', amount: 9000, category: 'material', supplier: 'Sodimac', description: 'Tienda Las Condes — devolución de garantía hasta el 30/11 con boleta original', date: '2026-10-07' },
+      { id: 'gasto01', amount: 30000, category: 'material', supplier: 'Sodimac', description: 'Sodimac Maipú · Av. Pajaritos 1234', sucursal: 'Av. Pajaritos 1234', date: '2026-10-02' },
+      { id: 'gasto02', amount: 20000, category: 'material', supplier: 'Sodimac', description: 'Clavos', date: '2026-10-05' },
+      { id: 'gasto03', amount: 9000, category: 'material', supplier: 'Sodimac', description: 'Tienda Las Condes', date: '2026-10-07' },
     ]);
     await mount(React.createElement(ProjectFinancialDashboard, { project: p, onCloseRendition: async () => {}, queue: createExportQueue() }));
-    // two levels: ONE master heading with the chain's total, the tickets below
     expect(q('fin-expenses').querySelectorAll('[data-testid="fin-shop-name"]')).toHaveLength(1);
     expect(q('fin-shop-total').textContent).toContain('59.000');
-    expect(q('fin-expenses').querySelectorAll('li')).toHaveLength(3);
-    // ticket with a description: date • micro-text
-    const g1 = q('fin-expense-gasto01');
-    const note = g1.querySelector('[data-testid="fin-expense-note"]');
-    expect(note.textContent).toBe('Sodimac Maipú · Av. Pajaritos 1234');
-    for (const c of ['text-xs', 'text-neutral-500', 'truncate', 'max-w-[150px]']) expect(note.className).toContain(c);
-    expect(note.getAttribute('title')).toBe('Sodimac Maipú · Av. Pajaritos 1234'); // the full text is one long-press away
-    const dateEl = g1.querySelector('[data-testid="fin-expense-date"]');
-    expect(dateEl.nextElementSibling.textContent).toBe('•'); // the bullet sits between date and note
-    expect(dateEl.nextElementSibling.getAttribute('aria-hidden')).toBe('true');
-    expect(dateEl.nextElementSibling.nextElementSibling).toBe(note);
-    expect(dateEl.className).toContain('shrink-0'); // the date is never squeezed by a long note
-    expect(g1.textContent).toContain('30.000');
-    // a long note is truncated, never wraps (one line per ticket)
-    expect(q('fin-expense-gasto03').querySelector('[data-testid="fin-expense-note"]').className).toContain('truncate');
-    // FALLBACK: no description -> only the date, same alignment (amount still right-aligned in the same flex row)
-    const g2 = q('fin-expense-gasto02');
-    expect(g2.querySelector('[data-testid="fin-expense-note"]')).toBeNull();
-    expect(g2.textContent).not.toContain('•');
-    expect(g2.className).toBe(g1.className);
-    expect(g2.querySelector('[data-testid="fin-expense-date"]').textContent).toMatch(/2026/);
-    expect(g2.textContent).toContain('20.000');
+    expect(q('fin-expenses').querySelectorAll('li')).toHaveLength(1);
+    const text = q('fin-expenses').textContent;
+    for (const hidden of ['Pajaritos', 'Clavos', 'Las Condes', '2026']) expect(text).not.toContain(hidden);
   });
 
   it('a payment registered in the project (with method) shows up here by itself, newest first, with the method tag', async () => {

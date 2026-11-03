@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
-import { cashSummary, expenseDayLabel, expensesTotal, supplierTotals } from '../lib/ledger.js';
+import { cashSummary, expensesTotal, supplierTotals } from '../lib/ledger.js';
 import { projectClient, projectTitle } from '../lib/projects.js';
 import { UI_WATCHDOG_MS, settleWithin } from '../lib/exportSync.js';
 import { useExportQueue } from '../lib/useExportSync.js';
@@ -23,8 +23,8 @@ function Stat({ id, label, value, tone = '' }) {
 /**
  * Financial command center of ONE project (full screen, opened from the Contabilidad card):
  *  - OLED headers: Fondo asignado (income) · Total gastado · Saldo a rendir (fund - spent),
- *  - Ingresos / Egresos: READ-ONLY lists. They show what was typed in the project itself (the client's payments of the CashBlock and the
- *    expenses module): the single source of truth. Nothing is entered here,
+ *  - Ingresos / Egresos: READ-ONLY. Ingresos mirrors the client's payments of the CashBlock; Egresos is ONE line per supplier with its total
+ *    (the individual receipts live only in the project's Gastos sheet: no loose tickets here). Nothing is entered here,
  *  - "Cerrar Rendición (Enviar a Drive)": the Excel goes to Drive, or to the offline queue (it is never downloaded).
  *
  * No back arrow: the phone's own Back (history) leaves it. `onCloseRendition()` resolves when it is done.
@@ -43,23 +43,8 @@ export default function ProjectFinancialDashboard({ project, onCloseRendition, o
   const toRender = Math.round((fund - spent) * 100) / 100;
   const entries = useMemo(() => [...project.payments].sort((a, b) => b.at - a.at), [project.payments]);
   const title = projectTitle(project) || t('proj.untitled');
-  // USCITE grouped by shop: the name ONCE as a heading, then its tickets (date + amount) newest first
-  const groups = useMemo(() => {
-    // the day printed on the receipt when there is one, else the moment it was registered
-    const when = (e) => {
-      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(e.date || '');
-      return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12).getTime() : e.at;
-    };
-    return supplierTotals(project.expenses).map((g) => ({
-      ...g,
-      items: project.expenses
-        .filter((e) => {
-          const name = (e.supplier || '').trim().replace(/\s+/g, ' ').toLowerCase();
-          return name === g.name.toLowerCase() && (String(e.currency || '').toUpperCase() === g.currency);
-        })
-        .sort((a, b) => when(b) - when(a) || b.at - a.at),
-    }));
-  }, [project.expenses]);
+  // USCITE: ONE line per shop with what went there. The individual receipts live in the project (Gastos): Contabilidad never lists loose tickets
+  const shops = useMemo(() => supplierTotals(project.expenses), [project.expenses]);
 
   // "Reconectar Drive": the ONLY place besides "Enviar a Drive" where the Google window may open, and only by this tap
   const reconnect = async () => {
@@ -136,46 +121,18 @@ export default function ProjectFinancialDashboard({ project, onCloseRendition, o
             </p>
           ) : (
             <>
-              <div className="mb-2 space-y-3" data-testid="fin-expenses-list">
-                {groups.map((g, i) => {
-                  const fmt = (v) => (g.currency ? moneyIn(v, g.currency) : money(v));
-                  return (
-                    <section key={g.key} data-testid={`fin-shop-${i}`} className="rounded-xl border border-white/10">
-                      <h3 className="flex items-baseline justify-between gap-3 px-3 pt-2.5">
-                        <span className={`min-w-0 flex-1 truncate text-sm font-semibold ${g.name ? 'text-neutral-100' : 'text-neutral-400'}`} data-testid="fin-shop-name">
-                          {g.name || t('exp.noSupplier')}
-                        </span>
-                        <span className="shrink-0 text-sm font-medium tabular-nums text-neutral-100" data-testid="fin-shop-total">
-                          {fmt(g.total)}
-                        </span>
-                      </h3>
-                      <ul className="divide-y divide-white/5 px-3 pb-1 pt-1">
-                        {g.items.map((e) => (
-                          <li key={e.id} data-testid={`fin-expense-${e.id}`} className="flex items-baseline justify-between gap-3 py-1.5 text-sm">
-                            <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
-                              <span className="shrink-0 whitespace-nowrap text-neutral-400 tabular-nums" data-testid="fin-expense-date">
-                                {expenseDayLabel(e.date, locale) || day.format(new Date(e.at))}
-                              </span>
-                              {/* "Receipt stack": the receipt's own line (the branch / street address the scan read, else the product description) as grey micro-text; nothing when there is none */}
-                              {(e.sucursal || e.description) && (
-                                <>
-                                  <span aria-hidden="true" className="shrink-0 text-xs text-neutral-600">
-                                    •
-                                  </span>
-                                  <span className="min-w-0 max-w-[150px] truncate text-xs text-neutral-500" title={e.sucursal || e.description} data-testid="fin-expense-note" data-source={e.sucursal ? 'sucursal' : 'description'}>
-                                    {e.sucursal || e.description}
-                                  </span>
-                                </>
-                              )}
-                            </span>
-                            <span className="shrink-0 tabular-nums text-[#E0E0E0]">{fmt(e.amount)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
-                  );
-                })}
-              </div>
+              <ul className="mb-2 divide-y divide-white/5 rounded-xl border border-white/10 px-3" data-testid="fin-expenses-list">
+                {shops.map((g, i) => (
+                  <li key={g.key} data-testid={`fin-shop-${i}`} className="flex items-baseline justify-between gap-3 py-2.5">
+                    <span className={`min-w-0 flex-1 truncate text-sm font-medium ${g.name ? 'text-neutral-200' : 'text-neutral-400'}`} data-testid="fin-shop-name">
+                      {g.name || t('exp.noSupplier')}
+                    </span>
+                    <span className="shrink-0 text-sm font-medium tabular-nums text-neutral-200" data-testid="fin-shop-total">
+                      {g.currency ? moneyIn(g.total, g.currency) : money(g.total)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
               <p className="flex items-baseline justify-between rounded-2xl border border-white/10 px-4 py-3" data-testid="fin-expenses-total">
                 <span className="text-sm font-semibold">{t('fin.expenses.total')}</span>
                 <span className="font-medium tabular-nums">{money(spent)}</span>

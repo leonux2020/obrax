@@ -17,6 +17,7 @@ import {
   projectTaxReserve,
   globalLiquidity,
   globalBreakdown,
+  globalSupplierShares,
   receivableList,
   globalTaxLabel,
   globalTaxReserve,
@@ -289,13 +290,13 @@ describe('Vista Contabilidad Global', () => {
     expect(hud.className).toContain('bg-black');
   });
 
-  it('caja negativa en ámbar suave; positiva en #E0E0E0', async () => {
+  it('caja negativa en ámbar suave; positiva en verde de marca', async () => {
     const neg = mk('CL', { expenses: [{ id: 'e', amount: 5000, at: back(1) }] });
     await render([neg]);
     expect(q('acc-liquid-CLP').className).toContain('#e8c35f');
     const pos = mk('CL', { payments: [pay(5000, back(1))] });
     await render([pos]);
-    expect(q('acc-liquid-CLP').className).toContain('#E0E0E0');
+    expect(q('acc-liquid-CLP').className).toContain('text-brand');
     expect(q('acc-liquid-CLP').className).not.toContain('#e8c35f');
   });
 
@@ -353,10 +354,13 @@ describe('Vista Contabilidad Global', () => {
     for (const c of ['rounded-2xl', 'border', 'border-white/10', 'bg-black', 'cursor-pointer', 'active:opacity-80', 'text-center']) expect(hud.className).toContain(c);
     expect(hud.contains(q('acc-liquid'))).toBe(true);
     expect(q('acc-liquid').className).not.toMatch(/border|rounded|bg-/); // floating: no per-column box or divider
-    const label = q('acc-liquid').firstChild;
+    const label = q('acc-donut-CLP').querySelector('span'); // the label sits in the hollow centre of the ring, above the figure
     expect(label.className).toContain('uppercase');
     expect(label.textContent.toUpperCase()).toBe('DISPONIBLE');
     expect(q('acc-liquid-CLP').className).toMatch(/text-(4xl|3xl)/); // the one big figure
+    expect(q('acc-liquid-CLP').className).toContain('font-medium');
+    expect(q('acc-liquid-CLP').className).toContain('tracking-tight');
+    expect(q('acc-liquid-CLP').className).toContain('tabular-nums');
   });
 
   it('el título en italiano es "Contabilità"', async () => {
@@ -369,8 +373,8 @@ describe('Vista Contabilidad Global', () => {
     const small = mk('ES', { payments: [pay(5, back(1))] });
     await render([big, small]);
     for (const code of ['CLP', 'EUR']) expect(q(`acc-liquid-${code}`).className).toContain('whitespace-nowrap');
-    expect(q('acc-liquid-CLP').className).toMatch(/text-(2xl|xl)/);
-    expect(q('acc-liquid-EUR').className).toContain('text-4xl');
+    expect(q('acc-liquid-CLP').className).toMatch(/text-(xl|lg)/);
+    expect(q('acc-liquid-EUR').className).toContain('text-3xl');
   });
 
   it('tocar el panel abre el detalle: solo Ingresos − Gastos − Adelantos = Saldo líquido por moneda', async () => {
@@ -541,5 +545,112 @@ describe('Vista Contabilidad Global', () => {
     await render([p, { ...mk('CL'), logbook: undefined, payments: undefined, expenses: undefined, advances: undefined }]);
     expect(q('acc-hud')).not.toBeNull();
     expect(host.textContent).not.toMatch(/NaN|undefined/);
+  });
+});
+
+
+describe('Donut OLED: gastos globales por proveedor y DISPONIBILE en el centro hueco', () => {
+  let host;
+  let root;
+  const q = (id) => host.querySelector(`[data-testid="${id}"]`);
+  const render = async (projects) => {
+    await act(async () => {
+      root.render(React.createElement(I18nProvider, { lang: 'es', regionCode: 'CL' }, React.createElement(GlobalAccounting, { projects })));
+    });
+    await act(async () => new Promise((r) => setTimeout(r, 0)));
+  };
+  beforeEach(() => {
+    localStorage.clear();
+    window.history.replaceState(null, '');
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+  });
+  afterEach(() => {
+    act(() => root.unmount());
+    host.remove();
+  });
+  const exp = (id, supplier, amount) => ({ id, supplier, amount, description: '', category: 'material', at: ago(1) });
+
+  it('globalSupplierShares: por moneda, por proveedor (sin distinguir mayúsculas), top 4 + "otros", solo proyectos activos', () => {
+    const a = mk('CL', { expenses: [exp('1', 'Sodimac', 500), exp('2', ' sodimac', 300), exp('3', 'Easy', 100), exp('4', '', 50), exp('5', 'Copec', 30), exp('6', 'Petrobras', 15), exp('7', 'Otro', 5), exp('8', 'Cero', 0)] });
+    const done = mk('CL', { closedAt: ago(2), expenses: [exp('9', 'Fantasma', 99999)] });
+    const es = mk('ES', { expenses: [exp('10', 'Obramat', 10)] });
+    const out = globalSupplierShares([a, done, es]);
+    expect(out.map((x) => x.currency)).toEqual(['CLP', 'EUR']); // never mixed
+    const clp = out[0];
+    expect(clp.total).toBe(1000);
+    expect(clp.segments.map((x) => [x.name, x.total])).toEqual([['Sodimac', 800], ['Easy', 100], ['Copec', 30], ['Petrobras', 15], ['', 55]]);
+    expect(clp.segments.at(-1)).toMatchObject({ key: '__others', others: true, total: 55 }); // "Otro" + nameless folded
+    expect(clp.segments.reduce((sum, x) => sum + x.pct, 0)).toBeCloseTo(100, 6);
+    expect(clp.segments[0].pct).toBeCloseTo(80, 6);
+    expect(out[1].segments).toHaveLength(1);
+    expect(globalSupplierShares([])).toEqual([]);
+    expect(globalSupplierShares([mk('CL')])).toEqual([{ currency: 'CLP', regionCode: 'CL', total: 0, segments: [] }]);
+  });
+
+  it('el anillo es SVG nativo con un segmento por proveedor; el centro está hueco y contiene DISPONIBILE + el saldo', async () => {
+    const p = mk('CL', { payments: [pay(100000, ago(1))], expenses: [exp('1', 'Sodimac', 30000), exp('2', 'Easy', 10000)] });
+    await render([p]);
+    const donut = q('acc-donut-CLP');
+    expect(donut.querySelector('svg')).not.toBeNull();
+    expect(donut.querySelector('svg').getAttribute('role')).toBe('img');
+    const segs = [...donut.querySelectorAll('circle[data-testid^="acc-donut-CLP-seg-"]')];
+    expect(segs).toHaveLength(2);
+    expect(segs.map((c) => c.dataset.pct)).toEqual(['75.0', '25.0']);
+    // hollow: every circle is a stroke only (fill none) and nothing paints the middle
+    for (const c of donut.querySelectorAll('circle')) expect(c.getAttribute('fill')).toBe('none');
+    expect(donut.innerHTML).not.toMatch(/<rect|<path|bg-neutral|bg-gray/);
+    // solid, sober colours (no gradients, no opacity tricks) and no chart library
+    expect(segs[0].getAttribute('stroke')).toBe('#22c55e');
+    expect(new Set(segs.map((c) => c.getAttribute('stroke'))).size).toBe(2);
+    // the main metric is INSIDE the ring's box: label + big green figure
+    expect(donut.contains(q('acc-liquid-CLP'))).toBe(true);
+    expect(donut.textContent.toUpperCase()).toContain('DISPONIBLE');
+    expect(q('acc-liquid-CLP').textContent).toMatch(/60\.000/); // 100.000 - 40.000
+    expect(q('acc-liquid-CLP').className).toContain('text-brand');
+  });
+
+  it('leyenda ultraminimalista bajo el anillo: los proveedores principales con su %, el resto como "Otros"', async () => {
+    const p = mk('CL', {
+      payments: [pay(1, ago(1))],
+      expenses: [exp('1', 'Sodimac', 500), exp('2', 'Easy', 300), exp('3', 'Copec', 100), exp('4', 'Petrobras', 60), exp('5', 'Chico', 40)],
+    });
+    await render([p]);
+    const legend = q('acc-legend-CLP');
+    expect(legend.compareDocumentPosition(q('acc-donut-CLP')) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy(); // under the ring
+    const items = [...legend.querySelectorAll('li')];
+    expect(items.map((li) => li.textContent)).toEqual(['Sodimac50%', 'Easy30%', 'Copec10%', 'Petrobras6%', 'Otros4%']);
+    for (const li of items) for (const c of ['text-xs', 'text-neutral-400']) expect(li.className).toContain(c);
+  });
+
+  it('sin gastos: anillo vacío (solo el carril tenue) y el saldo sigue en el centro', async () => {
+    await render([mk('CL', { payments: [pay(5000, ago(1))] })]);
+    const donut = q('acc-donut-CLP');
+    expect(donut.querySelectorAll('circle[data-testid^="acc-donut-CLP-seg-"]')).toHaveLength(0);
+    expect(q('acc-donut-CLP-track')).not.toBeNull();
+    expect(q('acc-legend-CLP').textContent).toBe('Sin gastos todavía');
+    expect(q('acc-liquid-CLP').textContent).toMatch(/5\.000/);
+  });
+
+  it('Contabilidad no lista boletas sueltas: ni en la vista principal ni en el centro financiero del proyecto', async () => {
+    const p = mk('CL', { payments: [pay(10000, ago(1))], expenses: [{ ...exp('1', 'Sodimac', 3000), description: 'Cemento 25 kg', sucursal: 'Via Roma 123' }] });
+    await render([p]);
+    const text = host.textContent;
+    expect(text).not.toContain('Cemento 25 kg');
+    expect(text).not.toContain('Via Roma 123');
+    expect(host.querySelector('[data-testid^="fin-expense-"]')).toBeNull();
+    expect(host.querySelector('[data-testid="expense-list"]')).toBeNull();
+  });
+
+  it('dos monedas = dos anillos, cada uno con su propio saldo y leyenda', async () => {
+    const cl = mk('CL', { payments: [pay(1000, ago(1))], expenses: [exp('1', 'Sodimac', 100)] });
+    const es = mk('ES', { payments: [pay(50, ago(1))], expenses: [exp('2', 'Obramat', 5)] });
+    await render([cl, es]);
+    expect(q('acc-donut-CLP')).not.toBeNull();
+    expect(q('acc-donut-EUR')).not.toBeNull();
+    expect(q('acc-legend-CLP').textContent).toContain('Sodimac');
+    expect(q('acc-legend-EUR').textContent).toContain('Obramat');
+    expect(q('acc-legend-CLP').textContent).not.toContain('Obramat');
   });
 });

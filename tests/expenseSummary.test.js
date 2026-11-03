@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
-// Expenses tab: the per-shop totals strip on top and the shop-first expense card.
+// Expenses sheet of the project: the "receipt stack" (receipts grouped by supplier).
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { I18nProvider } from '../src/lib/i18n.jsx';
 import ExpensesBlock from '../src/components/workspace/ExpensesBlock.jsx';
-import { expenseDayLabel, supplierTotals } from '../src/lib/ledger.js';
+import { expenseDayLabel, groupExpensesBySupplier, supplierTotals } from '../src/lib/ledger.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -34,7 +34,24 @@ describe('supplierTotals', () => {
   });
 });
 
-describe('ExpensesBlock: totals strip + shop-first cards', () => {
+describe('groupExpensesBySupplier', () => {
+  it('every expense lands in exactly one group, newest receipt first inside it, same order as supplierTotals', () => {
+    const list = [
+      exp('a', 'Sodimac', 100, { date: '2026-10-01' }),
+      exp('b', ' sodimac', 50, { date: '2026-10-09' }),
+      exp('c', '', 10, { at: 5 }),
+      exp('d', 'Easy', 500, { currency: 'eur' }),
+      exp('e', 'Easy', 1),
+    ];
+    const groups = groupExpensesBySupplier(list);
+    expect(groups.map((g) => g.key)).toEqual(supplierTotals(list).map((g) => g.key));
+    expect(groups.flatMap((g) => g.items.map((e) => e.id)).sort()).toEqual(['a', 'b', 'c', 'd', 'e']);
+    expect(groups.find((g) => g.name === 'Sodimac').items.map((e) => e.id)).toEqual(['b', 'a']);
+    expect(groupExpensesBySupplier(null)).toEqual([]);
+  });
+});
+
+describe('ExpensesBlock: receipt stack grouped by supplier', () => {
   let host;
   let root;
   const q = (id) => host.querySelector(`[data-testid="${id}"]`);
@@ -60,28 +77,34 @@ describe('ExpensesBlock: totals strip + shop-first cards', () => {
     exp('e4', '', 500),
   ];
 
-  it('shows a horizontally scrollable strip of chips above the list: biggest shop first, "Sin proveedor" last', async () => {
+  it('groups the receipts by supplier: biggest first, "Sin proveedor" last, each with its name big and what was spent there', async () => {
     await mount(list);
-    const strip = q('supplier-totals');
-    expect(strip.className).toContain('overflow-x-auto');
-    expect(strip.compareDocumentPosition(q('expense-list')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // right above the list
-    const chips = qa('supplier-total-name').map((n) => n.textContent);
-    expect(chips).toEqual(['Sodimac', 'Sin proveedor']);
-    const amounts = qa('supplier-total-amount').map((n) => n.textContent);
-    expect(amounts[0]).toContain('14.900');
-    expect(amounts[1]).toContain('4.500');
+    expect(q('supplier-totals')).toBeNull(); // the old chips strip is gone: the stack replaces it
+    expect(qa('stack-shop-name').map((n) => n.textContent)).toEqual(['Sodimac', 'Sin proveedor']);
+    const totals = qa('stack-shop-total').map((n) => n.textContent);
+    expect(totals[0]).toContain('14.900');
+    expect(totals[1]).toContain('4.500');
+    for (const c of ['text-lg', 'text-neutral-200', 'truncate']) expect(qa('stack-shop-name')[0].className).toContain(c);
+    expect(qa('stack-shop-total')[0].className).toContain('text-neutral-200');
+    // the supplier appears ONCE: its receipts are stacked underneath, never repeating the name
+    expect(q('expense-list').textContent.match(/Sodimac/g)).toHaveLength(1);
+    expect([...q('stack-shop-0').querySelectorAll('li')].map((li) => li.dataset.testid)).toEqual(['expense-e1', 'expense-e2']); // newest receipt first
+    expect([...q('stack-shop-1').querySelectorAll('li')]).toHaveLength(2);
   });
 
-  it('the card headline is the shop (else the description, else "Gasto"), with date + category as subtitles and the amount on the right', async () => {
+  it('every receipt is grey micro-text under its supplier: date (+ sucursal) and the description, with its amount on the right', async () => {
     await mount(list);
     const card = (id) => q(`expense-${id}`);
-    expect(card('e1').querySelector('[data-testid="expense-title"]').textContent).toBe('Sodimac');
-    expect(card('e1').querySelector('[data-testid="expense-sub"]').textContent).toMatch(/29.*2026 · Material/);
-    expect(card('e1').querySelector('[data-testid="expense-detail"]').textContent).toBe('Cemento');
-    expect(card('e1').textContent).toContain('11.900');
-    expect(card('e3').querySelector('[data-testid="expense-title"]').textContent).toBe('Peaje'); // no shop: the description
-    expect(card('e3').querySelector('[data-testid="expense-detail"]')).toBeNull();
-    expect(card('e4').querySelector('[data-testid="expense-title"]').textContent).toBe('Gasto'); // nothing at all
+    const line = card('e1').querySelector('[data-testid="stack-line"]');
+    expect(line.textContent).toMatch(/29.*2026/);
+    for (const c of ['text-xs', 'text-neutral-500']) expect(line.className).toContain(c);
+    const desc = card('e1').querySelector('[data-testid="stack-desc"]');
+    expect(desc.textContent).toBe('Cemento');
+    for (const c of ['text-xs', 'text-neutral-500']) expect(desc.className).toContain(c);
+    expect(card('e1').querySelector('[data-testid="stack-amount"]').textContent).toContain('11.900');
+    expect(card('e3').querySelector('[data-testid="stack-desc"]').textContent).toBe('Peaje'); // no shop: the description is still there
+    expect(card('e4').querySelector('[data-testid="stack-desc"]')).toBeNull(); // nothing at all: just a date and the amount
+    expect(card('e4').querySelector('[data-testid="stack-amount"]').textContent).toContain('500');
   });
 
   it('editing and deleting keep working: × removes exactly that expense and the rental switch still toggles', async () => {

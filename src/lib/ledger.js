@@ -254,6 +254,22 @@ export function supplierTotals(expenses = []) {
   return [...groups.values()].sort((a, b) => (a.name === '') - (b.name === '') || b.total - a.total || a.name.localeCompare(b.name));
 }
 
+/** The moment a receipt belongs to: the day printed on it (local noon) when there is one, else when it was registered. */
+const receiptTime = (e) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(typeof e?.date === 'string' ? e.date : '');
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12).getTime() : num(e?.at);
+};
+
+/**
+ * "Receipt stack": the expenses grouped by supplier, each group carrying its own receipts: the same groups as supplierTotals (biggest
+ * first, no-supplier last) plus `items`, newest receipt first. Every expense lands in exactly one group.
+ */
+export function groupExpensesBySupplier(expenses = []) {
+  const list = Array.isArray(expenses) ? expenses.filter((e) => e && typeof e === 'object') : [];
+  const keyOf = (e) => `${(typeof e.supplier === 'string' ? e.supplier.trim().replace(/\s+/g, ' ') : '').toLowerCase()}|${typeof e.currency === 'string' ? e.currency.toUpperCase() : ''}`;
+  return supplierTotals(list).map((g) => ({ ...g, items: list.filter((e) => keyOf(e) === g.key).sort((a, b) => receiptTime(b) - receiptTime(a) || num(b.at) - num(a.at)) }));
+}
+
 /** Expenses grouped by category: [{ category, total, count }], biggest first (the total of every line, any currency as the project's own). */
 export function expensesByCategory(expenses = []) {
   const groups = new Map();
@@ -446,6 +462,43 @@ export function globalBreakdown(projects, budgets) {
     lines.set(currency, line);
   }
   return [...lines.values()].sort((a, b) => a.currency.localeCompare(b.currency));
+}
+
+/**
+ * Where the money of ALL the expenses went, per currency, over the ACTIVE projects, grouped by supplier (shops matched ignoring case / extra
+ * spaces, the expenses with no supplier go together as `name: ''`): [{ currency, regionCode, total, segments: [{ key, name, total, pct }] }].
+ * The `top` biggest suppliers get a segment of their own; every other one is folded into ONE last segment `{ key: '__others', name: '', others: true }`.
+ * `pct` is the exact share (0-100) of the currency's expense total. Currencies are never mixed. Only positive amounts count.
+ */
+export function globalSupplierShares(projects, top = 4) {
+  const lines = new Map();
+  for (const p of arr(projects)) {
+    if (!isActiveProject(p)) continue;
+    const { currency, regionCode } = projectMarket(p);
+    if (!currency) continue;
+    const line = lines.get(currency) ?? { currency, regionCode, shops: new Map() };
+    for (const e of arr(p.expenses)) {
+      const amount = num(e.amount);
+      if (amount <= 0) continue;
+      const name = typeof e.supplier === 'string' ? e.supplier.trim().replace(/\s+/g, ' ') : '';
+      const key = name.toLowerCase();
+      const shop = line.shops.get(key) ?? { key, name, total: 0 };
+      shop.total = cents(shop.total + amount);
+      line.shops.set(key, shop);
+    }
+    lines.set(currency, line);
+  }
+  return [...lines.values()]
+    .map(({ currency, regionCode, shops }) => {
+      const all = [...shops.values()].sort((a, b) => (a.name === '') - (b.name === '') || b.total - a.total || a.name.localeCompare(b.name));
+      const sum = cents(all.reduce((s, x) => s + x.total, 0));
+      const head = all.slice(0, Math.max(1, top));
+      const rest = all.slice(head.length);
+      const segments = head.map((x) => ({ ...x }));
+      if (rest.length) segments.push({ key: '__others', name: '', others: true, total: cents(rest.reduce((s, x) => s + x.total, 0)) });
+      return { currency, regionCode, total: sum, segments: segments.map((x) => ({ ...x, pct: sum > 0 ? (x.total / sum) * 100 : 0 })) };
+    })
+    .sort((a, b) => a.currency.localeCompare(b.currency));
 }
 
 /** Active projects with a balance still to collect: [{ id, currency, regionCode, pending, late }] - late ones first, then by amount. */

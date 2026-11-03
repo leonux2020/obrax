@@ -8,11 +8,13 @@ import {
   daysAgo,
   getLastProjectActivity,
   globalBreakdown,
+  globalSupplierShares,
   projectDateRange,
   projectLiquidity,
   sortByActivity,
 } from '../lib/ledger.js';
 import GlobalBreakdownSheet from './GlobalBreakdownSheet.jsx';
+import DonutChart from './DonutChart.jsx';
 import { projectClient, projectTitle } from '../lib/projects.js';
 import { projectTotals } from '../lib/projectTotals.js';
 import { usePriceVersion } from '../lib/usePrices.js';
@@ -28,31 +30,50 @@ import { Button, Logo } from './ui.jsx';
  */
 const AMBER = 'text-[#e8c35f]';
 
-/** Big font size by length of the amount, so the single metric always fits on a 320 px screen (never wraps or clips). */
-const sizeFor = (text) => (text.length <= 9 ? 'text-4xl' : text.length <= 12 ? 'text-3xl' : text.length <= 15 ? 'text-2xl' : 'text-xl');
+/** Font size by length of the amount, so the figure always fits INSIDE the hole of the ring (never wraps or clips, 320 px screens included). */
+const sizeFor = (text) => (text.length <= 8 ? 'text-3xl' : text.length <= 10 ? 'text-2xl' : text.length <= 13 ? 'text-xl' : 'text-lg');
 
-/** The ONE main metric: label + one large, centred amount per currency (never mixed). No box, no divider. */
-function HudColumn({ id, label, lines, fmtOf, warn = false }) {
+/** Solid, sober segment colours (greens, greys, a dark orange); the folded "others" take the darkest grey. */
+const SEGMENT_COLORS = ['#22c55e', '#9ca3af', '#c2410c', '#166534'];
+const OTHERS_COLOR = '#52525b';
+
+/**
+ * ONE metric per currency: the DONUT. Its ring splits the global expenses by supplier; in its hollow centre sits DISPONIBILE (real liquid cash:
+ * collected - expenses - advances), large, green when positive. Under the ring an ultra-minimal legend names the main suppliers with their %.
+ * Currencies are never mixed: each one gets its own ring.
+ */
+function DonutBlock({ currency, liquid, shares, many, fmt, label }) {
+  const { t } = useI18n();
+  const text = fmt(liquid);
+  const segments = (shares?.segments ?? []).map((s, i) => ({ ...s, color: s.others ? OTHERS_COLOR : SEGMENT_COLORS[i % SEGMENT_COLORS.length], label: s.others ? t('acc.donut.others') : s.name || t('exp.noSupplier') }));
   return (
-    <span data-testid={id} className="block min-w-0 text-center">
-      <span className="block whitespace-nowrap text-xs font-semibold uppercase tracking-wider text-white/50">{label}</span>
-      {lines.length === 0 ? (
-        <span className="mt-1 block text-3xl font-medium tabular-nums text-[#E0E0E0]/50 tracking-tight">—</span>
+    <div data-testid={`acc-donut-block-${currency}`} className="min-w-0">
+      {many && <p className="mb-1 text-center text-xs font-medium tabular-nums text-neutral-400">{currency}</p>}
+      <DonutChart segments={segments} size={224} testId={`acc-donut-${currency}`} label={`${t('acc.donut.aria')} ${currency}`}>
+        <span className="block whitespace-nowrap text-[11px] font-medium uppercase tracking-wider text-neutral-400">{label}</span>
+        <span
+          data-testid={`acc-liquid-${currency}`}
+          className={`mt-0.5 block whitespace-nowrap font-medium tracking-tight tabular-nums ${sizeFor(text)} ${liquid < 0 ? AMBER : liquid > 0 ? 'text-brand' : 'text-neutral-200'}`}
+        >
+          {text}
+        </span>
+      </DonutChart>
+      {segments.length === 0 ? (
+        <p data-testid={`acc-legend-${currency}`} className="mt-3 text-center text-xs text-neutral-500">
+          {t('acc.donut.none')}
+        </p>
       ) : (
-        lines.map((l) => {
-          const text = fmtOf(l.regionCode)(l.amount);
-          return (
-            <span
-              key={l.currency}
-              data-testid={`${id}-${l.currency}`}
-              className={`mt-1 block whitespace-nowrap font-medium tracking-tight tabular-nums ${sizeFor(text)} ${warn && l.amount < 0 ? AMBER : 'text-[#E0E0E0]'}`}
-            >
-              {text}
-            </span>
-          );
-        })
+        <ul data-testid={`acc-legend-${currency}`} aria-label={t('exp.byVendor')} className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1">
+          {segments.map((s) => (
+            <li key={s.key} data-testid={`acc-legend-item-${s.key}`} className="flex min-w-0 items-center gap-1.5 text-xs text-neutral-400">
+              <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
+              <span className="max-w-[8rem] truncate">{s.label}</span>
+              <span className="tabular-nums">{Math.round(s.pct)}%</span>
+            </li>
+          ))}
+        </ul>
       )}
-    </span>
+    </div>
   );
 }
 
@@ -79,7 +100,7 @@ export default function GlobalAccounting({ projects, onOpenProject = null, onExp
     return sortByActivity(projects).map((p) => byId.get(p.id));
   }, [projects, rows]);
   const breakdown = useMemo(() => globalBreakdown(projects, totals), [projects, totals]);
-  const lines = (key) => breakdown.map((l) => ({ currency: l.currency, regionCode: l.regionCode, amount: l[key] }));
+  const shares = useMemo(() => new Map(globalSupplierShares(projects).map((x) => [x.currency, x])), [projects]);
   const [open, setOpen] = useState(false);
   const moneyOf = useMemo(() => {
     const cache = new Map();
@@ -142,9 +163,17 @@ export default function GlobalAccounting({ projects, onOpenProject = null, onExp
             onClick={() => setOpen(true)}
             aria-label={`${t('acc.sheet.open')}: ${t('acc.hud')}`}
             aria-haspopup="dialog"
-            className="mb-3 block w-full cursor-pointer rounded-2xl border border-white/10 bg-black px-3 py-6 text-center transition-opacity active:opacity-80"
+            className="mb-3 block w-full cursor-pointer rounded-2xl border border-white/10 bg-black px-3 py-5 text-center transition-opacity active:opacity-80"
           >
-            <HudColumn id="acc-liquid" label={t('acc.hud.liquid')} lines={lines('liquid')} fmtOf={moneyOf} warn />
+            <span data-testid="acc-liquid" className="block space-y-6">
+              {breakdown.length === 0 ? (
+                <DonutBlock currency="—" liquid={0} shares={null} many={false} fmt={() => '—'} label={t('acc.hud.liquid')} />
+              ) : (
+                breakdown.map((l) => (
+                  <DonutBlock key={l.currency} currency={l.currency} liquid={l.liquid} shares={shares.get(l.currency)} many={breakdown.length > 1} fmt={moneyOf(l.regionCode)} label={t('acc.hud.liquid')} />
+                ))
+              )}
+            </span>
           </button>
           {open && (
             <GlobalBreakdownSheet breakdown={breakdown} moneyOf={moneyOf} onClose={() => setOpen(false)} />
