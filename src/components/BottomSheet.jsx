@@ -7,9 +7,10 @@ const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([di
 
 /**
  * Bottom sheet (one-hand ergonomics): anchored to the bottom of the screen, pure #000 with an ultra
- * thin border (`tall`: an expanded sheet, 85 % of the screen, for dense lists). Focus is trapped inside, Escape / backdrop close it and focus returns to the opener.
+ * thin border (`tall`: an expanded sheet, 85 % of the screen, for dense lists). `headerAction` REPLACES the x of the header with another
+ * control (the photo sheet shows its Edit toggle there): that sheet closes the native way (device Back, swipe down, backdrop, Escape). Focus is trapped inside, Escape / backdrop close it and focus returns to the opener.
  */
-export default function BottomSheet({ title, subtitle, onClose, fullscreen = false, tall = false, swipeToClose = false, autoFocus = true, children }) {
+export default function BottomSheet({ title, subtitle, onClose, fullscreen = false, tall = false, swipeToClose = false, autoFocus = true, headerAction = null, children }) {
   const { t } = useI18n();
   const titleId = useId();
   const ref = useRef(null);
@@ -101,15 +102,17 @@ export default function BottomSheet({ title, subtitle, onClose, fullscreen = fal
           <h2 id={titleId} className="text-2xl font-medium tracking-tight">
             {title}
           </h2>
-          <button
-            type="button"
-            data-sheet-close
-            onClick={onClose}
-            aria-label={t('common.close')}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 text-xl hover:border-brand"
-          >
-            ×
-          </button>
+          {headerAction ?? (
+            <button
+              type="button"
+              data-sheet-close
+              onClick={onClose}
+              aria-label={t('common.close')}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 text-xl hover:border-brand"
+            >
+              ×
+            </button>
+          )}
         </div>
         {subtitle && <p className="mb-4 text-sm text-neutral-300">{subtitle}</p>}
         {children}

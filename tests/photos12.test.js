@@ -117,6 +117,8 @@ describe('12 slots in the UI', () => {
     expect(q('snap-4').textContent).toBe('Avance 5');
     expect(q('snap-11').textContent).toBe('Avance 12');
     await mount(h(SnapGrid, { photos: full(), setPhotos: () => {}, projectId: 'proyecto1' }));
+    expect(host.querySelectorAll('[data-testid^="snap-remove-"]')).toHaveLength(0); // deleting is hidden until the edit mode is on
+    await mount(h(SnapGrid, { photos: full(), setPhotos: () => {}, projectId: 'proyecto1', editMode: true }));
     expect(host.querySelectorAll('[data-testid^="snap-remove-"]')).toHaveLength(12);
   });
 

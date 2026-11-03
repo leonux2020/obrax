@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { useMarketClock } from '../lib/marketClock.js';
 import { computeAll } from '../lib/engine.js';
@@ -18,13 +18,14 @@ import { buildDossierDocuments, runExport } from '../lib/exportActions.js';
 import { warmPdfEngine } from '../lib/reportPdf.js';
 import { headerModel, initialWorkspaceState, partidaGroups, quoteLock, unlockQuote, withPriceOverride, workspaceReducer } from '../lib/workspaceModel.js';
 import BottomSheet from './BottomSheet.jsx';
+import { countPhotos } from '../lib/photos.js';
 import Logbook from './Logbook.jsx';
 import { notePhotosFor } from '../lib/notePhotos.js';
 import { receiptPhotosFor } from '../lib/receiptPhotos.js';
 import { useAccordionBack } from '../lib/useAccordionBack.js';
 import ReceiptSheet from './ReceiptSheet.jsx';
 import SignatureSheet from './SignatureSheet.jsx';
-import SnapGrid from './SnapGrid.jsx';
+import SnapGrid, { PhotoEditToggle } from './SnapGrid.jsx';
 import { Button } from './ui.jsx';
 import CashBlock from './workspace/CashBlock.jsx';
 import CrewBlock from './workspace/CrewBlock.jsx';
@@ -266,14 +267,33 @@ function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, c
           </div>
         </BottomSheet>
       )}
-      {ui.sheet === 'camera' && (
-        <BottomSheet title={t('snap.title')} onClose={closeSheet}>
-          <div className="mt-3">
-            <SnapGrid photos={photos} setPhotos={setPhotos} projectId={project.id} />
-          </div>
-        </BottomSheet>
-      )}
+      {ui.sheet === 'camera' && <PhotoSheet photos={photos} setPhotos={setPhotos} projectId={project.id} onClose={closeSheet} />}
       {ui.sheet === 'scan' && <ReceiptSheet onSave={saveExpenses} existing={project.expenses} onQueue={park} onClose={closeSheet} />}
     </main>
+  );
+}
+
+/**
+ * The photo panel: a tall sheet whose header action is the EDIT toggle (a pencil) instead of the classic x. It closes the native way
+ * (device Back, swipe down, tap on the backdrop, Escape). The edit mode lives here and only reveals the delete badges of the grid.
+ */
+export function PhotoSheet({ photos, setPhotos, projectId, onClose }) {
+  const { t } = useI18n();
+  const [edit, setEdit] = useState(false);
+  const count = countPhotos(photos);
+  const editing = edit && count > 0; // nothing left to delete: the mode switches itself off
+  return (
+    <BottomSheet
+      title={t('snap.title')}
+      onClose={onClose}
+      tall
+      swipeToClose
+      autoFocus={false}
+      headerAction={<PhotoEditToggle active={editing} disabled={count === 0} onToggle={() => setEdit((v) => !v)} />}
+    >
+      <div className="mt-3" data-testid="photo-sheet">
+        <SnapGrid photos={photos} setPhotos={setPhotos} projectId={projectId} editMode={editing} />
+      </div>
+    </BottomSheet>
   );
 }

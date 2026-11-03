@@ -3,6 +3,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { MAX_PHOTOS, PHOTO_SLOTS, PhotoError, compressImage, putPhoto, removePhoto, shouldUseLiveCamera, slotLabel } from '../lib/photos.js';
 import { photoStoreFor } from '../lib/photoStore.js';
 import CameraModal from './CameraModal.jsx';
+import PhotoLightbox from './PhotoLightbox.jsx';
 
 const CameraIcon = () => (
   <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -11,12 +12,50 @@ const CameraIcon = () => (
   </svg>
 );
 
+const PencilIcon = ({ size = 22 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" data-outline-icon="true" data-icon="pencil">
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+  </svg>
+);
+const CheckIcon = ({ size = 22 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" data-outline-icon="true" data-icon="check">
+    <path d="M5 12.5l4.5 4.5L19 7.5" />
+  </svg>
+);
+
 /**
- * Tap-to-Snap: an empty grid of photo tiles. Touching an empty tile opens the camera DIRECTLY (the phone's camera
- * app, or the in-app live camera on a desktop) and the photo is stored in that tile: compressed on the device,
- * saved locally, and printed in the reports. A filled tile only offers to remove its photo.
+ * The Edit toggle of the photo panel (the header action that replaces the classic close x): a pencil, or a check while the edit mode is on.
  */
-export default function SnapGrid({ photos, setPhotos, projectId = '_' }) {
+export function PhotoEditToggle({ active, onToggle, disabled = false }) {
+  const { t } = useI18n();
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={disabled}
+      aria-pressed={active}
+      aria-label={t(active ? 'photo.editDone' : 'photo.edit')}
+      title={t(active ? 'photo.editDone' : 'photo.edit')}
+      data-testid="photo-edit-toggle"
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border disabled:opacity-30 ${active ? 'border-brand text-brand' : 'border-white/10 text-neutral-300 hover:border-brand'}`}
+    >
+      {active ? <CheckIcon /> : <PencilIcon />}
+    </button>
+  );
+}
+
+/**
+ * Tap-to-Snap: a grid of photo tiles. Touching an EMPTY tile opens the camera DIRECTLY (the phone's camera app, or the in-app live camera on a
+ * desktop) and the photo is stored in that tile: compressed on the device, saved locally, and printed in the reports. Touching a tile that
+ * already has a photo opens the immersive gallery (PhotoLightbox) on it: swipe between the captured photos only, empty tiles are skipped.
+ * Deleting is hidden behind the EDIT MODE (`editMode`, driven by the header toggle of the sheet; on its own, the grid shows its toggle):
+ * only then does every photo wear its red remove badge, so a thumb on a muddy site can never delete a photo by accident.
+ */
+export default function SnapGrid({ photos, setPhotos, projectId = '_', editMode: controlled }) {
+  const [ownEdit, setOwnEdit] = useState(false);
+  const isEditMode = controlled ?? ownEdit;
+  const [viewing, setViewing] = useState(null); // slot of the photo open in the gallery
   const { t } = useI18n();
   const store = useMemo(() => photoStoreFor(projectId), [projectId]);
   const cameraRef = useRef(null);
@@ -77,8 +116,22 @@ export default function SnapGrid({ photos, setPhotos, projectId = '_' }) {
     setPhotos((prev) => removePhoto(prev, slot));
   };
 
+  // only the captured photos, in tile order: what the gallery pages through
+  const taken = useMemo(() => PHOTO_SLOTS.map((_, slot) => (photos[slot] ? { slot, photo: photos[slot], label: slotLabel(t, slot) } : null)).filter(Boolean), [photos, t]);
+  const viewIndex = viewing === null ? -1 : taken.findIndex((x) => x.slot === viewing);
+
   return (
     <section aria-label={t('snap.title')} data-testid="snap-grid">
+      {controlled === undefined && taken.length > 0 && (
+        <div className="mb-2 flex justify-end">
+          <PhotoEditToggle active={ownEdit} onToggle={() => setOwnEdit((v) => !v)} />
+        </div>
+      )}
+      {isEditMode && taken.length > 0 && (
+        <p className="mb-2 text-xs text-[#e8c35f]" role="status" data-testid="snap-edit-hint">
+          {t('photo.editHint')}
+        </p>
+      )}
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true" data-testid="snap-input" onChange={onFile} />
       <input ref={galleryRef} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={onFile} />
       <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3" data-testid="snap-list">
@@ -90,16 +143,27 @@ export default function SnapGrid({ photos, setPhotos, projectId = '_' }) {
             <li key={key} className="relative aspect-[4/3] overflow-hidden rounded-xl border border-white/10 bg-black sm:rounded-2xl">
               {photo ? (
                 <>
-                  <img src={photo.dataUrl} alt={label} width={photo.width} height={photo.height} decoding="async" draggable="false" className="h-full w-full object-cover" />
                   <button
                     type="button"
-                    aria-label={`${t('photo.delete')}: ${label}`}
-                    data-testid={`snap-remove-${slot}`}
-                    onClick={() => remove(slot)}
-                    className="absolute right-1 top-1 flex h-10 w-10 items-center justify-center rounded-full border border-red-500 bg-black/80 text-red-400"
+                    onClick={() => setViewing(slot)}
+                    data-testid={`snap-view-${slot}`}
+                    aria-label={label}
+                    aria-haspopup="dialog"
+                    className="block h-full w-full"
                   >
-                    ✕
+                    <img src={photo.dataUrl} alt={label} width={photo.width} height={photo.height} decoding="async" draggable="false" className="h-full w-full object-cover" />
                   </button>
+                  {isEditMode && (
+                    <button
+                      type="button"
+                      aria-label={`${t('photo.delete')}: ${label}`}
+                      data-testid={`snap-remove-${slot}`}
+                      onClick={() => remove(slot)}
+                      className="absolute right-1 top-1 flex h-10 w-10 items-center justify-center rounded-full border border-red-500 bg-black/80 text-red-400"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </>
               ) : (
                 <button
@@ -130,6 +194,7 @@ export default function SnapGrid({ photos, setPhotos, projectId = '_' }) {
           {error}
         </p>
       )}
+      {viewIndex >= 0 && <PhotoLightbox items={taken} start={viewIndex} onClose={() => setViewing(null)} />}
       {live !== null && (
         <CameraModal
           slotLabel={slotLabel(t, live)}
