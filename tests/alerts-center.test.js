@@ -122,14 +122,14 @@ describe('Dashboard bell + GlobalAlerts', () => {
     const bell = q('dash-bell');
     const pro = q('pro-scan');
     expect(bell).not.toBeNull();
-    expect(bell.nextElementSibling).toBe(pro); // just to the left of PRO
+    expect(bell.nextElementSibling).toBe(pro); // just to the left of PRO (one thin bar)
     const svg = bell.querySelector('svg');
     expect(svg.getAttribute('stroke-width')).toBe('1.5');
     expect(svg.getAttribute('stroke')).toBe('currentColor');
     expect(svg.getAttribute('fill')).toBe('none');
-    expect(bell.className).toContain('min-h-[52px]');
-    expect(bell.className).toContain('min-w-[52px]'); // the invisible touch area stays generous
-    expect(bell.className).toMatch(/(^|\s)p-3(\s|$)/);
+    expect(bell.className).toContain('min-h-[44px]');
+    expect(bell.className).toContain('min-w-[44px]'); // the invisible touch area still meets the 44 px minimum
+    expect(bell.className).toMatch(/(^|\s)p-2(\s|$)/);
     expect(bell.className).toContain('bg-transparent');
     // floating: nothing that draws a box around the icon
     expect(bell.className).not.toMatch(/(^|\s)(border|ring|shadow|rounded)(-\S+)?(\s|$)/);

@@ -148,12 +148,13 @@ describe('splash + dashboard', () => {
     expect(host.querySelector('[data-testid="splash-start"]')).not.toBeNull();
   });
 
-  it('the dashboard and the top bar carry the isotype at 32 px tall next to the CUBRAX lettering', async () => {
+  it('the dashboard, accounting and the top bar carry a compact isotype (24 px = h-6) next to the CUBRAX lettering', async () => {
     const fs = await import('node:fs');
     const src = fs.readFileSync('src/components/Dashboard.jsx', 'utf8');
     expect(src).toContain('<Wordmark');
-    expect(src).toContain('<Logo size={32}');
-    expect(fs.readFileSync('src/components/Header.jsx', 'utf8')).toContain('<Logo size={32}');
+    expect(src).toContain('<Logo size={24}');
+    expect(fs.readFileSync('src/components/GlobalAccounting.jsx', 'utf8')).toContain('<Logo size={24}');
+    expect(fs.readFileSync('src/components/Header.jsx', 'utf8')).toContain('<Logo size={24}');
     expect(fs.readFileSync('src/components/Header.jsx', 'utf8')).toContain('<Wordmark');
   });
 });
@@ -265,5 +266,57 @@ describe('Logo variant="stacked" (CUBRAX centred under the hat and the ruler)', 
     const letters = [...host.querySelectorAll('[data-testid="logo-word"] path')];
     expect(letters.map((p) => p.getAttribute('data-letter')).join('')).toBe('CUBRAX');
     for (const p of letters) expect(p.getAttribute('fill')).toBe(p.getAttribute('data-letter') === 'X' ? '#22c55e' : '#e5e5e5');
+  });
+});
+
+describe('PRO = titanium (no gold), compact operative headers', () => {
+  it('the PRO surfaces use the titanium palette and never gold / yellow', async () => {
+    const fs = await import('node:fs');
+    for (const f of ['ProPaywall.jsx', 'HelmetIcon.jsx']) expect(fs.readFileSync(`src/components/${f}`, 'utf8'), f).not.toMatch(/d4af37|e8c35f|yellow-|FBBF24|D97706/i);
+    const dash = fs.readFileSync('src/components/Dashboard.jsx', 'utf8');
+    const pro = dash.slice(dash.indexOf('data-testid="pro-pill"') - 200, dash.indexOf('PRO</span>'));
+    expect(pro).toContain('border-slate-500/50');
+    expect(pro).toContain('text-slate-300');
+    expect(pro).not.toMatch(/d4af37|e8c35f|yellow-/i);
+  });
+});
+
+describe('Logo: titanium hard hat when PRO', () => {
+  const hat = (sel) => host.querySelector(`${sel}[data-testid="logo-helmet"]`);
+  it('isPro puts the grayscale / brightness / contrast filter on the hat photo (mark, imagotype and stacked); not PRO leaves it untouched', async () => {
+    for (const variant of ['mark', 'imagotype', 'stacked']) {
+      const tag = variant === 'mark' ? 'img' : 'image';
+      await render(React.createElement(Logo, { variant, isPro: true }));
+      const el = hat(tag);
+      for (const c of ['grayscale', 'brightness-125', 'contrast-125']) expect(el.getAttribute('class'), `${variant} ${c}`).toContain(c);
+      expect(el.dataset.titanium).toBe('true');
+      act(() => root.unmount());
+      host.remove();
+      await render(React.createElement(Logo, { variant, isPro: false }));
+      expect(hat(tag).getAttribute('class') || '').not.toMatch(/grayscale|brightness|contrast/);
+      expect(hat(tag).dataset.titanium).toBeUndefined();
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('the green X of the lettering stays #22c55e and the rest of the lettering is never filtered (PRO or not)', async () => {
+    await render(React.createElement(Logo, { variant: 'stacked', isPro: true }));
+    const svg = host.querySelector('svg[data-testid="logo"]');
+    expect(svg.querySelector('path[data-letter="X"]').getAttribute('fill')).toBe('#22c55e');
+    expect(svg.querySelector('[data-testid="logo-word"]').getAttribute('class') || '').not.toMatch(/grayscale|brightness|contrast/);
+    expect(svg.getAttribute('class')).not.toMatch(/grayscale|brightness|contrast/); // the filter is on the hat only
+    expect(svg.innerHTML.match(/class="[^"]*grayscale/g)).toHaveLength(1);
+  });
+
+  it('without the prop it follows the app PRO flag (usePro)', async () => {
+    localStorage.setItem('cp.pro.sim.v1', '1');
+    await render(React.createElement(Logo, { variant: 'mark' }));
+    expect(hat('img').dataset.titanium).toBe('true');
+    act(() => root.unmount());
+    host.remove();
+    localStorage.removeItem('cp.pro.sim.v1');
+    await render(React.createElement(Logo, { variant: 'mark' }));
+    expect(hat('img').dataset.titanium).toBeUndefined();
   });
 });

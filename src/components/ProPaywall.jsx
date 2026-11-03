@@ -34,19 +34,19 @@ export default function ProPaywall({ feature = 'promo', onClose }) {
   return (
     <BottomSheet fullscreen title={t('pro.title')} subtitle={t('pro.subtitle')} onClose={onClose}>
       <div data-testid="pro-paywall" className="mx-auto max-w-lg pb-4">
-        <div className="mb-5 mt-1 flex items-center gap-2 text-[#e8c35f]">
+        <div className="mb-5 mt-1 flex items-center gap-2 text-slate-300">
           <HelmetIcon size={32} />
-          <span className="rounded-md border border-[#d4af37]/60 px-1.5 text-[11px] font-semibold tracking-wider">PRO</span>
+          <span className="rounded-md border border-slate-500/50 px-1.5 text-[11px] font-semibold tracking-wider">PRO</span>
         </div>
 
         {pro && (
-          <p role="status" data-testid="pro-active-note" className="mb-4 rounded-xl border border-[#d4af37] px-4 py-3 text-sm font-semibold text-[#e8c35f]">
+          <p role="status" data-testid="pro-active-note" className="mb-4 rounded-xl border border-slate-400 px-4 py-3 text-sm font-semibold text-slate-300">
             {t('pro.active')}
           </p>
         )}
 
         {feature !== 'promo' && !pro && (
-          <p role="status" data-testid="pro-reason" className="mb-4 rounded-xl border border-[#d4af37]/60 px-4 py-3 text-sm font-semibold text-[#e8c35f]">
+          <p role="status" data-testid="pro-reason" className="mb-4 rounded-xl border border-slate-500/50 px-4 py-3 text-sm font-semibold text-slate-300">
             {t(`pro.locked.${feature}`, { n: FREE_PROJECT_LIMIT })}
           </p>
         )}
@@ -57,9 +57,9 @@ export default function ProPaywall({ feature = 'promo', onClose }) {
             <li
               key={b.id}
               data-active={feature === b.id ? 'true' : undefined}
-              className={`flex items-start gap-3 p-4 ${feature === b.id ? 'shadow-[inset_3px_0_0_#d4af37]' : ''}`}
+              className={`flex items-start gap-3 p-4 ${feature === b.id ? 'shadow-[inset_3px_0_0_#94a3b8]' : ''}`}
             >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#e8c35f" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-0.5 shrink-0">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-0.5 shrink-0">
                 <path d={b.icon} />
               </svg>
               <div>
@@ -87,13 +87,13 @@ export default function ProPaywall({ feature = 'promo', onClose }) {
                 onClick={() => setPlan(p.id)}
                 className={`relative flex w-full items-center justify-between gap-3 rounded-2xl bg-black px-4 text-left transition active:scale-[0.99] ${
                   p.featured ? 'min-h-[104px] border-2 py-5' : 'min-h-[72px] border py-3'
-                } ${on ? 'border-[#d4af37]' : p.featured ? 'border-[#d4af37]/50' : 'border-white/10 hover:border-white/40'}`}
+                } ${on ? 'border-slate-400' : p.featured ? 'border-slate-500/50' : 'border-white/10 hover:border-white/40'}`}
               >
                 <span className="min-w-0">
                   <span className="flex flex-wrap items-center gap-2">
                     <span className={`${p.featured ? 'text-lg' : 'text-base'} font-semibold text-neutral-200`}>{t(p.name)}</span>
                     {p.badges?.map((bd) => (
-                      <span key={bd} className="rounded-md border border-[#d4af37]/60 px-1.5 text-[11px] font-semibold text-[#e8c35f]">
+                      <span key={bd} className="rounded-md border border-slate-500/50 px-1.5 text-[11px] font-semibold text-slate-300">
                         {t(bd)}
                       </span>
                     ))}
@@ -101,7 +101,7 @@ export default function ProPaywall({ feature = 'promo', onClose }) {
                   {p.perMonth && <span className="mt-0.5 block text-sm text-neutral-300">{t('pro.permonth', { price: p.perMonth })}</span>}
                   {p.note && <span className="block text-xs text-neutral-400">{t(p.note)}</span>}
                 </span>
-                <span className={`shrink-0 text-right font-medium tabular-nums ${p.featured ? 'text-xl' : 'text-base'} ${on || p.featured ? 'text-[#e8c35f]' : 'text-neutral-200'}`}>{t(p.price)}</span>
+                <span className={`shrink-0 text-right font-medium tabular-nums ${p.featured ? 'text-xl' : 'text-base'} ${on || p.featured ? 'text-slate-300' : 'text-neutral-200'}`}>{t(p.price)}</span>
               </button>
             );
           })}
@@ -123,7 +123,7 @@ export default function ProPaywall({ feature = 'promo', onClose }) {
             // Turning PRO on is immediate for the whole app (usePro) and closes this screen.
             <Button
               variant="ghost"
-              className="w-full !border-[#d4af37]/60 text-[#e8c35f]"
+              className="w-full !border-slate-500/50 text-slate-300"
               data-testid={pro ? 'pro-dev-deactivate' : 'pro-dev-activate'}
               onClick={() => {
                 setSimulatedPro(!pro);

@@ -379,14 +379,14 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
         type="button"
         onClick={() => (pro ? setScanOpen(true) : onPro('ai'))}
         data-testid="scan-receipt"
-        className="mt-5 flex min-h-[64px] w-full items-center justify-center gap-3 rounded-2xl border-2 border-[#d4af37] px-4 text-lg font-medium text-[#e8c35f] transition active:scale-[0.99]"
+        className="mt-5 flex min-h-[64px] w-full items-center justify-center gap-3 rounded-2xl border-2 border-slate-400 px-4 text-lg font-medium text-slate-300 transition active:scale-[0.99]"
       >
         <Icon size={28}>
           <path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" />
           <circle cx="12" cy="13.5" r="3.5" />
         </Icon>
         <span>{t('scan.cta')}</span>
-        {!pro && <span className="rounded border border-[#d4af37]/60 px-1.5 text-[10px] tracking-widest">PRO</span>}
+        {!pro && <span className="rounded border border-slate-500/50 px-1.5 text-[10px] tracking-widest">PRO</span>}
         {pro === 'dev' && <span data-testid="ai-dev-badge" className="rounded border border-white/30 px-1.5 text-[10px] tracking-widest text-neutral-300">DEV</span>}
       </button>
 

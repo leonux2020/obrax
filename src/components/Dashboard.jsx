@@ -80,12 +80,12 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro, 
 
   return (
     <main className="mx-auto w-full max-w-3xl px-3 pb-44 pt-3 sm:px-4">
-      <header className="mb-3 flex items-center gap-3">
-        {/* isotype (32 px tall) + name, aligned on one line */}
-        <Logo size={32} />
+      <header className="mb-2 flex items-center gap-2" data-testid="dash-header">
+        {/* ultra-compact top bar: isotype (24 px = h-6) + name, bell and PRO on ONE thin line */}
+        <Logo size={24} />
         <span className="sr-only">{t('app.name')}</span>
         <span className="flex min-w-0 flex-1 items-center">
-          <Wordmark height={16} />
+          <Wordmark height={13} />
         </span>
         {/* global alerts (Action Center): bell, 1.5 px outline, just left of PRO, floating (no box, no border, no background: only an invisible 52 px touch area); an amber dot only when something needs attention */}
         <button
@@ -94,24 +94,29 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro, 
           aria-label={t('ws.alerts.title')}
           data-testid="dash-bell"
           data-alerts={alerts.length || undefined}
-          className="relative flex min-h-[52px] min-w-[52px] items-center justify-center bg-transparent p-3 text-white/60 transition active:scale-95 active:text-neutral-200 active:opacity-50"
+          className="relative flex min-h-[44px] min-w-[44px] items-center justify-center bg-transparent p-2 text-white/60 transition active:scale-95 active:text-neutral-200 active:opacity-50"
         >
-          <BellIcon size={26} />
-          {alerts.length > 0 && <span aria-hidden="true" data-testid="dash-bell-dot" className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-amber-500" />}
+          <BellIcon size={24} />
+          {alerts.length > 0 && <span aria-hidden="true" data-testid="dash-bell-dot" className="absolute right-2.5 top-2.5 h-2.5 w-2.5 rounded-full bg-amber-500" />}
         </button>
-        {/* PRO: always a real button that opens the plans screen (also when PRO is already active). Gold hard hat on top. */}
+        {/* PRO: always a real button that opens the plans screen (also when PRO is already active). Titanium / silver hard hat + label side by side: a slim pill (36 px) inside a 44 px touch area. */}
         <button
           type="button"
           onClick={() => onPro()}
           data-testid={pro ? 'pro-active' : 'pro-scan'}
           data-pro={pro ? 'true' : undefined}
           aria-label={pro ? t('pro.active') : t('pro.cta')}
-          className={`flex min-h-[52px] min-w-[52px] flex-col items-center justify-center gap-0.5 rounded-xl border px-2 py-1 transition-shadow duration-200 hover:shadow-[0_0_14px_rgba(212,175,55,0.5)] focus-visible:shadow-[0_0_14px_rgba(212,175,55,0.5)] active:shadow-[0_0_18px_rgba(232,195,95,0.6)] ${
-            pro ? 'border-[#d4af37]/60 text-[#e8c35f]' : 'border-white/15 text-white/60 hover:border-[#d4af37]/70 hover:text-[#e8c35f]'
-          }`}
+          className="group flex min-h-[44px] min-w-[44px] items-center justify-center"
         >
-          <HelmetIcon size={28} />
-          <span className="text-[11px] font-semibold leading-none tracking-widest">PRO</span>
+          <span
+            data-testid="pro-pill"
+            className={`flex h-9 items-center gap-1.5 rounded-lg border px-2.5 transition-shadow duration-200 group-hover:shadow-[0_0_12px_rgba(203,213,225,0.35)] group-focus-visible:shadow-[0_0_12px_rgba(203,213,225,0.35)] group-active:shadow-[0_0_16px_rgba(226,232,240,0.45)] ${
+              pro ? 'border-slate-500/50 text-slate-300' : 'border-white/15 text-white/60 group-hover:border-slate-400/70 group-hover:text-slate-300'
+            }`}
+          >
+            <HelmetIcon size={20} />
+            <span className="text-[11px] font-semibold leading-none tracking-widest">PRO</span>
+          </span>
         </button>
       </header>
       {/* no visible title and no "MODO PRO (Prueba)" tag: top bar (logo + PRO) and, right below, the four triangles. The heading stays for screen readers. */}

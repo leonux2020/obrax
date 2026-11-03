@@ -236,17 +236,18 @@ describe('PRO button and benefits screen', () => {
     expect(pro.className).not.toMatch(/min-h-\[56px\]/);
   });
 
-  it('the hard hat is a 3/4 gold-gradient site-manager helmet: front-only short visor, smooth flank, low thin crest, top-left light', async () => {
+  it('the hard hat is a 3/4 titanium-gradient site-manager helmet: front-only short visor, smooth flank, low thin crest, top-left light', async () => {
     await setup();
     await click(q('pro-scan'));
     const svg = document.querySelector('svg[data-testid="helmet-icon"]');
-    expect(Number(svg.getAttribute('width'))).toBeGreaterThanOrEqual(24); // w-6 or larger, the protagonist of the button
+    expect(Number(svg.getAttribute('width'))).toBeGreaterThanOrEqual(20); // the slim pill of the compact bar
     expect(Number(svg.getAttribute('width'))).toBe(Number(svg.getAttribute('height')));
     const grads = [...svg.querySelectorAll('linearGradient')];
     expect(grads.length).toBeGreaterThanOrEqual(1);
     const stops = [...grads[0].querySelectorAll('stop')].map((s) => s.getAttribute('stop-color').toUpperCase());
-    expect(stops).toContain('#FBBF24');
-    expect(stops).toContain('#D97706');
+    expect(stops).toContain('#CBD5E1');
+    expect(stops).toContain('#64748B');
+    expect(svg.outerHTML).not.toMatch(/#FBBF24|#D97706|#F59E0B|#FDE08A/i); // no gold left
     // every gradient id is unique and the fills reference them (no flat single-colour body)
     const ids = grads.map((g) => g.getAttribute('id'));
     expect(new Set(ids).size).toBe(ids.length);

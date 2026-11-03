@@ -1,14 +1,18 @@
 import { useId, useState } from 'react';
 import { LETTER_PATHS, MARK_LAYOUT, IMAGO_LAYOUT, ICON_LAYOUT, IMAGO_INK, DIM_ART, RULER_ART, HELMET_FILE, WORD, WORD_BOX, WORD_VIEWBOX, BRAND } from '../brand/icon.js';
 import NumberPad from './workspace/NumberPad.jsx';
+import { usePro } from '../lib/usePro.js';
+
+/** Titanium / silver hard hat of a PRO user: the photo goes grey and a bit brighter and crisper. The green X of the lettering is never touched. */
+export const TITANIUM_HELMET = 'grayscale brightness-125 contrast-125';
 
 /**
  * The complete CUBRAX imagotype: isotype + lettering in ONE SVG (viewBox = the whole lockup, nothing is cut or squeezed).
  *   stacked    (welcome) the lettering is centred EXACTLY under the hard hat and the ruler (the same lockup as the app icon)
  *   imagotype  the lettering on the right of the hat (wide rectangle)
- * "CUBRA" light grey (#e5e5e5), only the "X" brand green (#22c55e). Size it with classes (`w-56 h-auto`).
+ * "CUBRA" light grey (#e5e5e5), only the "X" brand green (#22c55e). `titanium` (PRO) filters ONLY the hard hat photo. Size it with classes (`w-56 h-auto`).
  */
-function Imagotype({ className = '', stacked = false }) {
+function Imagotype({ className = '', stacked = false, titanium = false }) {
   const ink = (art) => art.replaceAll('#ffffff', IMAGO_INK);
   const box = stacked ? { w: ICON_LAYOUT.w, h: ICON_LAYOUT.h } : IMAGO_LAYOUT;
   const markX = stacked ? ICON_LAYOUT.markX : 0;
@@ -20,6 +24,8 @@ function Imagotype({ className = '', stacked = false }) {
         <image
           href={`${import.meta.env.BASE_URL}${HELMET_FILE}`}
           data-testid="logo-helmet"
+          data-titanium={titanium ? 'true' : undefined}
+          className={titanium ? TITANIUM_HELMET : undefined}
           x="0"
           y={MARK_LAYOUT.helmet.y}
           width={MARK_LAYOUT.w}
@@ -38,8 +44,11 @@ function Imagotype({ className = '', stacked = false }) {
 }
 
 /** The CUBRAX isotype (dimension line + 3/4 hard hat + ruler, vector, transparent): `size` is its HEIGHT in px. `variant="stacked"` = isotype with the lettering centred under it, `"imagotype"` = lettering on the right (both sized by classes). */
-export function Logo({ size = 40, className = '', variant = 'mark' }) {
-  if (variant === 'imagotype' || variant === 'stacked') return <Imagotype className={className} stacked={variant === 'stacked'} />;
+export function Logo({ size = 40, className = '', variant = 'mark', isPro }) {
+  // PRO state: explicit `isPro` wins, otherwise the app's own PRO flag (usePro) decides
+  const appPro = usePro();
+  const titanium = isPro ?? appPro;
+  if (variant === 'imagotype' || variant === 'stacked') return <Imagotype className={className} stacked={variant === 'stacked'} titanium={titanium} />;
   // Hybrid isotype, sized by HEIGHT: static SVG dimension line on top, the supplied photoreal hard hat in the middle
   // (<img>, object-fit: contain, never distorted) and the static SVG ruler below, with transparent air in between.
   const k = size / MARK_LAYOUT.h;
@@ -67,6 +76,8 @@ export function Logo({ size = 40, className = '', variant = 'mark' }) {
         alt=""
         draggable="false"
         data-testid="logo-helmet"
+        data-titanium={titanium ? 'true' : undefined}
+        className={titanium ? TITANIUM_HELMET : undefined}
         style={{
           display: 'block',
           flex: 'none',

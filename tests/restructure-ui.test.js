@@ -128,17 +128,21 @@ describe('Dashboard: counters instead of sentences, tabs, full-width clickable c
     expect(Object.values(LEVEL_COLOR).slice(0, 4)).toEqual(Object.values(colors));
   });
 
-  it('PRO button: gold hard hat right above the label, subtle gold glow on hover / touch, always opens the plans screen', async () => {
+  it('PRO button: titanium hard hat beside the label in a slim pill, subtle silver glow on hover / touch, always opens the plans screen', async () => {
     const onPro = vi.fn();
     await render(React.createElement(Dashboard, { projects: [], tab: 'active', onTab: () => {}, onNew: () => {}, onOpen: () => {}, onPro }));
     const btn = q('pro-scan');
     expect(btn.tagName).toBe('BUTTON');
-    expect(btn.className).toContain('flex-col');
-    const [hat, label] = [btn.firstElementChild, btn.lastElementChild];
-    expect(hat.getAttribute('data-testid')).toBe('helmet-icon'); // above...
+    expect(btn.className).toContain('min-h-[44px]'); // 44 px touch area...
+    const pill = q('pro-pill');
+    expect(pill.className).toContain('h-9'); // ...around a slim 36 px pill
+    expect(pill.className).not.toContain('flex-col'); // hat and label on ONE line
+    const [hat, label] = [pill.firstElementChild, pill.lastElementChild];
+    expect(hat.getAttribute('data-testid')).toBe('helmet-icon'); // left...
     expect(label.textContent).toBe('PRO'); // ...the text
-    expect(btn.className).toMatch(/hover:shadow-\[0_0_\d+px_rgba\(212,175,55/);
-    expect(btn.className).toMatch(/active:shadow-/);
+    expect(pill.className).toMatch(/group-hover:shadow-\[0_0_\d+px_rgba\(203,213,225/); // silver glow
+    expect(pill.className).toMatch(/group-active:shadow-/);
+    expect(btn.outerHTML).not.toMatch(/d4af37|e8c35f|yellow|amber|rgba\(212,175,55/i); // no gold at all
     await click(btn);
     expect(onPro).toHaveBeenCalledTimes(1);
     act(() => root.unmount());

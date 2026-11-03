@@ -172,13 +172,13 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
           ↻ {t('prices.refresh')}
         </Button>
       </div>
-      <div className="rounded-2xl border border-[#d4af37]/60 p-3" data-testid="invoice-card">
-        <Button variant="ghost" className="w-full !min-h-[56px] !border-[#d4af37]/60 text-[#e8c35f]" onClick={openInvoice} data-testid="invoice-open">
+      <div className="rounded-2xl border border-slate-500/50 p-3" data-testid="invoice-card">
+        <Button variant="ghost" className="w-full !min-h-[56px] !border-slate-500/50 text-slate-300" onClick={openInvoice} data-testid="invoice-open">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M4 7V5a1 1 0 0 1 1-1h2M20 7V5a1 1 0 0 0-1-1h-2M4 17v2a1 1 0 0 0 1 1h2M20 17v2a1 1 0 0 1-1 1h-2M8 12h8" />
           </svg>
           {t('inv.cta')}
-          {!pro && <span className="rounded-md border border-[#d4af37]/60 px-1.5 text-[11px] font-semibold tracking-wider">PRO</span>}
+          {!pro && <span className="rounded-md border border-slate-500/50 px-1.5 text-[11px] font-semibold tracking-wider">PRO</span>}
           {pro === 'dev' && <span data-testid="ai-dev-badge" className="rounded-md border border-white/30 px-1.5 text-[11px] font-semibold tracking-wider text-neutral-300">DEV</span>}
         </Button>
         <p className="mt-2 text-xs text-neutral-300">{t('inv.cta.hint')}</p>
