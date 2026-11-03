@@ -6,6 +6,7 @@
 
 import { sanitizeText, sanitizeEmail, sanitizeAvatarUrl } from './sanitize.js';
 import { getDriveToken, markDriveNeedsInteraction, needsDriveInteraction, setDriveToken } from './driveToken.js';
+import { isStandalone } from '../pwa/installPrompt.js';
 
 const CLIENT_ID_RE = /^[\w-]+\.apps\.googleusercontent\.com$/;
 
@@ -102,8 +103,11 @@ const driveError = (code) => Object.assign(new Error(`drive:${code}`), { code })
  * with a full-page redirect) and nothing visible is ever opened as a fallback. `hint` (the Google
  * account e-mail) lets Google pick the right account without asking.
  */
-export async function requestDriveAccess({ clientId = GOOGLE_CLIENT_ID, enabled = googleConfigured, load = loadGsi, prompt = '', hint = '', silentTimeoutMs = 15_000 } = {}) {
+export async function requestDriveAccess({ clientId = GOOGLE_CLIENT_ID, enabled = googleConfigured, load = loadGsi, prompt = '', hint = '', silentTimeoutMs = 15_000, popups = !isStandalone() } = {}) {
   if (!enabled) throw driveError('not_configured');
+  // An INSTALLED app (PWA) blocks OAuth pop-ups: the window opens blank and never answers. There the consent is a full-page redirect from the start:
+  // refusing with 'popup' at once sends every caller down that path (connectDrive / ensureDriveToken) instead of leaving the user on a white screen.
+  if (prompt !== 'none' && !popups) throw driveError('popup');
   let google;
   try {
     google = await load();
@@ -148,7 +152,7 @@ export async function requestDriveAccess({ clientId = GOOGLE_CLIENT_ID, enabled 
  *   `interactive: true` may open the Google window: ONLY from a tap of the user ("Enviar a Drive", "Reconectar Drive", "Respaldar ahora").
  * Never throws.
  */
-export async function ensureDriveToken({ interactive = false, request = requestDriveAccess, hint = '' } = {}) {
+export async function ensureDriveToken({ interactive = false, request = requestDriveAccess, hint = '', redirect = defaultRedirect } = {}) {
   const held = getDriveToken();
   if (held) return held;
   if (!interactive && needsDriveInteraction()) return null; // Google already said it needs the user: abort quietly, no request at all
@@ -158,6 +162,8 @@ export async function ensureDriveToken({ interactive = false, request = requestD
     try {
       await request({ prompt: interactive ? '' : 'none', ...(hint ? { hint } : {}) });
     } catch (err) {
+      // a tap and the pop-up cannot open (installed app / blocked): the same consent through a full-page redirect; the answer is caught on return (oauthCallback)
+      if (interactive && err?.code === 'popup') await redirect();
       // not offline / not configured: Google is there and cannot give a token without the user (or never answered): park until a tap
       if (!interactive && ['interaction_required', 'denied', 'timeout', 'popup'].includes(err?.code)) markDriveNeedsInteraction();
       return null;
@@ -169,3 +175,5 @@ export async function ensureDriveToken({ interactive = false, request = requestD
   return renewals[key];
 }
 const renewals = { silent: null, interactive: null };
+// oauthCallback imports this file: loaded on demand to avoid a circular import at start-up
+const defaultRedirect = () => import('./oauthCallback.js').then((m) => m.startDriveRedirect()).catch(() => null);

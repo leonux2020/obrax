@@ -69,7 +69,9 @@ import Dashboard from './components/Dashboard.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import ProjectSheet from './components/ProjectSheet.jsx';
 import SettingsView from './components/SettingsView.jsx';
-import { clearOAuthResult, connectDrive, peekOAuthResult } from './lib/oauthCallback.js';
+import { clearOAuthResult, clearSignInResult, connectDrive, peekOAuthResult, peekSignInResult } from './lib/oauthCallback.js';
+import { BackupStatusContext } from './lib/backupStatus.jsx';
+import { onWorkersChanged } from './lib/workers.js';
 import SplashScreen from './components/SplashScreen.jsx';
 import ProfileSetup from './components/ProfileSetup.jsx';
 import ProPaywall from './components/ProPaywall.jsx';
@@ -150,6 +152,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   const [activeId, setActiveId] = useState(null); // null = dashboard
   // Google's answer after a full-page redirect (Drive consent), already validated and stripped of its token in main.jsx.
   const [oauth] = useState(peekOAuthResult);
+  const [signInReturn] = useState(peekSignInResult); // the account chosen at Google after a full-page sign-in (installed apps never open a pop-up)
   const [meta, setMeta] = useState(() => {
     const m = loadProfileMeta(); // { onboarded, drive }
     return oauth?.granted && m.onboarded ? { ...m, drive: true } : m;
@@ -282,6 +285,8 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     };
   }, [sync]);
 
+  // The Squadra directory lives in localStorage, outside React state: its writes tell the backup engine too (a worker edited = a change to protect)
+  useEffect(() => onWorkersChanged(() => !wipingRef.current && backupOnRef.current && sync.markDirty()), [sync]);
   useEffect(() => saveSettings(settings), [settings]);
   useEffect(() => saveUser(user), [user]);
   useEffect(() => saveCompany(company), [company]);
@@ -815,6 +820,13 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     []
   );
 
+  // Back from Google after a full-page sign-in (installed app): take the chosen account in, once, and forget the one-shot result.
+  useEffect(() => {
+    if (!signInReturn) return;
+    clearSignInResult();
+    if (signInReturn.user) signIn(signInReturn.user);
+  }, [signInReturn, signIn]);
+
   const returning = meta.onboarded || !isCompanyEmpty(company);
   // "Iniciar": a returning user goes straight on; a new one gets the single setup screen, with the country,
   // currency and language already taken from the device (nothing to answer).
@@ -826,11 +838,16 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     }
     return setStage('setup');
   };
+  const backupStatusValue = useMemo(
+    () => ({ enabled: backupOn && Boolean(user), status: backup.status, reason: backup.reason, dirty: backup.dirty, at: backup.at, held: backup.held }),
+    [backupOn, user, backup]
+  );
   const editing = sheet?.type === 'edit' ? projects?.find((p) => p.id === sheet.id) : null;
   const navActive = tab;
 
   return (
     <I18nProvider lang={settings.lang} regionCode={active ? active.draft.regionCode : settings.region}>
+     <BackupStatusContext.Provider value={backupStatusValue}>
       {stage === 'splash' ? (
         <SplashScreen onStart={start} auto={Boolean(oauth)} pwa={pwa} />
       ) : stage === 'setup' ? (
@@ -985,6 +1002,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
         </>
       )}
       {restoreOffer && <RestorePrompt onRestore={restoreOffered} onLater={() => setRestoreOffer(false)} onDone={finishOffer} />}
+     </BackupStatusContext.Provider>
     </I18nProvider>
   );
 }

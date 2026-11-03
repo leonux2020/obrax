@@ -6,6 +6,7 @@ import { projectMarket } from '../lib/ledger.js';
 import { isClosed, projectLevel, projectTitle, sortProjects } from '../lib/projects.js';
 import { usePro } from '../lib/usePro.js';
 import { Logo, Wordmark } from './ui.jsx';
+import BackupBadge from './BackupBadge.jsx';
 import HelmetIcon from './HelmetIcon.jsx';
 import { LEVEL_COLOR } from './levelStyle.js';
 import ProjectCard from './ProjectCard.jsx';
@@ -87,6 +88,7 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro, 
         <span className="flex min-w-0 flex-1 items-center">
           <Wordmark height={13} />
         </span>
+        <BackupBadge />
         {/* global alerts (Action Center): bell, 1.5 px outline, just left of PRO, floating (no box, no border, no background: only an invisible 52 px touch area); an amber dot only when something needs attention */}
         <button
           type="button"

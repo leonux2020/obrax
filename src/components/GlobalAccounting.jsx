@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import BackupBadge from './BackupBadge.jsx';
 import { useI18n, makeI18n } from '../lib/i18n.jsx';
 import { useMarketClock } from '../lib/marketClock.js';
 import { projectBalance } from '../lib/rendition.js';
@@ -139,6 +140,7 @@ export default function GlobalAccounting({ projects, onOpenProject = null, onExp
       <header className="mb-2 flex min-h-[44px] items-center gap-2" data-testid="acc-header">
         <Logo size={24} />
         <h1 className="min-w-0 flex-1 truncate text-lg font-medium tracking-tight">{t('nav.accountingShort')}</h1>
+        <BackupBadge />
       </header>
 
       {projects.length === 0 ? (

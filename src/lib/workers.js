@@ -87,6 +87,15 @@ export function mergeWorkers(local, incoming) {
   return [...byId.values()].sort(byName).slice(0, WORKER_LIMIT);
 }
 
+// ---- change notifications: the invisible backup engine listens, so a worker edited in Ajustes goes up to Drive like any other change ----
+const listeners = new Set();
+/** `fn()` runs after every successful write of the directory. Returns the unsubscribe function. */
+export function onWorkersChanged(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+const emitChanged = () => listeners.forEach((fn) => { try { fn(); } catch { /* a listener never breaks a save */ } });
+
 // ---- storage (localStorage; never throws) -----------------------------------------------------------------------------------
 export function loadWorkers() {
   try {
@@ -107,6 +116,7 @@ export function saveWorkers(list) {
   } catch {
     /* storage full / blocked */
   }
+  emitChanged();
   return clean;
 }
 
