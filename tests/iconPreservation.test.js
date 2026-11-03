@@ -42,7 +42,7 @@ describe('icon preservation', () => {
 
   it('the advance button is the only user of CoinsIcon; the cobros block keeps its BanknoteIcon', () => {
     const crew = readFileSync('src/components/workspace/CrewBlock.jsx', 'utf8');
-    expect(crew).toContain('<CoinsIcon size={28} />');
+    expect(crew).toContain('<CoinsIcon size={20} />');
     expect(crew).not.toMatch(/Banknote|CashIcon/);
     const cash = readFileSync('src/components/workspace/CashBlock.jsx', 'utf8');
     expect(cash).toContain('<BanknoteIcon size={32} />');

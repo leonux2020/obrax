@@ -13,32 +13,35 @@ import LockedZone from './LockedZone.jsx';
 import NumberPad from './NumberPad.jsx';
 import { CoinsIcon, SPECIALTY_ICON, UsersIcon } from './icons.jsx';
 
-/** The two job dates, typed by hand, and the days between them (a plain subtraction, no estimate). */
+/**
+ * The two job dates, typed by hand, as ONE minimalist pill on a single line: "📅 23/10/2026 ➔ 25/10/2026 (2 días)". Each date is a real
+ * date field (the whole field opens the calendar) stripped of its box; the days between them are a plain subtraction, no estimate.
+ */
 function Dates({ project, setProject }) {
   const { t } = useI18n();
   const startId = useId();
   const endId = useId();
   const days = calendarDays(project);
+  const bare = '!min-h-[40px] !w-[8.6rem] !rounded-lg !border-transparent !bg-transparent !px-1.5 !py-0 text-center text-sm tabular-nums';
   return (
-    <div className="space-y-3" data-testid="crew-dates">
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="label tabular-nums" htmlFor={startId}>
-            {t('ws.crew.start')}
-          </label>
-          <DateInput id={startId} value={project.startDate} onChange={(e) => setProject((p) => withProjectDates(p, { startDate: e.target.value }))} data-testid="crew-start" />
-        </div>
-        <div>
-          <label className="label tabular-nums" htmlFor={endId}>
-            {t('ws.crew.end')}
-          </label>
-          <DateInput id={endId} value={project.endDate} min={project.startDate || undefined} onChange={(e) => setProject((p) => withProjectDates(p, { endDate: e.target.value }))} data-testid="crew-end" />
-        </div>
-      </div>
-      <p className="flex min-h-[44px] items-center justify-between rounded-xl border border-white/10 px-3 text-sm" data-testid="crew-duration" data-days={days ?? ''}>
-        <span className="text-[#E0E0E0]/70">{t('ws.crew.duration')}</span>
-        <span className="text-base font-medium tabular-nums">{days === null ? '—' : t(days === 1 ? 'ws.crew.day1' : 'ws.crew.dayN', { n: days })}</span>
-      </p>
+    <div className="flex min-h-[48px] flex-wrap items-center justify-center gap-x-1 gap-y-0 rounded-full border border-white/10 px-3 py-1" data-testid="crew-dates">
+      <span aria-hidden="true" className="text-base leading-none">
+        📅
+      </span>
+      <label className="sr-only" htmlFor={startId}>
+        {t('ws.crew.start')}
+      </label>
+      <DateInput id={startId} className={bare} value={project.startDate} onChange={(e) => setProject((p) => withProjectDates(p, { startDate: e.target.value }))} data-testid="crew-start" />
+      <span aria-hidden="true" className="text-neutral-400">
+        ➔
+      </span>
+      <label className="sr-only" htmlFor={endId}>
+        {t('ws.crew.end')}
+      </label>
+      <DateInput id={endId} className={bare} value={project.endDate} min={project.startDate || undefined} onChange={(e) => setProject((p) => withProjectDates(p, { endDate: e.target.value }))} data-testid="crew-end" />
+      <span className="text-sm tabular-nums text-[#E0E0E0]/80" data-testid="crew-duration" data-days={days ?? ''} aria-label={t('ws.crew.duration')}>
+        ({days === null ? '—' : t(days === 1 ? 'ws.crew.day1' : 'ws.crew.dayN', { n: days })})
+      </span>
     </div>
   );
 }
@@ -161,7 +164,10 @@ function WorkerSheet({ worker, file = null, health = false, onSave, onDelete, on
   );
 }
 
-/** One person: icon of the role, name, specialty, notes, the cash advanced to them and the button that hands over a new advance. */
+/**
+ * One person as a flat HORIZONTAL row: role icon | name (+ health warning) over the specialty in small muted type | a compact
+ * [coins Anticipo] button on the same line. The advances handed over (sum + detail) stay open right under that line, compact.
+ */
 function WorkerCard({ row, health = false, onEdit, onAdvance, onRemoveAdvance }) {
   const { t, money, locale } = useI18n();
   const { worker: w, list, total } = row;
@@ -169,55 +175,52 @@ function WorkerCard({ row, health = false, onEdit, onAdvance, onRemoveAdvance })
   const stamp = (ms) => (ms ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(ms)) : '');
   return (
     <li className="rounded-xl border border-white/10 bg-black" data-testid={`worker-${w.id}`} data-specialty={w.specialty}>
-      <button type="button" onClick={onEdit} data-testid={`worker-edit-${w.id}`} aria-label={`${t('ws.crew.sheetEdit')}: ${w.name}${health ? ` · ⚠ ${t('squadra.healthFlag')}` : ''}`} className="flex min-h-[64px] w-full items-center gap-3 px-3 py-2 text-left active:bg-black">
-        <Icon size={26} className="text-brand" />
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-2">
-            <span className="min-w-0 truncate text-base font-medium" data-testid={`worker-name-${w.id}`}>
-              {w.name}
-            </span>
-            {/* safety: the warning of the worker's file (limiting condition / allergy) stays on the card for as long as they are on the job */}
-            {health && (
-              <span role="img" aria-label={t('squadra.healthFlag')} title={t('squadra.healthFlag')} data-testid={`worker-health-${w.id}`} className="shrink-0 text-lg leading-none text-orange-500">
-                ⚠
+      <div className="flex items-center gap-2 pr-2">
+        <button type="button" onClick={onEdit} data-testid={`worker-edit-${w.id}`} aria-label={`${t('ws.crew.sheetEdit')}: ${w.name}${health ? ` · ⚠ ${t('squadra.healthFlag')}` : ''}`} className="flex min-h-[56px] min-w-0 flex-1 items-center gap-3 py-1.5 pl-3 text-left active:bg-black">
+          <Icon size={24} className="text-brand" />
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2">
+              <span className="min-w-0 truncate text-base font-medium" data-testid={`worker-name-${w.id}`}>
+                {w.name}
               </span>
-            )}
+              {/* safety: the warning of the worker's file (limiting condition / allergy) stays on the card for as long as they are on the job */}
+              {health && (
+                <span role="img" aria-label={t('squadra.healthFlag')} title={t('squadra.healthFlag')} data-testid={`worker-health-${w.id}`} className="shrink-0 text-lg leading-none text-orange-500">
+                  ⚠
+                </span>
+              )}
+            </span>
+            <span className="block truncate text-xs text-[#E0E0E0]/60" data-testid={`worker-spec-${w.id}`}>
+              {t(`ws.spec.${w.specialty}`)}
+              {w.notes ? ` · ${w.notes}` : ''}
+            </span>
           </span>
-          <span className="block truncate text-xs text-[#E0E0E0]/70" data-testid={`worker-spec-${w.id}`}>
-            {t(`ws.spec.${w.specialty}`)}
-            {w.notes ? ` · ${w.notes}` : ''}
-          </span>
-        </span>
-        <span aria-hidden="true" className="text-lg text-[#E0E0E0]/50">
-          ›
-        </span>
-      </button>
-      {/* the main action of the card, on its front face: always visible, big, green (OLED: black ground, coloured border + text) */}
-      <div className="px-3 pb-2">
+        </button>
+        {/* the card's main action, compact and on the name's own line (OLED: black ground, coloured border + text) */}
         <button
           type="button"
           onClick={onAdvance}
           data-testid={`worker-adv-${w.id}`}
-          className="flex min-h-[60px] w-full items-center justify-center gap-3 rounded-xl border-2 border-emerald-500 bg-black px-3 text-lg font-medium text-emerald-400 transition active:scale-[0.98] active:border-emerald-300"
+          className="flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-xl border border-emerald-500 bg-black px-3 text-sm font-medium text-emerald-400 transition active:scale-[0.98] active:border-emerald-300"
         >
-          <CoinsIcon size={28} />
+          <CoinsIcon size={20} />
           <span>{t('ws.crew.advance')}</span>
         </button>
       </div>
-      <div className="border-t border-white/10 px-3 py-2">
+      <div className="border-t border-white/5 px-3 py-1.5">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-[#E0E0E0]/70">{t('ws.crew.advanced')}</p>
-          <p className="text-base font-medium tabular-nums" data-testid={`worker-total-${w.id}`} data-total={total}>
+          <p className="text-xs text-[#E0E0E0]/60">{t('ws.crew.advanced')}</p>
+          <p className="text-sm font-medium tabular-nums" data-testid={`worker-total-${w.id}`} data-total={total}>
             {total > 0 ? money(total) : t('ws.crew.noAdvances')}
           </p>
         </div>
         {list.length > 0 && (
-          <ul className="mt-1 divide-y divide-white/10" data-testid={`worker-advlist-${w.id}`}>
+          <ul className="mt-0.5 divide-y divide-white/5" data-testid={`worker-advlist-${w.id}`}>
             {list.map((a) => (
-              <li key={a.id} className="flex min-h-[44px] items-center gap-3">
-                <span className="min-w-0 flex-1 text-xs text-[#E0E0E0]/60">{stamp(a.at)}</span>
-                <span className="text-sm font-medium tabular-nums">{money(a.amount)}</span>
-                <button type="button" onClick={() => onRemoveAdvance(a.id)} aria-label={`${t('common.delete')}: ${w.name}`} data-testid={`worker-adv-del-${a.id}`} className="flex h-11 w-11 shrink-0 items-center justify-center text-lg text-red-400">
+              <li key={a.id} className="flex min-h-[36px] items-center gap-3">
+                <span className="min-w-0 flex-1 text-xs text-[#E0E0E0]/50">{stamp(a.at)}</span>
+                <span className="text-xs font-medium tabular-nums">{money(a.amount)}</span>
+                <button type="button" onClick={() => onRemoveAdvance(a.id)} aria-label={`${t('common.delete')}: ${w.name}`} data-testid={`worker-adv-del-${a.id}`} className="flex h-9 w-9 shrink-0 items-center justify-center text-base text-red-400">
                   ×
                 </button>
               </li>
@@ -258,21 +261,40 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
   const advanceFull = (project.advances ?? []).length >= LEDGER_LIMITS.advances;
 
   return (
-    <Block icon={<UsersIcon size={32} />} label={t('ws.menu.crew')} id="crew" title={t('ws.crew.title')} meta={`${t(crew.length === 1 ? 'ws.crew.count1' : 'ws.crew.countN', { n: crew.length })}${days !== null ? ` · ${days} ${t('sched.d')}` : ''}`} open={open} onToggle={onToggle} testId="ws-crew">
-      <div className="space-y-5">
+    <Block icon={<UsersIcon size={32} />} label={t('ws.menu.crew')} id="crew" title={t('ws.crew.title')} meta={`${t(crew.length === 1 ? 'ws.crew.count1' : 'ws.crew.countN', { n: crew.length })}${days !== null ? ` · ${days} ${t('sched.d')}` : ''}`} open={open} onToggle={onToggle} testId="ws-crew" tall>
+      <div className="space-y-3">
         {/* the dates set the days of the machinery rental (a direct cost): read-only, with the shield, while the quote is frozen / signed.
             The people and their advances below are operational, so they stay editable. */}
         <LockedZone locked={locked} onBlocked={onBlocked}>
           <Dates project={project} setProject={setProject} />
         </LockedZone>
 
-        <div className="space-y-3">
+        {/* the control line right above the list: the round [+] opens the personnel selector (proximity radar + trade filters);
+            the labour balance is read BEFORE handing out an advance */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-3" data-testid="crew-bar">
+            <button
+              type="button"
+              onClick={() => setSheet('new')}
+              disabled={crew.length >= CREW_LIMIT}
+              aria-label={t('ws.crew.add')}
+              title={t('ws.crew.add')}
+              data-testid="crew-add"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-brand text-2xl font-medium leading-none text-brand transition active:scale-95 disabled:opacity-40"
+            >
+              <span aria-hidden="true">+</span>
+            </button>
+            <p data-testid="labor-pool" data-available={pool.available} data-spent={pool.advanced} className="min-w-0 flex-1 text-right text-sm text-[#E0E0E0]/80">
+              {t('ws.crew.labor')}: <b className="tabular-nums text-[#E0E0E0]">{money(pool.available)}</b>
+              <span className="whitespace-nowrap tabular-nums text-[#e8c35f]"> ({t('ws.crew.spent')}: {money(pool.advanced)})</span>
+            </p>
+          </div>
           {crew.length === 0 ? (
             <p className="text-sm text-[#E0E0E0]/60" data-testid="crew-empty">
               {t('ws.crew.empty')}
             </p>
           ) : (
-            <ul className="space-y-3" data-testid="crew-list">
+            <ul className="space-y-2" data-testid="crew-list">
               {rows.map((row) => (
                 <WorkerCard
                   key={row.worker.id}
@@ -289,16 +311,7 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
               ))}
             </ul>
           )}
-          <button type="button" onClick={() => setSheet('new')} disabled={crew.length >= CREW_LIMIT} data-testid="crew-add" className="min-h-[56px] w-full rounded-xl border-2 border-brand px-3 text-base font-medium text-brand disabled:opacity-40">
-            {t('ws.crew.add')}
-          </button>
         </div>
-
-        {/* what the labour line of the quote still allows once every advance (to anybody) is discounted */}
-        <p data-testid="labor-pool" data-available={pool.available} className="text-sm text-[#E0E0E0]/80">
-          {t('adv.pool')}: <b className="tabular-nums text-[#E0E0E0]">{money(pool.available)}</b>
-          {pool.advanced > 0 && <span className="text-[#e8c35f] tabular-nums"> (−{money(pool.advanced)})</span>}
-        </p>
 
         {loose.length > 0 && (
           <div className="space-y-1" data-testid="advances-loose" data-total={looseTotal}>

@@ -9,7 +9,7 @@ import BottomSheet from '../BottomSheet.jsx';
  * (BottomSheet -> lib/backStack.js): the device's Back closes ONLY the sheet and the user stays in the project; closing it with the x, the
  * backdrop or Escape drops its history entry again. `open` / `onToggle(id, open)` keep the same contract the accordions had.
  */
-export default function Block({ id, title, label, icon = null, meta = '', open, onToggle, children, testId }) {
+export default function Block({ id, title, label, icon = null, meta = '', open, onToggle, children, testId, tall = false }) {
   return (
     <>
       <button
@@ -29,7 +29,7 @@ export default function Block({ id, title, label, icon = null, meta = '', open, 
         {meta && <span className="mt-0.5 w-full truncate text-center text-[11px] tabular-nums text-neutral-500">{meta}</span>}
       </button>
       {open && (
-        <BottomSheet title={title} autoFocus={false} onClose={() => onToggle(id, false)}>
+        <BottomSheet title={title} tall={tall} autoFocus={false} onClose={() => onToggle(id, false)}>
           <div className="mt-3" data-testid={`${testId}-sheet`}>
             {children}
           </div>

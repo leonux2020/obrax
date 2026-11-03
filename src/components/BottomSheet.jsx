@@ -7,9 +7,9 @@ const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([di
 
 /**
  * Bottom sheet (one-hand ergonomics): anchored to the bottom of the screen, pure #000 with an ultra
- * thin border. Focus is trapped inside, Escape / backdrop close it and focus returns to the opener.
+ * thin border (`tall`: an expanded sheet, 85 % of the screen, for dense lists). Focus is trapped inside, Escape / backdrop close it and focus returns to the opener.
  */
-export default function BottomSheet({ title, subtitle, onClose, fullscreen = false, swipeToClose = false, autoFocus = true, children }) {
+export default function BottomSheet({ title, subtitle, onClose, fullscreen = false, tall = false, swipeToClose = false, autoFocus = true, children }) {
   const { t } = useI18n();
   const titleId = useId();
   const ref = useRef(null);
@@ -93,7 +93,7 @@ export default function BottomSheet({ title, subtitle, onClose, fullscreen = fal
         data-swipe-close={swipeToClose ? 'true' : undefined}
         {...swipe}
         className={`${swipeToClose ? 'sheet-slide ' : ''}relative w-full outline-none overflow-y-auto overscroll-contain border border-white/10 bg-black p-5 [padding-bottom:max(1.25rem,env(safe-area-inset-bottom))] ${
-          fullscreen ? 'h-[100dvh] max-w-none border-0 sm:mx-auto sm:max-w-3xl sm:border' : 'max-h-[92vh] max-w-lg rounded-t-3xl border-b-0'
+          fullscreen ? 'h-[100dvh] max-w-none border-0 sm:mx-auto sm:max-w-3xl sm:border' : tall ? 'h-[85vh] max-h-[92vh] max-w-lg rounded-t-3xl border-b-0' : 'max-h-[92vh] max-w-lg rounded-t-3xl border-b-0'
         }`}
       >
         {swipeToClose && <div aria-hidden="true" className="mx-auto -mt-2 mb-2 h-1 w-10 rounded-full bg-white/20" />}
