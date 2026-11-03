@@ -1,5 +1,5 @@
 // Field photo evidence (progress photos): at most 12 per project, one per slot. Every photo is resized on a <canvas>
-// (max 1080 px wide), stamped with the capture date (DD/MM/YYYY, bottom right) and saved as JPEG at quality 0.7, so twelve of
+// (max 1080 px wide), stamped with the capture date (DD/MM/YYYY, bottom left) and saved as JPEG at quality 0.7, so twelve of
 // them never overload the memory of the PWA. (WebP is not used on purpose: Safari / iOS cannot encode it and silently returns PNG.)
 // Pure helpers (limits, validation, normalisation) are separated from the browser-only
 // compression pipeline so the rules are unit-testable in Node.
@@ -212,7 +212,7 @@ export function formatStampDate(now = Date.now()) {
 }
 
 /**
- * Print the date in the bottom-right corner of the canvas, on a subtle semi-transparent black plate (rgba(0,0,0,0.5)) so it reads on any
+ * Print the date in the bottom-left corner of the canvas, on a subtle semi-transparent black plate (rgba(0,0,0,0.5)) so it reads on any
  * photo. The type size follows the photo width (3.5 %), so it looks the same on a 1080 px shot and on a small one.
  * A canvas without text support (very old WebView, test doubles) is left untouched: the photo is still saved.
  */
@@ -230,7 +230,7 @@ export function stampDate(canvas, now = Date.now()) {
     const textW = typeof ctx.measureText === 'function' ? ctx.measureText(text).width : size * 0.6 * text.length;
     const boxW = Math.ceil(textW + pad * 2);
     const boxH = size + pad * 2;
-    const x = W - boxW - margin;
+    const x = margin; // bottom LEFT: a fixed margin from the left edge (Y unchanged)
     const y = H - boxH - margin;
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.fillRect(x, y, boxW, boxH);
@@ -247,7 +247,7 @@ export function stampDate(canvas, now = Date.now()) {
 /**
  * Shared compressor for BOTH inputs (file picker and live camera frame). `source` must already be
  * decoded (ImageBitmap, loaded <img>, <video> with a frame) and `width/height` its intrinsic size.
- * Output: proportional size, at most 1080 px wide, the capture date stamped bottom right, JPEG at quality 0.7.
+ * Output: proportional size, at most 1080 px wide, the capture date stamped bottom left, JPEG at quality 0.7.
  */
 export function compressSource(source, width, height, { now = Date.now(), makeCanvas = domCanvas, stamp = true } = {}) {
   let { width: tw, height: th } = fitPhotoSize(width, height);

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Progress photos: up to 12 per project, resized on a canvas (max 1080 px wide, JPEG 0.7), the capture date stamped bottom right on a
+// Progress photos: up to 12 per project, resized on a canvas (max 1080 px wide, JPEG 0.7), the capture date stamped bottom left on a
 // semi-transparent plate, a grid that holds 12 tiles, and a PDF that paginates them (6 per page).
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import React, { act } from 'react';
@@ -43,7 +43,7 @@ describe('date stamp on the canvas', () => {
     expect(formatStampDate(new Date(2027, 0, 9, 0, 5).getTime())).toBe('09/01/2027');
   });
 
-  it('prints it bottom right, white on a rgba(0,0,0,0.5) plate that sits behind the text', () => {
+  it('prints it bottom LEFT, white on a rgba(0,0,0,0.5) plate that sits behind the text', () => {
     const c = recordingCanvas(1080, 810);
     const now = new Date(2026, 10, 3, 12).getTime();
     expect(stampDate(c, now)).toBe(true);
@@ -55,7 +55,10 @@ describe('date stamp on the canvas', () => {
     const [px, py, pw, ph] = plate.a;
     expect(px + pw).toBeLessThanOrEqual(1080); // inside the photo
     expect(py + ph).toBeLessThanOrEqual(810);
-    expect(px + pw).toBeGreaterThan(1080 * 0.9); // in the right corner
+    expect(px).toBeGreaterThanOrEqual(0);
+    expect(px).toBeLessThan(1080 * 0.1); // in the left corner (a small fixed margin from the left edge)
+    expect(px + pw).toBeLessThan(1080 * 0.4); // ...and nowhere near the right one
+    expect(py + ph).toBe(810 - Math.round(Math.round(1080 * 0.035) * 0.5)); // Y is unchanged: the same bottom margin as before
     expect(py + ph).toBeGreaterThan(810 * 0.9); // ...at the bottom
     expect(text.x).toBeGreaterThanOrEqual(px);
     expect(text.x + 10 * 20).toBeLessThanOrEqual(px + pw); // the text fits on its plate
