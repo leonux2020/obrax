@@ -43,8 +43,64 @@ function Dates({ project, setProject }) {
   );
 }
 
+/**
+ * IN-SITU EMERGENCY PANEL (read only), at the very top of a person's sheet: the limiting conditions, allergies and emergency contact written in
+ * their file of the directory, so nobody has to leave the job to read them in an emergency. Only rendered when the person carries a health warning.
+ * If the file was deleted from the directory the warning still stands, but its details cannot be shown (and it says so).
+ */
+function EmergencyPanel({ file }) {
+  const { t } = useI18n();
+  const phone = (file?.emergencyPhone ?? '').replace(/[^0-9+]/g, '');
+  const line = (id, label, value) =>
+    value ? (
+      <div data-testid={`crew-emergency-${id}`}>
+        <dt className="text-xs font-medium uppercase tracking-wider text-orange-300">{label}</dt>
+        <dd className="mt-0.5 whitespace-pre-wrap break-words text-sm text-neutral-200">{value}</dd>
+      </div>
+    ) : null;
+  return (
+    <section role="region" aria-label={t('crew.emergency.title')} data-testid="crew-emergency" className="mb-4 mt-3 rounded-lg border border-orange-500/30 bg-orange-500/10 p-3">
+      <h3 className="flex items-center gap-2 text-base font-medium text-orange-300">
+        <span aria-hidden="true" className="text-lg leading-none text-orange-500">
+          ⚠
+        </span>
+        {t('crew.emergency.title')}
+      </h3>
+      {!file ? (
+        <p className="mt-2 text-sm text-neutral-300" data-testid="crew-emergency-gone">
+          {t('crew.emergency.gone')}
+        </p>
+      ) : (
+        <dl className="mt-2 space-y-3">
+          {line('limiting', t('squadra.limiting'), file.limiting)}
+          {line('allergies', t('squadra.allergies'), file.allergies)}
+          {file.emergencyName || file.emergencyPhone ? (
+            <div data-testid="crew-emergency-contact">
+              <dt className="text-xs font-medium uppercase tracking-wider text-orange-300">{t('squadra.emName')}</dt>
+              <dd className="mt-0.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm text-neutral-200">
+                <span className="min-w-0 break-words" data-testid="crew-emergency-contact-name">
+                  {file.emergencyName}
+                </span>
+                {phone && (
+                  <a href={`tel:${phone}`} data-testid="crew-emergency-phone" className="inline-flex min-h-[44px] items-center rounded-lg border border-orange-500/30 px-3 tabular-nums text-orange-300">
+                    {file.emergencyPhone}
+                  </a>
+                )}
+              </dd>
+            </div>
+          ) : (
+            <p className="text-sm text-neutral-400" data-testid="crew-emergency-nocontact">
+              {t('crew.emergency.noContact')}
+            </p>
+          )}
+        </dl>
+      )}
+    </section>
+  );
+}
+
 /** EDIT one person of the crew: name, specialty (closed list) and an optional line of tasks or notes. (Adding is the hybrid CrewPicker.) */
-function WorkerSheet({ worker, onSave, onDelete, onClose }) {
+function WorkerSheet({ worker, file = null, health = false, onSave, onDelete, onClose }) {
   const { t } = useI18n();
   const [name, setName] = useState(worker?.name ?? '');
   const [specialty, setSpecialty] = useState(worker?.specialty ?? 'multi');
@@ -53,6 +109,7 @@ function WorkerSheet({ worker, onSave, onDelete, onClose }) {
   const ready = name.trim().length > 0;
   return (
     <BottomSheet title={worker ? t('ws.crew.sheetEdit') : t('ws.crew.sheetNew')} onClose={onClose}>
+      {health && <EmergencyPanel file={file} />}
       <form
         className="mt-3 space-y-4"
         data-testid="worker-form"
@@ -265,6 +322,8 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
       {editing && (
         <WorkerSheet
           worker={editing}
+          file={directory.find((f) => f.id === editing.ref) ?? null}
+          health={healthOf(editing)}
           onClose={() => setSheet(null)}
           onSave={(data) => {
             setProject((p) => withWorkerEdited(p, editing.id, { ...data, ref: editing.ref, health: editing.health }));

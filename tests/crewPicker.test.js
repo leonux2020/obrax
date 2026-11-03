@@ -383,3 +383,104 @@ describe('safety: the ⚠ of the file follows the worker onto the job', () => {
     expect(normalizeCrew([{ name: 'A', ref: 'wk000001', health: true }])[0]).toMatchObject({ ref: 'wk000001', health: true });
   });
 });
+
+describe('emergency: the health data is READ on site (the person\'s sheet in the project)', () => {
+  const FULL = { id: 'wk000009', name: 'Fito Vega', specialties: ['mason'], rating: 2, address: 'Maipú', limiting: 'Vértigo: no trabajar en altura', allergies: 'Penicilina, Látex', emergencyName: 'María Soto', emergencyPhone: '+56 9 8765 4321' };
+  const open = async (name) => {
+    const id = spy.project.crew.find((w) => w.name === name).id;
+    await click(q(`worker-edit-${id}`));
+  };
+
+  it('tapping a person with a health warning shows, at the TOP of the sheet, the conditions, allergies and emergency contact of the file, in an orange panel', async () => {
+    saveWorkers([FULL]);
+    await mount();
+    await click(q('crew-pick-wk000009'));
+    await open('Fito Vega');
+    const panel = q('crew-emergency');
+    expect(panel).not.toBeNull();
+    for (const cls of ['bg-orange-500/10', 'border-orange-500/30', 'border', 'p-3', 'rounded-lg', 'mb-4']) expect(panel.className).toContain(cls);
+    expect(panel.textContent).toContain('Aviso de salud');
+    expect(q('crew-emergency-limiting').textContent).toContain('Condiciones limitantes');
+    expect(q('crew-emergency-limiting').textContent).toContain('Vértigo: no trabajar en altura');
+    expect(q('crew-emergency-allergies').textContent).toContain('Alergias');
+    expect(q('crew-emergency-allergies').textContent).toContain('Penicilina, Látex');
+    expect(q('crew-emergency-contact').textContent).toContain('Contacto de emergencia');
+    expect(q('crew-emergency-contact-name').textContent).toBe('María Soto');
+    expect(q('crew-emergency-phone').textContent).toBe('+56 9 8765 4321');
+    expect(q('crew-emergency-phone').getAttribute('href')).toBe('tel:+56987654321'); // one tap to call
+    // it comes BEFORE the editing form: it is the first thing of the sheet
+    expect(panel.compareDocumentPosition(q('worker-form')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(panel.querySelector('input, textarea, select, button')).toBeNull(); // read only
+  });
+
+  it('only what exists is shown; a missing emergency contact is said out loud', async () => {
+    saveWorkers([{ ...FULL, limiting: '', emergencyName: '', emergencyPhone: '' }]);
+    await mount();
+    await click(q('crew-pick-wk000009'));
+    await open('Fito Vega');
+    expect(q('crew-emergency-limiting')).toBeNull();
+    expect(q('crew-emergency-allergies').textContent).toContain('Penicilina');
+    expect(q('crew-emergency-contact')).toBeNull();
+    expect(q('crew-emergency-nocontact').textContent).toBe('Sin contacto de emergencia registrado.');
+  });
+
+  it('it follows the live file: after the notes of the file change, the next opening of the sheet reads the new text', async () => {
+    saveWorkers([FULL]);
+    await mount();
+    await click(q('crew-pick-wk000009'));
+    await open('Fito Vega');
+    expect(q('crew-emergency-allergies').textContent).toContain('Penicilina');
+    await click(qa('sheet-backdrop').at(-1));
+    saveWorkers([{ ...FULL, allergies: 'Abejas' }]); // edited in Ajustes meanwhile
+    await click(q('crew-add')); // any sheet opening re-reads the directory
+    await click(qa('sheet-backdrop').at(-1));
+    await open('Fito Vega');
+    expect(q('crew-emergency-allergies').textContent).toContain('Abejas');
+    expect(q('crew-emergency-allergies').textContent).not.toContain('Penicilina');
+  });
+
+  it('NO panel for people with no health warning: plain text, a file with no notes, or a file with only an emergency contact', async () => {
+    saveWorkers([{ id: 'wk000008', name: 'Gaby Paz', specialties: ['mason'], rating: 1, address: 'Maipú', emergencyName: 'Luis', emergencyPhone: '+56 9 1' }, ...DIRECTORY.slice(1, 2)]);
+    await mount();
+    await click(q('crew-pick-wk000008'));
+    await click(q('crew-add'));
+    await typeInto(q('crew-name'), 'Pedro Urgente');
+    await click(q('crew-save'));
+    await click(q('crew-add'));
+    await click(q('crew-pick-wk000002')); // Beto: no notes
+    for (const name of ['Gaby Paz', 'Pedro Urgente', 'Beto Soto']) {
+      await open(name);
+      expect(q('worker-form'), name).not.toBeNull();
+      expect(q('crew-emergency'), name).toBeNull();
+      await click(qa('sheet-backdrop').at(-1));
+    }
+  });
+
+  it('if the file was deleted the warning stays and the panel says that the details are gone (it never pretends there is nothing)', async () => {
+    await mount({ ...place, crew: normalizeCrew([{ id: 'crew0001', name: 'Ana Ruiz', specialty: 'electrician', ref: 'wk000001', health: true }]) });
+    act(() => root.unmount());
+    root = createRoot(host);
+    saveWorkers(DIRECTORY.filter((w) => w.id !== 'wk000001'));
+    spy = {};
+    await act(async () => {
+      root.render(React.createElement(I18nProvider, { lang: 'es', regionCode: 'CL' }, React.createElement(Harness, { initial: { ...newProject({ regionCode: 'CL', name: 'Casa' }), ...place, crew: normalizeCrew([{ id: 'crew0001', name: 'Ana Ruiz', specialty: 'electrician', ref: 'wk000001', health: true }]) } })));
+    });
+    await flush();
+    await click(q('ws-crew'));
+    await click(q('worker-edit-crew0001'));
+    expect(q('crew-emergency')).not.toBeNull();
+    expect(q('crew-emergency-gone').textContent).toContain('ya no está en el directorio');
+    expect(q('crew-emergency-limiting')).toBeNull();
+  });
+
+  it('works in every language and the sheet still edits normally under the panel (name, trade, notes, delete)', async () => {
+    saveWorkers([FULL]);
+    await mount();
+    await click(q('crew-pick-wk000009'));
+    await open('Fito Vega');
+    await typeInto(q('crew-notes'), 'Tablero');
+    await click(q('crew-save'));
+    expect(spy.project.crew[0]).toMatchObject({ name: 'Fito Vega', notes: 'Tablero', ref: 'wk000009', health: true });
+    for (const l of ['es', 'en', 'pt', 'fr', 'it', 'de']) for (const k of ['crew.emergency.title', 'crew.emergency.noContact', 'crew.emergency.gone']) expect(DICT[l][k], `${l} ${k}`).toBeTruthy();
+  });
+});
