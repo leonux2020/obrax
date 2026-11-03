@@ -6,6 +6,7 @@ import { calendarDays, withAdvance, withProjectDates, withWorker, withWorkerEdit
 import BottomSheet from '../BottomSheet.jsx';
 import { DateInput, TextField } from '../ui.jsx';
 import Block from './Block.jsx';
+import CrewPicker from './CrewPicker.jsx';
 import LockedZone from './LockedZone.jsx';
 import NumberPad from './NumberPad.jsx';
 import { BanknoteIcon, SPECIALTY_ICON, UsersIcon } from './icons.jsx';
@@ -40,7 +41,7 @@ function Dates({ project, setProject }) {
   );
 }
 
-/** Add / edit one person: name, specialty (closed list) and an optional line of tasks or notes. */
+/** EDIT one person of the crew: name, specialty (closed list) and an optional line of tasks or notes. (Adding is the hybrid CrewPicker.) */
 function WorkerSheet({ worker, onSave, onDelete, onClose }) {
   const { t } = useI18n();
   const [name, setName] = useState(worker?.name ?? '');
@@ -236,12 +237,23 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
         )}
       </div>
 
-      {sheet && (sheet === 'new' || editing) && (
+      {sheet === 'new' && (
+        <CrewPicker
+          project={project}
+          crew={crew}
+          onClose={() => setSheet(null)}
+          onAdd={(data) => {
+            setProject((p) => withWorker(p, data));
+            setSheet(null);
+          }}
+        />
+      )}
+      {editing && (
         <WorkerSheet
           worker={editing}
           onClose={() => setSheet(null)}
           onSave={(data) => {
-            setProject((p) => (editing ? withWorkerEdited(p, editing.id, data) : withWorker(p, data)));
+            setProject((p) => withWorkerEdited(p, editing.id, { ...data, ref: editing.ref }));
             setSheet(null);
           }}
           onDelete={() => {

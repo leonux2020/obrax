@@ -95,12 +95,12 @@ export const normalizeAdvances = (raw) =>
 export const WORKER_SPECIALTIES = Object.freeze(['multi', 'foreman', 'laborer', 'mason', 'carpenter', 'painter', 'tiler', 'drywaller', 'electrician', 'plumber', 'smith', 'welder', 'glazier', 'gardener', 'operator', 'finishing', 'other']);
 export const CREW_LIMIT = 60;
 
-/** `project.crew`: [{ id, name, specialty, notes }]. A worker without a name is dropped; an unknown specialty becomes "multi". */
+/** `project.crew`: [{ id, name, specialty, notes, ref? }]. A worker without a name is dropped; an unknown specialty becomes "multi". */
 export const normalizeCrew = (raw) =>
   listOf(raw, CREW_LIMIT, (w, used) => {
     const name = sanitizeText(w.name, 60).trim();
     if (!name) return null;
-    return { id: idOf(w.id, used), name, specialty: WORKER_SPECIALTIES.includes(w.specialty) ? w.specialty : 'multi', notes: sanitizeText(w.notes, 120).trim() };
+    return { id: idOf(w.id, used), name, specialty: WORKER_SPECIALTIES.includes(w.specialty) ? w.specialty : 'multi', notes: sanitizeText(w.notes, 120).trim(), ...(typeof w.ref === 'string' && ID_RE.test(w.ref) ? { ref: w.ref } : {}) }; // `ref`: the file of the global directory (workers.js) it was picked from
   });
 
 /**

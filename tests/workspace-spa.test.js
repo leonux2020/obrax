@@ -223,15 +223,15 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
   const addWorker = async (name, specialty = null, notes = '') => {
     await click(q('crew-add'));
     await typeInto(q('crew-name'), name);
-    if (specialty) {
-      const sel = q('crew-specialty');
-      await act(async () => {
-        Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, specialty);
-        sel.dispatchEvent(new Event('change', { bubbles: true }));
-      });
-    }
-    if (notes) await typeInto(q('crew-notes'), notes);
+    if (specialty) await click(q(`crew-filter-${specialty}`)); // the trade chip becomes the specialty of a person added as plain text
     await click(q('crew-save'));
+    if (notes) {
+      // the picker adds fast (name + trade); the optional line of tasks is written from the person's card
+      const id = spy.project.crew.at(-1).id;
+      await click(q(`worker-edit-${id}`));
+      await typeInto(q('crew-notes'), notes);
+      await click(q('crew-save'));
+    }
   };
 
   it('the theoretical engine is gone from the screen: no HH, dead days, timeline bars, recalculate button or [-] [+] counter', async () => {
@@ -269,7 +269,7 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(q('crew-empty')).not.toBeNull();
     await click(q('crew-add'));
     expect(q('worker-form')).not.toBeNull();
-    expect([...q('crew-specialty').options].map((o) => o.value)).toEqual(WORKER_SPECIALTIES);
+    expect([...q('crew-filters').querySelectorAll('button')].map((b) => b.dataset.testid.replace('crew-filter-', ''))).toEqual(WORKER_SPECIALTIES);
     expect(q('crew-save').disabled).toBe(true); // a name is required
     await typeInto(q('crew-name'), 'Luca Rossi');
     expect(q('crew-save').disabled).toBe(false);
@@ -341,7 +341,7 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     await mount(mk());
     await openCrew();
     await click(q('crew-add'));
-    expect([...q('crew-specialty').options].map((o) => o.value)).toEqual(WORKER_SPECIALTIES);
+    expect([...q('crew-filters').querySelectorAll('button')].map((b) => b.dataset.testid.replace('crew-filter-', ''))).toEqual(WORKER_SPECIALTIES);
     await click(qa('sheet-backdrop').at(-1));
     await addWorker('Pía', 'painter');
     await addWorker('Tito', 'operator');
