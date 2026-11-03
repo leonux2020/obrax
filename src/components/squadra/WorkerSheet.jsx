@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { WORKER_SPECIALTIES, newEntryId } from '../../lib/ledger.js';
 import { sanitizePhone, sanitizeTextInput } from '../../lib/sanitize.js';
-import { MAX_SPECIALTIES, SEXES } from '../../lib/workers.js';
+import { BLOOD_TYPES, MAX_SPECIALTIES, SEXES } from '../../lib/workers.js';
 import BottomSheet from '../BottomSheet.jsx';
 import { Button, DateInput, TextField } from '../ui.jsx';
 import { StarPicker } from './Stars.jsx';
 
-const EMPTY = { name: '', specialties: [], rating: 0, phone: '', address: '', document: '', nationality: '', sex: '', birthDate: '', limiting: '', allergies: '', emergencyName: '', emergencyPhone: '' };
+const EMPTY = { name: '', specialties: [], rating: 0, phone: '', address: '', document: '', nationality: '', sex: '', birthDate: '', bloodType: '', limiting: '', allergies: '', emergencyName: '', emergencyPhone: '' };
 
 const Block = ({ id, title, children, className = '', headingClass = 'text-neutral-200' }) => (
   <section data-testid={`worker-block-${id}`} aria-labelledby={`worker-block-${id}-title`} className={`space-y-4 rounded-2xl border px-4 py-4 ${className || 'border-white/10'}`}>
@@ -122,6 +122,34 @@ export default function WorkerSheet({ worker, onSave, onDelete, onClose }) {
         {/* ---- c) SAFETY AND HEALTH: the block that must not be missed ----------------------------------------------------- */}
         <Block id="safety" title={t('squadra.safety')} className="border-orange-500/30 bg-orange-500/5" headingClass="text-orange-300">
           <p className="-mt-2 text-xs text-neutral-400">{t('squadra.safetyNote')}</p>
+          <div>
+            <span className="label">{t('squadra.blood')}</span>
+            <div role="radiogroup" aria-label={t('squadra.blood')} className="grid grid-cols-4 gap-2" data-testid="worker-blood">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={form.bloodType === ''}
+                onClick={() => set('bloodType')('')}
+                data-testid="worker-blood-none"
+                className={`col-span-4 min-h-[44px] rounded-xl border px-3 text-sm transition ${form.bloodType === '' ? 'border-orange-500/60 text-orange-300' : 'border-white/10 text-neutral-400'}`}
+              >
+                {t('squadra.blood.none')}
+              </button>
+              {BLOOD_TYPES.map((b) => (
+                <button
+                  key={b}
+                  type="button"
+                  role="radio"
+                  aria-checked={form.bloodType === b}
+                  onClick={() => set('bloodType')(b)}
+                  data-testid={`worker-blood-${b}`}
+                  className={`min-h-[48px] rounded-xl border px-2 text-base font-medium tabular-nums transition ${form.bloodType === b ? 'border-red-500/60 text-red-400' : 'border-white/10 text-neutral-300'}`}
+                >
+                  {b}
+                </button>
+              ))}
+            </div>
+          </div>
           <div>
             <label className="label" htmlFor="worker-limiting">
               {t('squadra.limiting')}

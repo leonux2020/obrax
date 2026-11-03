@@ -60,12 +60,25 @@ function EmergencyPanel({ file }) {
     ) : null;
   return (
     <section role="region" aria-label={t('crew.emergency.title')} data-testid="crew-emergency" className="mb-4 mt-3 rounded-lg border border-orange-500/30 bg-orange-500/10 p-3">
-      <h3 className="flex items-center gap-2 text-base font-medium text-orange-300">
-        <span aria-hidden="true" className="text-lg leading-none text-orange-500">
-          ⚠
-        </span>
-        {t('crew.emergency.title')}
-      </h3>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="flex items-center gap-2 text-base font-medium text-orange-300">
+          <span aria-hidden="true" className="text-lg leading-none text-orange-500">
+            ⚠
+          </span>
+          {t('crew.emergency.title')}
+        </h3>
+        {/* the blood group first and BIG: a paramedic reads it in a glance */}
+        {file?.bloodType && (
+          <span data-testid="crew-emergency-blood" role="img" aria-label={`${t('squadra.blood')}: ${file.bloodType}`} className="shrink-0 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-0.5 text-2xl font-semibold leading-tight text-red-500">
+            {file.bloodType}
+          </span>
+        )}
+      </div>
+      {file && !file.bloodType && (
+        <p className="mt-2 text-xs text-neutral-400" data-testid="crew-emergency-blood-none">
+          {t('squadra.blood')}: {t('squadra.blood.none').toLowerCase()}
+        </p>
+      )}
       {!file ? (
         <p className="mt-2 text-sm text-neutral-300" data-testid="crew-emergency-gone">
           {t('crew.emergency.gone')}
@@ -323,7 +336,7 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
         <WorkerSheet
           worker={editing}
           file={directory.find((f) => f.id === editing.ref) ?? null}
-          health={healthOf(editing)}
+          health={healthOf(editing) || Boolean(directory.find((f) => f.id === editing.ref)?.bloodType)} // the blood group is medical data too: it opens the panel on its own
           onClose={() => setSheet(null)}
           onSave={(data) => {
             setProject((p) => withWorkerEdited(p, editing.id, { ...data, ref: editing.ref, health: editing.health }));

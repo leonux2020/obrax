@@ -9,6 +9,7 @@ export const WORKERS_KEY = 'cp.workers.v1';
 export const WORKER_LIMIT = 200;
 export const MAX_SPECIALTIES = 6;
 export const SEXES = Object.freeze(['m', 'f', 'x']);
+export const BLOOD_TYPES = Object.freeze(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']); // a closed list: no free text, so no typo can reach a paramedic
 export const RATINGS = Object.freeze([1, 2, 3, 4, 5]);
 const MAX_STORED_CHARS = 2_000_000;
 const ID_RE = /^[a-z0-9]{4,24}$/;
@@ -47,6 +48,7 @@ export function normalizeWorker(raw, now = Date.now()) {
     nationality: text(raw.nationality, 40),
     sex: SEXES.includes(raw.sex) ? raw.sex : '',
     birthDate: cleanBirthDate(raw.birthDate, now),
+    bloodType: BLOOD_TYPES.includes(raw.bloodType) ? raw.bloodType : '', // '' = not specified
     limiting: text(raw.limiting, 300), // "Condiciones limitantes"
     allergies: text(raw.allergies, 300),
     emergencyName: text(raw.emergencyName, 80),

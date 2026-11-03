@@ -7,7 +7,7 @@ import { CLIENT, q, flush, click, typeInto, createHost, deviceBack } from './hel
 import { clearDriveToken } from '../src/lib/driveToken.js';
 import { collectBackup, parseBackup, restoreBackup } from '../src/lib/backup.js';
 import { liquidity, normalizeAdvances, normalizeExpenses, normalizePayments, profitability } from '../src/lib/ledger.js';
-import { WORKERS_KEY, WORKER_LIMIT, cleanBirthDate, hasHealthNotes, loadWorkers, mergeWorkers, normalizeWorker, normalizeWorkers, removeWorker, saveWorkers, upsertWorker } from '../src/lib/workers.js';
+import { BLOOD_TYPES, WORKERS_KEY, WORKER_LIMIT, cleanBirthDate, hasHealthNotes, loadWorkers, mergeWorkers, normalizeWorker, normalizeWorkers, removeWorker, saveWorkers, upsertWorker } from '../src/lib/workers.js';
 import { wipeLocalData } from '../src/lib/session.js';
 
 let App;
@@ -355,5 +355,55 @@ describe('Squadra: the worker file', () => {
     expect(loadWorkers()).toEqual([]);
     expect(q('worker-form')).toBeNull();
     expect(q('squadra-empty')).not.toBeNull();
+  });
+});
+
+describe('Grupo sanguíneo (closed list, inside Seguridad y Salud)', () => {
+  it('BLOOD_TYPES is the 8 ABO/Rh groups, and the entity only keeps one of them (anything else = not specified)', () => {
+    expect([...BLOOD_TYPES]).toEqual(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']);
+    for (const b of BLOOD_TYPES) expect(normalizeWorker({ name: 'X', bloodType: b }).bloodType).toBe(b);
+    for (const bad of ['', 'C+', 'o+', 'A', 'O positivo', '<b>', null, undefined, 5]) expect(normalizeWorker({ name: 'X', bloodType: bad }).bloodType).toBe('');
+    expect(normalizeWorker({ name: 'X' })).toHaveProperty('bloodType', '');
+  });
+
+  it('is stored in localStorage and read back; it travels in the backup and a hostile value in a backup is dropped', async () => {
+    upsertWorker({ id: 'wk000001', name: 'Ana Ruiz', bloodType: 'AB-' });
+    expect(JSON.parse(localStorage.getItem(WORKERS_KEY))[0].bloodType).toBe('AB-');
+    expect(loadWorkers()[0].bloodType).toBe('AB-');
+    const backup = await collectBackup({ settings: {}, company: {}, meta: {}, logo: '', projects: [] });
+    expect(parseBackup(JSON.stringify(backup)).workers[0].bloodType).toBe('AB-');
+    const hostile = { ...backup, workers: [{ id: 'wk000002', name: 'Eva', bloodType: 'Z+' }] };
+    expect(parseBackup(JSON.stringify(hostile)).workers[0].bloodType).toBe('');
+    // an older file of the directory (written before this field existed) still loads: not specified
+    localStorage.setItem(WORKERS_KEY, JSON.stringify([{ id: 'wk000003', name: 'Luis', allergies: 'Látex' }]));
+    expect(loadWorkers()[0]).toMatchObject({ name: 'Luis', bloodType: '', allergies: 'Látex' });
+  });
+
+  it('the form: 8 chips + "No especificado" (default), inside the orange safety block, no free text; the choice is saved and shown again on reopening', async () => {
+    await openAjustes();
+    await click(q('settings-squadra'));
+    await click(q('squadra-new'));
+    const blood = q('worker-blood');
+    expect(q('worker-block-safety').contains(blood)).toBe(true);
+    expect(blood.querySelector('input, textarea, select')).toBeNull(); // strict options only
+    const options = [...blood.querySelectorAll('button')];
+    expect(options.map((b) => b.textContent)).toEqual(['No especificado', ...BLOOD_TYPES]);
+    expect(options.every((b) => b.getAttribute('role') === 'radio')).toBe(true);
+    expect(q('worker-blood-none').getAttribute('aria-checked')).toBe('true'); // default
+    expect(options.filter((b) => b.getAttribute('aria-checked') === 'true')).toHaveLength(1);
+    await typeInto(q('worker-name'), 'Juan Pérez');
+    await click(q('worker-blood-O+'));
+    expect(q('worker-blood-O+').getAttribute('aria-checked')).toBe('true');
+    expect(q('worker-blood-none').getAttribute('aria-checked')).toBe('false');
+    await click(q('worker-blood-A-')); // one at a time
+    expect(q('worker-blood-O+').getAttribute('aria-checked')).toBe('false');
+    await click(q('worker-blood-O-'));
+    await click(q('worker-save'));
+    expect(loadWorkers()[0].bloodType).toBe('O-');
+    await click(q(`worker-${loadWorkers()[0].id}`));
+    expect(q('worker-blood-O-').getAttribute('aria-checked')).toBe('true');
+    await click(q('worker-blood-none')); // back to not specified
+    await click(q('worker-save'));
+    expect(loadWorkers()[0].bloodType).toBe('');
   });
 });

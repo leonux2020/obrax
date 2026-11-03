@@ -484,3 +484,71 @@ describe('emergency: the health data is READ on site (the person\'s sheet in the
     for (const l of ['es', 'en', 'pt', 'fr', 'it', 'de']) for (const k of ['crew.emergency.title', 'crew.emergency.noContact', 'crew.emergency.gone']) expect(DICT[l][k], `${l} ${k}`).toBeTruthy();
   });
 });
+
+describe('emergency panel: the blood group, big and red', () => {
+  const FILE = { id: 'wk000009', name: 'Fito Vega', specialties: ['mason'], rating: 2, address: 'Maipú', allergies: 'Penicilina', bloodType: 'O-', emergencyName: 'María', emergencyPhone: '+56 9 1' };
+  const openSheet = async (name) => {
+    await click(q(`worker-edit-${spy.project.crew.find((w) => w.name === name).id}`));
+  };
+
+  it('shows the group first in the orange panel as a red badge, large and semibold, announced with its label', async () => {
+    saveWorkers([FILE]);
+    await mount();
+    await click(q('crew-pick-wk000009'));
+    await openSheet('Fito Vega');
+    const badge = q('crew-emergency-blood');
+    expect(badge.textContent).toBe('O-');
+    for (const cls of ['text-red-500', 'text-2xl', 'font-semibold', 'border-red-500/40', 'bg-red-500/10']) expect(badge.className).toContain(cls);
+    expect(badge.className).not.toMatch(/font-(bold|extrabold|black)/);
+    expect(badge.getAttribute('aria-label')).toBe('Grupo sanguíneo: O-');
+    expect(q('crew-emergency').contains(badge)).toBe(true);
+    // before the conditions / allergies / contact: it is the first thing read
+    expect(badge.compareDocumentPosition(q('crew-emergency-allergies')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(q('crew-emergency-blood-none')).toBeNull();
+  });
+
+  it('every group of the closed list renders as written', async () => {
+    for (const b of ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']) {
+      saveWorkers([{ ...FILE, bloodType: b }]);
+      await mount();
+      await click(q('crew-pick-wk000009'));
+      await openSheet('Fito Vega');
+      expect(q('crew-emergency-blood').textContent).toBe(b);
+      act(() => root.unmount());
+      root = createRoot(host);
+    }
+  });
+
+  it('a health panel with no group says it is not specified (never silence)', async () => {
+    saveWorkers([{ ...FILE, bloodType: '' }]);
+    await mount();
+    await click(q('crew-pick-wk000009'));
+    await openSheet('Fito Vega');
+    expect(q('crew-emergency-blood')).toBeNull();
+    expect(q('crew-emergency-blood-none').textContent).toBe('Grupo sanguíneo: no especificado');
+  });
+
+  it('the group alone is medical data: it opens the panel even with no allergy or condition (the card has no ⚠: that is only for risks)', async () => {
+    saveWorkers([{ id: 'wk000008', name: 'Gaby Paz', specialties: ['mason'], rating: 1, address: 'Maipú', bloodType: 'B+' }]);
+    await mount();
+    await click(q('crew-pick-wk000008'));
+    const id = spy.project.crew[0].id;
+    expect(q(`worker-health-${id}`)).toBeNull();
+    await openSheet('Gaby Paz');
+    expect(q('crew-emergency-blood').textContent).toBe('B+');
+    expect(q('crew-emergency-limiting')).toBeNull();
+    expect(q('crew-emergency-allergies')).toBeNull();
+    expect(q('crew-emergency-nocontact')).not.toBeNull();
+  });
+
+  it('a file with neither notes nor group still shows no panel', async () => {
+    await mount();
+    await click(q('crew-pick-wk000002')); // Beto
+    await openSheet('Beto Soto');
+    expect(q('crew-emergency')).toBeNull();
+  });
+
+  it('every language names the group and its "not specified" state', () => {
+    for (const l of ['es', 'en', 'pt', 'fr', 'it', 'de']) for (const k of ['squadra.blood', 'squadra.blood.none']) expect(DICT[l][k], `${l} ${k}`).toBeTruthy();
+  });
+});
