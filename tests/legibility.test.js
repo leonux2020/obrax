@@ -36,7 +36,7 @@ describe('legibility calibration', () => {
     expect(fs.readFileSync('src/components/workspace/NumberPad.jsx', 'utf8')).toContain('text-5xl font-medium tracking-tight tabular-nums');
   });
   it('money and dates are rendered in tabular-nums components (CashBlock, Rendiconto, Dashboard...)', () => {
-    for (const f of ['src/components/workspace/CashBlock.jsx', 'src/components/workspace/ReceiptStack.jsx', 'src/components/GlobalAccounting.jsx', 'src/components/Dashboard.jsx', 'src/components/ProjectCard.jsx']) {
+    for (const f of ['src/components/workspace/CashBlock.jsx', 'src/components/workspace/ReceiptStack.jsx', 'src/components/workspace/ProfitabilityPanel.jsx', 'src/components/GlobalAccounting.jsx', 'src/components/Dashboard.jsx', 'src/components/ProjectCard.jsx']) {
       expect(fs.readFileSync(f, 'utf8'), f).toContain('tabular-nums');
     }
   });

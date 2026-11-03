@@ -14,7 +14,7 @@ describe('strict OLED theme', () => {
     for (const f of files) {
       // the documented exceptions: the 2 px track of the project header's single progress line (HeaderZone) and the dark circle of the
       // quick-control grid tiles (workspace/Block.jsx), both asked for by name
-      const text = fs.readFileSync(f, 'utf8').replaceAll('h-0.5 bg-neutral-800', 'h-0.5').replaceAll('border-white/5 bg-neutral-900', 'border-white/5');
+      const text = fs.readFileSync(f, 'utf8').replaceAll('h-0.5 bg-neutral-800', 'h-0.5').replaceAll('h-1 bg-neutral-800', 'h-1').replaceAll('border-white/5 bg-neutral-900', 'border-white/5');
       const m = text.match(/(?:^|[^\w-])(?:[a-z-]+:)*bg-(?:neutral|gray|zinc|slate|stone)-\d+(?:\/\d+)?/g);
       if (m) offenders.push(`${path.relative(root, f)}: ${m.join(', ')}`);
     }

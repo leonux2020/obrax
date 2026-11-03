@@ -270,6 +270,34 @@ export function groupExpensesBySupplier(expenses = []) {
   return supplierTotals(list).map((g) => ({ ...g, items: list.filter((e) => keyOf(e) === g.key).sort((a, b) => receiptTime(b) - receiptTime(a) || num(b.at) - num(a.at)) }));
 }
 
+/**
+ * The "profitability x-ray" of ONE project (Audit mode): what was collected, what was spent, the operating margin between them (collected minus
+ * expenses, NOT counting cash advanced to workers), the share of the budget already collected (null without a priced quote) and the `top`
+ * suppliers by what went to them as a share of the TOTAL spent. Suppliers are merged by trimmed, case-insensitive name; receipts with no
+ * supplier are not a supplier: they only appear (as one nameless line) when nothing else was named, so the spending never vanishes.
+ */
+export function profitability(project, budget = 0, top = 3) {
+  const collected = cents(sum(arr(project?.payments)));
+  const spent = cents(sum(arr(project?.expenses)));
+  const margin = cents(collected - spent);
+  const efficiency = num(budget) > 0 ? Math.max(0, (collected / num(budget)) * 100) : null;
+  const shops = new Map();
+  for (const e of arr(project?.expenses)) {
+    const amount = num(e?.amount);
+    if (amount <= 0) continue;
+    const name = typeof e?.supplier === 'string' ? e.supplier.trim().replace(/\s+/g, ' ') : '';
+    const key = name.toLowerCase();
+    const shop = shops.get(key) ?? { key, name, total: 0 };
+    shop.total = cents(shop.total + amount);
+    shops.set(key, shop);
+  }
+  const all = [...shops.values()].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+  const named = all.filter((x) => x.name);
+  const pool = (named.length ? named : all).slice(0, Math.max(1, top));
+  const suppliers = spent > 0 ? pool.map((x) => ({ ...x, share: (x.total / spent) * 100 })) : [];
+  return { collected, spent, margin, efficiency, suppliers };
+}
+
 /** Expenses grouped by category: [{ category, total, count }], biggest first (the total of every line, any currency as the project's own). */
 export function expensesByCategory(expenses = []) {
   const groups = new Map();

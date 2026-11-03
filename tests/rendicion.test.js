@@ -14,12 +14,13 @@ import { DB_VERSION, STORE_EXPORTS, STORE_PROJECTS, createRunner } from '../src/
 import { createExportQueue, idbExportBackend, normalizeExportRow, EXPORT_QUEUE_LIMITS } from '../src/lib/exportQueue.js';
 import { closeRendition, deliverRendition, drainExportQueue, renditionFileName, uploadRendition, backoffMs } from '../src/lib/exportSync.js';
 import { buildRenditionSheets, buildRenditionBytes } from '../src/lib/rendition.js';
-import { expensesByCategory, newFundEntry, normalizeExpenses, normalizePayments } from '../src/lib/ledger.js';
+import { expensesByCategory, newFundEntry, normalizeExpenses, normalizePayments, profitability } from '../src/lib/ledger.js';
 import { newProject } from '../src/lib/projects.js';
 import { DriveError } from '../src/lib/drive.js';
 import { createFakeDrive } from './helpers/fakeDrive.js';
 import { createDriveClient } from '../src/lib/drive.js';
 import ProjectAudit from '../src/components/ProjectAudit.jsx';
+import ProfitabilityPanel from '../src/components/workspace/ProfitabilityPanel.jsx';
 import RenditionBar from '../src/components/workspace/RenditionBar.jsx';
 import GlobalAccounting from '../src/components/GlobalAccounting.jsx';
 
@@ -396,32 +397,122 @@ describe('ProjectAudit (ledger) + RenditionBar + the Contabilidad card', () => {
 
   const audit = (extra = {}, p = project()) => mount(React.createElement(ProjectAudit, { project: p, rendition: { onClose: async () => {}, queue: createExportQueue() }, ...extra }));
 
-  it('the cockpit on top (what was collected), the receipt stack right under it, EXPANDED, and the one audit action at the bottom', async () => {
+  const panel = (p, budget) => mount(React.createElement(ProfitabilityPanel, { project: p, budget }));
+  const leaks = () => [...host.querySelectorAll('li[data-testid^="audit-leak-"]')];
+
+  it('the cockpit stays on top (collected) and the profitability x-ray sits right under it; the one audit action is at the bottom', async () => {
     await audit();
     const view = q('project-audit');
     expect(view.dataset.mode).toBe('audit');
     expect(q('ws-title').textContent).toBe('Casa Soto');
-    expect(q('ws-collected').textContent).toContain('150.000'); // cockpit: collected
-    expect(q('ws-zone-a').compareDocumentPosition(q('expense-list')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // the stack is under the cockpit
-    // nothing to tap: every supplier is open with its receipts
-    expect([...q('audit-stack').querySelectorAll('[data-testid="stack-shop-name"]')].map((n) => n.textContent)).toEqual(['Sodimac', 'Copec', 'Sin proveedor']); // "sodimac " and "Sodimac" are ONE shop
-    expect(q('stack-shop-0').querySelector('[data-testid="stack-shop-total"]').textContent).toContain('50.000');
-    expect(q('stack-shop-0').querySelectorAll('li')).toHaveLength(2);
-    expect(q('expense-gasto001').textContent).toContain('30.000');
-    expect(q('expense-gasto003').textContent).toContain('15.000');
+    expect(q('ws-collected').textContent).toContain('150.000'); // cockpit intact
+    expect(q('ws-due-label')).not.toBeNull();
+    expect(q('ws-zone-a').compareDocumentPosition(q('audit-health')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(q('fin-close').textContent).toContain('Cerrar Rendición (Enviar a Drive)');
   });
 
-  it('READ-ONLY: no pencil, no unlock, no payments button, no delete, no fields; the only button is "Cerrar Rendición"', async () => {
+  it('NO receipts and NO expense list anywhere in the audit view (the stack belongs to the tactical view)', async () => {
+    await audit();
+    for (const id of ['expense-list', 'audit-stack', 'audit-empty', 'stack-shop-0', 'stack-line', 'stack-desc', 'stack-amount', 'expense-gasto001', 'expense-gasto003']) expect(q(id), id).toBeNull();
+    const text = q('project-audit').textContent;
+    for (const word of ['Cemento', 'Clavos', 'Diésel', 'Almuerzo']) expect(text).not.toContain(word); // not a single receipt line
+    expect(q('project-audit').querySelector('li [data-testid="stack-amount"], ul.divide-y')).toBeNull();
+  });
+
+  it('MARGIN = collected minus expenses, big, green when it is a profit', async () => {
+    await audit();
+    expect(q('audit-margin').dataset.state).toBe('profit');
+    expect(q('audit-margin-value').textContent).toContain('80.000'); // 150.000 - 70.000
+    expect(q('audit-margin-value').className).toContain('text-brand-500');
+    expect(q('audit-margin-value').className).toContain('text-5xl');
+    expect(q('audit-margin-value').className).not.toContain('text-orange-400');
+  });
+
+  it('MARGIN in loss (spent more than collected): soft orange, never red, with the minus sign', async () => {
+    const p = project();
+    p.payments = normalizePayments([{ id: 'adel0001', amount: 20000, at: Date.UTC(2026, 9, 1) }]);
+    await audit({}, p);
+    expect(q('audit-margin').dataset.state).toBe('loss');
+    expect(q('audit-margin-value').className).toContain('text-orange-400');
+    expect(q('audit-margin-value').className).not.toContain('text-brand-500');
+    expect(q('audit-margin-value').className).not.toMatch(/red/);
+    expect(q('audit-margin-value').textContent).toMatch(/-.*50\.000/); // 20.000 - 70.000
+  });
+
+  it('MARGIN at zero (nothing collected, nothing spent) is neutral grey: neither profit nor loss', async () => {
+    const p = project();
+    p.payments = [];
+    p.expenses = [];
+    await audit({}, p);
+    expect(q('audit-margin').dataset.state).toBe('even');
+    expect(q('audit-margin-value').className).toContain('text-neutral-400');
+    expect(q('audit-leaks-empty').textContent).toContain('Sin gastos registrados');
+  });
+
+  it('TOP 3 LEAKS: only the share of the total spent (never an amount), biggest first, merged by name, 1 px-thin bars', async () => {
+    const p = project();
+    p.expenses = normalizeExpenses([
+      { id: 'g1', amount: 45000, category: 'material', supplier: 'Sodimac' },
+      { id: 'g2', amount: 5000, category: 'material', supplier: 'sodimac ' },
+      { id: 'g3', amount: 25000, category: 'transport', supplier: 'Copec' },
+      { id: 'g4', amount: 15000, category: 'material', supplier: 'Easy' },
+      { id: 'g5', amount: 8000, category: 'material', supplier: 'Ferretería Sur' },
+      { id: 'g6', amount: 2000, category: 'food', supplier: '' },
+    ]);
+    await audit({}, p); // spent: 100.000
+    const rows = leaks();
+    expect(rows).toHaveLength(3); // never a 4th
+    expect(rows.map((r) => r.querySelector('[data-testid="audit-leak-name"]').textContent)).toEqual(['Sodimac', 'Copec', 'Easy']);
+    expect(rows.map((r) => r.querySelector('[data-testid="audit-leak-share"]').textContent)).toEqual(['50%', '25%', '15%']);
+    const leaksText = q('audit-leaks').textContent;
+    expect(leaksText).not.toMatch(/\$|\d\.\d{3}/); // percentages only: no money in the leaks
+    for (const r of rows) {
+      const bar = r.querySelector('[role="progressbar"]');
+      expect(bar.className).toContain('h-1');
+      expect(bar.className).toContain('bg-neutral-800');
+      expect(bar.firstChild.className).toMatch(/bg-orange-400/); // coloured fill
+    }
+    expect(rows[0].querySelector('[role="progressbar"]').firstChild.style.width).toBe('50%');
+    expect(rows[1].querySelector('[role="progressbar"]').firstChild.style.width).toBe('25%');
+  });
+
+  it('fewer than 3 suppliers show fewer rows; receipts with no supplier only appear when nobody was named', async () => {
+    const p = project();
+    await audit({}, p); // Sodimac (merged) + Copec + one nameless receipt
+    expect(leaks().map((r) => r.querySelector('[data-testid="audit-leak-name"]').textContent)).toEqual(['Sodimac', 'Copec']);
+    const only = project();
+    only.expenses = normalizeExpenses([{ id: 'g1', amount: 4000, category: 'food', supplier: '' }]);
+    await audit({}, only);
+    expect(leaks().map((r) => r.querySelector('[data-testid="audit-leak-name"]').textContent)).toEqual(['Sin proveedor']);
+    expect(leaks()[0].querySelector('[data-testid="audit-leak-share"]').textContent).toBe('100%');
+  });
+
+  it('COLLECTION EFFICIENCY = the share of the budget already collected (thin bar); without a priced quote it says so instead of inventing a number', async () => {
+    await panel(project(), 300000); // 150.000 of 300.000
+    expect(q('audit-efficiency-value').textContent).toBe('50% del presupuesto ya cobrado');
+    expect(q('audit-efficiency-bar').className).toContain('h-1');
+    expect(q('audit-efficiency-bar').getAttribute('aria-valuenow')).toBe('50');
+    expect(q('audit-efficiency-bar-fill').style.width).toBe('50%');
+    expect(q('audit-efficiency-bar-fill').className).toContain('bg-brand-500');
+    await panel(project(), 100000); // overpaid: the bar never overflows
+    expect(q('audit-efficiency-value').textContent).toBe('150% del presupuesto ya cobrado');
+    expect(q('audit-efficiency-bar-fill').style.width).toBe('100%');
+    await audit(); // the empty project has no priced quote
+    expect(q('audit-efficiency-empty').textContent).toBe('Sin presupuesto valorizado');
+    expect(q('audit-efficiency-bar')).toBeNull();
+  });
+
+  it('PASSIVE reading: the panel has no button, link, field or scroll container; READ-ONLY view: only "Cerrar Rendición" is tappable', async () => {
     const changes = [];
     await audit({ setProject: (c) => changes.push(c) });
+    const health = q('audit-health');
+    expect(health.querySelector('button, a, input, textarea, select, details, [tabindex]')).toBeNull();
+    expect(health.className).not.toMatch(/overflow|h-\[/);
     const view = q('project-audit');
     expect(view.querySelector('input, textarea, select, form')).toBeNull();
     expect(q('ws-edit')).toBeNull();
     expect(q('ws-unlock')).toBeNull();
     expect(q('ws-total').tagName).toBe('DIV'); // plain figures, not a button that opens the payments
-    expect(q('expense-list').dataset.readonly).toBe('true');
-    expect(q('expense-list').querySelector('button')).toBeNull(); // no x, no "returned" switch
     expect([...view.querySelectorAll('button')].map((b) => b.dataset.testid)).toEqual(['fin-close']);
     expect(changes).toHaveLength(0);
   });
@@ -432,21 +523,16 @@ describe('ProjectAudit (ledger) + RenditionBar + the Contabilidad card', () => {
     expect(q('project-audit').querySelector('details')).toBeNull();
   });
 
-  it('a project with no expenses says so (no empty stack)', async () => {
+  it('profitability(): the pure numbers (margin ignores advances to workers, no suppliers when nothing was spent, junk in = zeros out)', () => {
     const p = project();
-    p.expenses = [];
-    await audit({}, p);
-    expect(q('audit-empty')).not.toBeNull();
-    expect(q('expense-list')).toBeNull();
-  });
-
-  it('the micro-text of the receipts (date, sucursal, description) stays in the stack: it is the audit trail', async () => {
-    const p = project();
-    p.expenses = normalizeExpenses([{ id: 'gasto01', amount: 30000, category: 'material', supplier: 'Sodimac', description: 'Cemento 25 kg', sucursal: 'Av. Pajaritos 1234', date: '2026-10-02' }]);
-    await audit({}, p);
-    expect(q('stack-line').textContent).toMatch(/2026 · Av\. Pajaritos 1234$/);
-    expect(q('stack-desc').textContent).toBe('Cemento 25 kg');
-    for (const c of ['text-xs', 'text-neutral-500']) expect(q('stack-line').className).toContain(c);
+    p.advances = [{ id: 'a1', amount: 99999, workerId: 'x', at: 1 }];
+    const x = profitability(p, 600000);
+    expect(x).toMatchObject({ collected: 150000, spent: 70000, margin: 80000, efficiency: 25 });
+    expect(x.suppliers.map((s) => [s.name, Math.round(s.share)])).toEqual([['Sodimac', 71], ['Copec', 21]]);
+    expect(profitability(p, 0).efficiency).toBeNull();
+    expect(profitability({ payments: [], expenses: [] }, 0)).toEqual({ collected: 0, spent: 0, margin: 0, efficiency: null, suppliers: [] });
+    expect(profitability(null, undefined)).toMatchObject({ collected: 0, spent: 0, margin: 0, suppliers: [] });
+    expect(profitability({ expenses: [{ amount: -5, supplier: 'X' }, { amount: 'abc', supplier: 'Y' }] }, 10).suppliers).toEqual([]);
   });
 
   it('"Cerrar Rendición" calls the delivery once (no double tap) and shows the waiting files of the offline queue', async () => {

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// The real App: Contabilidad -> tap the BODY of a card -> the project in AUDIT mode (cockpit + receipt stack) -> "Cerrar Rendición".
+// The real App: Contabilidad -> tap the BODY of a card -> the project in AUDIT mode (cockpit + profitability x-ray) -> "Cerrar Rendición".
 // The Excel goes to Drive (CUBRAX - Respaldos Obra / Proyectos / <name> / Rendicion_<date>.xlsx); offline it waits in IndexedDB and the background sync
 // uploads it when the connection returns. It is never downloaded.
 import 'fake-indexeddb/auto';
@@ -82,7 +82,7 @@ afterEach(async () => {
 });
 
 describe('Contabilidad -> project in AUDIT mode (pure ledger)', () => {
-  it('the card body opens the project in audit mode; the checkbox alone selects; cockpit + expanded receipt stack; Back returns to Contabilidad', async () => {
+  it('the card body opens the project in audit mode; the checkbox alone selects; cockpit + profitability x-ray (no receipts); Back returns to Contabilidad', async () => {
     h = createHost(App);
     await h.mount();
     await flush(100);
@@ -97,10 +97,12 @@ describe('Contabilidad -> project in AUDIT mode (pure ledger)', () => {
     expect(q('ws-title').textContent).toBe('Casa Soto');
     // the cockpit: what is left to collect / collected
     expect(q('ws-collected').textContent).toContain('100.000');
-    // the receipt stack is there with NO tap: every supplier expanded with its receipts
-    expect([...document.querySelectorAll('[data-testid="stack-shop-name"]')].map((n) => n.textContent)).toEqual(['Sodimac', 'Copec']);
-    expect(q('expense-gasto001')).not.toBeNull();
-    expect(q('expense-gasto002')).not.toBeNull();
+    // the x-ray, with NO tap: margin = 100.000 collected - 42.000 spent; the top suppliers as a share of the spending; NO receipts
+    expect(q('audit-margin-value').textContent).toContain('58.000');
+    expect(q('audit-margin').dataset.state).toBe('profit');
+    expect([...document.querySelectorAll('[data-testid="audit-leak-name"]')].map((n) => n.textContent)).toEqual(['Sodimac', 'Copec']);
+    expect([...document.querySelectorAll('[data-testid="audit-leak-share"]')].map((n) => n.textContent)).toEqual(['71%', '29%']);
+    for (const id of ['expense-list', 'expense-gasto001', 'expense-gasto002', 'stack-shop-0']) expect(q(id), id).toBeNull();
     expect(q('ws-edit')).toBeNull(); // no pencil: nothing is edited from the ledger
     expect(q('fin-close')).not.toBeNull(); // the one audit action
     expect(window.history.state?.cubraxProject).toBe(project.id); // the view owns one history entry...

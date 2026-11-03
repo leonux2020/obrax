@@ -8,19 +8,19 @@ import { expenseTitle } from '../ExpenseParts.jsx';
  * "Receipt stack": the project's expenses as ONE block per supplier (its name big, what was spent there) with the individual receipts stacked
  * underneath as grey micro-text (date + sucursal, then the description, the amount on the right). Renders nothing when there are no expenses.
  *
- * `readOnly` (Audit mode, opened from Contabilidad): a pure ledger. No delete button and no "returned" switch: nothing can be edited from here.
+ * It belongs to the TACTICAL view only (Gastos block): the Audit mode shows the profitability x-ray instead, never the receipts.
  */
-export default function ReceiptStack({ expenses, onChange = null, readOnly = false }) {
+export default function ReceiptStack({ expenses, onChange = null }) {
   const { t, money, moneyIn, locale } = useI18n();
   const day = useMemo(() => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }), [locale]);
   const groups = useMemo(() => groupExpensesBySupplier(expenses), [expenses]);
   const due = rentalsDue(expenses, Date.now());
-  const editable = !readOnly && typeof onChange === 'function';
+  const editable = typeof onChange === 'function';
   const toggleReturned = (id) => onChange(expenses.map((e) => (e.id === id ? { ...e, returned: !e.returned } : e)));
   if (!expenses.length) return null;
 
   return (
-    <div className="space-y-3" data-testid="expense-list" data-readonly={readOnly ? 'true' : undefined}>
+    <div className="space-y-3" data-testid="expense-list">
       {groups.map((g, i) => {
         const fmt = (v) => (g.currency ? moneyIn(v, g.currency) : money(v));
         return (
