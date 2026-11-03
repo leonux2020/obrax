@@ -297,7 +297,7 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(q(`worker-${generic.id}`).querySelector('svg path[d^="M19 21v-2"]')).not.toBeNull(); // generic User
   });
 
-  it('the pay / advance button is the main action on the FRONT of every card: big, green, with a banknote icon, no menu to open', async () => {
+  it('the pay / advance button is the main action on the FRONT of every card: big, green, with a coins icon, no menu to open', async () => {
     await mount(mk());
     await openCrew();
     await addWorker('Luca', 'electrician');
@@ -312,12 +312,12 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(btn.className).toContain('border-2');
     expect(btn.className).not.toMatch(/\bbg-(?!black)/); // OLED: black ground
     expect(btn.className).toMatch(/min-h-\[(5[6-9]|[6-9]\d)px\]/);
-    // a banknote with a second bill behind it (not the old plain rectangle that read as a brick)
-    const icon = btn.querySelector('svg[data-outline-icon="true"][data-icon="cash"]');
+    // COINS (a stack + a single coin), never a bill / block
+    const icon = btn.querySelector('svg[data-outline-icon="true"][data-icon="coins"]');
     expect(icon).not.toBeNull();
-    expect(icon.querySelector('rect[width="17"][height="11"]')).not.toBeNull();
-    expect(icon.querySelector('rect[width="20"][height="12"]')).toBeNull();
-    expect(icon.querySelectorAll('path').length).toBeGreaterThanOrEqual(2);
+    expect(icon.querySelector('ellipse')).not.toBeNull();
+    expect(icon.querySelectorAll('circle').length).toBeGreaterThanOrEqual(1);
+    expect(icon.querySelector('rect')).toBeNull();
     expect(DICT.it['ws.crew.advance']).toBe('+ Paga / Anticipo');
     // it comes right after the header of the card, before the history
     const card = q(`worker-${id}`);

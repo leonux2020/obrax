@@ -47,13 +47,16 @@ export const BanknoteIcon = (props) => (
   </Outline>
 );
 
-/** Cash in hand, unmistakable: a banknote (with the centre medallion and the corner marks) with a second bill peeking out behind it. */
-export const CashIcon = (props) => (
-  <Outline icon="cash" {...props}>
-    <path d="M6 8V6.5A2.5 2.5 0 0 1 8.5 4h11A2.5 2.5 0 0 1 22 6.5v7a2.5 2.5 0 0 1-2.5 2.5H19" />
-    <rect width="17" height="11" x="2" y="8" rx="2.5" />
-    <circle cx="10.5" cy="13.5" r="2.5" />
-    <path d="M5.5 13.5h.01M15.5 13.5h.01" />
+/**
+ * ADVANCES / pay to a person: COINS, the universal sign of cash in hand. A stack of coins (side view, top right) and a single coin seen
+ * from the front (bottom left) with its centre mark. Same 24 px grid and 1.5 px line as the rest; the two shapes never overlap.
+ */
+export const CoinsIcon = (props) => (
+  <Outline icon="coins" {...props}>
+    <ellipse cx="16.5" cy="6" rx="4.5" ry="2.5" />
+    <path d="M12 6v4c0 1.38 2.01 2.5 4.5 2.5S21 11.38 21 10V6" />
+    <circle cx="8.5" cy="15.5" r="5.5" />
+    <path d="M8.5 12.5v6" />
   </Outline>
 );
 
