@@ -239,10 +239,26 @@ describe('ProjectWorkspace: three zones', () => {
     expect(q('ws-progress').className).toContain('h-0.5');
   });
 
-  it('a job that is not late keeps its state word with the days, and a NAMED place is still shown', async () => {
+  it('a job on time shows NO state word nor day counter (Zero Stress); a NAMED place is still shown', async () => {
     await mount({ initial: mk({}, -5, 60) });
-    expect(q('ws-status').textContent).toMatch(/A tiempo.*\d/);
+    expect(q('ws-status')).toBeNull();
+    expect(q('ws-zone-a').textContent).not.toMatch(/A tiempo|Faltan|Quedan|\d+ ?d\b/);
     expect(q('ws-location').textContent).toBe('Providencia');
+  });
+
+  it('a LATE job shows no "Plazo excedido" alert inside the project either (the global bell keeps it)', async () => {
+    await mount({ initial: mk({}, -30, -4) });
+    expect(q('project-workspace')?.textContent ?? document.body.textContent).not.toMatch(/Plazo excedido/);
+  });
+
+  it('the flag of the work site leads the project name; the client line carries no flag', async () => {
+    await mount({ initial: mk({}, -5, 60) });
+    const flag = q('ws-flag');
+    expect(flag.textContent).toBe('🇨🇱');
+    expect(flag.nextElementSibling).toBe(q('ws-title')); // right before the name, same line
+    expect(q('ws-title').textContent).toBe('Casa Pérez'); // the name itself is untouched
+    expect(q('ws-client').textContent).not.toContain('🇨🇱');
+    expect(q('ws-client').textContent).toContain('Ana');
   });
 
   it('Zone C icons: four thin outline SVGs (no emoji), neutral colour, still labelled', async () => {

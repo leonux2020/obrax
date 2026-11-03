@@ -315,12 +315,14 @@ describe('Project interior', () => {
   const order = () => [...host.querySelectorAll('[data-testid]')].map((e) => e.getAttribute('data-testid'));
   const before = (a, b) => order().indexOf(a) < order().indexOf(b);
 
-  it('vertical order, pencil at the top right, status pill, budget total, no Open/Edit text buttons', async () => {
+  it('vertical order, pencil at the top right, NO deadline pill, budget total, no Open/Edit text buttons', async () => {
     const onEdit = vi.fn();
     await render(React.createElement(Harness, { initial: sized(mk('Casa', -2, 30)), onEdit }));
-    for (const [a, b] of [['pv-edit', 'pv-status'], ['pv-status', 'budget-total'], ['budget-total', 'cash-bar'], ['cash-bar', 'selectors'], ['selectors', 'scan-receipt'], ['scan-receipt', 'supply-list'], ['supply-list', 'snap-grid'], ['snap-grid', 'log-input'], ['log-input', 'export-rendition'], ['export-rendition', 'pdf-generate']]) {
+    for (const [a, b] of [['pv-edit', 'budget-total'], ['budget-total', 'cash-bar'], ['cash-bar', 'selectors'], ['selectors', 'scan-receipt'], ['scan-receipt', 'supply-list'], ['supply-list', 'snap-grid'], ['snap-grid', 'log-input'], ['log-input', 'export-rendition'], ['export-rendition', 'pdf-generate']]) {
       expect(before(a, b), `${a} before ${b}`).toBe(true);
     }
+    expect(q('pv-status')).toBeNull(); // Zero Stress: no "on time / days left / late" counter inside the project
+    expect(q('project-view').textContent).not.toMatch(/A tiempo|Atraso|Faltan|Quedan/);
     expect(q('budget-total').textContent).toMatch(/\d/);
     await click(q('pv-edit'));
     expect(onEdit).toHaveBeenCalledTimes(1);

@@ -1,5 +1,4 @@
 import { useI18n } from '../../lib/i18n.jsx';
-import { levelDetail } from '../levelStyle.js';
 import BackupBadge from '../BackupBadge.jsx';
 import WeatherChip from './WeatherChip.jsx';
 
@@ -34,29 +33,33 @@ function Total({ audit, onCash, label, settled, children }) {
 }
 
 /**
- * ZONE A: the header that never scrolls away. Name, client, place, the lock and ONE number: what is still to be collected (DA INCASSARE,
+ * ZONE A: the header that never scrolls away. Flag + name, client, place, the lock and ONE number: what is still to be collected (DA INCASSARE,
  * soft orange while there is debt, never red). The quote and what is already collected go under it, small and grey; when nothing is left
  * it says "Saldato" with a green check instead. ONE 2 px line at the base of the block shows the share collected of the budget.
- * No red late alert (the debt already says it), no back arrow (the device's back gesture leaves the project), no globe, no coordinates.
+ * No deadline / countdown of any kind (no "on time", no days left, no late alert: the debt already says it), no back arrow (the device's back gesture leaves the project), no globe, no coordinates.
  */
 export default function HeaderZone({ project, model, title, client, region, offline, onEdit, onCash, onUnlock, audit = false }) {
   const { t, money } = useI18n();
   // the place is shown only when it has a NAME; raw coordinates are data, not interface
   const where = project.location?.label || '';
-  const detail = model.closed ? t('proj.closed') : levelDetail(t, model.info) || t(`light.${model.info.level}`);
   const cash = model.bars[1];
   const known = model.total !== null; // a valid quote: the budget and what is left can be told
   const settled = known && model.total > 0 && cash.pending <= 0.005;
-  const late = model.info.level === 'red'; // late jobs show no red text: the debt number already says it
   return (
     <header data-testid="ws-zone-a" data-region={region.code} className="sticky top-0 z-20 border-b border-white/10 bg-black px-3 pb-3 pt-2">
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1">
-          <h1 data-testid="ws-title" className="truncate text-xl font-semibold leading-tight">
-            {title}
-          </h1>
-          <p className="truncate text-sm text-[#E0E0E0]/80">
-            <span aria-hidden="true">{region.flag}</span> {client || t('proj.noClient')}
+          {/* the flag is the WORK SITE's country: it leads the project name, not the client's line */}
+          <div className="flex min-w-0 items-center gap-2">
+            <span aria-hidden="true" data-testid="ws-flag" className="shrink-0 text-xl leading-tight">
+              {region.flag}
+            </span>
+            <h1 data-testid="ws-title" className="min-w-0 truncate text-xl font-semibold leading-tight">
+              {title}
+            </h1>
+          </div>
+          <p className="truncate text-sm text-[#E0E0E0]/80" data-testid="ws-client">
+            {client || t('proj.noClient')}
             {where && (
               <>
                 <span className="text-[#E0E0E0]/50"> · </span>
@@ -75,18 +78,6 @@ export default function HeaderZone({ project, model, title, client, region, offl
       </div>
 
       <div className="mt-2 flex items-end justify-between gap-3">
-        {!late && (
-          <p
-            data-testid="ws-status"
-            data-level={model.level}
-            aria-label={`${t('ws.state')}: ${detail}`}
-            style={{ borderLeftColor: model.tone, color: model.tone }}
-            className="border-l-2 pl-2 text-sm font-semibold leading-tight"
-          >
-            {t(`light.${model.info.level}`)}
-            <span className="block text-base">{detail}</span>
-          </p>
-        )}
         {/* audit (ledger) mode: the figures are plain text, not a button that opens the payments */}
         <Total audit={audit} onCash={onCash} label={t('cash.title')} settled={settled}>
           {settled ? (

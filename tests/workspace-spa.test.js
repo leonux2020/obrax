@@ -312,7 +312,12 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(btn.className).toContain('border-2');
     expect(btn.className).not.toMatch(/\bbg-(?!black)/); // OLED: black ground
     expect(btn.className).toMatch(/min-h-\[(5[6-9]|[6-9]\d)px\]/);
-    expect(btn.querySelector('svg[data-outline-icon="true"] rect[width="20"][height="12"]')).not.toBeNull(); // Banknote
+    // a banknote with a second bill behind it (not the old plain rectangle that read as a brick)
+    const icon = btn.querySelector('svg[data-outline-icon="true"][data-icon="cash"]');
+    expect(icon).not.toBeNull();
+    expect(icon.querySelector('rect[width="17"][height="11"]')).not.toBeNull();
+    expect(icon.querySelector('rect[width="20"][height="12"]')).toBeNull();
+    expect(icon.querySelectorAll('path').length).toBeGreaterThanOrEqual(2);
     expect(DICT.it['ws.crew.advance']).toBe('+ Paga / Anticipo');
     // it comes right after the header of the card, before the history
     const card = q(`worker-${id}`);

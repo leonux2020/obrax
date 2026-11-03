@@ -11,7 +11,7 @@ import { crewHealth } from '../../lib/crewMatch.js';
 import CrewPicker from './CrewPicker.jsx';
 import LockedZone from './LockedZone.jsx';
 import NumberPad from './NumberPad.jsx';
-import { BanknoteIcon, SPECIALTY_ICON, UsersIcon } from './icons.jsx';
+import { CashIcon, SPECIALTY_ICON, UsersIcon } from './icons.jsx';
 
 /** The two job dates, typed by hand, and the days between them (a plain subtraction, no estimate). */
 function Dates({ project, setProject }) {
@@ -200,7 +200,7 @@ function WorkerCard({ row, health = false, onEdit, onAdvance, onRemoveAdvance })
           data-testid={`worker-adv-${w.id}`}
           className="flex min-h-[60px] w-full items-center justify-center gap-3 rounded-xl border-2 border-emerald-500 bg-black px-3 text-lg font-medium text-emerald-400 transition active:scale-[0.98] active:border-emerald-300"
         >
-          <BanknoteIcon size={28} />
+          <CashIcon size={28} />
           <span>{t('ws.crew.advance')}</span>
         </button>
       </div>

@@ -219,7 +219,7 @@ function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, c
         <ExpensesBlock expenses={project.expenses} queued={queued} receipts={receipts} onChange={setList('expenses')} open={ui.open.expenses} onToggle={toggle} />
         </div>
         {/* machinery has no module of its own: each task lists the machines it uses; exceptions surface in the tray */}
-        <AlertTray alerts={projectAlerts(project, t, { now: Date.now(), budget: result.valid ? total : null, queue: queued, money: (n) => i18n.moneyIn(n, projectMarket(project).currency) })} />
+        <AlertTray alerts={projectAlerts(project, t, { now: Date.now(), budget: result.valid ? total : null, queue: queued, money: (n) => i18n.moneyIn(n, projectMarket(project).currency) }).filter((a) => a.kind !== 'deadline')} />
       </div>
 
       <Dock onOpen={openDock} queued={queued.filter((r) => r.status === 'pending' || r.status === 'sending').length} />

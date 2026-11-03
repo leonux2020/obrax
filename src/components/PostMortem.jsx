@@ -70,11 +70,16 @@ export default function PostMortem({ project, parent = null, company, photos, se
       <header data-testid="ws-zone-a" className="sticky top-0 z-20 border-b border-white/10 bg-black px-3 pb-3 pt-2">
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
-            <h1 data-testid="ws-title" className="truncate text-xl font-semibold leading-tight">
-              {title}
-            </h1>
+            <div className="flex min-w-0 items-center gap-2">
+              <span aria-hidden="true" data-testid="ws-flag" className="shrink-0 text-xl leading-tight">
+                {region.flag}
+              </span>
+              <h1 data-testid="ws-title" className="min-w-0 truncate text-xl font-semibold leading-tight">
+                {title}
+              </h1>
+            </div>
             <p className="truncate text-sm text-[#E0E0E0]/80">
-              <span aria-hidden="true">{region.flag}</span> {projectClient(project) || t('proj.noClient')}
+              {projectClient(project) || t('proj.noClient')}
               <span className="text-[#E0E0E0]/50"> · </span>
               <span>{where || t('ws.noLocation')}</span>
             </p>

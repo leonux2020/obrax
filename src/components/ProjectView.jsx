@@ -5,14 +5,13 @@ import { computeAll } from '../lib/engine.js';
 import { pricingTime, planningTimeline } from '../lib/signature.js';
 import { FINANCE_LIMITS } from '../lib/draft.js';
 import { LEDGER_LIMITS, cashSummary, dayOf, laborPool, locationLabel, newEntryId, rentalsDue, withProjectContext, RENTAL_CATEGORIES } from '../lib/ledger.js';
-import { isClosed, parseDay, projectClient, projectLevel, projectTitle, toDayString } from '../lib/projects.js';
+import { isClosed, parseDay, projectClient, projectTitle, toDayString } from '../lib/projects.js';
 import { runExport } from '../lib/exportActions.js';
 import { warmPdfEngine } from '../lib/reportPdf.js';
 import { sanitizeText } from '../lib/sanitize.js';
 import { useAiAccess } from '../lib/usePro.js';
 import { useProjectBook, usePriceFeed } from '../lib/usePrices.js';
 import { Button, DateInput, NumberField, TextField } from './ui.jsx';
-import { LEVEL_COLOR, levelDetail } from './levelStyle.js';
 import PercentSlider from './PercentSlider.jsx';
 import CashSheet from './CashSheet.jsx';
 import ReceiptSheet from './ReceiptSheet.jsx';
@@ -220,9 +219,6 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
   const cash = cashSummary(total, project.payments);
   const pool = laborPool(result.valid ? result.quote.labor : 0, project.advances);
   const closed = isClosed(project);
-  const info = projectLevel(project, Date.now());
-  const level = closed ? 'closed' : info.level;
-  const detail = closed ? t('proj.closed') : levelDetail(t, info);
   const due = rentalsDue(project.expenses, Date.now());
   const title = projectTitle(project) || t('proj.untitled');
   const client = projectClient(project);
@@ -281,10 +277,13 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
           </Icon>
         </button>
         <div className="min-w-0 flex-1 pt-0.5">
-          <h1 className="truncate text-2xl font-medium leading-tight">{title}</h1>
-          <p className="truncate text-sm text-neutral-300">
-            <span aria-hidden="true">{region.flag}</span> {client || t('proj.noClient')}
-          </p>
+          <div className="flex min-w-0 items-center gap-2">
+            <span aria-hidden="true" data-testid="pv-flag" className="shrink-0 text-2xl leading-tight">
+              {region.flag}
+            </span>
+            <h1 className="min-w-0 truncate text-2xl font-medium leading-tight">{title}</h1>
+          </div>
+          <p className="truncate text-sm text-neutral-300">{client || t('proj.noClient')}</p>
         </div>
         <button type="button" onClick={onEdit} aria-label={t('proj.edit')} data-testid="pv-edit" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/10 hover:border-brand">
           <Icon>
@@ -293,18 +292,12 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
           </Icon>
         </button>
       </header>
-      <div className="mt-2 flex items-center gap-2">
-        <span
-          data-testid="pv-status"
-          data-level={level}
-          className="inline-flex max-w-full items-center gap-2 rounded-full border-2 px-3 py-1.5 text-sm font-medium"
-          style={{ color: LEVEL_COLOR[level], borderColor: LEVEL_COLOR[level] }}
-        >
-          <span aria-hidden="true" className="h-3 w-3 shrink-0 rounded-full" style={{ background: LEVEL_COLOR[level] }} />
-          <span className="truncate">{detail || t(`light.${info.level}`)}</span>
-        </span>
-        {due.length > 0 && <Hourglass label={t('rental.dueToday')} />}
-      </div>
+      {/* no deadline pill, no countdown: this view is operative and financial only. Only the rental reminder (a tool to return) stays */}
+      {due.length > 0 && (
+        <div className="mt-2 flex items-center gap-2">
+          <Hourglass label={t('rental.dueToday')} />
+        </div>
+      )}
 
       <LocationBlock location={project.location} />
 

@@ -1,7 +1,7 @@
 // Thin outline icons of Zone B (24 px grid, 1.5 px line, round caps and joins), drawn after Lucide's Users, Calculator, Banknote,
 // BookOpen, Receipt and TriangleAlert. They draw with `currentColor`, so each one takes the colour of the text next to it.
 // (No icon package is installed: they are inlined, ~1 KB in total.) The partidas keep TaskIcon, the same line language (3 / 48 = 1.5 / 24).
-export const Outline = ({ children, size = 22, className = '' }) => (
+export const Outline = ({ children, size = 22, className = '', icon }) => (
   <svg
     width={size}
     height={size}
@@ -14,6 +14,7 @@ export const Outline = ({ children, size = 22, className = '' }) => (
     aria-hidden="true"
     focusable="false"
     data-outline-icon="true"
+    data-icon={icon}
     className={`shrink-0 ${className}`}
   >
     {children}
@@ -43,6 +44,16 @@ export const BanknoteIcon = (props) => (
     <rect width="20" height="12" x="2" y="6" rx="2" />
     <circle cx="12" cy="12" r="2" />
     <path d="M6 12h.01M18 12h.01" />
+  </Outline>
+);
+
+/** Cash in hand, unmistakable: a banknote (with the centre medallion and the corner marks) with a second bill peeking out behind it. */
+export const CashIcon = (props) => (
+  <Outline icon="cash" {...props}>
+    <path d="M6 8V6.5A2.5 2.5 0 0 1 8.5 4h11A2.5 2.5 0 0 1 22 6.5v7a2.5 2.5 0 0 1-2.5 2.5H19" />
+    <rect width="17" height="11" x="2" y="8" rx="2.5" />
+    <circle cx="10.5" cy="13.5" r="2.5" />
+    <path d="M5.5 13.5h.01M15.5 13.5h.01" />
   </Outline>
 );
 
