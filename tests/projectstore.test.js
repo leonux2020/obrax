@@ -66,8 +66,8 @@ describe('multi-project store (IndexedDB)', () => {
   });
 });
 
-describe('photos are scoped per project (4 slots each)', () => {
-  it('two projects keep their own 4 photos without mixing', async () => {
+describe('photos are scoped per project (12 slots each)', () => {
+  it('two projects keep their own photos without mixing', async () => {
     const factory = new IDBFactory();
     const a = createPhotoStore(idbBackend(factory, 'proyectoa1'));
     const b = createPhotoStore(idbBackend(factory, 'proyectob2'));
@@ -77,10 +77,9 @@ describe('photos are scoped per project (4 slots each)', () => {
 
     const aSlots = await createPhotoStore(idbBackend(factory, 'proyectoa1')).load();
     const bSlots = await createPhotoStore(idbBackend(factory, 'proyectob2')).load();
-    expect(aSlots.every(Boolean)).toBe(true);
-    expect(aSlots.map((p) => p.at)).toEqual([10, 11, 12, 13]);
-    expect(bSlots.map((p) => p && p.at)).toEqual([null, 99, null, 98]);
-    expect(PHOTO_SLOTS).toHaveLength(4);
+    expect(aSlots.filter(Boolean).map((p) => p.at)).toEqual([10, 11, 12, 13]);
+    expect(bSlots.map((p) => p && p.at)).toEqual([null, 99, null, 98, ...Array(8).fill(null)]);
+    expect(PHOTO_SLOTS).toHaveLength(12);
   });
 
   it('replace/remove/clear only touch the owning project', async () => {
@@ -124,7 +123,7 @@ describe('migration from the single-project version (DB v1)', () => {
     const moved = await migrateLegacyPhotos(factory, 'primerproyecto');
     expect(moved).toBe(4);
     const slots = await createPhotoStore(idbBackend(factory, 'primerproyecto')).load();
-    expect(slots.map((p) => p.at)).toEqual([40, 41, 42, 43]);
+    expect(slots.filter(Boolean).map((p) => p.at)).toEqual([40, 41, 42, 43]);
     // legacy rows are gone, another project sees nothing, and running it again is harmless
     expect((await createPhotoStore(idbBackend(factory, 'otroproyecto')).load()).filter(Boolean)).toHaveLength(0);
     expect(await migrateLegacyPhotos(factory, 'primerproyecto')).toBe(0);

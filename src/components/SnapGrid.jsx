@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
-import { MAX_PHOTOS, PHOTO_SLOTS, PhotoError, compressImage, putPhoto, removePhoto, shouldUseLiveCamera } from '../lib/photos.js';
+import { MAX_PHOTOS, PHOTO_SLOTS, PhotoError, compressImage, putPhoto, removePhoto, shouldUseLiveCamera, slotLabel } from '../lib/photos.js';
 import { photoStoreFor } from '../lib/photoStore.js';
 import CameraModal from './CameraModal.jsx';
 
@@ -81,13 +81,13 @@ export default function SnapGrid({ photos, setPhotos, projectId = '_' }) {
     <section aria-label={t('snap.title')} data-testid="snap-grid">
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true" data-testid="snap-input" onChange={onFile} />
       <input ref={galleryRef} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={onFile} />
-      <ul className="grid grid-cols-2 gap-3">
+      <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3" data-testid="snap-list">
         {PHOTO_SLOTS.map((key, slot) => {
           const photo = photos[slot];
-          const label = t(`photo.slot.${key}`);
+          const label = slotLabel(t, slot);
           const working = busy === slot;
           return (
-            <li key={key} className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-white/10 bg-black">
+            <li key={key} className="relative aspect-[4/3] overflow-hidden rounded-xl border border-white/10 bg-black sm:rounded-2xl">
               {photo ? (
                 <>
                   <img src={photo.dataUrl} alt={label} width={photo.width} height={photo.height} decoding="async" draggable="false" className="h-full w-full object-cover" />
@@ -96,7 +96,7 @@ export default function SnapGrid({ photos, setPhotos, projectId = '_' }) {
                     aria-label={`${t('photo.delete')}: ${label}`}
                     data-testid={`snap-remove-${slot}`}
                     onClick={() => remove(slot)}
-                    className="absolute right-1.5 top-1.5 flex h-10 w-10 items-center justify-center rounded-full border border-red-500 bg-black/80 text-red-400"
+                    className="absolute right-1 top-1 flex h-10 w-10 items-center justify-center rounded-full border border-red-500 bg-black/80 text-red-400"
                   >
                     ✕
                   </button>
@@ -115,7 +115,7 @@ export default function SnapGrid({ photos, setPhotos, projectId = '_' }) {
                   ) : (
                     <>
                       <CameraIcon />
-                      <span className="px-2 text-xs font-semibold">{label}</span>
+                      <span className="line-clamp-2 px-1.5 text-center text-[11px] font-semibold leading-tight sm:text-xs">{label}</span>
                     </>
                   )}
                 </button>
@@ -132,7 +132,7 @@ export default function SnapGrid({ photos, setPhotos, projectId = '_' }) {
       )}
       {live !== null && (
         <CameraModal
-          slotLabel={t(`photo.slot.${PHOTO_SLOTS[live]}`)}
+          slotLabel={slotLabel(t, live)}
           onCapture={onLiveCapture}
           onClose={() => setLive(null)}
           onUpload={() => {

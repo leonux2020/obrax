@@ -6,10 +6,13 @@
 //   renderTechPdf    -> technical dossier for the contractor (purchase plan, stores, waste, leftovers, costs)
 // Both are drawn from the pure models in reports.js, so what is (not) in the model is (not) in the file.
 
+import { MAX_PHOTOS } from './photos.js';
+
 const PAGE_W = 210;
 const PAGE_H = 297;
 const MARGIN = 15;
 const CONTENT_W = PAGE_W - 2 * MARGIN;
+export const PHOTOS_PER_PAGE = 6; // 2 columns x 3 rows: twelve photos = two clean pages
 
 const C = {
   text: [17, 17, 17],
@@ -267,37 +270,50 @@ class Writer {
     this.color(C.text);
   }
 
-  /** Balanced 2x2 photo grid (images are contained in equal cells, captions below). */
+  /**
+   * Photo record, up to MAX_PHOTOS (12) pictures: a balanced 2-column grid, PHOTOS_PER_PAGE (6 = 2 x 3) per page. The first group follows
+   * the content already on the page; every next group starts a NEW page with the title repeated as "title (2/2)", so the pictures are
+   * never cut by a page break nor squeezed. Images are contained in equal cells with their caption below.
+   */
   photoGrid(title, photos) {
     if (!photos || photos.length === 0) return;
+    const list = photos.slice(0, MAX_PHOTOS);
+    const pages = Math.ceil(list.length / PHOTOS_PER_PAGE);
     const gutter = 6;
     const cellW = (CONTENT_W - gutter) / 2;
-    const imgH = 56;
+    const imgH = 58;
     const cellH = imgH + 8;
-    this.ensure(14 + cellH);
-    this.section(title);
-    photos.slice(0, 4).forEach((p, i) => {
-      const col = i % 2;
-      if (col === 0 && i > 0) this.y += cellH + 2;
-      if (col === 0) this.ensure(cellH);
-      const x = MARGIN + col * (cellW + gutter);
-      const y = this.y;
-      this.doc.setDrawColor(...C.line);
-      this.doc.setLineWidth(0.3);
-      this.doc.rect(x, y, cellW, imgH);
-      const k = Math.min(cellW / p.width, imgH / p.height);
-      const w = p.width * k;
-      const h = p.height * k;
-      try {
-        this.doc.addImage(p.dataUrl, 'JPEG', x + (cellW - w) / 2, y + (imgH - h) / 2, w, h, undefined, 'FAST');
-      } catch {
-        /* an undecodable photo must never break the document */
+    for (let g = 0; g < pages; g += 1) {
+      if (g > 0) {
+        this.doc.addPage();
+        this.y = MARGIN;
+      } else {
+        this.ensure(14 + cellH);
       }
-      this.font('normal', 8.5);
-      this.color(C.muted);
-      this.text(p.label, x, y + imgH + 4.5, { maxWidth: cellW });
-    });
-    this.y += cellH + 4;
+      this.section(pages > 1 ? `${title} (${g + 1}/${pages})` : title);
+      list.slice(g * PHOTOS_PER_PAGE, (g + 1) * PHOTOS_PER_PAGE).forEach((p, i) => {
+        const col = i % 2;
+        if (col === 0 && i > 0) this.y += cellH + 2;
+        if (col === 0) this.ensure(cellH);
+        const x = MARGIN + col * (cellW + gutter);
+        const y = this.y;
+        this.doc.setDrawColor(...C.line);
+        this.doc.setLineWidth(0.3);
+        this.doc.rect(x, y, cellW, imgH);
+        const k = Math.min(cellW / p.width, imgH / p.height);
+        const w = p.width * k;
+        const h = p.height * k;
+        try {
+          this.doc.addImage(p.dataUrl, 'JPEG', x + (cellW - w) / 2, y + (imgH - h) / 2, w, h, undefined, 'FAST');
+        } catch {
+          /* an undecodable photo must never break the document */
+        }
+        this.font('normal', 8.5);
+        this.color(C.muted);
+        this.text(p.label, x, y + imgH + 4.5, { maxWidth: cellW });
+      });
+      this.y += cellH + 4;
+    }
     this.color(C.text);
   }
 

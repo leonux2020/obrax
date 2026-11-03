@@ -363,7 +363,8 @@ export const EXTRA = {
 // ---- field photo evidence ---------------------------------------------------------------------
 Object.assign(EXTRA.es, {
   'photo.title': 'Evidencia en terreno',
-  'photo.hint': 'Hasta {max} fotos por proyecto. Se comprimen en el dispositivo (máx. 1200 px, ≈150 KB) y no salen de él.',
+  'photo.hint': 'Hasta {max} fotos por proyecto. Se reducen en el dispositivo (máx. 1080 px de ancho, JPEG 70 %), llevan la fecha estampada y no salen de él.',
+  'photo.slot.extra': 'Avance {n}',
   'photo.count': '{n}/{max} fotos',
   'photo.slot.panoramic': 'Panorámica',
   'photo.slot.existing': 'Estructura existente',
@@ -388,7 +389,8 @@ Object.assign(EXTRA.es, {
 });
 Object.assign(EXTRA.en, {
   'photo.title': 'Field evidence',
-  'photo.hint': 'Up to {max} photos per project. They are compressed on the device (max 1200 px, ≈150 KB) and never leave it.',
+  'photo.hint': 'Up to {max} photos per project. They are resized on the device (max 1080 px wide, JPEG 70 %), date-stamped and never leave it.',
+  'photo.slot.extra': 'Progress {n}',
   'photo.count': '{n}/{max} photos',
   'photo.slot.panoramic': 'Overview',
   'photo.slot.existing': 'Existing structure',

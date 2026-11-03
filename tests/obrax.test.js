@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import { BRAND, buildManifest, buildIconSvg } from '../src/brand/icon.js';
 import {
   MAX_PHOTOS,
+  fitPhotoSize,
   PHOTO_SLOTS,
   PHOTO_LIMITS,
   fitSize,
@@ -104,16 +105,17 @@ describe('floor screed shares cement with slabs and walls', () => {
 });
 
 describe('photo limits and validation', () => {
-  it('allows at most 4 photos per project', () => {
-    expect(MAX_PHOTOS).toBe(4);
-    expect(PHOTO_SLOTS).toEqual(['panoramic', 'existing', 'details', 'logistics']);
+  it('allows at most 12 photos per project', () => {
+    expect(MAX_PHOTOS).toBe(12);
+    expect(PHOTO_SLOTS).toHaveLength(12);
+    expect(PHOTO_SLOTS.slice(0, 4)).toEqual(['panoramic', 'existing', 'details', 'logistics']); // the historical names are kept
     let slots = emptySlots();
-    for (let i = 0; i < 10; i += 1) slots = putPhoto(slots, i, photo(i % 4));
-    expect(slots).toHaveLength(4);
-    expect(countPhotos(slots)).toBe(4);
+    for (let i = 0; i < 20; i += 1) slots = putPhoto(slots, i, photo(i % 12));
+    expect(slots).toHaveLength(12);
+    expect(countPhotos(slots)).toBe(12);
     expect(firstFreeSlot(slots)).toBe(-1);
     // out of range slots are ignored
-    expect(countPhotos(putPhoto(emptySlots(), 4, photo(0)))).toBe(0);
+    expect(countPhotos(putPhoto(emptySlots(), 12, photo(0)))).toBe(0);
     expect(countPhotos(putPhoto(emptySlots(), -1, photo(0)))).toBe(0);
     expect(countPhotos(putPhoto(emptySlots(), 1.5, photo(0)))).toBe(0);
   });
@@ -128,18 +130,23 @@ describe('photo limits and validation', () => {
     expect(firstFreeSlot(slots)).toBe(0);
   });
 
-  it('fitSize caps the longest side at 1200 px, keeps the ratio and never upscales', () => {
-    expect(fitSize(4000, 3000)).toEqual({ width: 1200, height: 900 });
-    expect(fitSize(3000, 4000)).toEqual({ width: 900, height: 1200 });
-    expect(fitSize(800, 600)).toEqual({ width: 800, height: 600 });
+  it('fitSize (generic, used by the logo) caps the longest side, keeps the ratio and never upscales', () => {
+    expect(fitSize(4000, 3000, 1200)).toEqual({ width: 1200, height: 900 });
+    expect(fitSize(3000, 4000, 1200)).toEqual({ width: 900, height: 1200 });
+    expect(fitSize(800, 600, 1200)).toEqual({ width: 800, height: 600 });
     expect(fitSize(0, 10)).toEqual({ width: 0, height: 0 });
-    expect(fitSize(1200, 1200)).toEqual({ width: 1200, height: 1200 });
+    expect(fitSize(1200, 1200, 1200)).toEqual({ width: 1200, height: 1200 });
   });
 
-  it('size budget is ~150 KB per image', () => {
-    expect(PHOTO_LIMITS.maxSide).toBe(1200);
-    expect(PHOTO_LIMITS.targetBytes).toBeGreaterThanOrEqual(120_000);
-    expect(PHOTO_LIMITS.targetBytes).toBeLessThanOrEqual(150_000);
+  it('progress photos: at most 1080 px WIDE, JPEG quality 0.7, sized so that 12 of them stay light', () => {
+    expect(PHOTO_LIMITS.maxWidth).toBe(1080);
+    expect(PHOTO_LIMITS.startQuality).toBe(0.7);
+    expect(fitPhotoSize(4000, 3000)).toEqual({ width: 1080, height: 810 });
+    expect(fitPhotoSize(3000, 4000)).toEqual({ width: 1080, height: 1440 }); // the WIDTH is what is capped
+    expect(fitPhotoSize(800, 600)).toEqual({ width: 800, height: 600 }); // never upscaled
+    expect(fitPhotoSize(1000, 9000)).toEqual({ width: 213, height: 1920 }); // a very tall strip is still bounded
+    expect(fitPhotoSize(0, 10)).toEqual({ width: 0, height: 0 });
+    expect(PHOTO_LIMITS.targetBytes * 12).toBeLessThanOrEqual(4_000_000);
     expect(dataUrlBytes(`data:image/jpeg;base64,${'A'.repeat(400)}`)).toBe(300);
   });
 
@@ -148,14 +155,15 @@ describe('photo limits and validation', () => {
     expect(isValidPhotoDataUrl('data:text/html;base64,PHNjcmlwdD4=')).toBe(false);
     expect(isValidPhotoDataUrl('data:image/svg+xml;base64,PHN2Zz4=')).toBe(false);
     expect(isValidPhotoDataUrl('javascript:alert(1)')).toBe(false);
-    expect(isValidPhotoDataUrl(`data:image/jpeg;base64,${'A'.repeat(600_000)}`)).toBe(false);
+    expect(isValidPhotoDataUrl(`data:image/jpeg;base64,${'A'.repeat(700_000)}`)).toBe(false);
     expect(normalizePhoto(photo(0, { width: 99999 }))).toBeNull();
     expect(normalizePhoto(photo(0, { height: -3 }))).toBeNull();
-    expect(normalizePhoto(photo(7))).toBeNull();
+    expect(normalizePhoto(photo(12))).toBeNull();
+    expect(normalizePhoto(photo(11))).not.toBeNull();
     expect(normalizePhoto(null)).toBeNull();
     expect(normalizePhotos('nope')).toEqual(emptySlots());
-    const slots = normalizePhotos([photo(0), photo(0, { at: 5 }), photo(1, { dataUrl: 'x' }), photo(9), null, 3, photo(3)]);
-    expect(slots.map((s) => !!s)).toEqual([true, false, false, true]);
+    const slots = normalizePhotos([photo(0), photo(0, { at: 5 }), photo(1, { dataUrl: 'x' }), photo(12), null, 3, photo(3)]);
+    expect(slots.map((s) => !!s)).toEqual([true, false, false, true, false, false, false, false, false, false, false, false]);
     expect(slots[0].at).toBe(1); // first valid photo of a slot wins
   });
 
@@ -181,18 +189,19 @@ describe('photo persistence', () => {
     await store.save(photo(2));
     expect(countPhotos(await store.load())).toBe(2);
     await store.remove(0);
-    expect((await store.load()).map((p) => !!p)).toEqual([false, false, true, false]);
+    expect((await store.load()).map((p) => !!p)).toEqual([false, false, true, ...Array(9).fill(false)]);
     await store.clear();
     expect(countPhotos(await store.load())).toBe(0);
   });
 
-  it('refuses invalid photos and never returns more than 4 on load', async () => {
+  it('refuses invalid photos and never returns more than 12 on load', async () => {
     const store = createPhotoStore(memoryBackend());
     await expect(store.save({ slot: 0, dataUrl: 'evil', width: 1, height: 1 })).rejects.toThrow();
     const backend = memoryBackend();
-    for (let i = 0; i < 10; i += 1) await backend.put({ ...photo(i % 4), slot: i });
+    for (let i = 0; i < 20; i += 1) await backend.put({ ...photo(i % 4), slot: i });
     const loaded = await createPhotoStore(backend).load();
-    expect(loaded).toHaveLength(4);
+    expect(loaded).toHaveLength(12);
+    expect(countPhotos(loaded)).toBe(12);
   });
 
   it('degrades to memory if IndexedDB fails', async () => {

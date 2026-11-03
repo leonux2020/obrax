@@ -1,21 +1,36 @@
-// Field photo evidence: at most 4 photos per project, one per named slot.
+// Field photo evidence (progress photos): at most 12 per project, one per slot. Every photo is resized on a <canvas>
+// (max 1080 px wide), stamped with the capture date (DD/MM/YYYY, bottom right) and saved as JPEG at quality 0.7, so twelve of
+// them never overload the memory of the PWA. (WebP is not used on purpose: Safari / iOS cannot encode it and silently returns PNG.)
 // Pure helpers (limits, validation, normalisation) are separated from the browser-only
 // compression pipeline so the rules are unit-testable in Node.
 
 import { INVOICE_LIMITS } from './invoice.js';
 
-export const MAX_PHOTOS = 4;
-export const PHOTO_SLOTS = Object.freeze(['panoramic', 'existing', 'details', 'logistics']);
+export const MAX_PHOTOS = 12;
+// the first four keep their historical names (panoramic view, existing structure, details, logistics); the other eight are numbered progress shots
+export const PHOTO_SLOTS = Object.freeze(['panoramic', 'existing', 'details', 'logistics', 'extra5', 'extra6', 'extra7', 'extra8', 'extra9', 'extra10', 'extra11', 'extra12']);
+
+/** The label of slot `index` in the user's language: a named one, or "Avance 7" for the numbered ones. */
+export function slotLabel(t, index) {
+  const key = PHOTO_SLOTS[index];
+  if (!key) return '';
+  return key.startsWith('extra') ? t('photo.slot.extra', { n: index + 1 }) : t(`photo.slot.${key}`);
+}
 
 export const PHOTO_LIMITS = Object.freeze({
-  maxSide: 1200, // px, width or height
-  targetBytes: 150_000, // quality loop aims here (~100-150 KB per image)
-  acceptBytes: 160_000, // upper bound accepted before shrinking the image further
-  startQuality: 0.82,
-  minQuality: 0.45,
+  maxWidth: 1080, // px: every new photo is at most this wide
+  maxHeight: 1920, // px: a very tall panorama is still bounded
+  maxSide: 1920, // px, width or height: the largest a STORED photo may have (older photos were up to 1200)
+  targetBytes: 300_000, // the quality loop only lowers the 0.7 when a photo is heavier than this
+  acceptBytes: 320_000, // upper bound accepted before shrinking the image further
+  startQuality: 0.7, // JPEG quality of every new photo
+  minQuality: 0.5,
   maxInputBytes: 40 * 1024 * 1024, // refuse absurd inputs before decoding
-  maxStoredBytes: 400_000, // anything bigger than this coming from storage is rejected
+  maxStoredBytes: 450_000, // anything bigger than this coming from storage is rejected
 });
+
+/** The settings the invoice / receipt reader has always used (text needs more detail than evidence photos). */
+const INVOICE_JPEG = Object.freeze({ startQuality: 0.82, minQuality: 0.45 });
 
 const DATA_URL_RE = /^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/;
 
@@ -25,6 +40,15 @@ export function fitSize(width, height, max = PHOTO_LIMITS.maxSide) {
   const h = Number(height);
   if (!(w > 0) || !(h > 0)) return { width: 0, height: 0 };
   const k = Math.min(1, max / Math.max(w, h));
+  return { width: Math.max(1, Math.round(w * k)), height: Math.max(1, Math.round(h * k)) };
+}
+
+/** Progress photo size: at most 1080 px WIDE (and 1920 px tall), proportional, never upscaled. */
+export function fitPhotoSize(width, height) {
+  const w = Number(width);
+  const h = Number(height);
+  if (!(w > 0) || !(h > 0)) return { width: 0, height: 0 };
+  const k = Math.min(1, PHOTO_LIMITS.maxWidth / w, PHOTO_LIMITS.maxHeight / h);
   return { width: Math.max(1, Math.round(w * k)), height: Math.max(1, Math.round(h * k)) };
 }
 
@@ -103,7 +127,7 @@ function normalizeSlots(slots) {
 /** Photos ready for the PDF generators: labelled, in slot order, empty slots skipped. */
 export function photosForReport(slots, t) {
   return normalizeSlots(slots)
-    .map((p, i) => (p ? { ...p, label: t(`photo.slot.${PHOTO_SLOTS[i]}`) } : null))
+    .map((p, i) => (p ? { ...p, label: slotLabel(t, i) } : null))
     .filter(Boolean);
 }
 
@@ -169,27 +193,68 @@ function releaseCanvas(c) {
   }
 }
 
-/** Encode a canvas as JPEG starting at quality 0.82 and lowering it until the target size is met. */
-export function encodeJpeg(canvas, { targetBytes = PHOTO_LIMITS.targetBytes } = {}) {
-  let q = PHOTO_LIMITS.startQuality;
+/** Encode a canvas as JPEG starting at quality 0.7 and lowering it only when the file is heavier than the target. */
+export function encodeJpeg(canvas, { targetBytes = PHOTO_LIMITS.targetBytes, startQuality = PHOTO_LIMITS.startQuality, minQuality = PHOTO_LIMITS.minQuality } = {}) {
+  let q = startQuality;
   let dataUrl = canvas.toDataURL('image/jpeg', q);
-  while (dataUrlBytes(dataUrl) > targetBytes && q > PHOTO_LIMITS.minQuality) {
-    q = Math.max(PHOTO_LIMITS.minQuality, Math.round((q - 0.07) * 100) / 100);
+  while (dataUrlBytes(dataUrl) > targetBytes && q > minQuality) {
+    q = Math.max(minQuality, Math.round((q - 0.07) * 100) / 100);
     dataUrl = canvas.toDataURL('image/jpeg', q);
   }
   return { dataUrl, quality: q };
 }
 
+/** DD/MM/YYYY of the LOCAL calendar day (what the contractor sees on the phone, not UTC). */
+export function formatStampDate(now = Date.now()) {
+  const d = new Date(now);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+}
+
+/**
+ * Print the date in the bottom-right corner of the canvas, on a subtle semi-transparent black plate (rgba(0,0,0,0.5)) so it reads on any
+ * photo. The type size follows the photo width (3.5 %), so it looks the same on a 1080 px shot and on a small one.
+ * A canvas without text support (very old WebView, test doubles) is left untouched: the photo is still saved.
+ */
+export function stampDate(canvas, now = Date.now()) {
+  try {
+    const ctx = canvas.getContext('2d');
+    if (!ctx || typeof ctx.fillText !== 'function') return false;
+    const W = canvas.width;
+    const H = canvas.height;
+    const text = formatStampDate(now);
+    const size = Math.max(12, Math.round(W * 0.035));
+    const pad = Math.round(size * 0.35);
+    const margin = Math.round(size * 0.5);
+    ctx.font = `600 ${size}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+    const textW = typeof ctx.measureText === 'function' ? ctx.measureText(text).width : size * 0.6 * text.length;
+    const boxW = Math.ceil(textW + pad * 2);
+    const boxH = size + pad * 2;
+    const x = W - boxW - margin;
+    const y = H - boxH - margin;
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(x, y, boxW, boxH);
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, x + pad, y + boxH / 2 + 1);
+    return true;
+  } catch {
+    return false; // a stamp problem must never lose the photo
+  }
+}
+
 /**
  * Shared compressor for BOTH inputs (file picker and live camera frame). `source` must already be
  * decoded (ImageBitmap, loaded <img>, <video> with a frame) and `width/height` its intrinsic size.
- * Output: proportional size, longest side <= 1200 px, JPEG ~100-160 KB.
+ * Output: proportional size, at most 1080 px wide, the capture date stamped bottom right, JPEG at quality 0.7.
  */
-export function compressSource(source, width, height, { now = Date.now(), makeCanvas = domCanvas } = {}) {
-  let { width: tw, height: th } = fitSize(width, height);
+export function compressSource(source, width, height, { now = Date.now(), makeCanvas = domCanvas, stamp = true } = {}) {
+  let { width: tw, height: th } = fitPhotoSize(width, height);
   if (!tw) throw new PhotoError('decode');
   for (let attempt = 0; attempt < 6; attempt += 1) {
     const canvas = downscale(source, width, height, tw, th, makeCanvas);
+    if (stamp) stampDate(canvas, now);
     const { dataUrl } = encodeJpeg(canvas);
     releaseCanvas(canvas);
     const bytes = dataUrlBytes(dataUrl);
@@ -248,24 +313,24 @@ async function decode(file) {
   }
 }
 
-/** File picker / gallery / mobile camera capture -> compressed photo. */
+/** File picker / gallery / mobile camera capture -> compressed, date-stamped photo. */
 export async function compressImage(file, now = Date.now(), env = {}) {
   if (!file || typeof file.type !== 'string' || !file.type.startsWith('image/')) throw new PhotoError('type');
   if (file.size > PHOTO_LIMITS.maxInputBytes) throw new PhotoError('size');
   const img = await (env.decode || decode)(file);
   try {
-    return compressSource(img.source, img.width, img.height, { now, makeCanvas: env.makeCanvas });
+    return compressSource(img.source, img.width, img.height, { now, makeCanvas: env.makeCanvas, stamp: env.stamp !== false });
   } finally {
     img.close?.();
   }
 }
 
-/** Live camera frame (<video>) -> compressed photo, using exactly the same pipeline. */
+/** Live camera frame (<video>) -> compressed, date-stamped photo, using exactly the same pipeline. */
 export function compressVideoFrame(video, now = Date.now(), env = {}) {
   const width = video?.videoWidth;
   const height = video?.videoHeight;
   if (!(width > 0 && height > 0)) throw new PhotoError('decode');
-  return compressSource(video, width, height, { now, makeCanvas: env.makeCanvas });
+  return compressSource(video, width, height, { now, makeCanvas: env.makeCanvas, stamp: env.stamp !== false });
 }
 
 /**
@@ -297,7 +362,7 @@ export async function compressInvoiceImage(file, env = {}) {
     if (!tw) throw new PhotoError('decode');
     for (let attempt = 0; attempt < 6; attempt += 1) {
       const canvas = downscale(img.source, img.width, img.height, tw, th, env.makeCanvas);
-      const { dataUrl } = encodeJpeg(canvas, { targetBytes: INVOICE_LIMITS.targetBytes });
+      const { dataUrl } = encodeJpeg(canvas, { targetBytes: INVOICE_LIMITS.targetBytes, ...INVOICE_JPEG });
       releaseCanvas(canvas);
       if (dataUrlBytes(dataUrl) <= INVOICE_LIMITS.targetBytes * 1.2 || attempt === 5) {
         if (!/^data:image\/jpeg;base64,/.test(dataUrl)) throw new PhotoError('decode');

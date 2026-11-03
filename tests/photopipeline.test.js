@@ -15,6 +15,9 @@ import {
   photosForReport,
   putPhoto,
   shouldUseLiveCamera,
+  slotLabel,
+  stampDate,
+  formatStampDate,
 } from '../src/lib/photos.js';
 import { createPhotoStore, idbBackend } from '../src/lib/photoStore.js';
 import { newDraft } from '../src/lib/draft.js';
@@ -28,7 +31,7 @@ import { makeI18n } from '../src/lib/i18n.jsx';
 function fakeEnv(factor = 0.12) {
   const canvases = [];
   const makeCanvas = () => {
-    const calls = { toDataURL: [], draws: [], smoothingAtDraw: [] };
+    const calls = { toDataURL: [], draws: [], smoothingAtDraw: [], rects: [], texts: [] };
     const canvas = {
       _w: 300, // DOM default: what an unsized canvas would be
       _h: 150,
@@ -43,7 +46,12 @@ function fakeEnv(factor = 0.12) {
           imageSmoothingEnabled: false,
           imageSmoothingQuality: 'low',
           fillStyle: '',
-          fillRect() {},
+          font: '',
+          textAlign: '',
+          textBaseline: '',
+          fillRect: (...a) => calls.rects.push({ style: ctx.fillStyle, a }),
+          fillText: (...a) => calls.texts.push({ text: a[0], x: a[1], y: a[2], style: ctx.fillStyle, font: ctx.font }),
+          measureText: (t) => ({ width: String(t).length * 10 }),
           drawImage: (src, x, y, w, h) => {
             calls.draws.push({ w, h, src });
             calls.smoothingAtDraw.push([ctx.imageSmoothingEnabled, ctx.imageSmoothingQuality]);
@@ -65,17 +73,17 @@ function fakeEnv(factor = 0.12) {
 }
 
 describe('canvas compression pipeline', () => {
-  it('4000x3000 -> proportional 1200x900, JPEG 0.82 first, ~100-160 KB', () => {
-    const { makeCanvas, canvases } = fakeEnv();
+  it('4000x3000 -> proportional 1080x810 (max 1080 px wide), JPEG 0.7 first, light enough for 12 per project', () => {
+    const { makeCanvas, canvases } = fakeEnv(0.25);
     const photo = compressSource({ id: 'src' }, 4000, 3000, { makeCanvas, now: 7 });
-    expect(photo.width).toBe(1200);
-    expect(photo.height).toBe(900);
+    expect(photo.width).toBe(1080);
+    expect(photo.height).toBe(810);
     expect(photo.at).toBe(7);
     const encoded = canvases.find((c) => c.calls.toDataURL.length);
-    expect(encoded.calls.toDataURL[0]).toEqual(['image/jpeg', 0.82]);
+    expect(encoded.calls.toDataURL[0]).toEqual(['image/jpeg', 0.7]);
     expect(photo.dataUrl.startsWith('data:image/jpeg;base64,')).toBe(true);
     expect(photo.bytes).toBeGreaterThanOrEqual(100_000);
-    expect(photo.bytes).toBeLessThanOrEqual(160_000);
+    expect(photo.bytes).toBeLessThanOrEqual(PHOTO_LIMITS.acceptBytes);
     expect(dataUrlBytes(photo.dataUrl)).toBe(photo.bytes);
   });
 
@@ -102,30 +110,30 @@ describe('canvas compression pipeline', () => {
     const { makeCanvas, canvases } = fakeEnv();
     compressSource({}, 4800, 3600, { makeCanvas });
     const widths = canvases.map((c) => c.calls.draws.map((d) => d.w)).flat();
-    // 4800 -> 2400 -> (final) 1200: the first draw is the intermediate half-size step
+    // 4800 -> 2400 -> 1200 -> (final) 1080: the first draw is the intermediate half-size step
     expect(widths[0]).toBe(2400);
-    expect(widths).toContain(1200);
+    expect(widths).toContain(1080);
     // every draw shrinks by < 2x relative to its own source, except the exact halving steps
     expect(Math.max(...widths)).toBeLessThanOrEqual(2400);
   });
 
   it('keeps portrait proportions and never upscales small images', () => {
     const p = compressSource({}, 3000, 4000, { makeCanvas: fakeEnv().makeCanvas });
-    expect([p.width, p.height]).toEqual([900, 1200]);
+    expect([p.width, p.height]).toEqual([1080, 1440]);
     const small = compressSource({}, 800, 600, { makeCanvas: fakeEnv().makeCanvas });
     expect([small.width, small.height]).toEqual([800, 600]);
     const wide = compressSource({}, 6000, 1000, { makeCanvas: fakeEnv().makeCanvas });
-    expect([wide.width, wide.height]).toEqual([1200, 200]);
+    expect([wide.width, wide.height]).toEqual([1080, 180]);
   });
 
   it('heavy images lower the quality and then the size until they fit', () => {
-    const { makeCanvas, canvases } = fakeEnv(0.4); // pretend very detailed content
+    const { makeCanvas, canvases } = fakeEnv(0.8); // pretend very detailed content
     const photo = compressSource({}, 4000, 3000, { makeCanvas });
     expect(photo.bytes).toBeLessThanOrEqual(PHOTO_LIMITS.acceptBytes);
     const qualities = canvases.flatMap((c) => c.calls.toDataURL.map((x) => x[1]));
     expect(Math.min(...qualities)).toBeGreaterThanOrEqual(PHOTO_LIMITS.minQuality);
-    expect(qualities[0]).toBe(0.82);
-    expect(photo.width).toBeLessThan(1200); // had to shrink
+    expect(qualities[0]).toBe(0.7);
+    expect(photo.width).toBeLessThan(1080); // had to shrink
     expect(photo.width / photo.height).toBeCloseTo(4 / 3, 1);
   });
 
@@ -139,14 +147,14 @@ describe('canvas compression pipeline', () => {
     await expect(compressImage({ type: 'image/png', size: PHOTO_LIMITS.maxInputBytes + 1 }, 1, env)).rejects.toMatchObject({ code: 'size' });
     await expect(compressImage(null, 1, env)).rejects.toMatchObject({ code: 'type' });
     const ok = await compressImage({ type: 'image/jpeg', size: 5_000_000 }, 99, env);
-    expect([ok.width, ok.height]).toEqual([1200, 900]);
+    expect([ok.width, ok.height]).toEqual([1080, 810]);
     expect(normalizePhoto(ok)).not.toBeNull();
   });
 
   it('live camera frame uses the same compressor (video intrinsic size)', () => {
     const env = { makeCanvas: fakeEnv().makeCanvas };
     const p = compressVideoFrame({ videoWidth: 1920, videoHeight: 1080 }, 5, env);
-    expect([p.width, p.height]).toEqual([1200, 675]);
+    expect([p.width, p.height]).toEqual([1080, 608]);
     expect(() => compressVideoFrame({ videoWidth: 0, videoHeight: 0 }, 5, env)).toThrow(PhotoError);
     expect(() => compressVideoFrame(null, 5, env)).toThrow(PhotoError);
   });
@@ -227,16 +235,22 @@ const variant = (k) => {
 };
 const photo = (slot) => ({ slot, dataUrl: variant(slot), width: 1200, height: 900, at: 100 + slot });
 
-describe('four photo slots persist in IndexedDB', () => {
-  it('slots are the four named evidence areas', () => {
-    expect(MAX_PHOTOS).toBe(4);
-    expect([...PHOTO_SLOTS]).toEqual(['panoramic', 'existing', 'details', 'logistics']);
+describe('twelve photo slots persist in IndexedDB', () => {
+  it('slots: the four historical named areas + eight numbered progress shots', () => {
+    expect(MAX_PHOTOS).toBe(12);
+    expect([...PHOTO_SLOTS].slice(0, 4)).toEqual(['panoramic', 'existing', 'details', 'logistics']);
+    expect(PHOTO_SLOTS).toHaveLength(12);
+    const { t } = makeI18n('es', 'CL');
+    expect(slotLabel(t, 0)).toBe('Panorámica');
+    expect(slotLabel(t, 4)).toBe('Avance 5');
+    expect(slotLabel(t, 11)).toBe('Avance 12');
+    expect(slotLabel(t, 12)).toBe('');
   });
 
-  it('saves Panoramica/Estructura/Encuentros/Logistica and restores them after a reload', async () => {
+  it('saves all 12 slots and restores them after a reload', async () => {
     const factory = new IDBFactory();
     const store = createPhotoStore(idbBackend(factory));
-    for (let s = 0; s < 4; s += 1) await store.save(photo(s));
+    for (let s = 0; s < 12; s += 1) await store.save(photo(s));
     expect(store.kind).toBe('indexeddb');
 
     // "reload": brand-new store + new connection over the same database
@@ -267,9 +281,9 @@ describe('four photo slots persist in IndexedDB', () => {
     expect((await store.load()).filter(Boolean)).toHaveLength(0);
   });
 
-  it('a fifth slot can never be stored', async () => {
+  it('a 13th slot can never be stored', async () => {
     const store = createPhotoStore(idbBackend(new IDBFactory()));
-    await expect(store.save(photo(4))).rejects.toThrow();
+    await expect(store.save(photo(12))).rejects.toThrow();
     expect((await store.load()).filter(Boolean)).toHaveLength(0);
   });
 });
@@ -291,7 +305,7 @@ describe('persisted photos reach both PDFs', () => {
     const money = pdfMoneyFormatter(i.region, i.locale);
     const base = { draft: d, result, company: { name: 'Obra', taxId: '', phone: '', email: '', city: '' }, region: i.region, t: i.t, num: i.num, unit: i.unit, date: i.date };
     const photos = photosForReport(slots, i.t);
-    expect(photos.map((p) => p.label)).toEqual(PHOTO_SLOTS.map((k) => i.t(`photo.slot.${k}`)));
+    expect(photos.map((p) => p.label)).toEqual(PHOTO_SLOTS.slice(0, 4).map((k) => i.t(`photo.slot.${k}`)));
     expect(photos[0].label).toBe('Panorámica');
 
     const tech = raw(await renderTechPdf(buildTechModel({ ...base, money }), { t: i.t, num: i.num, money, photos }));

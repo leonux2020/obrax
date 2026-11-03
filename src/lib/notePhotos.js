@@ -117,7 +117,7 @@ export function notePhotosFor(projectId) {
   return cache.get(projectId);
 }
 
-/** A file from the camera / gallery -> compressed (JPEG ~150 KB, longest side 1200 px) -> a Blob ready for the store. */
+/** A file from the camera / gallery -> compressed (JPEG 0.7, max 1080 px wide, date-stamped) -> a Blob ready for the store. */
 export async function prepareNotePhoto(file) {
   const clean = normalizeNotePhoto(await compressImage(file));
   if (!clean) throw new PhotoError('decode');

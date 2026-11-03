@@ -3,6 +3,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import {
   MAX_PHOTOS,
   PHOTO_SLOTS,
+  slotLabel,
   PhotoError,
   compressImage,
   countPhotos,
@@ -103,10 +104,10 @@ export default function PhotoGallery({ photos, setPhotos, projectId = '_' }) {
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={onFile} />
       <input ref={galleryRef} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={onFile} />
 
-      <ul className="grid grid-cols-2 gap-3">
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-testid="photo-list">
         {PHOTO_SLOTS.map((key, slot) => {
           const photo = photos[slot];
-          const label = t(`photo.slot.${key}`);
+          const label = slotLabel(t, slot);
           const working = busy === slot;
           return (
             <li key={key} className="overflow-hidden rounded-xl border border-neutral-800 bg-black">
@@ -167,7 +168,7 @@ export default function PhotoGallery({ photos, setPhotos, projectId = '_' }) {
       )}
       {live !== null && (
         <CameraModal
-          slotLabel={t(`photo.slot.${PHOTO_SLOTS[live]}`)}
+          slotLabel={slotLabel(t, live)}
           onCapture={onLiveCapture}
           onClose={() => setLive(null)}
           onUpload={uploadInstead}
