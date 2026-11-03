@@ -98,7 +98,8 @@ describe('Drive cycle of the logbook photos', () => {
     await click(h.tab('Ajustes'));
     await click(q('backup-restore'));
     await flush(300);
-    expect(q('backup-note').textContent).toContain('Respaldo restaurado');
+    // the invisible auto-pull may have restored the backup a moment earlier: then the manual restore just reports that all is up to date
+    expect(q('backup-note').textContent).toMatch(/Respaldo restaurado|Todo al día/);
 
     // IndexedDB: a Blob row (never base64), the same bytes, the link in the project
     const rows = await createRunner(indexedDB)(STORE_PHOTOS, 'readonly', (s) => s.getAll());

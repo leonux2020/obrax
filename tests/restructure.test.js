@@ -124,7 +124,7 @@ describe('projects: dashboard level, closed jobs and the new fields', () => {
     expect(back.closedAt).toBe(NOW);
     expect([back.payments.length, back.advances.length, back.expenses.length, back.logbook.length]).toEqual([1, 1, 1, 1]);
     expect(back.location).toMatchObject({ lat: 1, lng: 2 });
-    const old = normalizeProject({ ...p, payments: 'x', expenses: [{ amount: -1 }], location: 'x', closedAt: 'y' });
+    const old = normalizeProject({ ...p, payments: 'x', expenses: [{ amount: 0 }], location: 'x', closedAt: 'y' });
     expect(old).toMatchObject({ payments: [], expenses: [], location: null, closedAt: 0 });
   });
 });

@@ -33,6 +33,11 @@ const amount = (v) => {
   const n = typeof v === 'string' ? Number(v.replace(',', '.')) : Number(v);
   return Number.isFinite(n) && n > 0 && n <= LEDGER_LIMITS.maxAmount ? Math.round(n * 100) / 100 : null;
 };
+// a SIGNED amount: expenses may carry a negative line (a global discount of a receipt); 0 is not an amount
+const signedAmount = (v) => {
+  const n = typeof v === 'string' ? Number(v.replace(',', '.')) : Number(v);
+  return Number.isFinite(n) && n !== 0 && Math.abs(n) <= LEDGER_LIMITS.maxAmount ? Math.round(n * 100) / 100 : null;
+};
 // like `amount` but 0 is a real value (an exempt document has tax 0)
 const amount0 = (v) => {
   if (v === null || v === undefined || v === '') return null;
@@ -122,7 +127,7 @@ const RECEIPT_ID_RE = /^[a-z0-9]{4,24}$/;
 
 export const normalizeExpenses = (raw) =>
   listOf(raw, LEDGER_LIMITS.expenses, (p, used) => {
-    const a = amount(p.amount);
+    const a = signedAmount(p.amount);
     if (a === null) return null;
     const category = EXPENSE_CATEGORIES.includes(p.category) ? p.category : 'other';
     const rental = RENTAL_CATEGORIES.includes(category);
@@ -286,14 +291,14 @@ export function profitability(project, budget = 0, top = 3) {
   const shops = new Map();
   for (const e of arr(project?.expenses)) {
     const amount = num(e?.amount);
-    if (amount <= 0) continue;
+    if (amount === 0) continue;
     const name = typeof e?.supplier === 'string' ? e.supplier.trim().replace(/\s+/g, ' ') : '';
     const key = name.toLowerCase();
     const shop = shops.get(key) ?? { key, name, total: 0 };
-    shop.total = cents(shop.total + amount);
+    shop.total = cents(shop.total + amount); // a discount line lowers ITS shop (net of discounts)
     shops.set(key, shop);
   }
-  const all = [...shops.values()].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+  const all = [...shops.values()].filter((x) => x.total > 0).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
   const named = all.filter((x) => x.name);
   const pool = (named.length ? named : all).slice(0, Math.max(1, top));
   const suppliers = spent > 0 ? pool.map((x) => ({ ...x, share: (x.total / spent) * 100 })) : [];
@@ -498,7 +503,7 @@ export function globalBreakdown(projects, budgets) {
  * Where the money of ALL the expenses went, per currency, over the ACTIVE projects, grouped by supplier (shops matched ignoring case / extra
  * spaces, the expenses with no supplier go together as `name: ''`): [{ currency, regionCode, total, segments: [{ key, name, total, pct }] }].
  * The `top` biggest suppliers get a segment of their own; every other one is folded into ONE last segment `{ key: '__others', name: '', others: true }`.
- * `pct` is the exact share (0-100) of the currency's expense total. Currencies are never mixed. Only positive amounts count.
+ * `pct` is the exact share (0-100) of the currency's expense total. Currencies are never mixed. Discount lines (negative) are netted into their shop.
  */
 export function globalSupplierShares(projects, top = 4) {
   const lines = new Map();
@@ -509,7 +514,7 @@ export function globalSupplierShares(projects, top = 4) {
     const line = lines.get(currency) ?? { currency, regionCode, shops: new Map() };
     for (const e of arr(p.expenses)) {
       const amount = num(e.amount);
-      if (amount <= 0) continue;
+      if (amount === 0) continue; // a discount line (negative) lowers its shop
       const name = typeof e.supplier === 'string' ? e.supplier.trim().replace(/\s+/g, ' ') : '';
       const key = name.toLowerCase();
       const shop = line.shops.get(key) ?? { key, name, total: 0 };
@@ -520,7 +525,7 @@ export function globalSupplierShares(projects, top = 4) {
   }
   return [...lines.values()]
     .map(({ currency, regionCode, shops }) => {
-      const all = [...shops.values()].sort((a, b) => (a.name === '') - (b.name === '') || b.total - a.total || a.name.localeCompare(b.name));
+      const all = [...shops.values()].filter((x) => x.total > 0).sort((a, b) => (a.name === '') - (b.name === '') || b.total - a.total || a.name.localeCompare(b.name));
       const sum = cents(all.reduce((s, x) => s + x.total, 0));
       const head = all.slice(0, Math.max(1, top));
       const rest = all.slice(head.length);

@@ -436,7 +436,9 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
                   <div className="flex items-start gap-3">
                     <ExpenseHead e={e} titleClass="" />
                     {isDue && <Hourglass label={t('rental.dueToday')} />}
-                    <span className="font-medium tabular-nums">{moneyIn(e.amount, e.currency)}</span>
+                    <span className={`font-medium tabular-nums ${e.amount < 0 ? 'text-brand-500' : ''}`} data-negative={e.amount < 0 ? 'true' : undefined}>
+                      {moneyIn(e.amount, e.currency)}
+                    </span>
                     <button
                       type="button"
                       onClick={() => setList('expenses')(project.expenses.filter((x) => x.id !== e.id))}

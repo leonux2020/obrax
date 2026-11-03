@@ -3,7 +3,7 @@
 // Pure logic shared by the browser and the server proxy (same rules as invoice.js: whatever the model prints is
 // treated as untrusted data and reduced to a clean, bounded structure).
 
-import { InvoiceError, INVOICE_LIMITS, parseAmount, postImage } from './invoice.js';
+import { InvoiceError, INVOICE_LIMITS, parseAmount, parseSignedAmount, postImage } from './invoice.js';
 import { MAX_PRICE } from './pricing.js';
 import { DOCUMENT_TYPES, EXPENSE_CATEGORIES, PAYMENT_METHODS, RENTAL_CATEGORIES, cleanFiscalCode, newEntryId, oneOfOrEmpty } from './ledger.js';
 
@@ -14,6 +14,57 @@ const CONTROL = /[\u0000-\u001f\u007f-\u009f<>]/g;
 const text = (v, max = 120) => (typeof v === 'string' ? v.replace(CONTROL, ' ').replace(/\s+/g, ' ').trim().slice(0, max) : '');
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const day = (v) => (typeof v === 'string' && DAY_RE.test(v.trim()) && !Number.isNaN(Date.parse(`${v.trim()}T00:00:00Z`)) ? v.trim() : '');
+
+// ---- discounts: a deduction is NEVER an expense ----------------------------------------------------------------------------------------
+/** Words of a deduction line in the six languages (and the common Italian till ones): SCONTO, BUONO, DISCOUNT, DESCUENTO, RABATT, COUPON... */
+export const DISCOUNT_RE = /\b(sconto|abbuono|riduzione|ribasso|buono|discount|descuento|desconto|rebate|coupon|cup[oó]n|rabatt|nachlass|gutschein|rabais|remise|r[eé]duction|reducci[oó]n|redu[cç][aã]o)\b/i;
+export const isDiscountLine = (it) => DISCOUNT_RE.test(String(it?.description || ''));
+const money2 = (n) => Math.round(n * 100) / 100;
+const sumItems = (list) => money2(list.reduce((s, i) => s + Math.round(i.amount * 100), 0) / 100);
+
+/**
+ * Mathematical self-check, server side, on top of the one asked of the model: the lines must add up to the TOTAL PAID. When they add up to MORE
+ * (a discount was read as a charge: the line printed "BUONO -1,21" came back as +1,21) and flipping the sign of the deduction-looking lines
+ * makes the sum match the total EXACTLY, the signs are corrected. Nothing is guessed: without a printed total, or when no flip matches, the lines stay
+ * as read (the review screen then warns). A negative line (global discount) takes the category that carries most of the purchase, so no
+ * category of the breakdown can ever go below zero. Mutates `items`.
+ */
+function settleDiscounts(items, total) {
+  if (total === null || !items.length) return;
+  const matches = (list) => Math.abs(sumItems(list) - total) <= 0.02;
+  if (!matches(items)) {
+    const candidates = items.map((it, i) => (it.amount > 0 && isDiscountLine(it) ? i : -1)).filter((i) => i >= 0);
+    const flipped = (idx) => items.map((it, i) => (idx.includes(i) ? { ...it, amount: -it.amount } : it));
+    const attempts = candidates.length ? [candidates, ...candidates.map((i) => [i])] : [];
+    for (const idx of attempts) {
+      const next = flipped(idx);
+      if (matches(next)) {
+        idx.forEach((i) => {
+          items[i].amount = -items[i].amount;
+        });
+        break;
+      }
+    }
+  }
+  const byCategory = new Map();
+  for (const it of items) if (it.amount > 0) byCategory.set(it.category, (byCategory.get(it.category) || 0) + it.amount);
+  const dominant = [...byCategory.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  for (const it of items) {
+    if (it.amount < 0) {
+      if (dominant) it.category = dominant;
+      it.returnDate = '';
+    }
+  }
+}
+
+/** { itemsSum, total, diff, inflated, ok } of a receipt (null without a printed total): `inflated` = the lines add up to MORE than was paid. */
+export function receiptSumCheck(receipt) {
+  const total = receipt?.total;
+  if (!(Number(total) > 0) || !Array.isArray(receipt?.items) || !receipt.items.length) return null;
+  const itemsSum = sumItems(receipt.items);
+  const diff = money2(itemsSum - total);
+  return { itemsSum, total, diff, inflated: diff > 0.02, ok: Math.abs(diff) <= 0.02 };
+}
 
 /**
  * Clean ONE untrusted receipt (a photo may hold several: see normalizeReceipts):
@@ -55,10 +106,13 @@ export function normalizeReceipt(raw) {
   const items = [];
   for (const it of Array.isArray(src.items) ? src.items.slice(0, RECEIPT_LIMITS.maxItems * 2) : []) {
     if (!it || typeof it !== 'object') continue;
-    const printed = parseAmount(it.amountText);
-    const fallback = typeof it.amount === 'number' && Number.isFinite(it.amount) && it.amount > 0 ? it.amount : null;
-    const amount = printed ?? fallback;
-    if (amount === null || amount > MAX_PRICE * 100) continue;
+    // SIGNED: a deduction ("BUONO -1,21", "SCONTO 2,41-", "(1,21)") is negative, never a charge. The printed text wins over the model's number;
+    // when the text lost its sign but the model's number is the same size and negative, the model's sign is kept.
+    const printed = parseSignedAmount(it.amountText);
+    const numeric = typeof it.amount === 'number' && Number.isFinite(it.amount) && it.amount !== 0 ? it.amount : null;
+    let amount = printed ?? numeric;
+    if (printed !== null && printed > 0 && numeric !== null && numeric < 0 && Math.abs(Math.abs(numeric) - printed) <= 0.011) amount = -printed;
+    if (amount === null || Math.abs(amount) > MAX_PRICE * 100) continue;
     const category = EXPENSE_CATEGORIES.includes(it.category) ? it.category : purchaseType || 'other';
     const quantity = Number(it.quantity);
     const unit = parseAmount(it.unitPriceText) ?? (typeof it.unitPrice === 'number' && Number.isFinite(it.unitPrice) && it.unitPrice > 0 ? it.unitPrice : null);
@@ -72,6 +126,7 @@ export function normalizeReceipt(raw) {
     });
     if (items.length >= RECEIPT_LIMITS.maxItems) break;
   }
+  settleDiscounts(items, total);
   const isReceipt = src.isReceipt !== false;
   // a slip with only a grand total (restaurant, fuel ticket) is still one valid expense
   if (isReceipt && !items.length && total !== null) items.push({ description: '', quantity: null, unitPrice: null, amount: total, category: purchaseType || 'other', returnDate: '' });
@@ -108,7 +163,7 @@ export function expensesFromRows(rows, { supplier = '', sucursal = null, date = 
   const split = netAmount !== null && taxAmount !== null && Number.isFinite(base) && base > 0 ? Number(netAmount) / base : null;
   const docId = newEntryId(); // one id per receipt document: its lines stay grouped (a photo can hold several documents)
   return rows
-    .filter((r) => r.selected && r.amount > 0)
+    .filter((r) => r.selected && r.amount !== 0) // a negative line (global discount) is kept: it lowers the total, it is never a charge
     .map((r) => {
       const net = split === null ? null : Math.round(r.amount * split * 100) / 100;
       return {

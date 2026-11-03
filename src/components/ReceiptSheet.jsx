@@ -4,7 +4,7 @@ import { InvoiceError } from '../lib/invoice.js';
 import { EXPENSE_CATEGORIES, RENTAL_CATEGORIES } from '../lib/ledger.js';
 import { PhotoError, compressInvoiceImage } from '../lib/photos.js';
 import { pushToast } from '../lib/notify.js';
-import { dropDuplicateReceipts, expensesFromRows, receiptMeta, requestReceipt } from '../lib/receipt.js';
+import { dropDuplicateReceipts, expensesFromRows, receiptMeta, receiptSumCheck, requestReceipt } from '../lib/receipt.js';
 import { Button, DateInput, NumberField } from './ui.jsx';
 import BottomSheet from './BottomSheet.jsx';
 import Hourglass from './Hourglass.jsx';
@@ -94,7 +94,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
 
   const setBranch = (doc, value) => setReceipts((list) => list.map((r, i) => (i === doc ? { ...r, sucursal: value } : r)));
   const patch = (key, change) => setRows((list) => list.map((r) => (r.key === key ? { ...r, ...change } : r)));
-  const chosen = rows.filter((r) => r.selected && r.amount > 0);
+  const chosen = rows.filter((r) => r.selected && r.amount !== 0); // a negative line (global discount) counts: it lowers the total
   const total = chosen.reduce((s, r) => s + r.amount, 0);
 
   const save = () => {
@@ -103,10 +103,12 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
     // place) is injected by the project that stores them, so none of them can be orphan
     const groups = receipts.map((r, doc) => ({ r, lines: rows.filter((x) => x.doc === doc) }));
     const expenses = groups.flatMap(({ r, lines }) => expensesFromRows(lines, { ...receiptMeta(r), now }));
-    const documents = groups.filter(({ lines }) => lines.some((x) => x.selected && x.amount > 0)).length;
+    const documents = groups.filter(({ lines }) => lines.some((x) => x.selected && x.amount !== 0)).length;
     onSave(expenses, { ...(image ? { image } : {}), receipts: documents });
     pushToast({ key: documents === 1 ? 'rcpt.toast.one' : 'rcpt.toast.many', params: { n: documents }, tone: 'ok' });
   };
+  // the lines of a document add up to MORE than was paid: a discount was probably read as a charge (the user is told, nothing is changed silently)
+  const inflated = receipts.map((r, doc) => ({ doc, check: receiptSumCheck(r) })).filter((x) => x.check?.inflated);
   const otherCurrency = receipts.find((r) => r.currency && r.currency !== region.currency)?.currency || '';
 
   return (
@@ -168,6 +170,11 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
                 {t('inv.currency', { cur: otherCurrency, proj: region.currency })}
               </p>
             )}
+            {inflated.map(({ doc, check }) => (
+              <p key={doc} role="alert" data-testid="receipt-sum-warn" className="rounded-xl border border-orange-500/40 bg-orange-500/5 px-4 py-3 text-sm text-orange-400">
+                {t('rcpt.sumWarn', { sum: money(check.itemsSum), total: money(check.total) })}
+              </p>
+            ))}
             <ul className="divide-y divide-white/10 rounded-2xl border border-white/10">
               {rows.map((r, idx) => {
                 const rental = RENTAL_CATEGORIES.includes(r.category);
@@ -198,6 +205,21 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
                         />
                       </li>
                     )}
+                  {r.amount < 0 ? (
+                    // a DISCOUNT (negative line): shown as a deduction in green, never as a charge; it can be unticked but not retyped
+                    <li data-testid={`receipt-row-${r.key}`} data-discount="true" className={`p-4 ${r.selected ? '' : 'opacity-50'}`}>
+                      <label className="flex cursor-pointer items-start gap-3">
+                        <input type="checkbox" className="mt-1 h-6 w-6 shrink-0 accent-[#d4af37]" checked={r.selected} onChange={() => patch(r.key, { selected: !r.selected })} aria-label={r.description || t('rcpt.discount')} />
+                        <span className="min-w-0 flex-1 leading-snug">
+                          <span className="block font-semibold">{r.description || t('rcpt.discount')}</span>
+                          <span className="block text-xs text-neutral-400">{t('rcpt.discount')}</span>
+                        </span>
+                        <span className="shrink-0 font-medium tabular-nums text-brand-500" data-testid={`receipt-discount-${r.key}`}>
+                          {money(r.amount)}
+                        </span>
+                      </label>
+                    </li>
+                  ) : (
                   <li data-testid={`receipt-row-${r.key}`} className={`space-y-3 p-4 ${r.selected ? '' : 'opacity-50'}`}>
                     <label className="flex cursor-pointer items-start gap-3">
                       <input type="checkbox" className="mt-1 h-6 w-6 shrink-0 accent-[#d4af37]" checked={r.selected} onChange={() => patch(r.key, { selected: !r.selected })} aria-label={r.description || t(`exp.cat.${r.category}`)} />
@@ -234,6 +256,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
                       )}
                     </div>
                   </li>
+                  )}
                   </React.Fragment>
                 );
               })}

@@ -65,6 +65,19 @@ export function parseAmount(value) {
 }
 
 /**
+ * Like parseAmount but SIGNED: a deduction printed as "-1,21", "−1,21" (typographic minus), "1,21-" (trailing minus, common on till
+ * tapes) or "(1,21)" (accounting brackets) is NEGATIVE. Returns a non-zero finite number or null. Discounts must never be read as charges.
+ */
+export function parseSignedAmount(value) {
+  if (typeof value === 'number') return Number.isFinite(value) && value !== 0 ? value : null;
+  if (typeof value !== 'string') return null;
+  const t = value.trim();
+  const negative = /^[\s(]*[-\u2212\u2013\u2014]/.test(t) || /[-\u2212\u2013\u2014)]\s*$/.test(t.replace(/\s*[A-Za-z$€£]{1,4}\s*$/, ''));
+  const n = parseAmount(t.replace(/[-\u2212\u2013\u2014]/g, ''));
+  return n === null ? null : negative ? -n : n;
+}
+
+/**
  * Clean an untrusted extraction. Returns { isInvoice, currency, taxIncluded, supplier, date, items[] } where
  * every item is { materialId|null, description, quantity|null, unit, unitPrice, priceBasis, lineTotal|null }.
  * Lines without a positive price are dropped.

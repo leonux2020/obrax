@@ -52,7 +52,7 @@ export default function ReceiptStack({ expenses, onChange = null }) {
                         )}
                       </span>
                       {isDue && <Hourglass label={t('rental.dueToday')} size={18} />}
-                      <span className="shrink-0 text-xs tabular-nums text-neutral-400" data-testid="stack-amount">
+                      <span className={`shrink-0 text-xs tabular-nums ${e.amount < 0 ? 'text-brand-500' : 'text-neutral-400'}`} data-testid="stack-amount" data-negative={e.amount < 0 ? 'true' : undefined}>
                         {fmt(e.amount)}
                       </span>
                       {editable && (
