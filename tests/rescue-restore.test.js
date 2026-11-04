@@ -192,8 +192,8 @@ describe('Phase 8: minimalism in Gastos y Caja', () => {
     const stack = read(files.stack);
     expect(stack).not.toMatch(/<section[^>]*rounded-xl border/); // no card per supplier
     expect(stack).toMatch(/text-sm tabular-nums \$\{e\.amount < 0 \? 'text-brand-500' : 'text-neutral-200'\}/);
-    // the delete cross is neutral until touched; no permanent red in a normal history
-    expect(cash).toMatch(/text-neutral-500 tabular-nums hover:text-red-400/);
+    // Phase 11: no delete at all in a normal history; it only exists in the protected edit mode (two-step RowDelete)
+    expect(cash).toMatch(/\{editing && \(\s*<span className="row-fade shrink-0">\s*<RowDelete/);
     expect(read(files.expenses)).not.toContain('e8c35f');
   });
 

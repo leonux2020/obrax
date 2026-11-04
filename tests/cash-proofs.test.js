@@ -178,7 +178,9 @@ describe('photo of the proof', () => {
     await addPayment('1200');
     const id = spy.payments[0].id;
     expect(await paymentPhotosFor('proj-p3').get(id)).not.toBeNull();
+    await click(q('cash-edit-toggle')); // the list is read-only until the pencil is pressed
     await click(q(`cash-del-${id}`));
+    await click(q(`cash-del-${id}-confirm`)); // two steps: arm, then confirm
     expect(spy.payments).toHaveLength(0);
     expect(await paymentPhotosFor('proj-p3').get(id)).toBeNull();
   });
@@ -329,5 +331,91 @@ describe('Phase 10: the client payments view has no borders and saves at once', 
     expect(spy.payments[0].amount).toBe(1500);
     expect(spy.payments[0].photo).toBeUndefined();
     spyPut.mockRestore();
+  });
+});
+
+describe('Phase 11: the payment history is read-only until the pencil is pressed', () => {
+  const addTwo = async () => {
+    await addPayment('1000');
+    await addPayment('2000');
+  };
+  const dels = () => host.querySelectorAll('[data-testid^="cash-del-"]');
+
+  it('it is born locked: no cross / delete button anywhere, and the pencil sits in the history header', async () => {
+    await mount();
+    expect(q('cash-edit-toggle')).toBeNull(); // nothing to edit yet
+    await addTwo();
+    expect(q('cash-history-block').dataset.editing).toBeUndefined();
+    expect(dels()).toHaveLength(0);
+    expect(host.textContent).not.toContain('×');
+    const toggle = q('cash-edit-toggle');
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    expect(toggle.querySelector('[data-icon="pencil"]')).not.toBeNull();
+    expect(q('cash-history-block').firstElementChild.contains(toggle)).toBe(true); // header of the list
+    expect(q('cash-history-block').firstElementChild.textContent).toContain('Pagos registrados');
+  });
+
+  it('the pencil turns on the edit mode (check icon, a fading delete on EVERY row); the check locks it again', async () => {
+    await mount();
+    await addTwo();
+    await click(q('cash-edit-toggle'));
+    expect(q('cash-history-block').dataset.editing).toBe('true');
+    expect(q('cash-edit-toggle').getAttribute('aria-pressed')).toBe('true');
+    expect(q('cash-edit-toggle').querySelector('[data-icon="check"]')).not.toBeNull();
+    expect(dels()).toHaveLength(2);
+    for (const d of dels()) expect(d.parentElement.className).toContain('row-fade'); // fades in
+    await click(q('cash-edit-toggle'));
+    expect(dels()).toHaveLength(0);
+    expect(q('cash-edit-toggle').querySelector('[data-icon="pencil"]')).not.toBeNull();
+  });
+
+  it('a stray tap cannot delete: the first tap only arms the row, the second one deletes', async () => {
+    await mount();
+    await addTwo();
+    await click(q('cash-edit-toggle'));
+    const id = spy.payments[0].id;
+    await click(q(`cash-del-${id}`));
+    expect(spy.payments).toHaveLength(2);
+    await click(q(`cash-del-${id}-confirm`));
+    expect(spy.payments).toHaveLength(1);
+  });
+
+  it('closing and re-opening the sheet always finds the list locked', async () => {
+    function Wrap() {
+      const [payments, set] = useState([{ id: 'a', amount: 500, at: 1, note: '' }]);
+      const [on, setOn] = useState(true);
+      Wrap.toggle = () => setOn((v) => !v);
+      spy.payments = payments;
+      return h(I18nProvider, { lang: 'es', regionCode: 'CL' }, h(CashBlock, { projectId: 'proj-reopen', total: 100000, payments, onChange: set, open: on, onToggle: (_id, o) => setOn(o) }));
+    }
+    spy = {};
+    await act(async () => root.render(h(Wrap)));
+    await flush();
+    await click(q('cash-edit-toggle'));
+    expect(q('cash-history-block').dataset.editing).toBe('true');
+    await act(async () => Wrap.toggle()); // close
+    expect(q('cash-history-block')).toBeNull();
+    await act(async () => Wrap.toggle()); // open again
+    await flush();
+    expect(q('cash-history-block').dataset.editing).toBeUndefined();
+    expect(dels()).toHaveLength(0);
+  });
+
+  it('deleting the last payment leaves the empty state (and no stuck edit mode for the next one)', async () => {
+    await mount();
+    await addPayment('700');
+    await click(q('cash-edit-toggle'));
+    const id = spy.payments[0].id;
+    await click(q(`cash-del-${id}`));
+    await click(q(`cash-del-${id}-confirm`));
+    expect(q('cash-empty')).not.toBeNull();
+    await addPayment('800');
+    expect(q('cash-history-block').dataset.editing).toBeUndefined();
+    expect(dels()).toHaveLength(0);
+  });
+
+  it('i18n: the history title exists in the six languages', () => {
+    for (const l of ['es', 'en', 'pt', 'fr', 'it', 'de']) expect(DICT[l]['ws.cash.history'], l).toBeTruthy();
+    expect(DICT.it['ws.cash.history']).toBe('Pagamenti registrati');
   });
 });

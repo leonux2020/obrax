@@ -159,7 +159,9 @@ describe('2. Anticipos y pagos del cliente', () => {
     expect(Number(q('ws-progress').dataset.pct)).toBe(Math.round(cashSummary(total, spy.project.payments).pct));
     expect(Math.abs(cashSummary(total, spy.project.payments).paid - paid)).toBeLessThanOrEqual(0.5); // the chip rounds to whole currency units
     // deleting a payment moves it back
-    await click(qa('cash-list')[0].querySelector('button'));
+    await click(q('cash-edit-toggle'));
+    await click(qa('cash-list')[0].querySelector('[data-testid^="cash-del-"]'));
+    await click(qa('cash-list')[0].querySelector('[data-testid$="-confirm"]'));
     expect(spy.project.payments).toHaveLength(1);
   });
 

@@ -254,6 +254,19 @@ body.eco-mode *::after {
   }
 }
 
+/* A control that appears with a quiet fade (the delete crosses of an edit mode); removed, not slowed, under reduced-motion / eco-mode */
+@keyframes row-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.row-fade {
+  animation: row-fade 0.18s ease-out;
+}
+
 /* The weather badge of a project card fades in when its reading lands (the card never waited for it) */
 @keyframes wx-in {
   from {

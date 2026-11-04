@@ -7,6 +7,7 @@ import { scrollBehavior } from '../../lib/motion.js';
 import { PhotoError } from '../../lib/photos.js';
 import { paymentPhotosFor, preparePaymentPhoto } from '../../lib/paymentPhotos.js';
 import { TextField } from '../ui.jsx';
+import { EditToggle, RowDelete } from '../EditControls.jsx';
 import Block from './Block.jsx';
 import { NoteThumb, PhotoLightbox, useBlobUrl, useNotePhoto } from './NotePhoto.jsx';
 import NumberPad from './NumberPad.jsx';
@@ -43,7 +44,7 @@ function MethodTag({ method }) {
 }
 
 /** One payment of the history: amount, date, how it was paid, the note (if any) and, when it has one, the proof photo that opens full screen. */
-function PaymentRow({ payment: p, store, onDelete, onOpenPhoto, when, saving = false }) {
+function PaymentRow({ payment: p, store, onDelete, onOpenPhoto, when, saving = false, editing = false }) {
   const { t, money } = useI18n();
   const stored = useNotePhoto(store, p.id, p.photo === true && !saving); // the photo is written in the background: it is read once it has landed
   return (
@@ -69,10 +70,46 @@ function PaymentRow({ payment: p, store, onDelete, onOpenPhoto, when, saving = f
             <CameraIcon size={20} />
           </span>
         ))}
-      <button type="button" onClick={() => onDelete(p)} aria-label={`${t('common.delete')}: ${money(p.amount)}`} data-testid={`cash-del-${p.id}`} className="flex h-11 w-11 shrink-0 items-center justify-center text-lg text-neutral-500 tabular-nums hover:text-red-400 active:text-red-400">
-        ×
-      </button>
+      {editing && (
+        <span className="row-fade shrink-0">
+          <RowDelete name={money(p.amount)} onConfirm={() => onDelete(p)} testId={`cash-del-${p.id}`} />
+        </span>
+      )}
     </li>
+  );
+}
+
+/**
+ * The payment history: READ-ONLY by default (no delete anywhere). The pencil beside the title turns on the edit mode (the pencil becomes a check and the
+ * delete of every row fades in, in two steps like the Squadra rows); the check locks it again. The state lives in this component, which exists only while
+ * the sheet is open: closing and re-opening the sheet always finds the list locked.
+ */
+function PaymentHistory({ payments, store, onDelete, onOpenPhoto, when, saving }) {
+  const { t } = useI18n();
+  const [editing, setEditing] = useState(false);
+  const locked = editing && payments.length > 0;
+  useEffect(() => {
+    if (editing && payments.length === 0) setEditing(false); // nothing left to edit: back to the read-only state
+  }, [editing, payments.length]);
+  if (payments.length === 0) {
+    return (
+      <p className="text-sm text-neutral-400" data-testid="cash-empty">
+        {t('ws.cash.empty')}
+      </p>
+    );
+  }
+  return (
+    <div data-testid="cash-history-block" data-editing={locked ? 'true' : undefined}>
+      <div className="flex min-h-[44px] items-center justify-between gap-3">
+        <h3 className="text-xs text-neutral-500">{t('ws.cash.history')}</h3>
+        <EditToggle active={locked} onToggle={() => setEditing((v) => !v)} label={t('crew.edit.on')} doneLabel={t('crew.edit.done')} testId="cash-edit-toggle" />
+      </div>
+      <ul className="space-y-1" data-testid="cash-list">
+        {payments.map((p) => (
+          <PaymentRow key={p.id} payment={p} store={store} onDelete={onDelete} onOpenPhoto={onOpenPhoto} when={when} saving={saving.has(p.id)} editing={locked} />
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -294,17 +331,7 @@ export default function CashBlock({ total, payments, onChange, open, onToggle, p
         </button>
 
         <div ref={historyRef} data-testid="cash-history">
-          {payments.length === 0 ? (
-            <p className="text-sm text-neutral-400" data-testid="cash-empty">
-              {t('ws.cash.empty')}
-            </p>
-          ) : (
-            <ul className="space-y-1" data-testid="cash-list">
-              {payments.map((p) => (
-                <PaymentRow key={p.id} payment={p} store={store} onDelete={remove} onOpenPhoto={setViewer} when={when} saving={saving.has(p.id)} />
-              ))}
-            </ul>
-          )}
+          <PaymentHistory payments={payments} store={store} onDelete={remove} onOpenPhoto={setViewer} when={when} saving={saving} />
         </div>
       </div>
 
