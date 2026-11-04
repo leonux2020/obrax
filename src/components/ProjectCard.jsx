@@ -9,6 +9,7 @@ import { hasRentalDue } from '../lib/ledger.js';
 import { isClosed, projectClient, projectLevel, projectTitle } from '../lib/projects.js';
 import { LEVEL_COLOR, levelDetail } from './levelStyle.js';
 import Hourglass from './Hourglass.jsx';
+import { MapPinIcon } from './workspace/icons.jsx';
 import WeatherBadge from './WeatherBadge.jsx';
 import { useCardWeather } from '../lib/useCardWeather.js';
 
@@ -42,6 +43,8 @@ export default function ProjectCard({ project, now, onOpen, weatherOpts = null }
 
   const title = projectTitle(project) || t('proj.untitled');
   const client = projectClient(project);
+  // the place of the job, to recognise it at a glance: the city / region typed in the project, else the label of its saved point (never bare coordinates)
+  const place = String(project.cityOrRegion || project.location?.label || '').trim();
 
   return (
     <li>
@@ -57,6 +60,12 @@ export default function ProjectCard({ project, now, onOpen, weatherOpts = null }
         <span className="flex items-start gap-3">
           <span className="min-w-0 flex-1">
             <span className="block truncate text-lg font-semibold">{title}</span>
+            {place && (
+              <span className="mt-0.5 flex items-center gap-1 text-xs font-medium text-neutral-400" data-testid="card-place">
+                <MapPinIcon size={12} />
+                <span className="min-w-0 truncate">{place}</span>
+              </span>
+            )}
             {client && <span className="block truncate text-sm text-neutral-300">{client}</span>}
           </span>
           {rentalDue && <Hourglass label={t('rental.dueToday')} />}

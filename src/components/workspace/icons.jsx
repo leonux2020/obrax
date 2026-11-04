@@ -21,6 +21,13 @@ export const Outline = ({ children, size = 22, className = '', icon }) => (
   </svg>
 );
 
+export const MapPinIcon = (props) => (
+  <Outline icon="map-pin" {...props}>
+    <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z" />
+    <circle cx="12" cy="10" r="3" />
+  </Outline>
+);
+
 export const UsersIcon = (props) => (
   <Outline {...props}>
     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />

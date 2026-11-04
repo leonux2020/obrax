@@ -24,9 +24,9 @@ describe('icon preservation', () => {
     for (const [name, h] of Object.entries(BASELINE)) expect(hash(icons[name]), name).toBe(h);
   });
 
-  it('the set has exactly the old icons + CoinsIcon (nothing else added or removed)', () => {
+  it('the set has exactly the old icons + CoinsIcon + MapPinIcon (nothing else added or removed)', () => {
     const fns = Object.keys(icons).filter((k) => typeof icons[k] === 'function' && k !== 'Outline').sort();
-    expect(fns).toEqual([...Object.keys(BASELINE), 'CoinsIcon'].sort());
+    expect(fns).toEqual([...Object.keys(BASELINE), 'CoinsIcon', 'MapPinIcon'].sort());
   });
 
   it('CoinsIcon is made of ellipse / circle / path on the shared 24 px outline grid', () => {

@@ -231,3 +231,48 @@ describe('Ajustes and Contabilidad: no big page title', () => {
     expect(readFileSync('src/components/GlobalAccounting.jsx', 'utf8')).not.toMatch(/<h1 className="min-w-0 flex-1 truncate text-lg/);
   });
 });
+
+describe('ProjectCard: the place under the title', () => {
+  let host;
+  let root;
+  beforeEach(() => {
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+  });
+  afterEach(async () => {
+    await act(async () => root.unmount());
+    host.remove();
+  });
+  const mount = (extra) =>
+    act(async () => {
+      const project = { ...newProject({ regionCode: 'CL', name: 'Casa Soto', client: 'Luis' }), ...extra };
+      root.render(h(I18nProvider, { lang: 'es', regionCode: 'CL' }, h('ul', null, h(ProjectCard, { project, now: Date.now(), onOpen: () => {} }))));
+    });
+
+  it('shows a quiet pin + the city right under the title, before the client (text-neutral-400 text-xs font-medium)', async () => {
+    await mount({ cityOrRegion: 'Valparaíso' });
+    const place = q('card-place');
+    expect(place.textContent).toBe('Valparaíso');
+    expect(place.querySelector('svg[data-icon="map-pin"]')).not.toBeNull();
+    expect(place.className).toContain('text-neutral-400');
+    expect(place.className).toContain('text-xs');
+    expect(place.className).toContain('font-medium');
+    const title = q('project-card').querySelector('.text-lg');
+    expect(title.nextElementSibling).toBe(place);
+    expect(place.nextElementSibling.textContent).toBe('Luis');
+  });
+
+  it('falls back to the label of the saved point, never to bare coordinates', async () => {
+    await mount({ cityOrRegion: '', location: { lat: -33.4, lng: -70.6, label: 'Obra Las Condes' } });
+    expect(q('card-place').textContent).toBe('Obra Las Condes');
+    await mount({ cityOrRegion: '', location: { lat: -33.4, lng: -70.6, label: '' } });
+    expect(q('card-place')).toBeNull();
+  });
+
+  it('no place -> the line does not exist in the DOM (no dead space)', async () => {
+    await mount({ cityOrRegion: '   ', location: null });
+    expect(q('card-place')).toBeNull();
+    expect(q('project-card').querySelector('svg[data-icon="map-pin"]')).toBeNull();
+  });
+});
