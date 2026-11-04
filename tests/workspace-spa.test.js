@@ -263,17 +263,18 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(q('crew-duration').textContent).toContain('—');
   });
 
-  it('"+ Añadir trabajador" opens a sheet (name, specialty list, optional notes); the person shows up as a card with the icon of the role', async () => {
+  it('"+ Añadir trabajador" unfolds the selector dropdown (name, trade filters, optional notes later); the person shows up as a minimal row', async () => {
     await mount(mk());
     await openCrew();
     expect(q('crew-empty')).not.toBeNull();
     await click(q('crew-add'));
     expect(q('worker-form')).not.toBeNull();
     expect([...q('crew-filters').querySelectorAll('button')].map((b) => b.dataset.testid.replace('crew-filter-', ''))).toEqual(WORKER_SPECIALTIES);
-    expect(q('crew-save').disabled).toBe(true); // a name is required
+    expect(q('crew-save')).toBeNull(); // a name is required: the add-as-text button appears once something is typed
     await typeInto(q('crew-name'), 'Luca Rossi');
     expect(q('crew-save').disabled).toBe(false);
-    await click(qa('sheet-backdrop').at(-1)); // closing without saving adds nobody
+    await click(q('crew-add')); // folding the dropdown without saving adds nobody
+    expect(q('worker-form')).toBeNull();
     expect(spy.project.crew).toHaveLength(0);
     await addWorker('Luca Rossi', 'electrician', 'Tablero general');
     expect(q('worker-form')).toBeNull();
@@ -283,8 +284,8 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     const card = q(`worker-${w.id}`);
     expect(card.dataset.specialty).toBe('electrician');
     expect(q(`worker-name-${w.id}`).textContent).toBe('Luca Rossi');
-    expect(q(`worker-spec-${w.id}`).textContent).toBe('Electricista · Tablero general');
-    expect(card.querySelector('svg[data-outline-icon="true"] path[d^="M13 2 3 14"]')).not.toBeNull(); // Zap = electrician
+    expect(card.querySelector('[data-testid^="worker-spec-"]')).toBeNull(); // the row is minimal: no specialty line, no role icon
+    expect(card.querySelector(`[data-testid="worker-edit-${w.id}"] svg`)).toBeNull();
     expect(q('crew-empty')).toBeNull();
     expect(q('ws-crew').textContent).toContain('1 trabajador');
     expect(q('ws-crew').textContent).not.toContain('1 trabajadores');
@@ -292,9 +293,9 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(q('ws-crew').textContent).toContain('2 trabajadores');
     await addWorker('Nico');
     const [, plumber, generic] = spy.project.crew;
-    expect(q(`worker-${plumber.id}`).querySelector('svg path[d^="M14.7 6.3"]')).not.toBeNull(); // Wrench
+    expect(q(`worker-${plumber.id}`).dataset.specialty).toBe('plumber');
     expect(generic.specialty).toBe('multi');
-    expect(q(`worker-${generic.id}`).querySelector('svg path[d^="M19 21v-2"]')).not.toBeNull(); // generic User
+    expect(q(`worker-${generic.id}`).dataset.specialty).toBe('multi');
   });
 
   it('the advance button is a COMPACT action on the name\'s own line: [coins Anticipo], green, no menu to open, no full-width block', async () => {
@@ -379,7 +380,7 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(Number(q('labor-pool').dataset.spent)).toBe(2500);
   });
 
-  it('flat horizontal card: icon | name over the specialty | compact button; the advances stay open right under the line', async () => {
+  it('MINIMAL row: only the name, the ⚠ (when it applies) and the compact advance button on one line; the advances detail lives behind the edit mode', async () => {
     await mount(mk());
     await openCrew();
     await addWorker('Luca', 'electrician');
@@ -388,13 +389,15 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     const line = q(`worker-edit-${id}`).parentElement;
     expect(line.className).toContain('flex');
     expect(line.contains(q(`worker-adv-${id}`))).toBe(true);
-    const edit = q(`worker-edit-${id}`);
-    expect(edit.querySelector('svg')).not.toBeNull(); // role icon on the left
-    expect(q(`worker-spec-${id}`).className).toContain('text-xs'); // smaller, dimmer, under the name
-    expect(q(`worker-spec-${id}`).compareDocumentPosition(q(`worker-name-${id}`)) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+    expect(q(`worker-edit-${id}`).querySelector('svg')).toBeNull(); // no role icon
+    expect(q(`worker-spec-${id}`)).toBeNull(); // no specialty line
+    expect([...card.querySelectorAll('button')].map((b) => b.dataset.testid)).toEqual([`worker-edit-${id}`, `worker-adv-${id}`]); // nothing else is tappable
     await click(q(`worker-adv-${id}`));
     await keys('1000');
     await click(q('pad-done'));
+    expect(q(`worker-advlist-${id}`)).toBeNull(); // quiet by default
+    expect(q(`worker-total-${id}`)).toBeNull();
+    await click(q('crew-edit-toggle'));
     const list = q(`worker-advlist-${id}`);
     expect(card.contains(list)).toBe(true);
     expect(line.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // under the line, no accordion
@@ -433,15 +436,13 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     await openCrew();
     await click(q('crew-add'));
     expect([...q('crew-filters').querySelectorAll('button')].map((b) => b.dataset.testid.replace('crew-filter-', ''))).toEqual(WORKER_SPECIALTIES);
-    await click(qa('sheet-backdrop').at(-1));
+    await click(q('crew-add')); // fold the dropdown
     await addWorker('Pía', 'painter');
     await addWorker('Tito', 'operator');
     await addWorker('Jefe', 'foreman');
     const [pia, tito, jefe] = spy.project.crew;
-    expect(q(`worker-spec-${pia.id}`).textContent).toBe('Pintor');
-    expect(q(`worker-${pia.id}`).querySelector('svg path[d^="M10 16v-2a2 2 0"]')).not.toBeNull(); // paint roller
-    expect(q(`worker-${tito.id}`).querySelector('svg circle[cx="17"][cy="18"]')).not.toBeNull(); // truck
-    expect(q(`worker-${jefe.id}`).querySelector('svg path[d^="M10 10V5a1"]')).not.toBeNull(); // hard hat
+    expect([pia.specialty, tito.specialty, jefe.specialty]).toEqual(['painter', 'operator', 'foreman']);
+    expect(q(`worker-${pia.id}`).dataset.specialty).toBe('painter');
   });
 
   it('a worker is edited and deleted from their card; their advances stay in the book as unassigned', async () => {
@@ -463,6 +464,8 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(spy.project.crew).toHaveLength(0);
     expect(spy.project.advances).toHaveLength(1); // the money already handed over stays
     expect(q('advances-loose').dataset.total).toBe('800');
+    expect(q('advances-loose').querySelector('button')).toBeNull(); // its delete only exists in edit mode
+    await click(q('crew-edit-toggle'));
     await click(q('advances-loose').querySelector('button'));
     expect(spy.project.advances).toHaveLength(0);
   });
@@ -475,6 +478,7 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     const [juan, marta] = spy.project.crew;
     const pool0 = Number(q('labor-pool').dataset.available);
     expect(pool0).toBeGreaterThan(0);
+    await click(q('crew-edit-toggle')); // the totals and their detail are read in edit mode
     expect(q(`worker-total-${juan.id}`).textContent).toBe('Sin anticipos');
     await click(q(`worker-adv-${juan.id}`));
     expect(q('advance-pad')).not.toBeNull();

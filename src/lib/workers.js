@@ -27,6 +27,21 @@ export function cleanBirthDate(v, now = Date.now()) {
   return `${m[1]}-${m[2]}-${m[3]}`;
 }
 
+/**
+ * True when the stored birth date (YYYY-MM-DD) has today's day and month in the device's LOCAL calendar (the year does not matter).
+ * Someone born on 29 February celebrates on 28 February in the years that have none.
+ */
+export function isBirthdayToday(birthDate, now = new Date()) {
+  const m = DAY_RE.exec(typeof birthDate === 'string' ? birthDate.trim() : '');
+  if (!m) return false;
+  const [month, day] = [Number(m[2]), Number(m[3])];
+  const year = now.getFullYear();
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  const [tm, td] = [now.getMonth() + 1, now.getDate()];
+  if (month === 2 && day === 29 && !leap) return tm === 2 && td === 28;
+  return month === tm && day === td;
+}
+
 const text = (v, max) => sanitizeText(v, max).trim();
 const when = (v, fallback) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : fallback);
 

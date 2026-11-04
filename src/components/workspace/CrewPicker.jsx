@@ -4,14 +4,13 @@ import { CREW_RANGES, DEFAULT_RANGE, LOCAL_KM, findByName, norm, rankWorkers } f
 import { WORKER_SPECIALTIES } from '../../lib/ledger.js';
 import { sanitizeTextInput } from '../../lib/sanitize.js';
 import { hasHealthNotes, loadWorkers } from '../../lib/workers.js';
-import BottomSheet from '../BottomSheet.jsx';
 import { Stars } from '../squadra/Stars.jsx';
 
 /**
- * The hybrid selector to add a person to a job ("fast-track").
+ * The hybrid selector to add a person to a job ("fast-track"), as an INLINE DROPDOWN under the control line of the crew (no stacked modal).
  *   1. DIRECTORY: the global directory (Squadra) below, filtered by the typed text, a trade chip and a range, nearest and best rated first.
- *      Tapping a row adds that worker at once (linked to their file).
- *   2. URGENCY: whatever is typed can be added as plain text with the big button, exactly as before: no medical file is asked for.
+ *      Tapping a row adds that worker at once (linked to their file) to the list underneath and the dropdown folds away.
+ *   2. URGENCY: whatever is typed can be added as plain text with the button that appears under the field: no medical file is asked for.
  * Range: "Local (< 70 km)" by default (short trips, less stress), "Regional" and "Todos" one tap away. The trade chip also becomes the
  * specialty of a person added as plain text.
  */
@@ -42,8 +41,18 @@ export default function CrewPicker({ project, crew, onAdd, onClose }) {
   const hint = !workers.length ? t('crew.pick.noDir') : empty ? (typed ? t('crew.pick.noMatch') : t('crew.pick.noRange')) : '';
 
   return (
-    <BottomSheet title={t('ws.crew.sheetNew')} onClose={onClose}>
-      <form className="mt-3 space-y-4" data-testid="worker-form" onSubmit={addText}>
+    <section
+      aria-label={t('ws.crew.sheetNew')}
+      data-testid="crew-selector"
+      className="rounded-xl border border-white/10 bg-black p-3"
+      onKeyDown={(e) => {
+        if (e.key !== 'Escape') return;
+        e.preventDefault();
+        e.stopPropagation(); // folds the dropdown only; the sheet underneath stays open
+        onClose();
+      }}
+    >
+      <form className="space-y-3" data-testid="worker-form" onSubmit={addText}>
         <div>
           <label className="label" htmlFor={nameId}>
             {t('crew.pick.name')}
@@ -60,10 +69,12 @@ export default function CrewPicker({ project, crew, onAdd, onClose }) {
             className="field-input"
           />
         </div>
-        {/* flow 2, urgency: whatever is typed goes in as plain text; no file is asked for */}
-        <button type="submit" disabled={!typed} data-testid="crew-save" className="min-h-[56px] w-full rounded-xl px-3 text-base disabled:opacity-40 bg-brand text-black font-semibold hover:bg-brand-light">
-          {typed ? t('crew.pick.add', { name: typed }) : t('ws.crew.save')}
-        </button>
+        {/* flow 2, urgency: whatever is typed goes in as plain text; no file is asked for (the button only exists once something is typed) */}
+        {typed && (
+          <button type="submit" data-testid="crew-save" className="min-h-[52px] w-full rounded-xl px-3 text-base bg-brand text-black font-semibold hover:bg-brand-light">
+            {t('crew.pick.add', { name: typed })}
+          </button>
+        )}
 
         {/* trades: a horizontally scrolling row; one tap filters the list at once, another tap clears it */}
         <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="crew-filters" role="group" aria-label={t('crew.pick.filter')}>
@@ -116,7 +127,7 @@ export default function CrewPicker({ project, crew, onAdd, onClose }) {
           </p>
         )}
         {rows.length > 0 && (
-          <ul className="space-y-2" data-testid="crew-directory">
+          <ul className="max-h-72 space-y-2 overflow-y-auto overscroll-contain" data-testid="crew-directory">
             {rows.map(({ worker: w, near }) => {
               const added = inProject(w);
               return (
@@ -161,6 +172,6 @@ export default function CrewPicker({ project, crew, onAdd, onClose }) {
           </ul>
         )}
       </form>
-    </BottomSheet>
+    </section>
   );
 }

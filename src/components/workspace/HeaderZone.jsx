@@ -71,7 +71,7 @@ export default function HeaderZone({ project, model, title, client, region, offl
         <WeatherChip project={project} regionCode={region.code} />
         <BackupBadge />
         {!audit && (
-          <button type="button" onClick={onEdit} aria-label={t('proj.edit')} data-testid="ws-edit" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 active:border-white/40">
+          <button type="button" onClick={onEdit} aria-label={t('proj.edit')} data-testid="ws-edit" className="flex h-11 w-11 shrink-0 items-center justify-center text-neutral-400 transition hover:text-white active:text-white">
             <Pencil />
           </button>
         )}

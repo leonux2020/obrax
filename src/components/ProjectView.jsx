@@ -285,7 +285,7 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
           </div>
           <p className="truncate text-sm text-neutral-300">{client || t('proj.noClient')}</p>
         </div>
-        <button type="button" onClick={onEdit} aria-label={t('proj.edit')} data-testid="pv-edit" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/10 hover:border-brand">
+        <button type="button" onClick={onEdit} aria-label={t('proj.edit')} data-testid="pv-edit" className="flex h-12 w-12 shrink-0 items-center justify-center text-neutral-400 transition hover:text-white active:text-white">
           <Icon>
             <path d="M12 20h9" />
             <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />

@@ -380,12 +380,12 @@ describe('device Back and the accordions of a project (Parámetros, Diario, Anti
     expect(q('ws-title')).toBeNull();
   });
 
-  it('stacked sheets: Escape closes only the topmost (the form over the Personal sheet), then the menu sheet', async () => {
+  it('Escape folds the selector dropdown first (inside the Personal sheet), then closes the menu sheet', async () => {
     await openProject();
     await click(summary('ws-crew'));
     await click(q('crew-add'));
     expect(q('worker-form')).not.toBeNull();
-    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    await act(async () => q('crew-name').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
     expect(q('worker-form')).toBeNull();
     expect(!!q('ws-crew-sheet')).toBe(true);
     await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));

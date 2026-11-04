@@ -1,25 +1,29 @@
 import { useEffect, useState } from 'react';
 import { useI18n } from '../../lib/i18n.jsx';
-import { WORKER_LIMIT, hasHealthNotes, loadWorkers, onWorkersChanged, removeWorker, upsertWorker } from '../../lib/workers.js';
+import { WORKER_LIMIT, hasHealthNotes, isBirthdayToday, loadWorkers, onWorkersChanged, removeWorker, upsertWorker } from '../../lib/workers.js';
 import BottomSheet from '../BottomSheet.jsx';
+import { EditToggle, RowDelete } from '../EditControls.jsx';
 import { Button } from '../ui.jsx';
+import BirthdayMark from './BirthdayMark.jsx';
 import { Stars } from './Stars.jsx';
 import WorkerSheet from './WorkerSheet.jsx';
 
 const MAX_CHIPS = 3;
 
 /** One row of the directory: full name, rating (stars), specialty chips and a quiet orange mark when the file carries health notes. */
-function Row({ worker, onOpen }) {
+function Row({ worker, onOpen, editing, onDelete }) {
   const { t } = useI18n();
   const shown = worker.specialties.slice(0, MAX_CHIPS);
   const rest = worker.specialties.length - shown.length;
   return (
-    <li>
-      <button type="button" onClick={() => onOpen(worker)} data-testid={`worker-${worker.id}`} className="block min-h-[64px] w-full rounded-xl border border-white/10 px-4 py-3 text-left transition active:border-white/40">
+    <li className="flex items-center gap-1">
+      {editing && <RowDelete name={worker.name} testId={`worker-del-${worker.id}`} onConfirm={() => onDelete(worker.id)} />}
+      <button type="button" onClick={() => onOpen(worker)} data-testid={`worker-${worker.id}`} className="block min-h-[64px] min-w-0 flex-1 rounded-xl border border-white/10 px-4 py-3 text-left transition active:border-white/40">
         <span className="flex items-center gap-2">
           <span data-testid="worker-row-name" className="min-w-0 flex-1 truncate text-base font-medium text-neutral-200">
             {worker.name}
           </span>
+          {isBirthdayToday(worker.birthDate) && <BirthdayMark />}
           {hasHealthNotes(worker) && (
             <span role="img" aria-label={t('squadra.healthFlag')} data-testid="worker-health-flag" className="shrink-0 text-sm text-orange-400">
               ⚠
@@ -57,7 +61,11 @@ export default function SquadraSheet({ onClose }) {
   const [workers, setWorkers] = useState(() => loadWorkers());
   useEffect(() => onWorkersChanged(() => setWorkers(loadWorkers())), []); // a pull from Drive (another device) refreshes the open list
   const [editing, setEditing] = useState(null); // null | { worker: object | null }
+  const [editMode, setEditMode] = useState(false); // the pencil of the header: only then do the delete icons exist
   const full = workers.length >= WORKER_LIMIT;
+  useEffect(() => {
+    if (editMode && workers.length === 0) setEditMode(false);
+  }, [editMode, workers.length]);
 
   const save = (data) => {
     const r = upsertWorker(data);
@@ -71,7 +79,15 @@ export default function SquadraSheet({ onClose }) {
 
   return (
     <>
-      <BottomSheet fullscreen title={t('squadra.title')} subtitle={t('squadra.subtitle')} onClose={onClose}>
+      <BottomSheet
+        fullscreen
+        swipeToClose
+        autoFocus={false}
+        title={t('squadra.title')}
+        subtitle={t('squadra.subtitle')}
+        onClose={onClose}
+        headerAction={<EditToggle active={editMode} onToggle={() => setEditMode((v) => !v)} disabled={workers.length === 0} label={t('crew.edit.on')} doneLabel={t('crew.edit.done')} testId="squadra-edit-toggle" />}
+      >
         <div className="space-y-4" data-testid="squadra">
           {workers.length === 0 ? (
             <p className="rounded-xl border border-white/10 px-4 py-6 text-center text-sm text-neutral-400" data-testid="squadra-empty">
@@ -80,7 +96,7 @@ export default function SquadraSheet({ onClose }) {
           ) : (
             <ul className="space-y-2" data-testid="squadra-list">
               {workers.map((w) => (
-                <Row key={w.id} worker={w} onOpen={(worker) => setEditing({ worker })} />
+                <Row key={w.id} worker={w} editing={editMode} onDelete={(id) => setWorkers(removeWorker(id))} onOpen={(worker) => setEditing({ worker })} />
               ))}
             </ul>
           )}

@@ -82,7 +82,7 @@ function NoteRow({ entry, store, editing, setEditing, onDelete, onOpenPhoto, onS
               onClick={() => setEditing({ id: entry.id, text: entry.text, photo: 'keep' })}
               aria-label={`${t('ws.log.edit')}: ${stamp(entry.at)}`}
               data-testid={`wlog-edit-${entry.id}`}
-              className="flex h-11 w-11 shrink-0 items-center justify-center text-neutral-500 active:text-neutral-200"
+              className="flex h-11 w-11 shrink-0 items-center justify-center text-neutral-400 transition hover:text-white active:text-white"
             >
               <Icon>
                 <path d="M12 20h9" />

@@ -1,17 +1,19 @@
-import { useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { CREW_LIMIT, LEDGER_LIMITS, WORKER_SPECIALTIES, advancesByWorker, laborPool } from '../../lib/ledger.js';
 import { sanitizeText } from '../../lib/sanitize.js';
-import { hasHealthNotes, loadWorkers } from '../../lib/workers.js';
+import { isBirthdayToday, loadWorkers } from '../../lib/workers.js';
 import { calendarDays, withAdvance, withProjectDates, withWorker, withWorkerEdited, withoutAdvance, withoutWorker } from '../../lib/workspaceModel.js';
 import BottomSheet from '../BottomSheet.jsx';
+import { EditToggle, RowDelete } from '../EditControls.jsx';
+import BirthdayMark from '../squadra/BirthdayMark.jsx';
 import { DateInput, TextField } from '../ui.jsx';
 import Block from './Block.jsx';
 import { crewHealth } from '../../lib/crewMatch.js';
 import CrewPicker from './CrewPicker.jsx';
 import LockedZone from './LockedZone.jsx';
 import NumberPad from './NumberPad.jsx';
-import { CoinsIcon, SPECIALTY_ICON, UsersIcon } from './icons.jsx';
+import { CoinsIcon, UsersIcon } from './icons.jsx';
 
 /**
  * The two job dates, typed by hand, as ONE minimalist pill on a single line: "📅 23/10/2026 ➔ 25/10/2026 (2 días)". Each date is a real
@@ -165,38 +167,31 @@ function WorkerSheet({ worker, file = null, health = false, onSave, onDelete, on
 }
 
 /**
- * One person as a flat HORIZONTAL row: role icon | name (+ health warning) over the specialty in small muted type | a compact
- * [coins Anticipo] button on the same line. The advances handed over (sum + detail) stay open right under that line, compact.
+ * One person as a MINIMAL row: the name (tap it for their sheet), the birthday cake on the day, the orange health triangle and the compact
+ * [coins Anticipo] button, all on one line. Nothing else lives on the row. In EDIT MODE (the pencil of the sheet's header) the row also wears
+ * its delete icon on the left and reveals what was handed over (total + detail, each entry deletable) right under the line.
  */
-function WorkerCard({ row, health = false, onEdit, onAdvance, onRemoveAdvance }) {
+function WorkerCard({ row, health = false, birthday = false, editing = false, onEdit, onAdvance, onRemove, onRemoveAdvance }) {
   const { t, money, locale } = useI18n();
   const { worker: w, list, total } = row;
-  const Icon = SPECIALTY_ICON[w.specialty] ?? SPECIALTY_ICON.other;
   const stamp = (ms) => (ms ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(ms)) : '');
   return (
     <li className="rounded-xl border border-white/10 bg-black" data-testid={`worker-${w.id}`} data-specialty={w.specialty}>
-      <div className="flex items-center gap-2 pr-2">
-        <button type="button" onClick={onEdit} data-testid={`worker-edit-${w.id}`} aria-label={`${t('ws.crew.sheetEdit')}: ${w.name}${health ? ` · ⚠ ${t('squadra.healthFlag')}` : ''}`} className="flex min-h-[56px] min-w-0 flex-1 items-center gap-3 py-1.5 pl-3 text-left active:bg-black">
-          <Icon size={24} className="text-brand" />
-          <span className="min-w-0 flex-1">
-            <span className="flex items-center gap-2">
-              <span className="min-w-0 truncate text-base font-medium" data-testid={`worker-name-${w.id}`}>
-                {w.name}
-              </span>
-              {/* safety: the warning of the worker's file (limiting condition / allergy) stays on the card for as long as they are on the job */}
-              {health && (
-                <span role="img" aria-label={t('squadra.healthFlag')} title={t('squadra.healthFlag')} data-testid={`worker-health-${w.id}`} className="shrink-0 text-lg leading-none text-orange-500">
-                  ⚠
-                </span>
-              )}
-            </span>
-            <span className="block truncate text-xs text-neutral-400" data-testid={`worker-spec-${w.id}`}>
-              {t(`ws.spec.${w.specialty}`)}
-              {w.notes ? ` · ${w.notes}` : ''}
-            </span>
+      <div className="flex items-center gap-1 pr-2">
+        {editing && <RowDelete name={w.name} testId={`worker-del-${w.id}`} onConfirm={onRemove} />}
+        <button type="button" onClick={onEdit} data-testid={`worker-edit-${w.id}`} aria-label={`${t('ws.crew.sheetEdit')}: ${w.name}${health ? ` · ⚠ ${t('squadra.healthFlag')}` : ''}`} className={`flex min-h-[56px] min-w-0 flex-1 items-center gap-2 py-1.5 text-left ${editing ? 'pl-1' : 'pl-4'}`}>
+          <span className="min-w-0 truncate text-base font-medium text-neutral-200" data-testid={`worker-name-${w.id}`}>
+            {w.name}
           </span>
+          {birthday && <BirthdayMark testId={`worker-birthday-${w.id}`} />}
+          {/* safety: the warning of the worker's file (limiting condition / allergy) stays on the row for as long as they are on the job */}
+          {health && (
+            <span role="img" aria-label={t('squadra.healthFlag')} title={t('squadra.healthFlag')} data-testid={`worker-health-${w.id}`} className="shrink-0 text-lg leading-none text-orange-500">
+              ⚠
+            </span>
+          )}
         </button>
-        {/* the card's main action, compact and on the name's own line (OLED: black ground, coloured border + text) */}
+        {/* the row's main action, compact and on the name's own line (OLED: black ground, coloured border + text) */}
         <button
           type="button"
           onClick={onAdvance}
@@ -207,27 +202,29 @@ function WorkerCard({ row, health = false, onEdit, onAdvance, onRemoveAdvance })
           <span>{t('ws.crew.advance')}</span>
         </button>
       </div>
-      <div className="border-t border-white/5 px-3 py-1.5">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-neutral-400">{t('ws.crew.advanced')}</p>
-          <p className="text-sm font-medium tabular-nums" data-testid={`worker-total-${w.id}`} data-total={total}>
-            {total > 0 ? money(total) : t('ws.crew.noAdvances')}
-          </p>
+      {editing && (
+        <div className="border-t border-white/5 px-4 py-1.5" data-testid={`worker-detail-${w.id}`}>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-medium text-neutral-500">{t('ws.crew.advanced')}</p>
+            <p className="text-sm font-medium tabular-nums" data-testid={`worker-total-${w.id}`} data-total={total}>
+              {total > 0 ? money(total) : t('ws.crew.noAdvances')}
+            </p>
+          </div>
+          {list.length > 0 && (
+            <ul className="mt-0.5 divide-y divide-white/5" data-testid={`worker-advlist-${w.id}`}>
+              {list.map((a) => (
+                <li key={a.id} className="flex min-h-[36px] items-center gap-3">
+                  <span className="min-w-0 flex-1 text-xs font-medium text-neutral-500">{stamp(a.at)}</span>
+                  <span className="text-xs font-medium tabular-nums">{money(a.amount)}</span>
+                  <button type="button" onClick={() => onRemoveAdvance(a.id)} aria-label={`${t('common.delete')}: ${w.name}`} data-testid={`worker-adv-del-${a.id}`} className="flex h-9 w-9 shrink-0 items-center justify-center text-base text-red-400/80 hover:text-red-400">
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-        {list.length > 0 && (
-          <ul className="mt-0.5 divide-y divide-white/5" data-testid={`worker-advlist-${w.id}`}>
-            {list.map((a) => (
-              <li key={a.id} className="flex min-h-[36px] items-center gap-3">
-                <span className="min-w-0 flex-1 text-xs text-neutral-500">{stamp(a.at)}</span>
-                <span className="text-xs font-medium tabular-nums">{money(a.amount)}</span>
-                <button type="button" onClick={() => onRemoveAdvance(a.id)} aria-label={`${t('common.delete')}: ${w.name}`} data-testid={`worker-adv-del-${a.id}`} className="flex h-9 w-9 shrink-0 items-center justify-center text-base text-red-400">
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      )}
     </li>
   );
 }
@@ -240,17 +237,20 @@ function WorkerCard({ row, health = false, onEdit, onAdvance, onRemoveAdvance })
  */
 export default function CrewBlock({ project, result, locked, onBlocked, setProject, open, onToggle }) {
   const { t, money, region } = useI18n();
-  const [sheet, setSheet] = useState(null); // null | 'new' | worker id
+  const [sheet, setSheet] = useState(null); // null | worker id (the sheet that edits one person)
+  const [picking, setPicking] = useState(false); // the inline dropdown to add people
+  const [editMode, setEditMode] = useState(false); // the pencil of the header: the delete icons only exist while it is on
   const [advFor, setAdvFor] = useState(null); // worker id whose advance is being typed on the pad
   const amount = useRef(0);
   const crew = project.crew ?? [];
   const { rows, loose, looseTotal } = advancesByWorker(crew, project.advances);
   const pool = laborPool(result.valid ? result.quote.labor : 0, project.advances);
   const days = calendarDays(project);
-  const editing = sheet && sheet !== 'new' ? crew.find((w) => w.id === sheet) : null;
-  // the directory is read again whenever a sheet opens or closes (its file may have just been edited)
-  const directory = useMemo(() => loadWorkers(), [sheet]); // eslint-disable-line react-hooks/exhaustive-deps
+  const editing = sheet ? crew.find((w) => w.id === sheet) : null;
+  // the directory is read again whenever a sheet or the dropdown opens or closes (its file may have just been edited)
+  const directory = useMemo(() => loadWorkers(), [sheet, picking]); // eslint-disable-line react-hooks/exhaustive-deps
   const healthOf = (w) => crewHealth(w, directory);
+  const birthdayOf = (w) => isBirthdayToday(directory.find((f) => f.id === w.ref)?.birthDate); // local date of the device, plain-text people have no file
 
   const closeAdvance = () => {
     const n = amount.current;
@@ -259,9 +259,35 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
     setAdvFor(null);
   };
   const advanceFull = (project.advances ?? []).length >= LEDGER_LIMITS.advances;
+  const nothingToEdit = crew.length === 0 && loose.length === 0;
+  // the sheet closed (device Back, swipe, backdrop) or nothing left to edit: back to the quiet, protected state
+  useEffect(() => {
+    if (!open) {
+      setEditMode(false);
+      setPicking(false);
+    }
+  }, [open]);
+  useEffect(() => {
+    if (editMode && nothingToEdit) setEditMode(false);
+  }, [editMode, nothingToEdit]);
+
+  // the pencil REPLACES the x of the header: the sheet closes only the native way (device Back, swipe down, backdrop, Escape)
+  const editToggle = (
+    <EditToggle
+      active={editMode}
+      onToggle={() => {
+        setEditMode((v) => !v);
+        setPicking(false);
+      }}
+      disabled={nothingToEdit}
+      label={t('crew.edit.on')}
+      doneLabel={t('crew.edit.done')}
+      testId="crew-edit-toggle"
+    />
+  );
 
   return (
-    <Block icon={<UsersIcon size={32} />} label={t('ws.menu.crew')} id="crew" title={t('ws.crew.title')} meta={`${t(crew.length === 1 ? 'ws.crew.count1' : 'ws.crew.countN', { n: crew.length })}${days !== null ? ` · ${days} ${t('sched.d')}` : ''}`} open={open} onToggle={onToggle} testId="ws-crew" tall>
+    <Block icon={<UsersIcon size={32} />} label={t('ws.menu.crew')} id="crew" title={t('ws.crew.title')} meta={`${t(crew.length === 1 ? 'ws.crew.count1' : 'ws.crew.countN', { n: crew.length })}${days !== null ? ` · ${days} ${t('sched.d')}` : ''}`} open={open} onToggle={onToggle} testId="ws-crew" tall swipeToClose headerAction={editToggle}>
       <div className="space-y-3">
         {/* the dates set the days of the machinery rental (a direct cost): read-only, with the shield, while the quote is frozen / signed.
             The people and their advances below are operational, so they stay editable. */}
@@ -269,26 +295,40 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
           <Dates project={project} setProject={setProject} />
         </LockedZone>
 
-        {/* the control line right above the list: the round [+] opens the personnel selector (proximity radar + trade filters);
+        {/* the control line right above the list: the [+] unfolds the personnel selector (trade filters + proximity radar) in place;
             the labour balance is read BEFORE handing out an advance */}
         <div className="space-y-2">
           <div className="flex items-center gap-3" data-testid="crew-bar">
             <button
               type="button"
-              onClick={() => setSheet('new')}
+              onClick={() => setPicking((v) => !v)}
               disabled={crew.length >= CREW_LIMIT}
               aria-label={t('ws.crew.add')}
+              aria-expanded={picking}
               title={t('ws.crew.add')}
               data-testid="crew-add"
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-2xl font-medium leading-none text-brand transition active:scale-95 disabled:opacity-40"
             >
-              <span aria-hidden="true">+</span>
+              <span aria-hidden="true" className={`transition-transform ${picking ? 'rotate-45' : ''}`}>
+                +
+              </span>
             </button>
             <p data-testid="labor-pool" data-available={pool.available} data-spent={pool.advanced} className="min-w-0 flex-1 text-right text-sm text-neutral-300">
               {t('ws.crew.labor')}: <b className="tabular-nums text-neutral-200">{money(pool.available)}</b>
               <span className="whitespace-nowrap tabular-nums text-[#e8c35f]"> ({t('ws.crew.spent')}: {money(pool.advanced)})</span>
             </p>
           </div>
+          {picking && (
+            <CrewPicker
+              project={project}
+              crew={crew}
+              onClose={() => setPicking(false)}
+              onAdd={(data) => {
+                setProject((p) => withWorker(p, data));
+                setPicking(false);
+              }}
+            />
+          )}
           {crew.length === 0 ? (
             <p className="text-sm text-neutral-400" data-testid="crew-empty">
               {t('ws.crew.empty')}
@@ -300,7 +340,10 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
                   key={row.worker.id}
                   row={row}
                   health={healthOf(row.worker)}
+                  birthday={birthdayOf(row.worker)}
+                  editing={editMode}
                   onEdit={() => setSheet(row.worker.id)}
+                  onRemove={() => setProject((p) => withoutWorker(p, row.worker.id))}
                   onAdvance={() => {
                     if (advanceFull) return;
                     amount.current = 0;
@@ -324,9 +367,11 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
                 <li key={a.id} className="flex min-h-[44px] items-center gap-3">
                   <span className="min-w-0 flex-1 truncate text-sm">{a.worker}</span>
                   <span className="text-sm font-medium tabular-nums">{money(a.amount)}</span>
-                  <button type="button" onClick={() => setProject((p) => withoutAdvance(p, a.id))} aria-label={`${t('common.delete')}: ${a.worker}`} data-testid={`worker-adv-del-${a.id}`} className="flex h-11 w-11 shrink-0 items-center justify-center text-lg text-red-400">
-                    ×
-                  </button>
+                  {editMode && (
+                    <button type="button" onClick={() => setProject((p) => withoutAdvance(p, a.id))} aria-label={`${t('common.delete')}: ${a.worker}`} data-testid={`worker-adv-del-${a.id}`} className="flex h-11 w-11 shrink-0 items-center justify-center text-lg text-red-400/80 hover:text-red-400">
+                      ×
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -334,17 +379,6 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
         )}
       </div>
 
-      {sheet === 'new' && (
-        <CrewPicker
-          project={project}
-          crew={crew}
-          onClose={() => setSheet(null)}
-          onAdd={(data) => {
-            setProject((p) => withWorker(p, data));
-            setSheet(null);
-          }}
-        />
-      )}
       {editing && (
         <WorkerSheet
           worker={editing}

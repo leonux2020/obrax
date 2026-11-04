@@ -3,6 +3,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { MAX_PHOTOS, PHOTO_SLOTS, PhotoError, compressImage, putPhoto, removePhoto, shouldUseLiveCamera, slotLabel } from '../lib/photos.js';
 import { photoStoreFor } from '../lib/photoStore.js';
 import CameraModal from './CameraModal.jsx';
+import { EditToggle } from './EditControls.jsx';
 import PhotoLightbox from './PhotoLightbox.jsx';
 
 const CameraIcon = () => (
@@ -12,37 +13,12 @@ const CameraIcon = () => (
   </svg>
 );
 
-const PencilIcon = ({ size = 22 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" data-outline-icon="true" data-icon="pencil">
-    <path d="M12 20h9" />
-    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
-  </svg>
-);
-const CheckIcon = ({ size = 22 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" data-outline-icon="true" data-icon="check">
-    <path d="M5 12.5l4.5 4.5L19 7.5" />
-  </svg>
-);
-
 /**
- * The Edit toggle of the photo panel (the header action that replaces the classic close x): a pencil, or a check while the edit mode is on.
+ * The Edit toggle of the photo panel (the header action that replaces the classic close x): a floating pencil, or a check while the edit mode is on.
  */
 export function PhotoEditToggle({ active, onToggle, disabled = false }) {
   const { t } = useI18n();
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      disabled={disabled}
-      aria-pressed={active}
-      aria-label={t(active ? 'photo.editDone' : 'photo.edit')}
-      title={t(active ? 'photo.editDone' : 'photo.edit')}
-      data-testid="photo-edit-toggle"
-      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border disabled:opacity-30 ${active ? 'border-brand text-brand' : 'border-white/10 text-neutral-300 hover:border-brand'}`}
-    >
-      {active ? <CheckIcon /> : <PencilIcon />}
-    </button>
-  );
+  return <EditToggle active={active} onToggle={onToggle} disabled={disabled} label={t('photo.edit')} doneLabel={t('photo.editDone')} testId="photo-edit-toggle" />;
 }
 
 /**

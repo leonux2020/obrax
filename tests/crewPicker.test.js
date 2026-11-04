@@ -136,6 +136,18 @@ afterEach(() => {
 });
 
 describe('CrewPicker: the hybrid selector', () => {
+  it('is an inline DROPDOWN, not a stacked modal: it unfolds under the control line of the crew and the [+] folds it again', async () => {
+    await mount();
+    expect(q('crew-selector')).not.toBeNull();
+    expect(q('crew-add').getAttribute('aria-expanded')).toBe('true');
+    expect(q('ws-crew-sheet').contains(q('crew-selector'))).toBe(true); // inside the crew sheet itself
+    expect(qa('sheet-backdrop')).toHaveLength(1); // no second sheet above it
+    expect(q('crew-bar').compareDocumentPosition(q('crew-selector')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await click(q('crew-add'));
+    expect(q('crew-selector')).toBeNull();
+    expect(q('crew-add').getAttribute('aria-expanded')).toBe('false');
+  });
+
   it('replaces the plain input: the directory is listed below the name field; rows show name, stars and the ⚠ only for health notes', async () => {
     await mount();
     expect(q('worker-form')).not.toBeNull();
@@ -253,11 +265,14 @@ describe('CrewPicker: the hybrid selector', () => {
     expect(spy.project.crew[0]).toMatchObject({ name: 'Carla Díaz', ref: 'wk000003', specialty: 'plumber' });
   });
 
-  it('the add button needs text (disabled while empty), as before', async () => {
+  it('the add-as-text button needs text: it only appears once something is typed (nothing noisy while you just browse the directory)', async () => {
     await mount();
-    expect(q('crew-save').disabled).toBe(true);
+    expect(q('crew-save')).toBeNull();
     await typeInto(q('crew-name'), 'X');
+    expect(q('crew-save')).not.toBeNull();
     expect(q('crew-save').disabled).toBe(false);
+    await typeInto(q('crew-name'), '');
+    expect(q('crew-save')).toBeNull();
   });
 
   it('a job with no city cannot filter by reach: says so and offers everybody', async () => {
@@ -432,8 +447,8 @@ describe('emergency: the health data is READ on site (the person\'s sheet in the
     expect(q('crew-emergency-allergies').textContent).toContain('Penicilina');
     await click(qa('sheet-backdrop').at(-1));
     saveWorkers([{ ...FULL, allergies: 'Abejas' }]); // edited in Ajustes meanwhile
-    await click(q('crew-add')); // any sheet opening re-reads the directory
-    await click(qa('sheet-backdrop').at(-1));
+    await click(q('crew-add')); // opening the dropdown re-reads the directory
+    await click(q('crew-add')); // and folding it again
     await open('Fito Vega');
     expect(q('crew-emergency-allergies').textContent).toContain('Abejas');
     expect(q('crew-emergency-allergies').textContent).not.toContain('Penicilina');
