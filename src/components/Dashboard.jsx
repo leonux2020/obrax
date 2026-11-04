@@ -134,11 +134,11 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro, 
             return (
               <li key={level} data-testid={`pill-${level}`} data-count={n} data-empty={n > 0 ? undefined : 'true'} aria-label={`${t(key)}: ${n}`} title={t(key)} className="relative block h-[54px] w-[60px]">
                 {/* warning-sign triangle: transparent / OLED black inside; vivid state colour + number when > 0, empty and dimmed at 0 */}
-                <svg viewBox="0 0 60 54" className="absolute inset-0 h-full w-full" aria-hidden="true" focusable="false" style={n > 0 ? { filter: `drop-shadow(0 0 5px ${color}66)` } : undefined}>
-                  <polygon points="30,3 57,51 3,51" fill="none" stroke={stroke} strokeWidth="2" strokeOpacity={n > 0 ? 1 : 0.28} strokeLinejoin="round" data-testid={`tri-${level}`} />
+                <svg viewBox="0 0 60 54" className="absolute inset-0 h-full w-full" aria-hidden="true" focusable="false" style={n > 0 ? { filter: `drop-shadow(0 0 3px ${color}55)` } : undefined}>
+                  <polygon points="30,3 57,51 3,51" fill="none" stroke={stroke} strokeWidth="1.25" strokeOpacity={n > 0 ? 1 : 0.28} strokeLinejoin="round" data-testid={`tri-${level}`} />
                 </svg>
                 {n > 0 && (
-                  <span aria-hidden="true" className="absolute inset-x-0 top-[25px] text-center text-xl font-medium leading-none tabular-nums" style={{ color }}>
+                  <span aria-hidden="true" className="absolute inset-x-0 top-[25px] text-center text-xl font-light leading-none tabular-nums" style={{ color }}>
                     {n}
                   </span>
                 )}

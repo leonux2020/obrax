@@ -11,6 +11,7 @@ import LockedZone from './LockedZone.jsx';
 import PartidaMachinery from './PartidaMachinery.jsx';
 import TaskPicker, { TaskIcon } from '../TaskPicker.jsx';
 import DimsForm from '../DimsForm.jsx';
+import HseButton from '../HseSheet.jsx';
 
 /**
  * ZONE B, the living list: one native <details>/<summary> per partida. Open it and the measures, the materials and
@@ -120,6 +121,12 @@ export default function PartidaList({ draft, groups, open, locked, onBlocked, on
               )}
 
               {/* the machinery this task uses (it used to be a module of its own) */}
+              {/* the HSE guide (PPE, ergonomics, waste) of this task: read-only, so it stays available while the quote is frozen */}
+              <div className="flex items-center gap-3" data-testid={`hse-row-${i}`}>
+                <HseButton task={p.task} />
+                <span className="text-xs text-neutral-400">{t('hse.open')}</span>
+              </div>
+
               {result && setDraft && <PartidaMachinery draft={draft} result={result} index={i} regionCode={draft.regionCode} projectLocation={projectLocation} locked={locked} onBlocked={onBlocked} setDraft={setDraft} />}
             </div>
           </details>

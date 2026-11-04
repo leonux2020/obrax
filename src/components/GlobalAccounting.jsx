@@ -19,7 +19,7 @@ import DonutChart from './DonutChart.jsx';
 import { projectClient, projectTitle } from '../lib/projects.js';
 import { projectTotals } from '../lib/projectTotals.js';
 import { usePriceVersion } from '../lib/usePrices.js';
-import { Button, Logo } from './ui.jsx';
+import { Button } from './ui.jsx';
 
 /**
  * "Contabilidad Global": every project with its cash balance (collected - expenses - advances). Tick several and
@@ -136,9 +136,8 @@ export default function GlobalAccounting({ projects, onOpenProject = null, onExp
   };
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-3 pb-44 pt-3 sm:px-4" data-testid="accounting">
+    <main className="mx-auto w-full max-w-3xl px-3 pb-28 pt-3 sm:px-4" data-testid="accounting">
       <header className="mb-2 flex min-h-[44px] items-center gap-2" data-testid="acc-header">
-        <Logo size={24} />
         {/* no visible title: the bottom nav already says where you are (the heading stays for screen readers) */}
         <h1 className="sr-only">{t('nav.accountingShort')}</h1>
         <span className="flex-1" />
@@ -173,6 +172,17 @@ export default function GlobalAccounting({ projects, onOpenProject = null, onExp
           {open && (
             <GlobalBreakdownSheet breakdown={breakdown} moneyOf={moneyOf} onClose={() => setOpen(false)} />
           )}
+          {/* solid, static export button: part of the page flow (right under the chart, above the list), so it can never cover text while scrolling */}
+          <div className="no-print mb-2" data-testid="acc-export-bar">
+            {note === 'error' && (
+              <p role="alert" className="mb-2 text-sm font-semibold text-red-400">
+                {t('xl.error')}
+              </p>
+            )}
+            <Button className="w-full" disabled={selected.length === 0 || busy} onClick={exportGlobal} data-testid="acc-export">
+              {busy ? t('pdf.generating') : t('acc.export', { n: selected.length })}
+            </Button>
+          </div>
           {/* "Tutti" / "Ninguno": a discreet chip right above the list it controls (the checkboxes), a 44 px invisible touch area around the pill */}
           <button type="button" onClick={() => setSelected(all ? [] : projects.map((p) => p.id))} data-testid="acc-all" className="mb-0.5 flex min-h-[44px] items-center px-1 active:opacity-70">
             <span data-testid="acc-all-chip" className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-neutral-400">
@@ -237,20 +247,6 @@ export default function GlobalAccounting({ projects, onOpenProject = null, onExp
         </>
       )}
 
-      {projects.length > 0 && (
-        <div className="no-print fixed inset-x-0 z-30 px-3 [bottom:calc(5.25rem+env(safe-area-inset-bottom))]">
-          <div className="mx-auto max-w-3xl">
-            {note === 'error' && (
-              <p role="alert" className="mb-2 rounded-lg bg-black px-1 text-sm font-semibold text-red-400">
-                {t('xl.error')}
-              </p>
-            )}
-            <Button className="w-full" disabled={selected.length === 0 || busy} onClick={exportGlobal} data-testid="acc-export">
-              {busy ? t('pdf.generating') : t('acc.export', { n: selected.length })}
-            </Button>
-          </div>
-        </div>
-      )}
     </main>
   );
 }

@@ -104,7 +104,7 @@ describe('Dashboard: counters instead of sentences, tabs, full-width clickable c
       const tri = q(`tri-${level}`);
       const li = q(`pill-${level}`);
       const n = Number(li.getAttribute('data-count'));
-      expect(tri.getAttribute('stroke-width')).toBe('2');
+      expect(tri.getAttribute('stroke-width')).toBe('1.25'); // hairline
       expect(tri.getAttribute('fill')).toBe('none'); // OLED black / transparent inside
       expect(li.className).not.toMatch(/opacity|bg-/);
       expect(li.className).toContain('h-[54px]'); // small, not a giant rectangle
@@ -203,7 +203,8 @@ describe('Dashboard: counters instead of sentences, tabs, full-width clickable c
     for (const c of cards) {
       expect(c.tagName).toBe('BUTTON');
       expect(c.className).toContain('w-full');
-      expect(c.className).toContain('border-l-[6px]'); // thick left stripe...
+      expect(c.className).toContain('border-l-2'); // a thin neon thread on the left (never a thick bar)...
+      expect(c.className).not.toContain('border-l-[6px]');
       expect(c.className).not.toMatch(/border-b-\[|border-b-\d/); // ...and no coloured/thick bottom edge any more
       expect(c.style.borderBottomColor).toBe('');
       expect(c.className).toMatch(/\bborder\b/); // ...on a 1px perimeter

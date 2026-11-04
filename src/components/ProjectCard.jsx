@@ -55,7 +55,7 @@ export default function ProjectCard({ project, now, onOpen, weatherOpts = null }
         data-level={level}
         aria-label={[title, client, detail].filter(Boolean).join(', ')}
         style={{ borderLeftColor: LEVEL_COLOR[level] }}
-        className="block w-full rounded-xl border border-l-[6px] border-white/10 bg-transparent p-4 pl-4 text-left transition active:bg-white/[0.04]"
+        className="block w-full rounded-xl border border-l-2 border-white/10 bg-transparent p-4 pl-4 text-left transition active:bg-white/[0.04]"
       >
         <span className="flex items-start gap-3">
           <span className="min-w-0 flex-1">
