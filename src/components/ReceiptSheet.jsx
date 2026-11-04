@@ -170,7 +170,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
             <Button className="w-full" onClick={() => setPhase('pick')} data-testid="receipt-another">
               {t('q.another')}
             </Button>
-            <Button variant="ghost" className="w-full" onClick={onClose}>
+            <Button variant="secondary" className="w-full" onClick={onClose}>
               {t('common.close')}
             </Button>
           </div>
@@ -180,7 +180,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
           <div className="flex flex-col items-center gap-5 py-16 text-center" role="status" data-testid="receipt-reading">
             <span className="h-10 w-10 animate-spin rounded-full border-4 border-white/10 border-t-[#e8c35f]" aria-hidden="true" />
             <p className="text-lg font-medium">{t('inv.reading')}</p>
-            <Button variant="ghost" onClick={() => abortRef.current?.abort()} data-testid="receipt-cancel">
+            <Button variant="secondary" onClick={() => abortRef.current?.abort()} data-testid="receipt-cancel">
               {t('inv.cancel')}
             </Button>
           </div>
@@ -201,7 +201,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
             )}
             {foreign.map((cur) =>
               fxOpen[cur] || (fxFailed[cur] && !(fx[cur]?.rate > 0)) ? (
-                <div key={cur} data-testid={`receipt-fx-${cur}`} className="space-y-2 rounded-xl border border-white/15 px-4 py-3">
+                <div key={cur} data-testid={`receipt-fx-${cur}`} className="space-y-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
                   <p className="text-sm font-medium">{t('fx.rate', { cur })}</p>
                   <NumberField hideLabel label={t('fx.rate', { cur })} unit={region.currency} decimals={6} value={fx[cur]?.rate ?? null} onChange={(v) => setRate(cur, v)} testId={`receipt-fx-rate-${cur}`} />
                   <p className="text-xs text-neutral-400" data-testid={`receipt-fx-src-${cur}`} data-source={fx[cur]?.source || 'loading'}>
@@ -314,7 +314,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
                 <Button className="w-full" disabled={chosen.length === 0 || !fxReady} onClick={save} data-testid="receipt-save">
                   {t('rcpt.save', { n: chosen.length })}
                 </Button>
-                <Button variant="ghost" className="w-full" onClick={() => setPhase('pick')} data-testid="receipt-retry">
+                <Button variant="secondary" className="w-full" onClick={() => setPhase('pick')} data-testid="receipt-retry">
                   {t('inv.retry')}
                 </Button>
               </div>

@@ -97,7 +97,7 @@ describe('ExpensesBlock: receipt stack grouped by supplier', () => {
     const card = (id) => q(`expense-${id}`);
     const line = card('e1').querySelector('[data-testid="stack-line"]');
     expect(line.textContent).toMatch(/29.*2026/);
-    for (const c of ['text-xs', 'text-neutral-500']) expect(line.className).toContain(c);
+    for (const c of ['text-xs', 'text-neutral-400']) expect(line.className).toContain(c);
     const desc = card('e1').querySelector('[data-testid="stack-desc"]');
     expect(desc.textContent).toBe('Cemento');
     for (const c of ['text-xs', 'text-neutral-500']) expect(desc.className).toContain(c);

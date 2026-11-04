@@ -52,7 +52,7 @@ export default function CashSheet({ total, payments, onChange, onClose }) {
                 ['75 %', 0.75],
                 [t('cash.rest'), 1],
               ].map(([label, f]) => (
-                <button key={label} type="button" onClick={() => quick(f)} className="min-h-[44px] rounded-xl border border-white/10 text-sm font-semibold hover:border-brand">
+                <button key={label} type="button" onClick={() => quick(f)} className="min-h-[44px] rounded-xl border border-white/10 bg-white/5 text-sm font-normal text-neutral-300 hover:bg-white/10">
                   {label}
                 </button>
               ))}
@@ -65,18 +65,22 @@ export default function CashSheet({ total, payments, onChange, onClose }) {
         </form>
 
         {payments.length > 0 && (
-          <ul className="divide-y divide-white/10 rounded-2xl border border-white/10" data-testid="cash-list">
+          <ul className="divide-y divide-white/5" data-testid="cash-list">
             {payments.map((p) => (
-              <li key={p.id} className="flex min-h-[56px] items-center gap-3 px-4 py-2">
+              <li key={p.id} className="flex min-h-[56px] items-center gap-3 py-2">
                 <span className="min-w-0 flex-1">
-                  <span className="block font-medium tabular-nums">{money(p.amount)}</span>
-                  <span className="block truncate text-xs text-neutral-400 tabular-nums">{[when(p.at), p.note].filter(Boolean).join(' · ')}</span>
+                  <span className="block text-sm text-neutral-200 tabular-nums">{when(p.at)}</span>
+                  {p.note && <span className="block truncate text-xs text-neutral-400">{p.note}</span>}
+                </span>
+                <span className="shrink-0 text-sm text-neutral-200 tabular-nums">
+                  <span aria-hidden="true" className="text-neutral-500">+ </span>
+                  {money(p.amount)}
                 </span>
                 <button
                   type="button"
                   onClick={() => onChange(payments.filter((x) => x.id !== p.id))}
                   aria-label={`${t('common.delete')}: ${money(p.amount)}`}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 text-lg text-red-400 hover:border-red-500"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center text-lg text-neutral-500 hover:text-red-400 active:text-red-400"
                 >
                   ×
                 </button>

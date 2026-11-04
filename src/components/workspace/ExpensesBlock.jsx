@@ -16,7 +16,7 @@ function TotalAuditor({ expenses }) {
   return (
     <div className="flex min-w-0 shrink-0 flex-col items-end justify-center pt-0.5 text-right" role="status" aria-live="polite" data-testid="expenses-total" data-total={total}>
       <span className="text-xs font-medium uppercase text-neutral-500">{t('rcpt.total')}</span>
-      <span className={`max-w-[11rem] truncate text-xl font-semibold leading-tight tabular-nums ${total < 0 ? 'text-brand-500' : 'text-[#e8c35f]'}`} data-testid="expenses-total-amount">
+      <span className={`max-w-[11rem] truncate text-xl font-medium leading-tight tabular-nums ${total < 0 ? 'text-brand-500' : 'text-neutral-200'}`} data-testid="expenses-total-amount">
         {money(total)}
       </span>
     </div>

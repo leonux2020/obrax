@@ -25,7 +25,7 @@ function MethodTag({ method }) {
   const Icon = METHOD_ICON[method];
   if (!Icon) return null;
   return (
-    <span data-testid="cash-method-tag" data-method={method} className="inline-flex items-center gap-1 rounded-md border border-white/15 px-1.5 py-0.5 text-xs font-semibold text-neutral-300">
+    <span data-testid="cash-method-tag" data-method={method} className="inline-flex items-center gap-1 rounded-md bg-white/5 px-1.5 py-0.5 text-xs font-normal text-neutral-300">
       <Icon size={13} />
       {t(`ws.cash.m.${method}`)}
     </span>
@@ -39,21 +39,27 @@ function PaymentRow({ payment: p, store, onDelete, onOpenPhoto, when }) {
   return (
     <li className="flex min-h-[52px] items-center gap-3 py-1.5" data-testid={`cash-row-${p.id}`} data-method={p.method ?? ''}>
       <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="text-sm font-medium tabular-nums">{money(p.amount)}</span>
-          {p.method && <MethodTag method={p.method} />}
-        </span>
-        <span className="block truncate text-xs text-neutral-400 tabular-nums">{[when(p.at), p.note].filter(Boolean).join(' · ')}</span>
+        <span className="block truncate text-sm text-neutral-200 tabular-nums">{when(p.at)}</span>
+        {(p.method || p.note) && (
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-400">
+            {p.method && <MethodTag method={p.method} />}
+            {p.note && <span className="min-w-0 truncate">{p.note}</span>}
+          </span>
+        )}
+      </span>
+      <span className="shrink-0 text-sm text-neutral-200 tabular-nums" data-testid={`cash-amount-${p.id}`}>
+        <span aria-hidden="true" className="text-neutral-500">+ </span>
+        {money(p.amount)}
       </span>
       {p.photo === true &&
         (stored ? (
           <NoteThumb photo={stored} label={t('ws.cash.photoOpen')} onOpen={onOpenPhoto} testId={`cash-thumb-${p.id}`} size={44} />
         ) : (
-          <span data-testid={`cash-thumb-${p.id}`} data-pending="true" aria-label={t('ws.cash.photoOpen')} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/15 text-neutral-500">
+          <span data-testid={`cash-thumb-${p.id}`} data-pending="true" aria-label={t('ws.cash.photoOpen')} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/10 text-neutral-500">
             <CameraIcon size={20} />
           </span>
         ))}
-      <button type="button" onClick={() => onDelete(p)} aria-label={`${t('common.delete')}: ${money(p.amount)}`} data-testid={`cash-del-${p.id}`} className="flex h-11 w-11 shrink-0 items-center justify-center text-lg text-red-400 tabular-nums">
+      <button type="button" onClick={() => onDelete(p)} aria-label={`${t('common.delete')}: ${money(p.amount)}`} data-testid={`cash-del-${p.id}`} className="flex h-11 w-11 shrink-0 items-center justify-center text-lg text-neutral-500 tabular-nums hover:text-red-400 active:text-red-400">
         ×
       </button>
     </li>
@@ -154,7 +160,7 @@ export default function CashBlock({ total, payments, onChange, open, onToggle, p
           </p>
         )}
 
-        <button type="button" onClick={() => setPad(true)} data-testid="cash-amount" className="flex min-h-[52px] w-full items-center justify-between rounded-xl border border-white/15 px-3 active:border-white/50">
+        <button type="button" onClick={() => setPad(true)} data-testid="cash-amount" className="flex min-h-[52px] w-full items-center justify-between rounded-xl border border-white/10 bg-neutral-900 px-3 active:bg-white/10">
           <span className="text-sm text-neutral-400">{t('cash.amount')}</span>
           <span className="text-base font-medium tabular-nums">{amount > 0 ? money(amount) : '—'}</span>
         </button>
@@ -162,7 +168,7 @@ export default function CashBlock({ total, payments, onChange, open, onToggle, p
         {total > 0 && (
           <div className="grid grid-cols-4 gap-2" data-testid="cash-quick">
             {[...QUICK, [t('cash.rest'), 1]].map(([label, f]) => (
-              <button key={label} type="button" onClick={() => quick(f)} data-testid={`cash-quick-${f}`} className="min-h-[44px] rounded-lg border border-white/10 bg-black text-xs font-medium text-neutral-400 active:border-white/40 active:text-neutral-200">
+              <button key={label} type="button" onClick={() => quick(f)} data-testid={`cash-quick-${f}`} className="min-h-[44px] rounded-lg border border-white/10 bg-white/5 text-xs font-medium text-neutral-300 active:bg-white/10">
                 {label}
               </button>
             ))}
@@ -192,13 +198,13 @@ export default function CashBlock({ total, payments, onChange, open, onToggle, p
 
         <div className="flex items-center gap-3">
           <input ref={fileRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true" data-testid="cash-photo-input" onChange={pick} />
-          <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} data-testid="cash-photo" className="flex min-h-[52px] min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-white/15 px-3 text-sm font-semibold active:border-white/50 disabled:opacity-60">
+          <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} data-testid="cash-photo" className="flex min-h-[52px] min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm font-semibold text-neutral-200 active:bg-white/10 disabled:opacity-60">
             <CameraIcon size={22} />
             <span className="truncate">{busy ? t('ws.log.photoBusy') : shot ? t('ws.cash.photoChange') : t('ws.cash.photoAdd')}</span>
           </button>
           {shot && shotUrl && (
             <>
-              <button type="button" onClick={() => setViewer(shotUrl)} aria-label={t('ws.cash.photoOpen')} data-testid="cash-photo-preview" className="h-[52px] w-[52px] shrink-0 overflow-hidden rounded-lg border border-white/15 active:border-white/50">
+              <button type="button" onClick={() => setViewer(shotUrl)} aria-label={t('ws.cash.photoOpen')} data-testid="cash-photo-preview" className="h-[52px] w-[52px] shrink-0 overflow-hidden rounded-lg border border-white/10">
                 <img src={shotUrl} alt="" className="h-full w-full object-cover" draggable="false" />
               </button>
               <button type="button" onClick={() => setShot(null)} aria-label={t('ws.cash.photoRemove')} data-testid="cash-photo-remove" className="flex h-11 w-11 shrink-0 items-center justify-center text-neutral-400 active:text-red-400">
@@ -220,7 +226,7 @@ export default function CashBlock({ total, payments, onChange, open, onToggle, p
             {t(error)}
           </p>
         )}
-        <button type="button" disabled={!ready} onClick={add} data-testid="cash-add" className="min-h-[52px] w-full rounded-xl px-3 text-base disabled:opacity-40 bg-brand text-black font-semibold hover:bg-brand-light">
+        <button type="button" disabled={!ready} onClick={add} data-testid="cash-add" className="min-h-[52px] w-full rounded-xl border-none bg-brand px-3 text-base font-semibold text-black hover:bg-brand-light disabled:opacity-40">
           {t('cash.add')}
         </button>
 
@@ -229,7 +235,7 @@ export default function CashBlock({ total, payments, onChange, open, onToggle, p
             {t('ws.cash.empty')}
           </p>
         ) : (
-          <ul className="divide-y divide-white/10" data-testid="cash-list">
+          <ul className="divide-y divide-white/5" data-testid="cash-list">
             {payments.map((p) => (
               <PaymentRow key={p.id} payment={p} store={store} onDelete={remove} onOpenPhoto={setViewer} when={when} />
             ))}

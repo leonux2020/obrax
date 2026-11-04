@@ -8,7 +8,7 @@ export default function QueueList({ rows, onRetry, onDiscard, onAccept }) {
   if (!rows.length) return null;
   const when = (ms) => (ms ? new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(ms)) : '');
   const label = (r) => (r.status === 'failed' ? t('q.state.failed') : r.status === 'review' ? t('q.state.review') : r.status === 'sending' ? t('q.sending') : t('q.pending'));
-  const btn = 'min-h-[44px] rounded-lg border border-white/15 px-3 text-xs font-semibold active:border-white/50';
+  const btn = 'min-h-[44px] rounded-lg border border-white/10 bg-white/5 px-3 text-xs font-medium text-neutral-200 active:bg-white/10';
   return (
     <ul className="mb-3 space-y-2" data-testid="queue-list" aria-label={t('q.title')}>
       {rows.map((r) => (
@@ -28,7 +28,7 @@ export default function QueueList({ rows, onRetry, onDiscard, onAccept }) {
                 {t('q.act.retry')}
               </button>
             )}
-            <button type="button" className={`${btn} text-red-400`} onClick={() => onDiscard(r.id)} data-testid={`queued-discard-${r.id}`}>
+            <button type="button" className={`${btn} !text-neutral-400`} onClick={() => onDiscard(r.id)} data-testid={`queued-discard-${r.id}`}>
               {t('q.act.discard')}
             </button>
           </div>

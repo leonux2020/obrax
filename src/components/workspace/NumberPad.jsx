@@ -47,7 +47,7 @@ export default function NumberPad({ title, unit = '', value, decimals = 2, max =
         disabled={k === 'dot' && decimals === 0}
         aria-label={k === 'back' ? t('ws.pad.backspace') : label}
         data-testid={`pad-${k}`}
-        className="flex h-16 min-w-16 items-center justify-center rounded-xl border border-white/20 text-3xl font-medium text-neutral-200 transition active:scale-95 active:border-white/60 disabled:opacity-30"
+        className="flex h-16 min-w-16 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-3xl font-normal text-neutral-200 transition active:scale-95 active:bg-white/10 disabled:opacity-30"
       >
         {label}
       </button>
@@ -78,7 +78,7 @@ export default function NumberPad({ title, unit = '', value, decimals = 2, max =
         <div className="grid grid-cols-3 gap-2">{KEYS.map(key)}</div>
         <div className={`mt-2 grid gap-2 ${onReset ? 'grid-cols-2' : 'grid-cols-1'}`}>
           {onReset && (
-            <button type="button" onClick={onReset} data-testid="pad-reset" className="min-h-[72px] rounded-2xl border border-white/20 px-3 text-sm font-semibold text-neutral-300 active:border-white/50">
+            <button type="button" onClick={onReset} data-testid="pad-reset" className="min-h-[72px] rounded-2xl border border-white/10 bg-white/5 px-3 text-sm font-medium text-neutral-300 active:bg-white/10">
               {t('ws.pad.reset')}
             </button>
           )}

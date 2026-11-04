@@ -20,11 +20,11 @@ export default function ReceiptStack({ expenses, onChange = null }) {
   if (!expenses.length) return null;
 
   return (
-    <div className="space-y-3" data-testid="expense-list">
+    <div className="divide-y divide-white/5" data-testid="expense-list">
       {groups.map((g, i) => {
         const fmt = (v) => (g.currency ? moneyIn(v, g.currency) : money(v));
         return (
-          <section key={g.key} data-testid={`stack-shop-${i}`} className="rounded-xl border border-white/10 px-3 py-3">
+          <section key={g.key} data-testid={`stack-shop-${i}`} className="py-3">
             <h3 className="flex items-baseline justify-between gap-3">
               <span className={`min-w-0 flex-1 truncate text-lg font-medium tracking-tight ${g.name ? 'text-neutral-200' : 'text-neutral-400'}`} data-testid="stack-shop-name">
                 {g.name || t('exp.noSupplier')}
@@ -33,16 +33,16 @@ export default function ReceiptStack({ expenses, onChange = null }) {
                 {fmt(g.total)}
               </span>
             </h3>
-            <ul className="mt-1 divide-y divide-white/5">
+            <ul className="mt-1">
               {g.items.map((e) => {
                 const rental = RENTAL_CATEGORIES.includes(e.category);
                 const isDue = due.some((x) => x.id === e.id);
                 const when = expenseDayLabel(e.date, locale) || day.format(new Date(e.at || Date.now()));
                 return (
-                  <li key={e.id} data-testid={`expense-${e.id}`} data-due={isDue ? 'true' : undefined} className="py-2">
+                  <li key={e.id} data-testid={`expense-${e.id}`} data-due={isDue ? 'true' : undefined} className="py-1.5">
                     <div className="flex items-start gap-2">
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-xs tabular-nums text-neutral-500" data-testid="stack-line">
+                        <span className="block truncate text-xs tabular-nums text-neutral-400" data-testid="stack-line">
                           {[when, e.sucursal].filter(Boolean).join(' · ')}
                         </span>
                         {e.description && (
@@ -58,7 +58,7 @@ export default function ReceiptStack({ expenses, onChange = null }) {
                         )}
                       </span>
                       {isDue && <Hourglass label={t('rental.dueToday')} size={18} />}
-                      <span className={`shrink-0 text-xs tabular-nums ${e.amount < 0 ? 'text-brand-500' : 'text-neutral-400'}`} data-testid="stack-amount" data-negative={e.amount < 0 ? 'true' : undefined}>
+                      <span className={`shrink-0 text-sm tabular-nums ${e.amount < 0 ? 'text-brand-500' : 'text-neutral-200'}`} data-testid="stack-amount" data-negative={e.amount < 0 ? 'true' : undefined}>
                         {fmt(e.amount)}
                       </span>
                       {editable && (
@@ -73,8 +73,8 @@ export default function ReceiptStack({ expenses, onChange = null }) {
                         onClick={() => toggleReturned(e.id)}
                         aria-pressed={Boolean(e.returned)}
                         data-testid={`expense-return-${e.id}`}
-                        className="mt-2 min-h-[44px] w-full rounded-lg border border-white/15 px-3 text-sm font-semibold"
-                        style={e.returned ? { color: '#22c55e' } : isDue ? { color: '#e8c35f', borderColor: '#d4af37' } : undefined}
+                        className="mt-2 min-h-[44px] w-full rounded-lg border border-white/10 bg-white/5 px-3 text-sm font-medium text-neutral-200 active:bg-white/10"
+                        style={e.returned ? { color: '#22c55e' } : isDue ? { color: '#e8c35f' } : undefined}
                       >
                         {e.returned ? `✓ ${t('rental.returned')}` : e.returnDate ? t('rental.returnBy', { date: e.returnDate === dayOf(Date.now()) ? t('light.todayShort') : e.returnDate }) : t('rental.markReturned')}
                       </button>

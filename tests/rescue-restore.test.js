@@ -155,3 +155,55 @@ describe('Phase 7: OLED calm (less light, less stress)', () => {
     expect(dash).toContain('drop-shadow(0 0 3px ${color}55)');
   });
 });
+
+describe('Phase 8: minimalism in Gastos y Caja', () => {
+  const files = {
+    cash: 'src/components/workspace/CashBlock.jsx',
+    cashSheet: 'src/components/CashSheet.jsx',
+    expenses: 'src/components/workspace/ExpensesBlock.jsx',
+    stack: 'src/components/workspace/ReceiptStack.jsx',
+    queue: 'src/components/workspace/QueueList.jsx',
+    receipt: 'src/components/ReceiptSheet.jsx',
+    pad: 'src/components/workspace/NumberPad.jsx',
+  };
+  const all = Object.values(files);
+
+  it('the shared input style is the soft fill: bg-neutral-900 + 1 px white/10, no heavy borders in any money form', () => {
+    expect(read('src/index.css')).toMatch(/\.field-input\s*\{\s*@apply[^}]*border border-white\/10 bg-neutral-900/);
+    for (const f of all) expect(read(f), f).not.toMatch(/\bborder-2\b|border-neutral-700|border-white\/(15|20|25|30)\b/);
+    expect(read(files.cash)).toMatch(/data-testid="cash-amount" className="[^"]*border border-white\/10 bg-neutral-900/);
+  });
+
+  it('no ghost (outline-only) buttons: primaries are solid brand, secondaries a soft white/5 fill', () => {
+    expect(read(files.receipt)).not.toContain('variant="ghost"');
+    expect(read(files.cashSheet)).not.toContain('variant="ghost"');
+    expect(read(files.cash)).toMatch(/data-testid="cash-add" className="[^"]*bg-brand[^"]*text-black/);
+    for (const f of [files.cash, files.cashSheet, files.queue, files.pad]) expect(read(f), f).toMatch(/border border-white\/10 bg-white\/5/);
+    expect(read(files.stack)).not.toMatch(/borderColor/); // the due-date tool no longer gets a gold outline
+  });
+
+  it('the history rows are clean: no box around each item, date on the left, amount on the right, calm colours', () => {
+    const cash = read(files.cash);
+    expect(cash).toMatch(/divide-y divide-white\/5" data-testid="cash-list"/);
+    expect(cash).toMatch(/data-testid=\{`cash-amount-\$\{p\.id\}`\}/);
+    expect(cash).toContain('text-neutral-200');
+    expect(read(files.cashSheet)).not.toMatch(/rounded-2xl border border-white\/10" data-testid="cash-list"/);
+    const stack = read(files.stack);
+    expect(stack).not.toMatch(/<section[^>]*rounded-xl border/); // no card per supplier
+    expect(stack).toMatch(/text-sm tabular-nums \$\{e\.amount < 0 \? 'text-brand-500' : 'text-neutral-200'\}/);
+    // the delete cross is neutral until touched; no permanent red in a normal history
+    expect(cash).toMatch(/text-neutral-500 tabular-nums hover:text-red-400/);
+    expect(read(files.expenses)).not.toContain('e8c35f');
+  });
+
+  it('every financial modal closes with swipe-to-close and none opts out', () => {
+    for (const f of all) expect(read(f), f).not.toMatch(/swipeToClose=\{false\}/);
+    expect(read(files.pad)).toMatch(/data-swipe-close="true"/);
+    expect(read(files.receipt)).toContain('<BottomSheet');
+    expect(read(files.cashSheet)).toContain('<BottomSheet');
+  });
+
+  it('the minimum type size is 12 px (no text-[10px]/[11px]) in every money module', () => {
+    for (const f of all) expect(read(f), f).not.toMatch(/text-\[(8|9|10|11)px\]/);
+  });
+});

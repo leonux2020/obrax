@@ -127,7 +127,7 @@ describe('Receipt stack micro-text (project > Gastos)', () => {
     expect(desc('gasto002').textContent).toBe('Clavos 2"');
     expect(desc('gasto003')).toBeNull(); // date only
     expect(q('expense-gasto003').textContent).not.toContain('•');
-    for (const id of ['gasto001', 'gasto002', 'gasto003']) for (const c of ['text-xs', 'text-neutral-500', 'truncate']) expect(line(id).className).toContain(c);
+    for (const id of ['gasto001', 'gasto002', 'gasto003']) for (const c of ['text-xs', 'text-neutral-400', 'truncate']) expect(line(id).className).toContain(c);
   });
 
   it('a receipt with only a sucursal (no description) still shows it', async () => {
