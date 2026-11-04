@@ -187,6 +187,10 @@ describe('after onboarding, the profile lives only in Ajustes', () => {
     await click(tab('Ajustes'));
     expect(q('settings-profile')).not.toBeNull();
     expect(q('settings-edit-profile')).toBeNull(); // no competing "Editar" / modal
+    expect(q('settings-company-name')).toBeNull(); // passive business card first: no inputs until the pencil
+    expect(q('settings-profile-name').textContent).toBe('Aurora');
+    expect(q('settings-profile-pro').textContent).toBe('Ana Ruiz');
+    await click(q('settings-profile-edit'));
     expect(q('settings-company-name').value).toBe('Aurora');
     expect(q('settings-pro-name').value).toBe('Ana Ruiz');
     expect(q('settings-company-tax')).not.toBeNull();

@@ -11,6 +11,7 @@ import { PhotoError } from '../lib/photos.js';
 import { useBackLayer } from '../lib/backStack.js';
 import { CloudUploadIcon, FileSignatureIcon, GlobeIcon, SmartphoneIcon, UserIcon, UsersIcon } from './workspace/icons.jsx';
 import { Button, Switch, TextField } from './ui.jsx';
+import { EditToggle } from './EditControls.jsx';
 import GoogleButton from './GoogleButton.jsx';
 import LangSelect from './LangSelect.jsx';
 import RegionCombobox from './RegionCombobox.jsx';
@@ -30,7 +31,7 @@ function Accordion({ testId, titleId, icon: Icon, title, open, onToggle, childre
     <details
       open={open}
       onToggle={(e) => e.currentTarget.open !== open && onToggle(e.currentTarget.open)}
-      className="card group !p-0"
+      className="card !p-0"
       data-testid={testId}
     >
       <summary data-testid={`${testId}-summary`} className="flex min-h-[64px] cursor-pointer list-none items-center gap-3 px-4 sm:px-5 [&::-webkit-details-marker]:hidden">
@@ -38,9 +39,6 @@ function Accordion({ testId, titleId, icon: Icon, title, open, onToggle, childre
         <h2 id={titleId} className="min-w-0 flex-1 truncate text-lg font-semibold">
           {title}
         </h2>
-        <span aria-hidden="true" className="text-lg text-neutral-500 transition-transform group-open:rotate-90">
-          ›
-        </span>
       </summary>
       <div className={`border-t border-white/10 ${bodyClassName}`}>{children}</div>
     </details>
@@ -82,7 +80,11 @@ export default function SettingsView({
   const [logoError, setLogoError] = useState('');
   const [logoBusy, setLogoBusy] = useState(false);
   const [openAcc, setOpenAcc] = useState({ profile: false, ops: false, locale: false }); // everything starts closed: a nearly empty screen
-  const toggleAcc = (key) => (isOpen) => setOpenAcc((o) => ({ ...o, [key]: isOpen }));
+  const [editProfile, setEditProfile] = useState(false); // the company card is a passive business card; only the pencil turns it into the form
+  const toggleAcc = (key) => (isOpen) => {
+    setOpenAcc((o) => ({ ...o, [key]: isOpen }));
+    if (key === 'profile' && !isOpen) setEditProfile(false); // folding the card puts it back to read-only
+  };
   const [signing, setSigning] = useState(false); // only the signature canvas (never the old profile modal)
   const [squadra, setSquadra] = useState(false); // the global directory of workers (full-screen sheet over Ajustes)
   const logoRef = useRef(null);
@@ -233,8 +235,16 @@ export default function SettingsView({
     </div>
   );
 
+  // the read-only business card shows only what is filled in
+  const facts = [
+    [t(`company.taxId.${region?.code || 'CL'}`), form.taxId, 'tax'],
+    [t('company.email'), form.email, 'email'],
+    [t('company.phone'), form.phone, 'phone'],
+    [t('company.city'), form.city, 'city'],
+  ].filter(([, v]) => v);
+
   // The layers live in a fragment OUTSIDE the swap below, so the signature canvas replacing the screen never remounts them (no stray history entries)
-  const layers = ['profile', 'ops', 'locale'].filter((k) => openAcc[k]).map((k) => <OpenLayer key={k} onClose={() => setOpenAcc((o) => ({ ...o, [k]: false }))} />);
+  const layers = ['profile', 'ops', 'locale'].filter((k) => openAcc[k]).map((k) => <OpenLayer key={k} onClose={() => toggleAcc(k)(false)} />);
 
   if (signing) {
     return (
@@ -270,7 +280,42 @@ export default function SettingsView({
 
         {/* ---- 1. Perfil de Empresa ---------------------------------------------------------------------------------- */}
         <Accordion testId="settings-profile" titleId="settings-profile-title" icon={UserIcon} title={t('settings.profile')} open={openAcc.profile} onToggle={toggleAcc('profile')}>
-          <div className="relative space-y-4 px-4 py-4 sm:px-5">
+          <div className="relative">
+          <div className="absolute right-1 top-1 z-10">
+            <EditToggle active={editProfile} onToggle={() => setEditProfile((v) => !v)} label={t('settings.profile.edit')} doneLabel={t('crew.edit.done')} testId="settings-profile-edit" />
+          </div>
+          {!editProfile ? (
+            <div className="px-4 py-5 pr-14 sm:px-5 sm:pr-16" data-testid="settings-profile-card">
+              <div className="flex items-center gap-4">
+                <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 p-1.5" data-testid="settings-profile-logo">
+                  {pic ? <img src={pic} alt="" className="max-h-full max-w-full object-contain" /> : <span aria-hidden="true" className="text-2xl font-medium text-neutral-500">{(form.name || form.proName || '?').trim().slice(0, 1).toUpperCase() || '?'}</span>}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className={`block truncate text-xl font-medium tracking-tight ${form.name ? 'text-neutral-100' : 'text-neutral-500'}`} data-testid="settings-profile-name">
+                    {form.name || t('settings.profile.empty')}
+                  </span>
+                  {form.proName && (
+                    <span className="mt-0.5 block truncate text-sm text-neutral-400" data-testid="settings-profile-pro">
+                      {form.proName}
+                    </span>
+                  )}
+                </span>
+              </div>
+              {facts.length > 0 && (
+                <dl className="mt-5 grid grid-cols-1 gap-x-6 gap-y-3 border-t border-white/10 pt-4 sm:grid-cols-2">
+                  {facts.map(([label, value, key]) => (
+                      <div key={key} className="min-w-0">
+                        <dt className="text-xs font-medium text-neutral-500">{label}</dt>
+                        <dd className="truncate text-base text-neutral-200" data-testid={`settings-profile-${key}`}>
+                          {value}
+                        </dd>
+                      </div>
+                  ))}
+                </dl>
+              )}
+            </div>
+          ) : (
+          <div className="space-y-4 px-4 pb-4 pt-12 sm:px-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             <div className="shrink-0">
               <button
@@ -343,6 +388,8 @@ export default function SettingsView({
             <TextField label={t('company.city')} value={form.city} onChange={setField('city')} onBlur={commitField} testId="settings-company-city" maxLength={60} optional={t('common.optional')} sanitize={(v) => sanitizeTextInput(v, 60)} placeholder={t('company.city.ph')} />
           </div>
           </div>
+          )}
+          </div>
         </Accordion>
 
         {/* ---- 2. Operaciones y Sincronización: firma + Drive en UNA tarjeta ---------------------------------------- */}
@@ -362,11 +409,7 @@ export default function SettingsView({
               <span className="flex h-10 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-white px-1">
                 <img src={form.signature.dataUrl} alt="" className="max-h-full max-w-full object-contain" />
               </span>
-            ) : (
-              <span aria-hidden="true" className="text-lg text-neutral-500">
-                ›
-              </span>
-            )}
+            ) : null}
           </button>
 
         {/* ---- Google Drive y Respaldo ---------------------------------------------------------------------------- */}
@@ -484,7 +527,6 @@ export default function SettingsView({
               ) : (
                 <button type="button" onClick={onChangeRegion} className="flex min-h-[52px] w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-neutral-900 px-4 text-left font-medium hover:bg-white/10">
                   <span className="truncate">{t('settings.region.change')}</span>
-                  <span aria-hidden="true">›</span>
                 </button>
               )}
             </div>
@@ -520,9 +562,6 @@ export default function SettingsView({
           <span className="min-w-0 flex-1">
             <span className="block truncate text-lg font-semibold">{t('squadra.title')}</span>
             <span className="block truncate text-xs text-neutral-400">{t('squadra.subtitle')}</span>
-          </span>
-          <span aria-hidden="true" className="text-lg text-neutral-500">
-            ›
           </span>
         </button>
 

@@ -39,6 +39,9 @@ describe('Ajustes: three cards', () => {
     expect(q('settings-cloud')).not.toBeNull();
     expect(q('settings-lang').querySelector('[data-testid="lang-select"]')).not.toBeNull();
     expect(q('settings-region')).not.toBeNull();
+    expect(q('settings-logo')).toBeNull(); // read-only card until the pencil
+    expect(q('settings-company-email')).toBeNull();
+    await click(q('settings-profile-edit'));
     expect(q('settings-logo').getAttribute('aria-label')).toBeTruthy();
     expect(q('settings-logo').textContent).toContain('Cambiar');
     expect(q('settings-logo').className).toContain('bg-transparent');
@@ -74,6 +77,7 @@ describe('Ajustes: three cards', () => {
     h = createHost(App);
     await h.mount();
     await click(h.tab('Ajustes'));
+    await click(q('settings-profile-edit'));
     const pro = q('settings-pro-name');
     await typeInto(pro, 'Ana ');
     expect(pro.value).toBe('Ana '); // space still there right after onChange
