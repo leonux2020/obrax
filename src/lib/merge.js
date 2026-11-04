@@ -24,7 +24,12 @@ const isRecordList = (key, value) =>
 
 /** A financial record with its amount as a finite NUMBER ("1250,50" / "100" from a backup would otherwise concatenate: "100" + 20 = "10020"). */
 function sanitizeAmount(record) {
-  if (!record || typeof record !== 'object' || typeof record.amount === 'number') return record;
+  if (!record || typeof record !== 'object') return record;
+  if (record.amountBase !== undefined && record.amountBase !== null && Number.isFinite(Number(record.amountBase))) {
+    // a foreign expense IS its frozen base value
+    return Number(record.amountBase) === record.amount ? record : { ...record, amount: Number(record.amountBase), amountBase: Number(record.amountBase) };
+  }
+  if (typeof record.amount === 'number') return record;
   const raw = record.amount;
   const n = typeof raw === 'string' ? Number(raw.trim().replace(',', '.')) : Number(raw);
   return { ...record, amount: Number.isFinite(n) ? n : 0 };

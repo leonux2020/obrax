@@ -8,6 +8,7 @@
 
 import { sanitizeText } from './sanitize.js';
 import { getRegion, taxRateFor } from './regions.js';
+import { FX_SOURCES, baseOf, isoOf, normalizeRate } from './fx.js';
 
 export const LEDGER_LIMITS = Object.freeze({ payments: 200, advances: 200, expenses: 500, logbook: 500, maxAmount: 1e12, noteChars: 80, logChars: 2000 });
 
@@ -125,9 +126,25 @@ export function advancesByWorker(crew = [], advances = []) {
 
 const RECEIPT_ID_RE = /^[a-z0-9]{4,24}$/;
 
+/**
+ * The FX snapshot of an expense (see fx.js): { currencyOriginal, amountOriginal, exchangeRate, amountBase, fxSource, fxAt } or null.
+ * The frozen `amountBase` is the truth: when it is missing it is computed ONCE from original x rate; `amount` is always forced to it.
+ */
+function fxSnapshot(p) {
+  const currencyOriginal = isoOf(p.currencyOriginal);
+  const amountOriginal = signedAmount(p.amountOriginal);
+  const exchangeRate = normalizeRate(p.exchangeRate);
+  if (!currencyOriginal || amountOriginal === null || exchangeRate === null) return null;
+  const amountBase = signedAmount(p.amountBase) ?? signedAmount(amountOriginal * exchangeRate);
+  if (amountBase === null) return null;
+  const at = Number(p.fxAt);
+  return { currencyOriginal, amountOriginal, exchangeRate, amountBase, fxSource: FX_SOURCES.includes(p.fxSource) ? p.fxSource : 'manual', ...(Number.isFinite(at) && at > 0 ? { fxAt: at } : {}) };
+}
+
 export const normalizeExpenses = (raw) =>
   listOf(raw, LEDGER_LIMITS.expenses, (p, used) => {
-    const a = signedAmount(p.amount);
+    const fx = fxSnapshot(p);
+    const a = fx ? fx.amountBase : signedAmount(p.amount); // a foreign expense IS its frozen base value: a different `amount` cannot override it
     if (a === null) return null;
     const category = EXPENSE_CATEGORIES.includes(p.category) ? p.category : 'other';
     const rental = RENTAL_CATEGORIES.includes(category);
@@ -137,6 +154,7 @@ export const normalizeExpenses = (raw) =>
       supplier: sanitizeText(p.supplier, 60).trim(),
       description: sanitizeText(p.description, 120).trim(),
       amount: a,
+      ...(fx || {}),
       category,
       // only rented tools / machinery have a day to give them back
       returnDate: rental ? day(p.returnDate) : '',
@@ -209,7 +227,8 @@ export const toAmount = (v) => {
   const f = typeof v === 'string' ? parseFloat(v.replace(',', '.')) : NaN;
   return Number.isFinite(f) ? f : 0;
 };
-const sum = (list) => (Array.isArray(list) ? list : []).reduce((s, x) => s + toAmount(x?.amount), 0);
+// every total adds the BASE value of a record (the frozen `amountBase` of a foreign expense; the plain `amount` of everything else)
+const sum = (list) => (Array.isArray(list) ? list : []).reduce((s, x) => s + baseOf(x), 0);
 const cents = (n) => Math.round(n * 100) / 100;
 
 /** Cash control: what the client paid against the budget. `pct` is clamped to 0..100 for the bar. */
@@ -265,7 +284,7 @@ export function supplierTotals(expenses = []) {
     const currency = typeof e?.currency === 'string' ? e.currency.toUpperCase() : '';
     const key = `${name.toLowerCase()}|${currency}`;
     const g = groups.get(key) || { key, name, currency, total: 0, count: 0 };
-    g.total = Math.round((g.total + (Number(e?.amount) || 0)) * 100) / 100;
+    g.total = Math.round((g.total + baseOf(e)) * 100) / 100;
     g.count += 1;
     groups.set(key, g);
   }
@@ -302,7 +321,7 @@ export function profitability(project, budget = 0, top = 3) {
   const efficiency = num(budget) > 0 ? Math.max(0, (collected / num(budget)) * 100) : null;
   const shops = new Map();
   for (const e of arr(project?.expenses)) {
-    const amount = num(e?.amount);
+    const amount = baseOf(e);
     if (amount === 0) continue;
     const name = typeof e?.supplier === 'string' ? e.supplier.trim().replace(/\s+/g, ' ') : '';
     const key = name.toLowerCase();
@@ -323,7 +342,7 @@ export function expensesByCategory(expenses = []) {
   for (const e of Array.isArray(expenses) ? expenses : []) {
     const category = EXPENSE_CATEGORIES.includes(e?.category) ? e.category : 'other';
     const g = groups.get(category) || { category, total: 0, count: 0 };
-    g.total = Math.round((g.total + (Number(e?.amount) || 0)) * 100) / 100;
+    g.total = Math.round((g.total + baseOf(e)) * 100) / 100;
     g.count += 1;
     groups.set(category, g);
   }
@@ -360,7 +379,7 @@ export function expenseDayLabel(value, locale = 'es') {
 const DAY_MS = 86_400_000;
 const arr = (v) => (Array.isArray(v) ? v.filter((x) => x && typeof x === 'object') : []);
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-const total = (list) => cents(arr(list).reduce((s, x) => s + num(x.amount), 0));
+const total = (list) => cents(arr(list).reduce((s, x) => s + baseOf(x), 0));
 
 /** A project that is still running (not finished / historical). */
 export const isActiveProject = (project) => !(Number(project?.closedAt) > 0);
@@ -525,7 +544,7 @@ export function globalSupplierShares(projects, top = 4) {
     if (!currency) continue;
     const line = lines.get(currency) ?? { currency, regionCode, shops: new Map() };
     for (const e of arr(p.expenses)) {
-      const amount = num(e.amount);
+      const amount = baseOf(e);
       if (amount === 0) continue; // a discount line (negative) lowers its shop
       const name = typeof e.supplier === 'string' ? e.supplier.trim().replace(/\s+/g, ' ') : '';
       const key = name.toLowerCase();

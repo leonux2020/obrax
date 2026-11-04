@@ -245,7 +245,7 @@ const documentsOf = (expenses) => {
   for (const e of Array.isArray(expenses) ? expenses : []) {
     const key = e?.docId || `line:${e?.id}`;
     const d = docs.get(key) || { amount: 0, date: e?.date, supplier: e?.supplier };
-    d.amount += Number(e?.amount) || 0;
+    d.amount += Number(e?.amountOriginal ?? e?.amount) || 0; // a converted receipt is recognised by what the PAPER says
     docs.set(key, d);
   }
   return [...docs.values()];

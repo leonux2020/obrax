@@ -5,12 +5,14 @@
 //
 // Rules: retry only what can succeed later (network, timeout, rate limit, upstream) with exponential backoff and stop the
 // run at the first connectivity problem (do not hammer a dead line); mark what can never succeed ('failed'); never
-// add silently a receipt printed in ANOTHER currency ('review'); never run twice at once (in this tab, nor across tabs
+// tabulate behind the user's back a receipt printed in ANOTHER currency whose only rate is an approximation ('review'; a real rate is frozen
+// into the project's base currency automatically, see fx.js); never run twice at once (in this tab, nor across tabs
 // when the Web Locks API exists); never send anything while offline.
 
 import { LEDGER_LIMITS, withProjectContext } from './ledger.js';
 import { asReceipts, batchExpenses, requestReceipt } from './receipt.js';
 import { QUEUE_LIMITS, receiptQueue } from './receiptQueue.js';
+import { convertToBase, resolveRate } from './fx.js';
 
 export const SYNC_TAG = 'cubrax-receipts';
 export const SYNC_MESSAGE = 'SYNC_RECEIPTS';
@@ -53,7 +55,7 @@ async function exclusive(fn) {
  * @param apply async (projectId, expenses, row) => boolean   false = the project no longer exists (the row is dropped)
  * @returns {Promise<{done: {row, count}[], review: object[], failed: object[], deferred: number, skipped: boolean}|null>}
  */
-export function drainReceiptQueue({ queue = receiptQueue, apply, request = requestReceipt, online = isOnline, now = Date.now, fetchImpl, force = false } = {}) {
+export function drainReceiptQueue({ queue = receiptQueue, apply, request = requestReceipt, online = isOnline, now = Date.now, fetchImpl, force = false, resolve = resolveRate } = {}) {
   return exclusive(async () => {
     const result = { done: [], review: [], failed: [], deferred: 0, skipped: false };
     if (!online()) return { ...result, skipped: true };
@@ -69,13 +71,15 @@ export function drainReceiptQueue({ queue = receiptQueue, apply, request = reque
         const image = await queue.imageOf(row);
         const answer = await request(image, { currency: row.currency, lang: row.lang, ...(fetchImpl ? { fetchImpl } : {}) });
         const receipts = asReceipts(answer); // one photo can hold several receipts: each one becomes its own group of expenses
-        if (receipts.some((r) => r.currency && row.currency && r.currency !== row.currency)) {
-          // printed in another currency: do not tabulate behind the user's back
+        // printed in another currency: frozen into the project's base currency with the rate of this moment (fx.js). A real rate (service /
+        // last known) is applied silently; with only the approximate reference rate (or none) the user is asked, nothing is tabulated behind their back
+        const fx = await convertToBase(batchExpenses(receipts, { now: now() }), { base: row.currency, resolve, now: now(), ...(fetchImpl ? { fetchImpl } : {}) });
+        if (fx.missing.length || fx.approximate.length) {
           await queue.update(row.id, { status: 'review', result: { receipts }, lastError: 'currency' });
           result.review.push(row);
           continue;
         }
-        const expenses = batchExpenses(receipts, { now: now() });
+        const expenses = fx.expenses;
         const applied = await apply(row.projectId, expenses, row);
         await queue.remove(row.id); // applied, or the project is gone: either way the picture is no longer needed
         if (applied) result.done.push({ row, count: expenses.length });
@@ -105,13 +109,16 @@ export function drainReceiptQueue({ queue = receiptQueue, apply, request = reque
 }
 
 /** Accept a 'review' row as it is (the user confirmed the other currency): its expenses go into the project. */
-export async function acceptReviewed(row, { queue = receiptQueue, apply, now = Date.now } = {}) {
+export async function acceptReviewed(row, { queue = receiptQueue, apply, now = Date.now, resolve = resolveRate, fetchImpl } = {}) {
   const receipts = asReceipts(row.result).filter((r) => r?.items?.length);
   if (!receipts.length) {
     await queue.remove(row.id);
     return 0;
   }
-  const expenses = batchExpenses(receipts, { now: now() });
+  // the user confirmed: the best rate there is (even the approximate one) is frozen with the expense; no rate at all keeps the line in review
+  const fx = await convertToBase(batchExpenses(receipts, { now: now() }), { base: row.currency, resolve, now: now(), ...(fetchImpl ? { fetchImpl } : {}) });
+  if (fx.missing.length) return 0;
+  const expenses = fx.expenses;
   const applied = await apply(row.projectId, expenses, row);
   await queue.remove(row.id);
   return applied ? expenses.length : 0;

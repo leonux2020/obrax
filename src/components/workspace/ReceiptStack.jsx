@@ -11,7 +11,7 @@ import { expenseTitle } from '../ExpenseParts.jsx';
  * It belongs to the TACTICAL view only (Gastos block): the Audit mode shows the profitability x-ray instead, never the receipts.
  */
 export default function ReceiptStack({ expenses, onChange = null }) {
-  const { t, money, moneyIn, locale } = useI18n();
+  const { t, money, moneyIn, num, locale } = useI18n();
   const day = useMemo(() => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }), [locale]);
   const groups = useMemo(() => groupExpensesBySupplier(expenses), [expenses]);
   const due = rentalsDue(expenses, Date.now());
@@ -48,6 +48,12 @@ export default function ReceiptStack({ expenses, onChange = null }) {
                         {e.description && (
                           <span className="block truncate text-xs text-neutral-500" data-testid="stack-desc">
                             {e.description}
+                          </span>
+                        )}
+                        {e.currencyOriginal && (
+                          // the FX snapshot: the line is shown (and added up) in the project's base currency; the paper's own amount stays beside it, dim
+                          <span className="block truncate text-[11px] tabular-nums text-neutral-600" data-testid="stack-fx" title={`1 ${e.currencyOriginal} = ${num(e.exchangeRate, 6)} ${e.currency || ''}`}>
+                            {moneyIn(e.amountOriginal, e.currencyOriginal)} · ×{num(e.exchangeRate, 4)}
                           </span>
                         )}
                       </span>

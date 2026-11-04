@@ -12,7 +12,8 @@ export const CSP_DIRECTIVES = {
   'font-src': ["'self'"],
   // Drive backup: ONLY the Drive v3 REST paths (metadata + upload); the browser still never talks to Google AI.
   // Weather chip of the project header: ONLY open-meteo's forecast + geocoding paths (free, no key, no cookies).
-  'connect-src': ["'self'", 'https://accounts.google.com/gsi/', 'https://www.googleapis.com/drive/', 'https://www.googleapis.com/upload/drive/', 'https://api.open-meteo.com/v1/forecast', 'https://geocoding-api.open-meteo.com/v1/search'],
+  // FX snapshot of a receipt in a foreign currency: ONLY the latest-rates path of open.er-api.com (free, no key, no cookies).
+  'connect-src': ["'self'", 'https://accounts.google.com/gsi/', 'https://www.googleapis.com/drive/', 'https://www.googleapis.com/upload/drive/', 'https://api.open-meteo.com/v1/forecast', 'https://geocoding-api.open-meteo.com/v1/search', 'https://open.er-api.com/v6/latest/'],
   'frame-src': ['https://accounts.google.com/gsi/'],
   'manifest-src': ["'self'"],
   'worker-src': ["'self'"],

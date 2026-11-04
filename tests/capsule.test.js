@@ -276,7 +276,7 @@ describe('3b. the middleware runs before the merged project is compared and save
   });
 
   it('identical data on both sides is still "nothing to do" (the derived fields do not cause a sync loop)', async () => {
-    const same = project([SLAB()], { updatedAt: 100 });
+    const same = recalculateProjectTotals(project([SLAB()], { updatedAt: 100 }), { now: NOW });
     const file = parseBackup(serializeBackup(await collectBackup({ ...device([same]) })));
     const m = mergeBackup({ ...device([same]), tombs: { projects: {}, workers: {} } }, file);
     expect(m.wonProjects).toEqual([]);

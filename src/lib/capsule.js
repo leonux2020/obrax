@@ -128,3 +128,11 @@ export function normalizeTotals(obj) {
   const expensesTotal = num(obj.expensesTotal) ?? 0;
   return { total, paid, pending, expensesTotal };
 }
+
+/**
+ * Self-healing: did recalculating this project create its capsule for the FIRST time (a legacy project)? Such a project holds, for the first
+ * time, numbers that every device will agree on, so it must go up to Drive by itself (no phantom edit by the user): the app marks the backup dirty
+ * (the Auto-Sync daemon pulls, merges and uploads in the background) and, when it came from a pull, flags `needsPush`.
+ * The project's `updatedAt` is NOT moved: healing is not a user edit, and a newer stamp would let a stale device's scalars win the merge.
+ */
+export const isHealed = (before, after) => Boolean(after?.draft?.capsule) && !before?.draft?.capsule;

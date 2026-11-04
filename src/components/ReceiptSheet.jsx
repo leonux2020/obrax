@@ -5,6 +5,7 @@ import { EXPENSE_CATEGORIES, RENTAL_CATEGORIES, toAmount } from '../lib/ledger.j
 import { PhotoError, compressInvoiceImage } from '../lib/photos.js';
 import { pushToast } from '../lib/notify.js';
 import { dropDuplicateReceipts, expensesFromRows, receiptMeta, receiptSumCheck, requestReceipt } from '../lib/receipt.js';
+import { applyRates, resolveRate } from '../lib/fx.js';
 import { Button, DateInput, NumberField } from './ui.jsx';
 import BottomSheet from './BottomSheet.jsx';
 import Hourglass from './Hourglass.jsx';
@@ -17,13 +18,14 @@ import Hourglass from './Hourglass.jsx';
  * is what lights the hourglass on the project card.
  * The photo is compressed on the device and sent ONLY to our own proxy; the Gemini key never reaches this code.
  */
-export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], prepareImage = compressInvoiceImage, fetchImpl, today = Date.now }) {
-  const { t, region, lang, money } = useI18n();
+export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], prepareImage = compressInvoiceImage, fetchImpl, today = Date.now, resolveFx = resolveRate }) {
+  const { t, region, lang, money, moneyIn } = useI18n();
   const [phase, setPhase] = useState('pick'); // 'pick' | 'reading' | 'review'
   const [error, setError] = useState('');
   const [receipts, setReceipts] = useState([]); // ONE photo can hold several receipts: each is an independent record
   const [image, setImage] = useState(null); // the compressed photo that was read: it stays with the expenses (Comprobantes)
   const [rows, setRows] = useState([]);
+  const [fx, setFx] = useState({}); // FX snapshot of the foreign currencies of the batch: { EUR: { rate, source, at } } (the user can retype the rate)
   const cameraRef = useRef(null);
   const fileRef = useRef(null);
   const abortRef = useRef(null);
@@ -92,6 +94,25 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
     if (file) read(file);
   };
 
+  // A receipt printed in another currency is frozen into the project's BASE currency when it is saved (fx.js). The rate is looked up in the
+  // background as soon as the review opens (service -> last known -> reference table); the user can always type it by hand.
+  const foreign = [...new Set(receipts.map((r) => r.currency).filter((c) => c && c !== region.currency))];
+  const foreignKey = foreign.join(',');
+  useEffect(() => {
+    if (phase !== 'review') return undefined;
+    let live = true;
+    foreign.forEach((cur) => {
+      resolveFx(cur, region.currency, { ...(fetchImpl ? { fetchImpl } : {}) })
+        .then((r) => live && r && setFx((f) => (f[cur]?.source === 'manual' ? f : { ...f, [cur]: r })))
+        .catch(() => {});
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, foreignKey, region.currency]);
+  const fxReady = foreign.every((cur) => fx[cur]?.rate > 0);
+  const setRate = (cur, rate) => setFx((f) => ({ ...f, [cur]: { rate: rate > 0 ? rate : 0, source: 'manual', at: Date.now() } }));
   const setBranch = (doc, value) => setReceipts((list) => list.map((r, i) => (i === doc ? { ...r, sucursal: value } : r)));
   const patch = (key, change) => setRows((list) => list.map((r) => (r.key === key ? { ...r, ...change } : r)));
   const chosen = rows.filter((r) => r.selected && r.amount !== 0); // a negative line (global discount) counts: it lowers the total
@@ -102,7 +123,8 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
     // one independent group of expenses per receipt (its own fiscal data, folio and net / tax split); the project context (id, currency,
     // place) is injected by the project that stores them, so none of them can be orphan
     const groups = receipts.map((r, doc) => ({ r, lines: rows.filter((x) => x.doc === doc) }));
-    const expenses = groups.flatMap(({ r, lines }) => expensesFromRows(lines, { ...receiptMeta(r), now }));
+    const printed = groups.flatMap(({ r, lines }) => expensesFromRows(lines, { ...receiptMeta(r), now }));
+    const { expenses } = applyRates(printed, { base: region.currency, digits: region.digits, rates: fx, now }); // the amount of a foreign line becomes its frozen base value
     const documents = groups.filter(({ lines }) => lines.some((x) => x.selected && x.amount !== 0)).length;
     onSave(expenses, { ...(image ? { image } : {}), receipts: documents });
     pushToast({ key: documents === 1 ? 'rcpt.toast.one' : 'rcpt.toast.many', params: { n: documents }, tone: 'ok' });
@@ -170,6 +192,15 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
                 {t('inv.currency', { cur: otherCurrency, proj: region.currency })}
               </p>
             )}
+            {foreign.map((cur) => (
+              <div key={cur} data-testid={`receipt-fx-${cur}`} className="space-y-2 rounded-xl border border-white/15 px-4 py-3">
+                <p className="text-sm font-medium">{t('fx.rate', { cur })}</p>
+                <NumberField hideLabel label={t('fx.rate', { cur })} unit={region.currency} decimals={6} value={fx[cur]?.rate ?? null} onChange={(v) => setRate(cur, v)} testId={`receipt-fx-rate-${cur}`} />
+                <p className="text-xs text-neutral-400" data-testid={`receipt-fx-src-${cur}`} data-source={fx[cur]?.source || 'loading'}>
+                  {t(`fx.src.${fx[cur]?.source || 'loading'}`)}
+                </p>
+              </div>
+            ))}
             {inflated.map(({ doc, check }) => (
               <p key={doc} role="alert" data-testid="receipt-sum-warn" className="rounded-xl border border-orange-500/40 bg-orange-500/5 px-4 py-3 text-sm text-orange-400">
                 {t('rcpt.sumWarn', { sum: money(check.itemsSum), total: money(check.total) })}
@@ -215,7 +246,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
                           <span className="block text-xs text-neutral-400">{t('rcpt.discount')}</span>
                         </span>
                         <span className="shrink-0 font-medium tabular-nums text-brand-500" data-testid={`receipt-discount-${r.key}`}>
-                          {money(r.amount)}
+                          {moneyIn(r.amount, receipts[r.doc]?.currency)}
                         </span>
                       </label>
                     </li>
@@ -264,7 +295,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
 
             <div className="fixed inset-x-0 bottom-0 z-10 border-t border-white/10 bg-black px-5 pb-3 pt-3 [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
               <div className="mx-auto flex max-w-lg flex-col gap-2">
-                <Button className="w-full" disabled={chosen.length === 0} onClick={save} data-testid="receipt-save">
+                <Button className="w-full" disabled={chosen.length === 0 || !fxReady} onClick={save} data-testid="receipt-save">
                   {t('rcpt.save', { n: chosen.length })}
                 </Button>
                 <Button variant="ghost" className="w-full" onClick={() => setPhase('pick')} data-testid="receipt-retry">
@@ -273,8 +304,14 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
               </div>
             </div>
             <p className="text-right text-sm font-medium tabular-nums" data-testid="receipt-total">
-              {t('rcpt.total')}: {money(total)}
+              {t('rcpt.total')}: {foreign.length === 1 && receipts.every((r) => r.currency === foreign[0]) ? moneyIn(total, foreign[0]) : money(total)}
             </p>
+            {foreign.length === 1 && receipts.every((r) => r.currency === foreign[0]) && fx[foreign[0]]?.rate > 0 && (
+              <p className="text-right text-xs tabular-nums text-neutral-400" data-testid="receipt-total-base">
+                {'≈ '}
+                {money(total * fx[foreign[0]].rate)}
+              </p>
+            )}
           </div>
         )}
       </div>

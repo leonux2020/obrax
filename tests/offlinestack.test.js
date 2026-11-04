@@ -201,7 +201,9 @@ describe('receipt sync: nothing is read offline, everything is read when the net
     const q = queueOn();
     await q.enqueue(job());
     const a = apply();
-    const res = await drainReceiptQueue({ queue: q, apply: a.fn, request: async () => receiptOf({ currency: 'USD' }), online: () => true });
+    // only the approximate reference rate is known (no service, no cache): nothing is tabulated behind the user's back
+    const resolve = async (from, to) => ({ rate: 0.001, source: 'static', at: 1 });
+    const res = await drainReceiptQueue({ queue: q, apply: a.fn, request: async () => receiptOf({ currency: 'USD' }), online: () => true, resolve });
     expect(res.review).toHaveLength(1);
     expect(a.calls).toHaveLength(0);
     const [row] = await q.list();

@@ -62,6 +62,7 @@ import { exportQueue } from './lib/exportQueue.js';
 import { closeGlobalRendition, closeRendition, uploadRendition } from './lib/exportSync.js';
 import { useExportSync } from './lib/useExportSync.js';
 import { projectTotals, recalculateProjectTotals } from './lib/projectTotals.js';
+import { isHealed } from './lib/capsule.js';
 import { addExpenses, registerBackgroundSync } from './lib/receiptSync.js';
 import { dropDuplicateExpenses } from './lib/receipt.js';
 import { useReceiptSync } from './lib/useReceiptSync.js';
@@ -374,6 +375,9 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
       const sealed = list.map((p) => recalculateProjectTotals(p));
       sealed.forEach((p, i) => p !== list[i] && projectStore.save(p).catch(() => {}));
       setProjects(sealed);
+      // SELF-HEALING: a legacy project that just got its capsule holds numbers every device will agree on, so it goes up to Drive by itself:
+      // the Auto-Sync daemon is woken silently (it pulls and merges first, then uploads). No toast, no phantom edit by the user.
+      if (sealed.some((p, i) => isHealed(list[i], p)) && backupOnRef.current) sync.markDirty();
     });
     return () => {
       alive = false;

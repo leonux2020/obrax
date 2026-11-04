@@ -12,6 +12,7 @@ import { normalizeLogo } from './logo.js';
 import { normalizeProjects } from './projects.js';
 import { canon, canonById, mergePhotoSlots, mergeProjectLists } from './merge.js';
 import { recalculateProjectTotals } from './projectTotals.js';
+import { isHealed } from './capsule.js';
 import { hasTombs, loadTombs, mergeTombs, normalizeTombs, saveTombs } from './tombstones.js';
 import { normalizePhoto, normalizePhotos } from './photos.js';
 import { writeNotePhotos } from './notePhotos.js';
@@ -150,6 +151,7 @@ export function mergeBackup(local, backup) {
     if (!before || canon(recalculateProjectTotals(before)) !== canon(recalculateProjectTotals(p))) won.push(p.id);
     if (remote && (!before || remote.updatedAt > before.updatedAt)) remoteWon.push(p.id);
     if (!remote || canon(recalculateProjectTotals(remote)) !== canon(recalculateProjectTotals(p))) needsPush = true;
+    if (remote && isHealed(remote, p)) needsPush = true; // a legacy copy in Drive gets the capsule this device just created: the repaired project goes up by itself
   }
   const profileRestored = isCompanyEmpty(local.company) && !local.meta?.onboarded && (!isCompanyEmpty(backup.company) || backup.meta.onboarded);
   return {
