@@ -649,7 +649,7 @@ describe('Parametri del preventivo: error-prevention lock', () => {
     expect(dialog.querySelector('h2').nextElementSibling.contains(pencil)).toBe(true); // top right
     expect(pencil.querySelector('svg[data-icon="pencil"]')).not.toBeNull();
     expect(pencil.getAttribute('aria-pressed')).toBe('false');
-    expect(pencil.className).not.toMatch(/\b(border|bg-|ring|shadow)/); // floating, no box
+    expect(pencil.className).not.toMatch(/\b(border|bg-(?!transparent)|ring|shadow)/); // floating, no box
   });
 
   it('the pencil enables the controls (a check while on); touching it again locks them', async () => {

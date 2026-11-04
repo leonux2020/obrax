@@ -14,7 +14,7 @@ export const CSP_DIRECTIVES = {
   // Weather chip of the project header: ONLY open-meteo's forecast + geocoding paths (free, no key, no cookies).
   // Reverse geocoding of the city field (target button of the project form): ONLY Nominatim's reverse path (free, no key).
   // FX snapshot of a receipt in a foreign currency: ONLY the latest-rates path of open.er-api.com (free, no key, no cookies).
-  'connect-src': ["'self'", 'https://accounts.google.com/gsi/', 'https://www.googleapis.com/drive/', 'https://www.googleapis.com/upload/drive/', 'https://api.open-meteo.com/v1/forecast', 'https://geocoding-api.open-meteo.com/v1/search', 'https://open.er-api.com/v6/latest/', 'https://nominatim.openstreetmap.org/reverse'],
+  'connect-src': ["'self'", 'https://accounts.google.com/gsi/', 'https://www.googleapis.com/drive/', 'https://www.googleapis.com/upload/drive/', 'https://api.open-meteo.com/v1/forecast', 'https://geocoding-api.open-meteo.com/v1/search', 'https://open.er-api.com/v6/latest/', 'https://nominatim.openstreetmap.org/reverse', 'https://nominatim.openstreetmap.org/search'],
   'frame-src': ['https://accounts.google.com/gsi/'],
   'manifest-src': ["'self'"],
   'worker-src': ["'self'"],

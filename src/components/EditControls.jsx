@@ -40,7 +40,7 @@ export function EditToggle({ active, onToggle, disabled = false, label, doneLabe
       aria-label={text}
       title={text}
       data-testid={testId}
-      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition disabled:opacity-30 ${active ? 'text-brand' : 'text-neutral-400 hover:text-white'}`}
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-transparent transition focus:outline-none focus-visible:outline-none active:bg-transparent disabled:opacity-30 ${active ? 'text-brand' : 'text-neutral-400 hover:text-white focus-visible:text-white'}`}
     >
       {active ? <CheckIcon /> : <PencilIcon />}
     </button>

@@ -2,6 +2,8 @@ import { useId, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { currentPosition, detectCurrentRegion } from '../lib/geo.js';
 import { reverseCity } from '../lib/reverseGeocode.js';
+import { searchPlaces } from '../lib/forwardGeocode.js';
+import { SEARCH_DEBOUNCE_MS, useCitySearch } from '../lib/useCitySearch.js';
 import { REGIONS } from '../lib/regions.js';
 import { quoteLock } from '../lib/workspaceModel.js';
 import { normalizeLocation } from '../lib/ledger.js';
@@ -54,7 +56,7 @@ const ModeIcon = ({ mode }) => (
  * New job: the agile form (name, client, Partida Única / Proyecto Completo, dates, city with its GPS target), no money.
  * Edit job (the pencil inside the project): the same fields + finished / frozen switches + delete.
  */
-export default function ProjectSheet({ project, onSave, onDelete, onClose, locate = currentPosition, detectRegion = detectCurrentRegion, defaultRegion = null, reverse = reverseCity }) {
+export default function ProjectSheet({ project, onSave, onDelete, onClose, locate = currentPosition, detectRegion = detectCurrentRegion, defaultRegion = null, reverse = reverseCity, search = null, searchDelay = SEARCH_DEBOUNCE_MS }) {
   const { t, lang } = useI18n();
   const [ask, confirmNode] = useConfirm();
   const editing = Boolean(project);
@@ -74,6 +76,14 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
   const [cityGeo, setCityGeo] = useState('idle'); // idle | asking | unsupported | denied | unavailable | timeout | offline | notfound | failed
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }));
 
+  // CITY AUTOCOMPLETE (Nominatim forward geocoding, debounced). Only what the user TYPES is searched (`typed`): choosing a match clears it, so the list closes
+  // and the chosen name is never searched again. Off in the test build unless a `search` is injected (no real network from the suite).
+  const finder = search ?? (import.meta.env.MODE === 'test' ? null : searchPlaces);
+  const [typed, setTyped] = useState('');
+  const [active, setActive] = useState(-1);
+  const places = useCitySearch(typed, { search: finder, lang, delay: searchDelay });
+  const listId = useId();
+
   const marketLocked = editing && Boolean(quoteLock(project.draft)); // a signed / frozen quote keeps its market
   const marketChanged = editing && Boolean(form.regionCode) && form.regionCode !== project.draft.regionCode;
   const start = parseDay(form.startDate);
@@ -92,9 +102,42 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
       // ONE tap, both jobs: the name of the place goes into the field AND the point is saved in the project (the weather, the supplier
       // radius and the "how to get there" link read it). The label of the point is the city, so the card can show it too.
       setForm((f) => ({ ...f, cityOrRegion: city, location: { ...point, label: city } }));
+      setTyped('');
       setCityGeo('idle');
     } catch (err) {
       setCityGeo(['unsupported', 'denied', 'unavailable', 'timeout', 'offline', 'notfound', 'failed'].includes(err?.code) ? err.code : 'failed');
+    }
+  };
+
+  // Picking a match does three things at once: the city name goes into the field, the country / market follows the ISO code of the answer (whatever
+  // the language of the interface; a market with a signed quote stays, and a country the app has no market for is left alone) and the point is
+  // saved quietly in the project (the weather, the supplier radius and the "how to get there" link read it).
+  const choose = (place) => {
+    const point = normalizeLocation({ lat: place.lat, lng: place.lng, label: place.name });
+    const city = cleanCityOrRegion(place.name);
+    setForm((f) => ({
+      ...f,
+      cityOrRegion: city,
+      location: point,
+      ...(!marketLocked && REGIONS[place.countryCode] ? { regionCode: place.countryCode } : {}),
+    }));
+    setTyped('');
+    setActive(-1);
+    setCityGeo('idle');
+  };
+  const onCityKey = (e) => {
+    if (!places.length) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActive((i) => (e.key === 'ArrowDown' ? (i + 1) % places.length : (i <= 0 ? places.length : i) - 1));
+    } else if (e.key === 'Enter' && active >= 0) {
+      e.preventDefault();
+      choose(places[active]);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation(); // closes the list, not the sheet
+      setTyped('');
+      setActive(-1);
     }
   };
 
@@ -193,7 +236,17 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
             onChange={(v) => {
               // typing a different place by hand: the saved point no longer describes it (it would feed the weather and the nearby prices), so it goes
               setForm((f) => ({ ...f, cityOrRegion: v, location: null }));
+              setTyped(v);
+              setActive(-1);
               if (cityGeo !== 'idle' && cityGeo !== 'asking') setCityGeo('idle');
+            }}
+            inputProps={{
+              role: 'combobox',
+              'aria-autocomplete': 'list',
+              'aria-expanded': places.length > 0,
+              'aria-controls': listId,
+              'aria-activedescendant': active >= 0 ? `${listId}-${active}` : undefined,
+              onKeyDown: onCityKey,
             }}
             end={
               <button
@@ -209,6 +262,26 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
               </button>
             }
           />
+          {places.length > 0 && (
+            <ul id={listId} role="listbox" aria-label={t('project.city')} data-testid="project-city-results" className="mt-1.5 overflow-hidden rounded-xl bg-white/5 py-1">
+              {places.map((pl, i) => (
+                <li key={pl.id} id={`${listId}-${i}`} role="option" aria-selected={i === active}>
+                  <button
+                    type="button"
+                    onClick={() => choose(pl)}
+                    data-testid={`project-city-option-${i}`}
+                    data-country={pl.countryCode || undefined}
+                    className={`flex min-h-[44px] w-full items-center gap-3 px-4 text-left text-sm text-neutral-200 transition active:bg-white/10 ${i === active ? 'bg-white/10' : ''}`}
+                  >
+                    <span aria-hidden="true" className="w-6 shrink-0 text-base">
+                      {REGIONS[pl.countryCode]?.flag || ''}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{pl.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
           {!['idle', 'asking'].includes(cityGeo) && (
             <p role="status" data-testid="project-city-error" className="mt-1.5 text-sm font-medium text-red-400">
               {t(['unsupported', 'denied', 'unavailable', 'timeout'].includes(cityGeo) ? `newp.geo.${cityGeo}` : `project.city.err.${cityGeo}`)}

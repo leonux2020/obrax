@@ -416,7 +416,7 @@ describe('Ajustes "Zero Stress" fase 5: sin flechas y tarjeta pasiva de empresa'
     expect(q('settings-profile-phone')).toBeNull();
     const pencil = q('settings-profile-edit');
     expect(pencil.querySelector('svg[data-icon="pencil"]')).not.toBeNull();
-    expect(pencil.className).not.toMatch(/\b(border|bg-|ring|shadow)\b/);
+    expect(pencil.className).not.toMatch(/\b(border|bg-(?!transparent)|ring|shadow)\b/);
     expect(pencil.getAttribute('aria-pressed')).toBe('false');
   });
 
