@@ -25,6 +25,8 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
   const [receipts, setReceipts] = useState([]); // ONE photo can hold several receipts: each is an independent record
   const [image, setImage] = useState(null); // the compressed photo that was read: it stays with the expenses (Comprobantes)
   const [rows, setRows] = useState([]);
+  const [fxOpen, setFxOpen] = useState({}); // the rate card is collapsed (passive UX): { EUR: true } once the user asks to edit it
+  const [fxFailed, setFxFailed] = useState({}); // no rate could be found for this currency: the card opens by itself so it can be typed
   const [fx, setFx] = useState({}); // FX snapshot of the foreign currencies of the batch: { EUR: { rate, source, at } } (the user can retype the rate)
   const cameraRef = useRef(null);
   const fileRef = useRef(null);
@@ -103,8 +105,12 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
     let live = true;
     foreign.forEach((cur) => {
       resolveFx(cur, region.currency, { ...(fetchImpl ? { fetchImpl } : {}) })
-        .then((r) => live && r && setFx((f) => (f[cur]?.source === 'manual' ? f : { ...f, [cur]: r })))
-        .catch(() => {});
+        .then((r) => {
+          if (!live) return;
+          if (r) setFx((f) => (f[cur]?.source === 'manual' ? f : { ...f, [cur]: r }));
+          else setFxFailed((f) => ({ ...f, [cur]: true }));
+        })
+        .catch(() => live && setFxFailed((f) => ({ ...f, [cur]: true })));
     });
     return () => {
       live = false;
@@ -131,6 +137,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
   };
   // the lines of a document add up to MORE than was paid: a discount was probably read as a charge (the user is told, nothing is changed silently)
   const inflated = receipts.map((r, doc) => ({ doc, check: receiptSumCheck(r) })).filter((x) => x.check?.inflated);
+  const single = foreign.length === 1 && receipts.every((r) => r.currency === foreign[0]); // the whole batch is in ONE foreign currency: its total is shown as original -> base
   const otherCurrency = receipts.find((r) => r.currency && r.currency !== region.currency)?.currency || '';
 
   return (
@@ -192,15 +199,24 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
                 {t('inv.currency', { cur: otherCurrency, proj: region.currency })}
               </p>
             )}
-            {foreign.map((cur) => (
-              <div key={cur} data-testid={`receipt-fx-${cur}`} className="space-y-2 rounded-xl border border-white/15 px-4 py-3">
-                <p className="text-sm font-medium">{t('fx.rate', { cur })}</p>
-                <NumberField hideLabel label={t('fx.rate', { cur })} unit={region.currency} decimals={6} value={fx[cur]?.rate ?? null} onChange={(v) => setRate(cur, v)} testId={`receipt-fx-rate-${cur}`} />
-                <p className="text-xs text-neutral-400" data-testid={`receipt-fx-src-${cur}`} data-source={fx[cur]?.source || 'loading'}>
-                  {t(`fx.src.${fx[cur]?.source || 'loading'}`)}
-                </p>
-              </div>
-            ))}
+            {foreign.map((cur) =>
+              fxOpen[cur] || (fxFailed[cur] && !(fx[cur]?.rate > 0)) ? (
+                <div key={cur} data-testid={`receipt-fx-${cur}`} className="space-y-2 rounded-xl border border-white/15 px-4 py-3">
+                  <p className="text-sm font-medium">{t('fx.rate', { cur })}</p>
+                  <NumberField hideLabel label={t('fx.rate', { cur })} unit={region.currency} decimals={6} value={fx[cur]?.rate ?? null} onChange={(v) => setRate(cur, v)} testId={`receipt-fx-rate-${cur}`} />
+                  <p className="text-xs text-neutral-400" data-testid={`receipt-fx-src-${cur}`} data-source={fx[cur]?.source || 'loading'}>
+                    {t(`fx.src.${fx[cur]?.source || 'loading'}`)}
+                  </p>
+                </div>
+              ) : (
+                // the rate is the system's business: only a quiet link, for the one who needs to correct it
+                <div key={cur} className="text-right" data-testid={`receipt-fx-link-${cur}`} data-source={fx[cur]?.source || 'loading'}>
+                  <button type="button" onClick={() => setFxOpen((o) => ({ ...o, [cur]: true }))} data-testid={`receipt-fx-edit-${cur}`} className="min-h-[44px] px-2 text-xs text-neutral-500 underline underline-offset-2 hover:text-neutral-300">
+                    {t('fx.edit')}
+                  </button>
+                </div>
+              )
+            )}
             {inflated.map(({ doc, check }) => (
               <p key={doc} role="alert" data-testid="receipt-sum-warn" className="rounded-xl border border-orange-500/40 bg-orange-500/5 px-4 py-3 text-sm text-orange-400">
                 {t('rcpt.sumWarn', { sum: money(check.itemsSum), total: money(check.total) })}
@@ -304,14 +320,14 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
               </div>
             </div>
             <p className="text-right text-sm font-medium tabular-nums" data-testid="receipt-total">
-              {t('rcpt.total')}: {foreign.length === 1 && receipts.every((r) => r.currency === foreign[0]) ? moneyIn(total, foreign[0]) : money(total)}
+              {t('rcpt.total')}: {single ? moneyIn(total, foreign[0]) : money(total)}
+              {single && fx[foreign[0]]?.rate > 0 && (
+                <span data-testid="receipt-total-base" className="text-neutral-300">
+                  {' → ≈ '}
+                  {money(total * fx[foreign[0]].rate)}
+                </span>
+              )}
             </p>
-            {foreign.length === 1 && receipts.every((r) => r.currency === foreign[0]) && fx[foreign[0]]?.rate > 0 && (
-              <p className="text-right text-xs tabular-nums text-neutral-400" data-testid="receipt-total-base">
-                {'≈ '}
-                {money(total * fx[foreign[0]].rate)}
-              </p>
-            )}
           </div>
         )}
       </div>

@@ -196,17 +196,23 @@ describe('the screens', () => {
     return saved;
   };
 
-  it('a EUR receipt in a CLP project shows the rate, the converted total, and saves a frozen expense', async () => {
+  it('a EUR receipt in a CLP project: the rate card is collapsed (only a quiet link), the summary is original -> base, and the expense is frozen', async () => {
     const saved = await scan(async () => ({ rate: 1000, source: 'api', at: NOW }));
-    expect(q('receipt-fx-EUR')).not.toBeNull();
-    expect(q('receipt-fx-src-EUR').dataset.source).toBe('api');
-    expect(q('receipt-total-base').textContent.replace(/\D/g, '')).toContain('10000');
+    expect(q('receipt-fx-EUR')).toBeNull(); // no technical card by default
+    expect(q('receipt-fx-edit-EUR').textContent).toBe('Modificar tipo de cambio');
+    expect(q('receipt-fx-rate-EUR')).toBeNull();
+    const total = q('receipt-total').textContent.replace(/\s/g, '');
+    expect(total).toMatch(/€10,00→≈\$10\.000/); // Total: €10,00 -> ≈ $10.000
+    expect(q('receipt-total-base').textContent.replace(/\D/g, '')).toBe('10000');
     await act(async () => q('receipt-save').dispatchEvent(new MouseEvent('click', { bubbles: true })));
     expect(saved).toHaveLength(1);
     expect(saved[0].list[0]).toMatchObject({ currency: 'CLP', currencyOriginal: 'EUR', amountOriginal: 10, exchangeRate: 1000, amountBase: 10000, amount: 10000, fxSource: 'api' });
   });
-  it('the rate can be corrected by hand: the expense is frozen with source "manual"', async () => {
+  it('"Modificar tipo de cambio" opens the card; the rate typed by hand is frozen with source "manual"', async () => {
     const saved = await scan(async () => ({ rate: 900, source: 'static', at: NOW }));
+    await act(async () => q('receipt-fx-edit-EUR').dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(q('receipt-fx-EUR')).not.toBeNull();
+    expect(q('receipt-fx-link-EUR')).toBeNull();
     expect(q('receipt-fx-src-EUR').dataset.source).toBe('static');
     await act(async () => q('receipt-fx-rate-EUR').dispatchEvent(new MouseEvent('click', { bubbles: true }))); // opens the number pad
     await act(async () => q('pad-5').dispatchEvent(new MouseEvent('click', { bubbles: true })));
@@ -219,6 +225,12 @@ describe('the screens', () => {
     expect(e.amountBase).toBe(Math.round(10 * e.exchangeRate));
     expect(e.amount).toBe(e.amountBase);
   });
+  it('no rate could be found: the card opens by itself so it can be typed (and saving waits for it)', async () => {
+    await scan(async () => null);
+    expect(q('receipt-fx-EUR')).not.toBeNull();
+    expect(q('receipt-save').disabled).toBe(true);
+    expect(q('receipt-total-base')).toBeNull();
+  });
   it('a receipt in the project currency has no rate card at all', async () => {
     const saved = [];
     await act(async () => {
@@ -229,6 +241,7 @@ describe('the screens', () => {
     await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
     await flush(40);
     expect(q('receipt-fx-EUR')).toBeNull();
+    expect(q('receipt-fx-edit-EUR')).toBeNull();
     expect(q('receipt-total-base')).toBeNull();
   });
   it('the receipt stack shows the base value and a dim tag with the original foreign amount', () => {
@@ -243,7 +256,7 @@ describe('the screens', () => {
   it('the labels exist in the six languages', () => {
     for (const lang of ['es', 'en', 'pt', 'fr', 'it', 'de']) {
       const t = makeI18n(lang, 'CL').t;
-      for (const k of ['fx.rate', 'fx.src.api', 'fx.src.cache', 'fx.src.static', 'fx.src.manual', 'fx.src.loading']) expect(t(k)).not.toBe(k);
+      for (const k of ['fx.rate', 'fx.src.api', 'fx.src.cache', 'fx.src.static', 'fx.src.manual', 'fx.src.loading', 'fx.edit']) expect(t(k)).not.toBe(k);
     }
   });
 });

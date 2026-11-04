@@ -420,6 +420,7 @@ export const P8 = {
     'fx.src.static': "Tasa aproximada (sin conexión): corrígela si conoces la real",
     'fx.src.manual': "Tasa manual: se guarda con el gasto",
     'fx.src.loading': "Buscando la tasa del día…",
+    'fx.edit': "Modificar tipo de cambio",
   },
   en: {
     'ws.locked': 'Prices locked',
@@ -840,6 +841,7 @@ export const P8 = {
     'fx.src.static': "Approximate rate (offline): correct it if you know the real one",
     'fx.src.manual': "Manual rate: saved with the expense",
     'fx.src.loading': "Looking up today's rate…",
+    'fx.edit': "Edit exchange rate",
   },
   pt: {
     'ws.locked': 'Preços bloqueados',
@@ -1260,6 +1262,7 @@ export const P8 = {
     'fx.src.static': "Taxa aproximada (sem conexão): corrija-a se souber a real",
     'fx.src.manual': "Taxa manual: guardada com a despesa",
     'fx.src.loading': "Buscando a taxa do dia…",
+    'fx.edit': "Alterar taxa de câmbio",
   },
   fr: {
     'ws.locked': 'Prix verrouillés',
@@ -1680,6 +1683,7 @@ export const P8 = {
     'fx.src.static': "Taux approximatif (hors ligne) : corrigez-le si vous connaissez le vrai",
     'fx.src.manual': "Taux manuel : enregistré avec la dépense",
     'fx.src.loading': "Recherche du taux du jour…",
+    'fx.edit': "Modifier le taux de change",
   },
   it: {
     'ws.locked': 'Prezzi bloccati',
@@ -2100,6 +2104,7 @@ export const P8 = {
     'fx.src.static': "Tasso approssimativo (offline): correggilo se conosci quello reale",
     'fx.src.manual': "Tasso manuale: salvato con la spesa",
     'fx.src.loading': "Ricerca del tasso del giorno…",
+    'fx.edit': "Modifica tasso",
   },
   de: {
     'ws.locked': 'Preise gesperrt',
@@ -2520,5 +2525,6 @@ export const P8 = {
     'fx.src.static': "Ungefährer Kurs (offline): korrigieren Sie ihn, wenn Sie den echten kennen",
     'fx.src.manual': "Manueller Kurs: wird mit der Ausgabe gespeichert",
     'fx.src.loading': "Tageskurs wird gesucht…",
+    'fx.edit': "Kurs ändern",
   },
 };
