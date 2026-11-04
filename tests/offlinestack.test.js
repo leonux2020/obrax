@@ -233,7 +233,7 @@ describe('receipt sync: nothing is read offline, everything is read when the net
   });
 
   it('addExpenses puts the new lines on top of the project and bumps updatedAt', () => {
-    const p = newProject({ regionCode: 'CL', name: 'X' });
+    const p = newProject({ regionCode: 'CL', name: 'X', now: 1 });
     const next = addExpenses(p, [{ id: 'aaaa', amount: 5 }], 99);
     expect(next.expenses[0].id).toBe('aaaa');
     expect(next.updatedAt).toBe(99);

@@ -13,6 +13,7 @@ import { LEDGER_LIMITS, withProjectContext } from './ledger.js';
 import { asReceipts, batchExpenses, requestReceipt } from './receipt.js';
 import { QUEUE_LIMITS, receiptQueue } from './receiptQueue.js';
 import { convertToBase, resolveRate } from './fx.js';
+import { nextStamp } from './merge.js';
 
 export const SYNC_TAG = 'cubrax-receipts';
 export const SYNC_MESSAGE = 'SYNC_RECEIPTS';
@@ -31,7 +32,7 @@ export const isOnline = () => typeof navigator === 'undefined' || navigator.onLi
 export const addExpenses = (project, expenses, now = Date.now()) => ({
   ...project,
   expenses: [...withProjectContext(project, expenses), ...project.expenses].slice(0, LEDGER_LIMITS.expenses), // every line inherits the project's id / currency / place
-  updatedAt: now,
+  updatedAt: nextStamp(project.updatedAt, now), // strictly newer than what the project had: the Auto-Sync daemon and the merge always see this as a change
 });
 
 let running = null;

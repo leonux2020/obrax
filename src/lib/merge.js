@@ -22,17 +22,65 @@ export const FINANCIAL_COLLECTIONS = Object.freeze(['payments', 'advances', 'exp
 const isRecordList = (key, value) =>
   Array.isArray(value) && (RECORD_COLLECTIONS.includes(key) || (key !== 'draft' && value.length > 0 && value.every((r) => r && typeof r === 'object' && typeof r.id === 'string')));
 
+/** A finite number from a number or a numeric string ("1250,50"); null when it is neither. */
+const numeric = (v) => {
+  if (v === undefined || v === null || v === '') return null;
+  const n = typeof v === 'string' ? Number(v.trim().replace(',', '.')) : Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+/** The fields of the FX snapshot of an expense (fx.js): frozen together, once, when a foreign receipt is converted to the project's base currency. */
+export const FX_FIELDS = Object.freeze(['currencyOriginal', 'amountOriginal', 'exchangeRate', 'amountBase', 'fxSource', 'fxAt']);
+const FX_NUMBERS = ['amountOriginal', 'exchangeRate', 'amountBase', 'fxAt'];
+
+/** An expense with a snapshot: its numeric FX fields are real numbers and `amountBase` exists (original x rate when missing). Otherwise null. */
+function fxOf(record) {
+  if (!record || typeof record !== 'object' || typeof record.currencyOriginal !== 'string' || !record.currencyOriginal.trim()) return null;
+  const original = numeric(record.amountOriginal);
+  const rate = numeric(record.exchangeRate);
+  if (original === null || rate === null || rate <= 0) return null;
+  let base = numeric(record.amountBase);
+  if (base === null) base = Math.round(original * rate * 100) / 100;
+  const at = numeric(record.fxAt);
+  return { currencyOriginal: record.currencyOriginal.trim().toUpperCase(), amountOriginal: original, exchangeRate: rate, amountBase: base, ...(typeof record.fxSource === 'string' ? { fxSource: record.fxSource } : {}), ...(at !== null && at > 0 ? { fxAt: at } : {}) };
+}
+
 /** A financial record with its amount as a finite NUMBER ("1250,50" / "100" from a backup would otherwise concatenate: "100" + 20 = "10020"). */
 function sanitizeAmount(record) {
   if (!record || typeof record !== 'object') return record;
-  if (record.amountBase !== undefined && record.amountBase !== null && Number.isFinite(Number(record.amountBase))) {
-    // a foreign expense IS its frozen base value
-    return Number(record.amountBase) === record.amount ? record : { ...record, amount: Number(record.amountBase), amountBase: Number(record.amountBase) };
+  if (FX_FIELDS.some((k) => record[k] !== undefined)) {
+    const fx = fxOf(record);
+    if (fx) {
+      // a foreign expense IS its frozen base value: the FX numbers are real numbers and `amount` follows `amountBase`
+      const same = record.amount === fx.amountBase && FX_NUMBERS.every((k) => record[k] === undefined || record[k] === fx[k]);
+      return same ? record : { ...record, ...fx, amount: fx.amountBase };
+    }
   }
   if (typeof record.amount === 'number') return record;
   const raw = record.amount;
   const n = typeof raw === 'string' ? Number(raw.trim().replace(',', '.')) : Number(raw);
   return { ...record, amount: Number.isFinite(n) ? n : 0 };
+}
+
+/**
+ * Two versions of ONE expense: the snapshot is IMMUTABLE. Whatever side's record wins the merge (the newest edit: returned, note...), it keeps
+ * the frozen FX values; a winner without a snapshot gets the other side's one; two different snapshots resolve the same way on every device
+ * (the first frozen = the oldest `fxAt`; then the content) so the devices converge instead of ping-ponging.
+ */
+function reconcileFx(pick, x, y) {
+  if (!x || !y) return pick;
+  const fx = fxOf(x);
+  const fy = fxOf(y);
+  if (!fx && !fy) return pick;
+  let keep = fx || fy;
+  if (fx && fy && canon(fx) !== canon(fy)) {
+    const ax = fx.fxAt || Infinity;
+    const ay = fy.fxAt || Infinity;
+    keep = ax !== ay ? (ax < ay ? fx : fy) : canon(fx) <= canon(fy) ? fx : fy;
+  }
+  const own = fxOf(pick);
+  if (own && canon(own) === canon(keep)) return pick;
+  return { ...pick, ...keep, amount: keep.amountBase };
 }
 const RECORD_TOMB_LIMIT = 200;
 
@@ -52,6 +100,8 @@ function canonical(value, sortLists) {
 export const canon = (value) => JSON.stringify(canonical(value, true));
 /** `canon` of a list of records whose order is not data (sorted by id). */
 export const canonById = (list) => canon([...(list || [])].sort((a, b) => String(a?.id).localeCompare(String(b?.id))));
+/** The `updatedAt` of an edit made now: always strictly newer than the project's own stamp, even when this device's clock is behind the one that wrote it. */
+export const nextStamp = (prev, now = Date.now()) => Math.max(Number(now) || 0, (Number(prev) > 0 ? Number(prev) : 0) + 1);
 const stampOf = (r) => (Number(r?.updatedAt) > 0 ? Number(r.updatedAt) : 0);
 const projectStamp = (p) => (Number(p?.updatedAt) > 0 ? Number(p.updatedAt) : 0);
 
@@ -62,7 +112,7 @@ const preferFirst = (a, b) => {
   return sa !== sb ? sa > sb : canon(a) >= canon(b);
 };
 
-function mergeRecords(aList, bList, aFirst, tomb) {
+function mergeRecords(aList, bList, aFirst, tomb, reconcile = null) {
   const usable = (list) => (Array.isArray(list) ? list.filter((r) => r && typeof r === 'object' && r.id !== undefined && r.id !== null) : []);
   const A = usable(aList);
   const B = usable(bList);
@@ -83,6 +133,7 @@ function mergeRecords(aList, bList, aFirst, tomb) {
       const sy = stampOf(y);
       // the newest change wins; with the same stamp (or none: older data) the side whose project is the base wins
       pick = sx !== sy ? (sx > sy ? x : y) : aFirst ? x : y;
+      if (reconcile) pick = reconcile(pick, x, y);
     }
     if (tomb[pick.id] >= stampOf(pick) && tomb[pick.id] > 0) continue; // deleted after its last change
     out.push(pick);
@@ -123,7 +174,7 @@ export function mergeProject(a, b) {
   for (const side of [a, b]) for (const [k, v] of Object.entries(side)) if (!keys.has(k) && isRecordList(k, v)) keys.add(k);
   for (const key of [...keys].sort()) {
     const clean = (list) => (FINANCIAL_COLLECTIONS.includes(key) && Array.isArray(list) ? list.map(sanitizeAmount) : list);
-    lists[key] = mergeRecords(clean(a[key]), clean(b[key]), aFirst, tomb);
+    lists[key] = mergeRecords(clean(a[key]), clean(b[key]), aFirst, tomb, key === 'expenses' ? reconcileFx : null);
     if (key === 'expenses') lists[key] = lists[key].map((e) => (e.projectId === base.id ? e : { ...e, projectId: base.id }));
   }
   const merged = { ...base, ...lists, draft: mergeDraft(a, b, aFirst, tomb), updatedAt: Math.max(projectStamp(a), projectStamp(b)) };

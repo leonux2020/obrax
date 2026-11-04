@@ -36,7 +36,7 @@ import { ensureDriveToken, googleConfigured, GOOGLE_CONFIG_STATUS, localUser } f
 import { clearDriveToken, getDriveToken, isDriveLinked, needsDriveInteraction, subscribeDriveAuth } from './lib/driveToken.js';
 import { createDriveClient } from './lib/drive.js';
 import { createDriveSync, getSeenRemote, setSeenRemote } from './lib/driveSync.js';
-import { mergeProjectLists, stampProject, stampProjects } from './lib/merge.js';
+import { mergeProjectLists, nextStamp, stampProject, stampProjects } from './lib/merge.js';
 import { markDeleted, mergeTomb } from './lib/tombstones.js';
 import { collectBackup, hasNoProjects, parseBackup, restoreBackup } from './lib/backup.js';
 import { projectLimitReached } from './lib/pro.js';
@@ -431,9 +431,11 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
       }
     }
     if (!expenses.length) return false; // nothing new: the queued photo is dropped, there is nothing to announce as saved
-    const next = recalculateProjectTotals(addExpenses(target, expenses), { at: target.draft?.capsule ? Date.now() : 1 });
+    const now = Date.now();
+    const grow = (p) => recalculateProjectTotals(addExpenses(p, expenses, now), { at: p.draft?.capsule ? now : 1 }); // new expenses + a newer updatedAt + fresh totals: one and the same version everywhere
+    const next = grow(target);
     projectsRef.current = projectsRef.current.map((p) => (p.id === projectId ? next : p)); // two receipts in a row stack up
-    setProjects((list) => list.map((p) => (p.id === projectId ? addExpenses(p, expenses) : p)));
+    setProjects((list) => list.map((p) => (p.id === projectId ? grow(p) : p))); // the state change is what wakes the Auto-Sync daemon (markDirty)
     if (activeRef.current?.id !== projectId) projectStore.save(next).catch(() => {}); // the open project saves itself
     return true;
   }, []);
@@ -499,7 +501,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
           if (draft === p.draft) return p;
           // every edit of the quote seals what it needs into the project's capsule (price / rate / tax copied INTO the project) and refreshes its stored totals
           const now = Date.now();
-          return recalculateProjectTotals({ ...p, draft, updatedAt: now }, { now, at: draft.capsule ? now : 1 });
+          return recalculateProjectTotals({ ...p, draft, updatedAt: nextStamp(p.updatedAt, now) }, { now, at: draft.capsule ? now : 1 });
         })
       ),
     [activeId]
@@ -511,7 +513,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
         list.map((p) => {
           if (p.id !== activeId) return p;
           const next = typeof update === 'function' ? update(p) : update;
-          return next === p ? p : recalculateProjectTotals({ ...next, updatedAt: Date.now() }, { at: next.draft?.capsule ? Date.now() : 1 }); // the stored totals follow the payments / expenses
+          return next === p ? p : recalculateProjectTotals({ ...next, updatedAt: nextStamp(p.updatedAt) }, { at: next.draft?.capsule ? Date.now() : 1 }); // the stored totals follow the payments / expenses; the stamp is always newer than the project's own (clock skew cannot hide an edit)
         })
       ),
     [activeId]
