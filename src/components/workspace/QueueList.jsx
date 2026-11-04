@@ -1,6 +1,6 @@
 import { useI18n } from '../../lib/i18n.jsx';
 
-const TONE = { pending: '#E0E0E0', sending: '#E0E0E0', review: '#ff9500', failed: '#ff2b2b' };
+const TONE = { pending: '#e5e5e5', sending: '#e5e5e5', review: '#ff9500', failed: '#ff2b2b' };
 
 /** Receipts of this project waiting in the deferred queue, with what the user can do about each one. */
 export default function QueueList({ rows, onRetry, onDiscard, onAccept }) {
@@ -16,7 +16,7 @@ export default function QueueList({ rows, onRetry, onDiscard, onAccept }) {
           <p style={{ color: TONE[r.status] }} className="text-sm font-semibold">
             🧾 {label(r)}
           </p>
-          <p className="text-xs text-[#E0E0E0]/60 tabular-nums">{when(r.createdAt)}</p>
+          <p className="text-xs text-neutral-400 tabular-nums">{when(r.createdAt)}</p>
           <div className="mt-1 flex flex-wrap gap-2">
             {r.status === 'review' && (
               <button type="button" className={btn} onClick={() => onAccept(r.id)} data-testid={`queued-accept-${r.id}`}>

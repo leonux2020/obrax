@@ -27,7 +27,7 @@ export default function Block({ id, title, label, icon = null, meta = '', open, 
           {icon}
         </span>
         <span className="mt-2 w-full truncate text-center text-xs text-neutral-400">{label || title}</span>
-        {meta && <span className="mt-0.5 w-full truncate text-center text-[11px] tabular-nums text-neutral-500">{meta}</span>}
+        {meta && <span className="mt-0.5 w-full truncate text-center text-xs tabular-nums text-neutral-500">{meta}</span>}
       </button>
       {open && (
         <BottomSheet title={title} tall={tall} autoFocus={false} headerAction={headerAction} swipeToClose={swipeToClose} onClose={() => onToggle(id, false)}>

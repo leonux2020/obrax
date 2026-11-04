@@ -33,7 +33,7 @@ function CompanyBlock({ company }) {
   const { t } = useI18n();
   if (company.empty) {
     return (
-      <p className="no-print mb-4 rounded-xl border border-white/10 px-4 py-3 text-sm text-white/40" data-testid="company-block-empty">
+      <p className="no-print mb-4 rounded-xl border border-white/10 px-4 py-3 text-sm text-neutral-500" data-testid="company-block-empty">
         {t('company.empty')}
       </p>
     );
@@ -409,8 +409,8 @@ export default function StepReport({ draft, setDraft, result, pricedAt, photos, 
             type="button"
             aria-selected={view === v}
             onClick={() => setView(v)}
-            className={`min-h-[52px] rounded-xl border-2 font-semibold transition ${
-              view === v ? 'border-brand bg-brand text-black' : 'border-white/10 hover:border-white/30'
+            className={`min-h-[52px] rounded-xl border font-semibold transition ${
+              view === v ? 'border-brand bg-brand text-black' : 'border-white/10 bg-white/5 hover:bg-white/10'
             }`}
           >
             {t(key)}

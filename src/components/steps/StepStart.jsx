@@ -42,8 +42,8 @@ export default function StepStart({ draft, setDraft, photos, setPhotos, projectI
               role="radio"
               aria-checked={active}
               onClick={() => setMode(m)}
-              className={`rounded-2xl border-2 p-4 text-left transition ${
-                active ? 'border-brand bg-brand/10' : 'border-white/10 bg-black hover:border-white/30'
+              className={`rounded-2xl border p-4 text-left transition ${
+                active ? 'border-brand bg-brand/10' : 'border-white/10 bg-white/5 hover:bg-white/10'
               }`}
             >
               <span className="block text-lg font-semibold">{t(`mode.${m}`)}</span>

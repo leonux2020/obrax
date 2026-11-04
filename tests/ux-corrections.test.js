@@ -231,10 +231,9 @@ describe('3. new project: the closing button', () => {
     const form = q('new-form');
     const button = q('project-save');
     expect(button.textContent).toContain('Crear proyecto');
-    expect(button.className).toContain('border-brand');
-    expect(button.className).toContain('text-brand');
-    expect(button.className).toContain('bg-black');
-    expect(button.className).not.toContain('bg-brand');
+    expect(button.className).toContain('bg-brand'); // solid, inverted CTA: green fill, black lettering, no outline
+    expect(button.className).toContain('text-black');
+    expect(button.className).not.toContain('border-2');
     expect(button.className).toContain('min-h-[64px]');
     expect(button.type).toBe('submit');
     // it is the LAST thing of the form: nothing but the cancel link comes after it

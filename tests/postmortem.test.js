@@ -387,9 +387,9 @@ describe('"Crear extensión" inside the app', () => {
     await click(q('project-card'));
     const button = q('pm-extension');
     expect(button.textContent).toContain('Crear extensión');
-    expect(button.className).toContain('border-brand');
-    expect(button.className).toContain('text-brand');
-    expect(button.className).toContain('bg-black');
+    expect(button.className).toContain('bg-brand'); // solid, inverted: green fill, black lettering
+    expect(button.className).toContain('text-black');
+    expect(button.className).not.toContain('border-2');
     expect(button.className).toContain('min-h-[64px]');
     await click(button);
     expect(q('project-postmortem')).toBeNull();

@@ -207,7 +207,7 @@ describe('Ajustes "Zero Stress": main block, quiet logout, invisible autosave', 
     expect(quiet.className).toContain('border-white/10');
     expect(quiet.className).toContain('text-neutral-400');
     expect(quiet.className).not.toContain('border-brand');
-    expect(loud.className).toContain('border-brand');
+    expect(loud.className).toContain('bg-brand'); // solid primary
     act(() => r.unmount());
     el.remove();
   });

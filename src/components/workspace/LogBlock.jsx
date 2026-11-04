@@ -74,7 +74,7 @@ function NoteRow({ entry, store, editing, setEditing, onDelete, onOpenPhoto, onS
   return (
     <li className="py-3 first:pt-0 last:pb-0" data-testid="wlog-note" data-id={entry.id}>
       <div className="flex items-center gap-1">
-        <p className="min-w-0 flex-1 truncate text-xs font-semibold text-[#E0E0E0]/60">{stamp(entry.at)}</p>
+        <p className="min-w-0 flex-1 truncate text-xs font-semibold text-neutral-400">{stamp(entry.at)}</p>
         {!mine && (
           <>
             <button
@@ -82,7 +82,7 @@ function NoteRow({ entry, store, editing, setEditing, onDelete, onOpenPhoto, onS
               onClick={() => setEditing({ id: entry.id, text: entry.text, photo: 'keep' })}
               aria-label={`${t('ws.log.edit')}: ${stamp(entry.at)}`}
               data-testid={`wlog-edit-${entry.id}`}
-              className="flex h-11 w-11 shrink-0 items-center justify-center text-[#E0E0E0]/50 active:text-[#E0E0E0]"
+              className="flex h-11 w-11 shrink-0 items-center justify-center text-neutral-500 active:text-neutral-200"
             >
               <Icon>
                 <path d="M12 20h9" />
@@ -94,7 +94,7 @@ function NoteRow({ entry, store, editing, setEditing, onDelete, onOpenPhoto, onS
               onClick={() => onDelete(entry)}
               aria-label={`${t('common.delete')}: ${stamp(entry.at)}`}
               data-testid={`wlog-del-${entry.id}`}
-              className="flex h-11 w-11 shrink-0 items-center justify-center text-[#E0E0E0]/50 active:text-red-400"
+              className="flex h-11 w-11 shrink-0 items-center justify-center text-neutral-500 active:text-red-400"
             >
               <Icon>
                 <path d="M4 7h16" />
@@ -130,7 +130,7 @@ function NoteRow({ entry, store, editing, setEditing, onDelete, onOpenPhoto, onS
               data-testid="wlog-mic"
               data-listening={mic.listening ? 'true' : 'false'}
               className={`absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full border text-xl leading-none transition active:scale-95 ${
-                mic.listening ? 'animate-pulse border-red-500 bg-red-500 text-neutral-200' : 'border-white/15 text-[#E0E0E0] hover:border-brand'
+                mic.listening ? 'animate-pulse border-red-500 bg-red-500 text-neutral-200' : 'border-white/15 text-neutral-200 hover:border-brand'
               }`}
             >
               <span aria-hidden="true">🎙️</span>
@@ -165,7 +165,7 @@ function NoteRow({ entry, store, editing, setEditing, onDelete, onOpenPhoto, onS
             {shown && (
               <>
                 <NoteThumb photo={shown} label={t('ws.log.photoOpen')} onOpen={onOpenPhoto} testId="wlog-edit-thumb" />
-                <button type="button" onClick={() => setEditing({ ...editing, photo: 'remove' })} aria-label={t('ws.log.photoRemove')} data-testid="wlog-photo-remove" className="flex h-11 w-11 items-center justify-center text-[#E0E0E0]/60 active:text-red-400">
+                <button type="button" onClick={() => setEditing({ ...editing, photo: 'remove' })} aria-label={t('ws.log.photoRemove')} data-testid="wlog-photo-remove" className="flex h-11 w-11 items-center justify-center text-neutral-400 active:text-red-400">
                   ✕
                 </button>
               </>
@@ -181,7 +181,7 @@ function NoteRow({ entry, store, editing, setEditing, onDelete, onOpenPhoto, onS
             <button type="button" onClick={finish(() => setEditing(null))} data-testid="wlog-cancel" className="min-h-[44px] rounded-xl border border-white/15 text-sm font-medium active:border-white/50">
               {t('common.cancel')}
             </button>
-            <button type="button" onClick={finish(onSave)} disabled={!editing.text.trim() || busy} data-testid="wlog-save" className="min-h-[44px] rounded-xl border-2 border-brand text-sm font-medium text-brand disabled:opacity-40">
+            <button type="button" onClick={finish(onSave)} disabled={!editing.text.trim() || busy} data-testid="wlog-save" className="min-h-[44px] rounded-xl text-sm disabled:opacity-40 bg-brand text-black font-semibold hover:bg-brand-light">
               {t('ws.log.save')}
             </button>
           </div>
@@ -238,7 +238,7 @@ export default function LogBlock({ entries, onChange, open, onToggle, projectId 
   return (
     <Block icon={<BookOpenIcon size={32} />} label={t('ws.menu.log')} id="log" title={t('ws.log.title')} meta={entries.length ? String(entries.length) : ''} open={open} onToggle={onToggle} testId="ws-log">
       {list.length === 0 ? (
-        <p className="text-sm text-[#E0E0E0]/60" data-testid="wlog-empty">
+        <p className="text-sm text-neutral-400" data-testid="wlog-empty">
           {t('ws.log.empty')}
         </p>
       ) : (

@@ -120,14 +120,14 @@ export default function RegionCombobox({ value, onChange, hideLabel = false, lab
           id={listId}
           role="listbox"
           aria-label={t('region.listLabel')}
-          className="absolute inset-x-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-xl border-2 border-neutral-700 bg-black shadow-2xl"
+          className="absolute inset-x-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-xl border border-white/10 bg-neutral-900 shadow-2xl"
           // keep the input focused while interacting with the list
           onMouseDown={(e) => e.preventDefault()}
         >
           {flat.length === 0 && <p className="px-4 py-3 text-neutral-400">{t('region.noResults')}</p>}
           {groups.map((g) => (
             <div key={g.id} role="group" aria-label={t(g.id === 'AM' ? 'region.america' : 'region.europe')}>
-              <p className="sticky top-0 bg-black px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand">
+              <p className="sticky top-0 bg-black px-4 py-1.5 text-xs font-semibold uppercase text-brand">
                 {t(g.id === 'AM' ? 'region.america' : 'region.europe')}
               </p>
               {g.items.map((r) => {

@@ -22,7 +22,7 @@ export default function AlertTray({ alerts }) {
           className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-black px-3 py-3 text-amber-500"
         >
           <AlertTriangleIcon size={22} />
-          <p className="min-w-0 flex-1 text-sm font-semibold uppercase leading-snug tracking-wider">{a.text}</p>
+          <p className="min-w-0 flex-1 text-sm font-semibold uppercase leading-snug">{a.text}</p>
         </div>
       ))}
     </section>

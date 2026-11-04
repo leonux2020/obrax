@@ -14,7 +14,7 @@ export default function LangSelect({ onChange, className = '', hideLabel = false
         title={t('lang.switch')}
         data-testid="lang-select"
         lang={lang}
-        className={`min-h-[44px] cursor-pointer rounded-lg border border-neutral-700 bg-black px-3 text-sm font-semibold hover:border-brand focus:border-brand ${className}`}
+        className={`min-h-[44px] cursor-pointer rounded-lg border border-white/10 bg-neutral-900 px-3 text-sm font-semibold hover:bg-white/10 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand ${className}`}
       >
         {LANGS.map((code) => (
           <option key={code} value={code} lang={code} className="bg-black">

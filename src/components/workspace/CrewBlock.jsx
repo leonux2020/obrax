@@ -39,7 +39,7 @@ function Dates({ project, setProject }) {
         {t('ws.crew.end')}
       </label>
       <DateInput id={endId} className={bare} value={project.endDate} min={project.startDate || undefined} onChange={(e) => setProject((p) => withProjectDates(p, { endDate: e.target.value }))} data-testid="crew-end" />
-      <span className="text-sm tabular-nums text-[#E0E0E0]/80" data-testid="crew-duration" data-days={days ?? ''} aria-label={t('ws.crew.duration')}>
+      <span className="text-sm tabular-nums text-neutral-300" data-testid="crew-duration" data-days={days ?? ''} aria-label={t('ws.crew.duration')}>
         ({days === null ? '—' : t(days === 1 ? 'ws.crew.day1' : 'ws.crew.dayN', { n: days })})
       </span>
     </div>
@@ -57,7 +57,7 @@ function EmergencyPanel({ file }) {
   const line = (id, label, value) =>
     value ? (
       <div data-testid={`crew-emergency-${id}`}>
-        <dt className="text-xs font-medium uppercase tracking-wider text-orange-300">{label}</dt>
+        <dt className="text-xs font-medium uppercase text-orange-300">{label}</dt>
         <dd className="mt-0.5 whitespace-pre-wrap break-words text-sm text-neutral-200">{value}</dd>
       </div>
     ) : null;
@@ -92,7 +92,7 @@ function EmergencyPanel({ file }) {
           {line('allergies', t('squadra.allergies'), file.allergies)}
           {file.emergencyName || file.emergencyPhone ? (
             <div data-testid="crew-emergency-contact">
-              <dt className="text-xs font-medium uppercase tracking-wider text-orange-300">{t('squadra.emName')}</dt>
+              <dt className="text-xs font-medium uppercase text-orange-300">{t('squadra.emName')}</dt>
               <dd className="mt-0.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm text-neutral-200">
                 <span className="min-w-0 break-words" data-testid="crew-emergency-contact-name">
                   {file.emergencyName}
@@ -148,7 +148,7 @@ function WorkerSheet({ worker, file = null, health = false, onSave, onDelete, on
           </select>
         </div>
         <TextField label={t('ws.crew.notes')} optional={t('common.optional')} value={notes} onChange={setNotes} sanitize={(v) => sanitizeText(v, 120)} maxLength={120} testId="crew-notes" />
-        <button type="submit" disabled={!ready} data-testid="crew-save" className="min-h-[56px] w-full rounded-xl border-2 border-brand px-3 text-base font-medium text-brand disabled:opacity-40">
+        <button type="submit" disabled={!ready} data-testid="crew-save" className="min-h-[56px] w-full rounded-xl px-3 text-base disabled:opacity-40 bg-brand text-black font-semibold hover:bg-brand-light">
           {t('ws.crew.save')}
         </button>
         {worker && (
@@ -156,7 +156,7 @@ function WorkerSheet({ worker, file = null, health = false, onSave, onDelete, on
             <button type="button" onClick={onDelete} data-testid="crew-delete" className="min-h-[52px] w-full rounded-xl border border-red-500/40 px-3 text-sm font-medium text-red-400 active:border-red-400">
               {t('common.delete')}
             </button>
-            <p className="text-center text-xs text-[#E0E0E0]/60">{t('ws.crew.deleteNote')}</p>
+            <p className="text-center text-xs text-neutral-400">{t('ws.crew.deleteNote')}</p>
           </div>
         )}
       </form>
@@ -190,7 +190,7 @@ function WorkerCard({ row, health = false, onEdit, onAdvance, onRemoveAdvance })
                 </span>
               )}
             </span>
-            <span className="block truncate text-xs text-[#E0E0E0]/60" data-testid={`worker-spec-${w.id}`}>
+            <span className="block truncate text-xs text-neutral-400" data-testid={`worker-spec-${w.id}`}>
               {t(`ws.spec.${w.specialty}`)}
               {w.notes ? ` · ${w.notes}` : ''}
             </span>
@@ -209,7 +209,7 @@ function WorkerCard({ row, health = false, onEdit, onAdvance, onRemoveAdvance })
       </div>
       <div className="border-t border-white/5 px-3 py-1.5">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-[#E0E0E0]/60">{t('ws.crew.advanced')}</p>
+          <p className="text-xs text-neutral-400">{t('ws.crew.advanced')}</p>
           <p className="text-sm font-medium tabular-nums" data-testid={`worker-total-${w.id}`} data-total={total}>
             {total > 0 ? money(total) : t('ws.crew.noAdvances')}
           </p>
@@ -218,7 +218,7 @@ function WorkerCard({ row, health = false, onEdit, onAdvance, onRemoveAdvance })
           <ul className="mt-0.5 divide-y divide-white/5" data-testid={`worker-advlist-${w.id}`}>
             {list.map((a) => (
               <li key={a.id} className="flex min-h-[36px] items-center gap-3">
-                <span className="min-w-0 flex-1 text-xs text-[#E0E0E0]/50">{stamp(a.at)}</span>
+                <span className="min-w-0 flex-1 text-xs text-neutral-500">{stamp(a.at)}</span>
                 <span className="text-xs font-medium tabular-nums">{money(a.amount)}</span>
                 <button type="button" onClick={() => onRemoveAdvance(a.id)} aria-label={`${t('common.delete')}: ${w.name}`} data-testid={`worker-adv-del-${a.id}`} className="flex h-9 w-9 shrink-0 items-center justify-center text-base text-red-400">
                   ×
@@ -280,17 +280,17 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
               aria-label={t('ws.crew.add')}
               title={t('ws.crew.add')}
               data-testid="crew-add"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-brand text-2xl font-medium leading-none text-brand transition active:scale-95 disabled:opacity-40"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-2xl font-medium leading-none text-brand transition active:scale-95 disabled:opacity-40"
             >
               <span aria-hidden="true">+</span>
             </button>
-            <p data-testid="labor-pool" data-available={pool.available} data-spent={pool.advanced} className="min-w-0 flex-1 text-right text-sm text-[#E0E0E0]/80">
-              {t('ws.crew.labor')}: <b className="tabular-nums text-[#E0E0E0]">{money(pool.available)}</b>
+            <p data-testid="labor-pool" data-available={pool.available} data-spent={pool.advanced} className="min-w-0 flex-1 text-right text-sm text-neutral-300">
+              {t('ws.crew.labor')}: <b className="tabular-nums text-neutral-200">{money(pool.available)}</b>
               <span className="whitespace-nowrap tabular-nums text-[#e8c35f]"> ({t('ws.crew.spent')}: {money(pool.advanced)})</span>
             </p>
           </div>
           {crew.length === 0 ? (
-            <p className="text-sm text-[#E0E0E0]/60" data-testid="crew-empty">
+            <p className="text-sm text-neutral-400" data-testid="crew-empty">
               {t('ws.crew.empty')}
             </p>
           ) : (
@@ -315,7 +315,7 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
 
         {loose.length > 0 && (
           <div className="space-y-1" data-testid="advances-loose" data-total={looseTotal}>
-            <p className="flex justify-between text-xs font-semibold text-[#E0E0E0]/70">
+            <p className="flex justify-between text-xs font-semibold text-neutral-400">
               <span>{t('ws.crew.loose')}</span>
               <span className="tabular-nums">{money(looseTotal)}</span>
             </p>

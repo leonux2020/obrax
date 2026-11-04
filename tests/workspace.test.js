@@ -191,7 +191,7 @@ describe('ProjectWorkspace: three zones', () => {
     expect(q('ws-zone-a').className).toMatch(/sticky/);
     expect(q('ws-zone-a').className).toContain('bg-black'); // pure OLED black, the same as the app theme
     expect(q('project-workspace').className).toContain('bg-black');
-    expect(q('project-workspace').className).toContain('text-[#E0E0E0]');
+    expect(q('project-workspace').className).toContain('text-neutral-200');
   });
 
   it('Zone B: partidas are native <details>/<summary> accordions with their materials inside', async () => {
@@ -272,7 +272,7 @@ describe('ProjectWorkspace: three zones', () => {
       expect(Number(svg.getAttribute('stroke-width'))).toBeLessThanOrEqual(1.75); // thin line
       expect(btn.textContent).not.toMatch(/[\u{1F300}-\u{1FAFF}]/u); // no emoji
       expect(btn.textContent.length).toBeGreaterThan(0); // the label stays
-      expect(btn.className).toContain('text-[#E0E0E0]'); // neutral smoke on black
+      expect(btn.className).toContain('text-neutral-200'); // neutral smoke on black
     }
   });
 

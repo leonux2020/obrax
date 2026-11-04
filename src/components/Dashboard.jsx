@@ -96,7 +96,7 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro, 
           aria-label={t('ws.alerts.title')}
           data-testid="dash-bell"
           data-alerts={alerts.length || undefined}
-          className="relative flex min-h-[44px] min-w-[44px] items-center justify-center bg-transparent p-2 text-white/60 transition active:scale-95 active:text-neutral-200 active:opacity-50"
+          className="relative flex min-h-[44px] min-w-[44px] items-center justify-center bg-transparent p-2 text-neutral-400 transition active:scale-95 active:text-neutral-200 active:opacity-50"
         >
           <BellIcon size={24} />
           {alerts.length > 0 && <span aria-hidden="true" data-testid="dash-bell-dot" className="absolute right-2.5 top-2.5 h-2.5 w-2.5 rounded-full bg-amber-500" />}
@@ -113,11 +113,11 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro, 
           <span
             data-testid="pro-pill"
             className={`flex h-9 items-center gap-1.5 rounded-lg border px-2.5 transition-shadow duration-200 group-hover:shadow-[0_0_12px_rgba(203,213,225,0.35)] group-focus-visible:shadow-[0_0_12px_rgba(203,213,225,0.35)] group-active:shadow-[0_0_16px_rgba(226,232,240,0.45)] ${
-              pro ? 'border-slate-500/50 text-slate-300' : 'border-white/15 text-white/60 group-hover:border-slate-400/70 group-hover:text-slate-300'
+              pro ? 'border-slate-500/50 text-slate-300' : 'border-white/15 text-neutral-400 group-hover:border-slate-400/70 group-hover:text-slate-300'
             }`}
           >
             <HelmetIcon size={20} />
-            <span className="text-[11px] font-semibold leading-none tracking-widest">PRO</span>
+            <span className="text-xs font-semibold leading-none">PRO</span>
           </span>
         </button>
       </header>
@@ -166,7 +166,7 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro, 
                 : 'border-transparent text-neutral-500 hover:text-neutral-300' // the section you are NOT in is dimmed
             }`}
           >
-            {t(key)} <span className={`text-sm font-semibold ${tab === id ? 'text-neutral-400' : 'text-neutral-600'}`}>{n}</span>
+            {t(key)} <span className={`text-sm font-semibold ${tab === id ? 'text-neutral-400' : 'text-neutral-500'}`}>{n}</span>
           </button>
         ))}
       </div>

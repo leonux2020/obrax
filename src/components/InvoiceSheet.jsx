@@ -101,7 +101,7 @@ export default function InvoiceSheet({ quoteItems, taxRate = 0, onApply, onClose
 
         {phase === 'review' && extraction && (
           <div className="space-y-4 pb-28" data-testid="invoice-review">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">{t('inv.results')}</h3>
+            <h3 className="text-xs font-semibold uppercase text-neutral-400">{t('inv.results')}</h3>
             {extraction.supplier && <p className="text-sm text-neutral-300">{t('inv.supplier', { name: extraction.supplier })}</p>}
             {extraction.currencyMismatch && (
               <p role="alert" data-testid="invoice-currency" className="rounded-xl border border-red-500/60 px-4 py-3 text-sm font-semibold text-red-400">

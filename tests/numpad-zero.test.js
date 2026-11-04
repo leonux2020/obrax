@@ -116,13 +116,13 @@ describe('transient zero (pure state)', () => {
     await click(q('amt'));
     const d = () => q('pad-display');
     expect(d().dataset.empty).toBe('true');
-    expect(d().className).toContain('text-white/30');
+    expect(d().className).toContain('text-neutral-500');
     await click(q('pad-0'));
     expect(d().textContent).toBe('0');
     expect(d().dataset.empty).toBeUndefined();
     expect(d().dataset.zero).toBe('true');
     expect(d().className).toContain('text-neutral-200');
-    expect(d().className).not.toContain('text-white/30');
+    expect(d().className).not.toContain('text-neutral-500');
     await click(q('pad-dot'));
     expect(d().textContent).toBe('0,');
     await click(q('pad-5'));

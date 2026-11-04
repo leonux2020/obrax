@@ -31,7 +31,7 @@ export default function ProjectAudit({ project, rendition = null }) {
   const model = headerModel({ project, total, valid: total > 0, cash, liquid: liquidity(project.payments, project.expenses, project.advances), now: Date.now() });
 
   return (
-    <main className="mx-auto min-h-[100dvh] w-full max-w-3xl bg-black pb-44 text-[#E0E0E0]" data-testid="project-audit" data-mode="audit">
+    <main className="mx-auto min-h-[100dvh] w-full max-w-3xl bg-black pb-44 text-neutral-200" data-testid="project-audit" data-mode="audit">
       <HeaderZone audit project={project} model={model} title={projectTitle(project) || t('proj.untitled')} client={projectClient(project)} region={region} offline={false} />
       <ProfitabilityPanel project={project} budget={total} />
       {rendition && <RenditionBar projectId={project.id} onClose={rendition.onClose} onRetryQueue={rendition.onRetry} onReconnect={rendition.onReconnect} needsReconnect={rendition.needsReconnect} queue={rendition.queue} />}

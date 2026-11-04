@@ -34,15 +34,15 @@ export default function PartidaList({ draft, groups, open, locked, onBlocked, on
             onToggle={(e) => e.currentTarget.open !== isOpen && onToggle(p.id, e.currentTarget.open)}
             data-testid={`partida-${i}`}
             className="group rounded-xl border border-l-2 border-white/10"
-            style={{ borderLeftColor: g.incomplete ? LEVEL_COLOR.orange : 'rgba(224,224,224,0.35)' }}
+            style={{ borderLeftColor: g.incomplete ? LEVEL_COLOR.orange : '#525252' }}
           >
             <summary className="flex min-h-[60px] cursor-pointer list-none items-center gap-3 px-3 [&::-webkit-details-marker]:hidden" data-testid={`partida-summary-${i}`}>
-              <span className="text-[#E0E0E0]/70" aria-hidden="true">
+              <span className="text-neutral-400" aria-hidden="true">
                 <TaskIcon id={p.task} size={24} />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-base font-semibold">{partidaTitle(p, t)}</span>
-                <span className="block truncate text-xs text-[#E0E0E0]/70">
+                <span className="block truncate text-xs text-neutral-400">
                   {t(`task.${p.task}`)}
                   {g.incomplete && (
                     <span style={{ color: LEVEL_COLOR.orange }} className="font-medium">
@@ -53,7 +53,7 @@ export default function PartidaList({ draft, groups, open, locked, onBlocked, on
                 </span>
               </span>
               <span className="text-base font-medium tabular-nums">{g.incomplete ? '—' : money(g.amount)}</span>
-              <span aria-hidden="true" className="text-lg text-[#E0E0E0]/50 transition-transform group-open:rotate-90">
+              <span aria-hidden="true" className="text-lg text-neutral-500 transition-transform group-open:rotate-90">
                 ›
               </span>
             </summary>
@@ -87,7 +87,7 @@ export default function PartidaList({ draft, groups, open, locked, onBlocked, on
                       <li key={r.id} className="flex items-center gap-3 px-3 py-2">
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold">{t(`mat.${r.id}`)}</span>
-                          <span className="block text-xs text-[#E0E0E0]/60 tabular-nums">
+                          <span className="block text-xs text-neutral-400 tabular-nums">
                             {num(r.packs)} {unit(r.saleUnit)} · {money(r.total)}
                           </span>
                         </span>
@@ -105,11 +105,11 @@ export default function PartidaList({ draft, groups, open, locked, onBlocked, on
                             {locked && <span aria-hidden="true">🔒 </span>}
                             {money(r.unitPrice)}
                           </span>
-                          <span className="block text-[10px] font-semibold" style={{ color: r.origin === 'user' ? '#e8c35f' : 'rgba(224,224,224,0.6)' }}>
+                          <span className="block text-xs font-semibold" style={{ color: r.origin === 'user' ? '#e8c35f' : '#a3a3a3' }}>
                             {r.shared && <span aria-hidden="true">↔ </span>}
                             {t(`ws.origin.${r.origin}`)}
                           </span>
-                          <span data-testid={`supplier-${r.id}`} className="block max-w-[11rem] truncate text-xs text-gray-500">
+                          <span data-testid={`supplier-${r.id}`} className="block max-w-[11rem] truncate text-xs text-neutral-500">
                             {priceCaption(t, { origin: r.origin, meta: r.supplier, regionCode: draft.regionCode })}
                           </span>
                         </button>
@@ -132,7 +132,7 @@ export default function PartidaList({ draft, groups, open, locked, onBlocked, on
           disabled={draft.partidas.length >= MAX_PARTIDAS}
           onClick={onAdd}
           data-testid="partida-add"
-          className="min-h-[52px] w-full rounded-xl border border-dashed border-white/25 text-sm font-semibold text-[#E0E0E0]/80 disabled:opacity-40"
+          className="min-h-[52px] w-full rounded-xl border border-dashed border-white/25 text-sm font-semibold text-neutral-300 disabled:opacity-40"
         >
           + {t('ws.addPartida')}
         </button>

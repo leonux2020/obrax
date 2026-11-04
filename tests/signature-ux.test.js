@@ -60,7 +60,7 @@ describe('client signature box: the box itself is the trigger', () => {
     mount({ model, signature: null, total });
     expect(box().className).toContain('border-white/10');
     expect(host.querySelector('[data-testid="signature-hint"]').textContent).toBe('Doble toque para firmar');
-    expect(host.querySelector('[data-testid="signature-hint"]').className).toContain('text-white/30');
+    expect(host.querySelector('[data-testid="signature-hint"]').className).toContain('text-neutral-500');
     expect(host.querySelectorAll('button')).toHaveLength(0);
     expect(sheet()).toBeNull();
   });

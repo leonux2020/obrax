@@ -1,7 +1,7 @@
 import { useI18n } from '../../lib/i18n.jsx';
 
 /**
- * Outline icons (24 px grid, 1.5 px line, round caps): thin, quiet, one neutral colour (they follow the text colour, smoke #E0E0E0).
+ * Outline icons (24 px grid, 1.5 px line, round caps): thin, quiet, one neutral colour (they follow the text colour, neutral-200).
  * Same drawing language as Lucide's Mic / Camera / Receipt / FileUp (no icon package is installed, so they are inlined: ~1 KB).
  */
 const Outline = ({ children }) => (
@@ -60,12 +60,12 @@ export default function Dock({ onOpen, queued = 0 }) {
               type="button"
               onClick={() => onOpen(id)}
               data-testid={`dock-${id}`}
-              className="relative flex min-h-[64px] w-full flex-col items-center justify-center gap-0.5 text-[#E0E0E0] transition active:scale-95 active:text-brand"
+              className="relative flex min-h-[64px] w-full flex-col items-center justify-center gap-0.5 text-neutral-200 transition active:scale-95 active:text-brand"
             >
               {ICONS[id]}
-              <span className="text-[11px] font-semibold">{t(key)}</span>
+              <span className="text-xs font-semibold">{t(key)}</span>
               {id === 'scan' && queued > 0 && (
-                <span data-testid="dock-queued" aria-label={t('q.pending')} className="absolute right-[22%] top-1.5 rounded-full border border-[#d4af37] px-1.5 text-[10px] font-semibold leading-4 text-[#e8c35f]">
+                <span data-testid="dock-queued" aria-label={t('q.pending')} className="absolute right-[22%] top-1.5 rounded-full border border-[#d4af37] px-1.5 text-xs font-semibold leading-4 text-[#e8c35f]">
                   {queued}
                 </span>
               )}

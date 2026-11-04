@@ -422,7 +422,7 @@ describe('workspace UI', () => {
     const line = q('supplier-cement_bag');
     expect(line.textContent).toBe(`Estimación IA (${region.chains[0].name})`);
     expect(line.className).toContain('text-xs');
-    expect(line.className).toContain('text-gray-500');
+    expect(line.className).toContain('text-neutral-500');
   });
 
   it('numpad: supplier tags on top; picking one saves the price with its name and place; the list shows it', async () => {

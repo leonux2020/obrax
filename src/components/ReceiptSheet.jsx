@@ -230,7 +230,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
                 return (
                   <React.Fragment key={r.key}>
                     {head && (
-                      <li role="presentation" data-testid={`receipt-doc-${r.doc}`} className="bg-white/5 px-4 py-2 text-xs font-medium uppercase tracking-wide text-[#e8c35f] tabular-nums">
+                      <li role="presentation" data-testid={`receipt-doc-${r.doc}`} className="bg-white/5 px-4 py-2 text-xs font-medium uppercase text-[#e8c35f] tabular-nums">
                         {t('rcpt.doc', { i: r.doc + 1, n: receipts.length })}
                         {[head.supplier, head.documentNumber, head.total ? money(head.total) : ''].filter(Boolean).map((x) => ` · ${x}`).join('')}
                       </li>

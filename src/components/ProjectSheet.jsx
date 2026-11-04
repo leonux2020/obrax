@@ -22,7 +22,7 @@ function DateField({ label, value, onChange, invalid }) {
   );
 }
 
-const SectionTitle = ({ children }) => <h3 className="pt-2 text-xs font-semibold uppercase tracking-wider text-neutral-400">{children}</h3>;
+const SectionTitle = ({ children }) => <h3 className="pt-2 text-xs font-semibold uppercase text-neutral-400">{children}</h3>;
 
 const ModeIcon = ({ mode }) => (
   <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -121,8 +121,8 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
                   aria-checked={on}
                   data-testid={`mode-${m}`}
                   onClick={() => set('mode')(m)}
-                  className={`flex min-h-[92px] flex-col items-center justify-center gap-2 rounded-2xl border-2 px-2 text-center transition ${
-                    on ? 'border-brand bg-brand/10 text-brand' : 'border-white/10 text-neutral-300 hover:border-white/30'
+                  className={`flex min-h-[92px] flex-col items-center justify-center gap-2 rounded-2xl border px-2 text-center transition ${
+                    on ? 'border-brand bg-brand/10 text-brand' : 'border-white/10 bg-white/5 text-neutral-300 hover:bg-white/10'
                   }`}
                 >
                   <ModeIcon mode={m} />
@@ -223,7 +223,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
               type="submit"
               disabled={badRange}
               data-testid="project-save"
-              className="flex min-h-[64px] w-full select-none items-center justify-center gap-2 rounded-2xl border-2 border-brand bg-black px-5 text-lg font-medium text-brand transition active:scale-[0.98] disabled:opacity-40"
+              className="flex min-h-[64px] w-full select-none items-center justify-center gap-2 rounded-2xl px-5 text-lg transition active:scale-[0.98] disabled:opacity-40 bg-brand text-black font-semibold hover:bg-brand-light"
             >
               {t('proj.create')}
               <span aria-hidden="true">→</span>

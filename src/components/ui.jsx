@@ -105,9 +105,9 @@ export function Wordmark({ height = 28, className = '' }) {
 
 const VARIANTS = {
   primary: 'bg-brand text-black hover:bg-brand-light',
-  secondary: 'border-2 border-brand text-brand hover:bg-brand/10',
-  ghost: 'border border-white/10 text-neutral-200 hover:border-white/40',
-  danger: 'border-2 border-red-500 text-red-400 hover:bg-red-500/10',
+  secondary: 'border border-white/10 bg-white/5 text-neutral-200 hover:bg-white/10',
+  ghost: 'border border-white/10 text-neutral-200 hover:bg-white/5',
+  danger: 'border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20',
 };
 
 export function Button({ variant = 'primary', className = '', type = 'button', ...props }) {
@@ -274,8 +274,8 @@ export function Segmented({ label, value, options, onChange }) {
             role="radio"
             aria-checked={value === o.value}
             onClick={() => onChange(o.value)}
-            className={`min-h-[52px] rounded-xl border-2 px-3 font-semibold transition ${
-              value === o.value ? 'border-brand bg-brand text-black' : 'border-neutral-700 text-neutral-200 hover:border-neutral-500'
+            className={`min-h-[52px] rounded-xl border px-3 font-semibold transition ${
+              value === o.value ? 'border-brand bg-brand text-black' : 'border-white/10 bg-white/5 text-neutral-200 hover:bg-white/10'
             }`}
           >
             {o.label}
@@ -309,7 +309,7 @@ export function Slider({ label, description, value, min, max, step = 1, suffix =
           type="button"
           aria-label={`${label} -${step}`}
           onClick={() => onChange(clamp(value - step))}
-          className="h-12 w-12 shrink-0 rounded-xl border-2 border-neutral-700 text-2xl font-medium hover:border-brand"
+          className="h-12 w-12 shrink-0 rounded-xl border border-white/10 bg-white/5 text-2xl font-medium hover:bg-white/10"
         >
           −
         </button>
@@ -328,7 +328,7 @@ export function Slider({ label, description, value, min, max, step = 1, suffix =
           type="button"
           aria-label={`${label} +${step}`}
           onClick={() => onChange(clamp(value + step))}
-          className="h-12 w-12 shrink-0 rounded-xl border-2 border-neutral-700 text-2xl font-medium hover:border-brand"
+          className="h-12 w-12 shrink-0 rounded-xl border border-white/10 bg-white/5 text-2xl font-medium hover:bg-white/10"
         >
           +
         </button>

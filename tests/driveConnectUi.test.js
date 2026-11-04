@@ -52,7 +52,7 @@ describe('Google Drive card in Ajustes', () => {
     const btn = q('backup-connect');
     expect(btn.textContent).toContain('Conectar cuenta de Google');
     expect(btn.className).toContain('min-h-[44px]');
-    expect(btn.className).toContain('text-brand');
+    expect(btn.className).toContain('bg-brand'); // solid primary action
     expect(q('backup-now')).toBeNull();
     expect(q('backup-connected')).toBeNull();
     expect(drive.calls).toHaveLength(0);

@@ -24,7 +24,7 @@ export default function ContractorSignatureField({ value, onOpen }) {
         {value ? (
           <img src={value.dataUrl} alt="" draggable={false} className="max-h-full w-auto max-w-full object-contain" data-testid="profile-signature-preview" />
         ) : (
-          <span className="text-sm font-light tracking-wide text-white/40">{t('sign.pro.empty')}</span>
+          <span className="text-sm font-light text-neutral-500">{t('sign.pro.empty')}</span>
         )}
       </button>
       <p className="text-xs text-neutral-400">{t('sign.pro.hint')}</p>

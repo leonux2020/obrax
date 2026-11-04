@@ -6,15 +6,15 @@ const AMBER = 'text-[#e8c35f]';
 function Row({ sign, label, value, strong = false, warn = false, testid }) {
   return (
     <div className={`flex items-baseline justify-between gap-3 py-1.5 ${strong ? 'border-t border-white/10 pt-2.5' : ''}`}>
-      <dt className={`min-w-0 flex-1 text-sm ${strong ? 'font-semibold text-[#E0E0E0]' : 'text-[#E0E0E0]/70'}`}>
-        <span aria-hidden="true" className="mr-1.5 inline-block w-4 text-center text-[#E0E0E0]/50">
+      <dt className={`min-w-0 flex-1 text-sm ${strong ? 'font-semibold text-neutral-200' : 'text-neutral-400'}`}>
+        <span aria-hidden="true" className="mr-1.5 inline-block w-4 text-center text-neutral-500">
           {sign}
         </span>
         {label}
       </dt>
       <dd
         data-testid={testid}
-        className={`shrink-0 whitespace-nowrap text-right tabular-nums ${strong ? 'text-lg font-semibold' : 'text-sm font-semibold'} ${warn ? AMBER : 'text-[#E0E0E0]'}`}
+        className={`shrink-0 whitespace-nowrap text-right tabular-nums ${strong ? 'text-lg font-semibold' : 'text-sm font-semibold'} ${warn ? AMBER : 'text-neutral-200'}`}
       >
         {value}
       </dd>
@@ -37,7 +37,7 @@ export default function GlobalBreakdownSheet({ breakdown, moneyOf, onClose }) {
           const money = moneyOf(l.regionCode);
           return (
             <div key={l.currency} data-testid={`acc-sheet-avail-${l.currency}`}>
-              {many && <p className="mb-0.5 text-xs font-medium text-[#E0E0E0]/70 tabular-nums">{l.currency}</p>}
+              {many && <p className="mb-0.5 text-xs font-medium text-neutral-400 tabular-nums">{l.currency}</p>}
               <dl>
                 <Row sign="+" label={t('acc.sheet.in')} value={money(l.received)} testid={`acc-sheet-in-${l.currency}`} />
                 <Row sign="−" label={t('acc.sheet.exp')} value={money(l.spent)} testid={`acc-sheet-exp-${l.currency}`} />

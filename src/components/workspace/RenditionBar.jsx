@@ -67,7 +67,7 @@ export default function RenditionBar({ projectId, onClose, onRetryQueue = null, 
           onClick={close}
           disabled={busy}
           data-testid="fin-close"
-          className="flex min-h-[64px] w-full select-none items-center justify-center gap-2 rounded-2xl border-2 border-brand bg-black px-5 text-lg font-medium text-brand transition active:scale-[0.98] disabled:opacity-40"
+          className="flex min-h-[64px] w-full select-none items-center justify-center gap-2 rounded-2xl px-5 text-lg transition active:scale-[0.98] disabled:opacity-40 bg-brand text-black font-semibold hover:bg-brand-light"
         >
           <CloudUploadIcon size={24} />
           {busy ? t('fin.closing') : t('fin.close')}

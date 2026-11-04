@@ -32,7 +32,7 @@ const Icon = ({ children, size = 24 }) => (
 function Section({ id, title, children }) {
   return (
     <section aria-labelledby={id} className="mt-6">
-      <h2 id={id} className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-400">
+      <h2 id={id} className="mb-2 text-xs font-semibold uppercase text-neutral-400">
         {title}
       </h2>
       {children}
@@ -139,7 +139,7 @@ function LocationBlock({ location }) {
   };
   return (
     <section aria-labelledby="pv-loc" className="card mt-4" data-testid="pv-location-block">
-      <h2 id="pv-loc" className="text-xs font-medium uppercase tracking-wider text-neutral-400">
+      <h2 id="pv-loc" className="text-xs font-medium uppercase text-neutral-400">
         {t('loc.title')}
       </h2>
       {location ? (
@@ -157,7 +157,7 @@ function LocationBlock({ location }) {
               target="_blank"
               rel="noopener noreferrer"
               data-testid="loc-open"
-              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-brand px-3 text-sm font-medium text-brand transition hover:bg-brand/10 active:scale-[0.98]"
+              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm font-medium text-neutral-200 transition hover:bg-white/10 active:scale-[0.98]"
             >
               {t('loc.open')}
             </a>
@@ -303,7 +303,7 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
 
       {/* 2. money: the budget and the cash control bar */}
       <section aria-labelledby="pv-budget" className="card mt-4">
-        <h2 id="pv-budget" className="text-xs font-medium uppercase tracking-wider text-neutral-400">
+        <h2 id="pv-budget" className="text-xs font-medium uppercase text-neutral-400">
           {t('pv.budget')}
         </h2>
         <p data-testid="budget-total" className="mt-1 text-4xl font-medium tracking-tight tabular-nums text-brand">
@@ -372,15 +372,15 @@ export default function ProjectView({ project, setProject, setDraft, photos, set
         type="button"
         onClick={() => (pro ? setScanOpen(true) : onPro('ai'))}
         data-testid="scan-receipt"
-        className="mt-5 flex min-h-[64px] w-full items-center justify-center gap-3 rounded-2xl border-2 border-slate-400 px-4 text-lg font-medium text-slate-300 transition active:scale-[0.99]"
+        className="mt-5 flex min-h-[64px] w-full items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 text-lg font-medium text-neutral-200 transition active:scale-[0.99]"
       >
         <Icon size={28}>
           <path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" />
           <circle cx="12" cy="13.5" r="3.5" />
         </Icon>
         <span>{t('scan.cta')}</span>
-        {!pro && <span className="rounded border border-slate-500/50 px-1.5 text-[10px] tracking-widest">PRO</span>}
-        {pro === 'dev' && <span data-testid="ai-dev-badge" className="rounded border border-white/30 px-1.5 text-[10px] tracking-widest text-neutral-300">DEV</span>}
+        {!pro && <span className="rounded border border-slate-500/50 px-1.5 text-xs">PRO</span>}
+        {pro === 'dev' && <span data-testid="ai-dev-badge" className="rounded border border-white/30 px-1.5 text-xs text-neutral-300">DEV</span>}
       </button>
 
       {/* 5. supplies: what the quote needs + what the receipts say was bought / rented */}

@@ -310,7 +310,7 @@ describe('Vista Contabilidad Global', () => {
     expect(q(`acc-timeline-${mid.id}`).textContent).toContain('hace 2 días');
     expect(q(`acc-timeline-${old.id}`).textContent).toContain('hace 10 días');
     expect(q(`acc-timeline-${old.id}`).className).toContain('text-xs');
-    expect(q(`acc-timeline-${old.id}`).className).toContain('#E0E0E0]/50');
+    expect(q(`acc-timeline-${old.id}`).className).toContain('text-neutral-500');
   });
 
   it('sin fechas muestra la creación; sin actividad lo dice, sin fallar', async () => {

@@ -37,7 +37,7 @@ export default function FinanceBlock({ draft, locked, onBlocked, setDraft, open,
           ))}
           {region.taxEditable && (
             <button type="button" onClick={() => setPad(true)} disabled={safe} data-testid="tax-edit" className={`flex min-h-[52px] w-full items-center justify-between rounded-xl border px-3 ${safe ? 'border-white/10 opacity-70' : 'border-white/15 active:border-white/50'}`}>
-              <span className="text-sm text-[#E0E0E0]/70 tabular-nums">{t('fin.tax', { name: region.taxName })}</span>
+              <span className="text-sm text-neutral-400 tabular-nums">{t('fin.tax', { name: region.taxName })}</span>
               <span className={`text-base font-medium tabular-nums ${safe ? 'text-neutral-200' : ''}`}>{draft.finance.tax === null ? `${official} %` : `${num(draft.finance.tax)} %`}</span>
             </button>
           )}
@@ -55,8 +55,8 @@ export default function FinanceBlock({ draft, locked, onBlocked, setDraft, open,
           aria-pressed={!safe}
           data-testid="finance-lock"
           data-state={safe ? 'locked' : 'unlocked'}
-          className={`mt-4 flex min-h-[60px] w-full items-center justify-center gap-3 rounded-xl border-2 px-4 text-base font-normal transition active:scale-[0.98] ${
-            safe ? 'border-neutral-600 text-neutral-400' : 'border-amber-500 text-amber-500'
+          className={`mt-4 flex min-h-[60px] w-full items-center justify-center gap-3 rounded-xl border px-4 text-base font-normal transition active:scale-[0.98] ${
+            safe ? 'border-white/10 bg-white/5 text-neutral-400' : 'border-amber-500/40 bg-amber-500/10 text-amber-500'
           }`}
         >
           {safe ? <LockIcon size={26} /> : <UnlockIcon size={26} />}

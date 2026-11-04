@@ -206,7 +206,7 @@ function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, c
   const title = projectTitle(project) || t('proj.untitled');
 
   return (
-    <main className="mx-auto min-h-[100dvh] w-full max-w-3xl bg-black pb-40 text-[#E0E0E0]" data-testid="project-workspace" data-locked={locked || undefined}>
+    <main className="mx-auto min-h-[100dvh] w-full max-w-3xl bg-black pb-40 text-neutral-200" data-testid="project-workspace" data-locked={locked || undefined}>
       <HeaderZone project={project} model={model} title={title} client={projectClient(project)} region={region} offline={!online} onEdit={onEdit} onCash={openCash} onUnlock={() => dispatch({ type: 'sheet', name: 'unlock' })} />
 
       <div className="space-y-3 px-3 pt-3">

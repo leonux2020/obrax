@@ -63,7 +63,7 @@ export function PhotoLightbox({ url, onClose }) {
   return (
     <div role="dialog" aria-modal="true" aria-label={t('ws.log.photo')} data-testid="photo-lightbox" className="fixed inset-0 z-[60] flex items-center justify-center bg-black" onClick={onClose}>
       <img src={url} alt={t('ws.log.photo')} data-testid="photo-lightbox-img" className="max-h-full max-w-full object-contain" />
-      <button type="button" onClick={onClose} aria-label={t('common.close')} data-testid="photo-lightbox-close" className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-black text-lg text-[#E0E0E0] [margin-top:env(safe-area-inset-top)]">
+      <button type="button" onClick={onClose} aria-label={t('common.close')} data-testid="photo-lightbox-close" className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-black text-lg text-neutral-200 [margin-top:env(safe-area-inset-top)]">
         ✕
       </button>
     </div>

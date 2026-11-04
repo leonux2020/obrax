@@ -61,7 +61,7 @@ export default function CrewPicker({ project, crew, onAdd, onClose }) {
           />
         </div>
         {/* flow 2, urgency: whatever is typed goes in as plain text; no file is asked for */}
-        <button type="submit" disabled={!typed} data-testid="crew-save" className="min-h-[56px] w-full rounded-xl border-2 border-brand px-3 text-base font-medium text-brand disabled:opacity-40">
+        <button type="submit" disabled={!typed} data-testid="crew-save" className="min-h-[56px] w-full rounded-xl px-3 text-base disabled:opacity-40 bg-brand text-black font-semibold hover:bg-brand-light">
           {typed ? t('crew.pick.add', { name: typed }) : t('ws.crew.save')}
         </button>
 

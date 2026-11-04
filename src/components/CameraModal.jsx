@@ -85,7 +85,7 @@ export default function CameraModal({ slotLabel, onCapture, onClose, onUpload, g
         aria-labelledby="cam-title"
         tabIndex={-1}
         data-testid="camera-modal"
-        className="flex max-h-full w-full max-w-2xl flex-col gap-3 rounded-2xl border border-neutral-700 bg-black p-4 outline-none"
+        className="flex max-h-full w-full max-w-2xl flex-col gap-3 rounded-2xl border border-white/10 bg-black p-4 outline-none"
       >
         <div className="flex items-baseline justify-between gap-3">
           <h2 id="cam-title" className="text-lg font-semibold">
@@ -117,13 +117,13 @@ export default function CameraModal({ slotLabel, onCapture, onClose, onUpload, g
         )}
 
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={onClose} className="min-h-[52px] rounded-xl border border-neutral-700 px-5 font-semibold hover:border-white/40">
+          <button type="button" onClick={onClose} className="min-h-[52px] rounded-xl border border-white/10 bg-white/5 px-5 font-semibold hover:bg-white/10">
             {t('common.close')}
           </button>
           <button
             type="button"
             onClick={onUpload}
-            className="min-h-[52px] rounded-xl border-2 border-brand px-5 font-semibold text-brand hover:bg-brand/10"
+            className="min-h-[52px] rounded-xl px-5 font-semibold bg-brand text-black font-semibold hover:bg-brand-light"
           >
             {t('photo.upload')}
           </button>

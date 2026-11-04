@@ -128,7 +128,7 @@ const SignaturePad = forwardRef(function SignaturePad({ label, placeholder, onIn
       {/* guide line + hint, both ignored by pointer events */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-5 bottom-10 border-t border-white/10" />
       {!inked && (
-        <span aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center justify-center text-lg font-semibold text-white/25">
+        <span aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center justify-center text-lg font-semibold text-neutral-500">
           {placeholder}
         </span>
       )}

@@ -25,7 +25,7 @@ export default function MachineryBlock({ draft, result, regionCode, projectLocat
   return (
     <Block id="machinery" title={t('ws.mach.title')} meta={total > 0 ? money(total) : ''} open={open} onToggle={onToggle} testId="ws-machinery">
       {rows.length === 0 ? (
-        <p className="text-sm text-[#E0E0E0]/60" data-testid="machinery-none">
+        <p className="text-sm text-neutral-400" data-testid="machinery-none">
           {t('mach.none')}
         </p>
       ) : (
@@ -43,13 +43,13 @@ export default function MachineryBlock({ draft, result, regionCode, projectLocat
                     description={`${t(`mach.why.${r.id}`)} ${r.lines.map((i) => t('mach.line', { qty: num(i.qty, 0), days: num(i.days, 0), rate: money(i.rate) })).join(' + ')}`}
                   />
                   <button type="button" onClick={() => setPad(r.id)} data-testid={`rent-rate-${r.id}`} data-source={r.source} className="flex min-h-[52px] w-full items-center justify-between rounded-xl border border-white/15 px-3 active:border-white/50">
-                    <span className="text-sm text-[#E0E0E0]/70">{t('ws.mach.rate')}</span>
+                    <span className="text-sm text-neutral-400">{t('ws.mach.rate')}</span>
                     <span className="text-right">
                       <span className="block text-base font-medium tabular-nums">{money(r.rate)}</span>
-                      <span className="block text-[10px] font-medium" style={{ color: r.source === 'saved' ? '#e8c35f' : 'rgba(224,224,224,0.6)' }}>
+                      <span className="block text-xs font-medium" style={{ color: r.source === 'saved' ? '#e8c35f' : '#a3a3a3' }}>
                         {t(`ws.origin.${r.source === 'saved' ? 'user' : r.source === 'ai' ? 'ai' : 'base'}`)}
                       </span>
-                      <span data-testid={`rent-supplier-${r.id}`} className="block max-w-[11rem] truncate text-xs text-gray-500">
+                      <span data-testid={`rent-supplier-${r.id}`} className="block max-w-[11rem] truncate text-xs text-neutral-500">
                         {priceCaption(t, { origin: r.source === 'saved' ? 'user' : r.source === 'ai' ? 'ai' : 'base', meta: r.supplier, regionCode })}
                       </span>
                     </span>
@@ -60,7 +60,7 @@ export default function MachineryBlock({ draft, result, regionCode, projectLocat
           )}
         </LockedZone>
       )}
-      <p className="mt-3 text-xs text-[#E0E0E0]/60">{t('mach.nohand')}</p>
+      <p className="mt-3 text-xs text-neutral-400">{t('mach.nohand')}</p>
 
       {target && MACHINE_IDS.includes(target.id) && (
         <SupplierPad

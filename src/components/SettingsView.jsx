@@ -215,13 +215,13 @@ export default function SettingsView({
       {user?.picture ? (
         <img src={user.picture} alt="" className="h-10 w-10 shrink-0 rounded-full border border-white/10 object-cover" />
       ) : (
-        <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm font-medium text-[#E0E0E0]/70">
+        <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm font-medium text-neutral-400">
           {(user?.name || user?.email || '?').slice(0, 1).toUpperCase()}
         </span>
       )}
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium">{user?.name}</span>
-        {user?.email && <span className="block truncate text-sm text-[#E0E0E0]/60">{user.email}</span>}
+        {user?.email && <span className="block truncate text-sm text-neutral-400">{user.email}</span>}
       </span>
     </div>
   );
@@ -266,8 +266,8 @@ export default function SettingsView({
                 aria-label={t(pic ? 'company.logo.replace' : 'company.logo.add')}
                 className="group relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-xl bg-transparent p-1.5 transition disabled:opacity-60"
               >
-                {pic ? <img src={pic} alt="" className="max-h-full max-w-full object-contain" /> : <span className="text-[10px] font-medium text-[#E0E0E0]/40">LOGO</span>}
-                <span aria-hidden="true" className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-black/70 py-1 text-[10px] font-medium text-[#E0E0E0] opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+                {pic ? <img src={pic} alt="" className="max-h-full max-w-full object-contain" /> : <span className="text-xs font-medium text-neutral-500">LOGO</span>}
+                <span aria-hidden="true" className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-black/70 py-1 text-xs font-medium text-neutral-200 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 20h9" />
                     <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
@@ -378,7 +378,7 @@ export default function SettingsView({
                   onClick={connect}
                   disabled={Boolean(working)}
                   data-testid="backup-connect"
-                  className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-black px-3 text-sm font-medium text-brand hover:border-brand disabled:opacity-50"
+                  className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-brand px-3 text-sm font-semibold text-black hover:bg-brand-light disabled:opacity-50"
                 >
                   <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11.5 4.4" />
@@ -398,14 +398,14 @@ export default function SettingsView({
                     )}
                   </div>
                   {!googleUser && (user?.email || user?.name) && (
-                    <p className="truncate text-sm text-[#E0E0E0]/80" data-testid="backup-account">
+                    <p className="truncate text-sm text-neutral-300" data-testid="backup-account">
                       {user.name}
                       {user.email && user.name ? ' · ' : ''}
                       {user.email}
                     </p>
                   )}
                   {googleUser && <span className="sr-only" data-testid="backup-account">{[user.name, user.email].filter(Boolean).join(' · ')}</span>}
-                  <p className="truncate text-[11px] text-[#E0E0E0]/50" data-testid="backup-folder">
+                  <p className="truncate text-xs text-neutral-500" data-testid="backup-folder">
                     {t('backup.folder', { name: BACKUP_FOLDER })}
                   </p>
                   {/* ZERO STRESS: no "save now" / "restore" buttons. The daemon syncs by itself (app comes back, signal returns, every change, debounced);
@@ -416,7 +416,7 @@ export default function SettingsView({
                         {t(`backup.status.pending.${waitReason}`)}
                       </p>
                     )}
-                    <p className="text-xs leading-snug text-[#E0E0E0]/50" data-testid="backup-auto">
+                    <p className="text-xs leading-snug text-neutral-500" data-testid="backup-auto">
                       {t('backup.auto')}
                       {st?.at ? (
                         <>
@@ -435,7 +435,7 @@ export default function SettingsView({
                       onClick={connect}
                       disabled={Boolean(working)}
                       data-testid="backup-reconnect"
-                      className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-black px-3 text-sm font-medium text-brand hover:border-brand disabled:opacity-50"
+                      className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-brand px-3 text-sm font-semibold text-black hover:bg-brand-light disabled:opacity-50"
                     >
                       {working === 'connect' ? t('backup.connecting') : t('backup.connect')}
                     </button>
@@ -448,7 +448,7 @@ export default function SettingsView({
                 </div>
               )}
               {note && (
-                <p className="text-sm text-[#E0E0E0]/80" role="status" data-testid="backup-note">
+                <p className="text-sm text-neutral-300" role="status" data-testid="backup-note">
                   {note}
                 </p>
               )}
@@ -467,7 +467,7 @@ export default function SettingsView({
               {onConfirmRegion ? (
                 <RegionCombobox value={regionCode || detectCurrentRegion()} onChange={onConfirmRegion} />
               ) : (
-                <button type="button" onClick={onChangeRegion} className="flex min-h-[52px] w-full items-center justify-between gap-2 rounded-xl border-2 border-neutral-700 px-4 text-left font-medium hover:border-brand">
+                <button type="button" onClick={onChangeRegion} className="flex min-h-[52px] w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-neutral-900 px-4 text-left font-medium hover:bg-white/10">
                   <span className="truncate">{t('settings.region.change')}</span>
                   <span aria-hidden="true">›</span>
                 </button>
@@ -481,13 +481,13 @@ export default function SettingsView({
         {/* Local account (Google account lives inside the Drive card when connected) */}
         {!googleUser && (
           <section className="card space-y-3" aria-labelledby="settings-account-title">
-            <h2 id="settings-account-title" className="text-sm font-medium text-[#E0E0E0]/70">
+            <h2 id="settings-account-title" className="text-sm font-medium text-neutral-400">
               {t('settings.account')}
             </h2>
             {accountRow}
             {googleConfigured && (
               <div className="rounded-xl border border-white/10 p-3" data-testid="settings-google-link">
-                <p className="mb-2 text-center text-sm text-[#E0E0E0]/60">{t('settings.account.link')}</p>
+                <p className="mb-2 text-center text-sm text-neutral-400">{t('settings.account.link')}</p>
                 <GoogleButton onUser={onSignIn} />
               </div>
             )}

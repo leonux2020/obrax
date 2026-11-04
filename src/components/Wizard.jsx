@@ -78,18 +78,18 @@ export default function Wizard({ projectId, draft, setDraft: setProjectDraft, ph
                   disabled={locked}
                   onClick={() => go(i)}
                   aria-current={current ? 'step' : undefined}
-                  className={`flex h-11 w-11 items-center justify-center rounded-full border-2 text-base font-semibold transition disabled:opacity-40 ${
+                  className={`flex h-11 w-11 items-center justify-center rounded-full border text-base font-semibold transition disabled:opacity-40 ${
                     current
                       ? 'border-brand bg-brand text-black'
                       : done
-                        ? 'border-brand text-brand'
-                        : 'border-neutral-700 text-neutral-300'
+                        ? 'border-brand/50 bg-brand/10 text-brand'
+                        : 'border-white/10 bg-white/5 text-neutral-300'
                   }`}
                 >
                   {done ? '✓' : i + 1}
                 </button>
                 <span
-                  className={`w-full truncate text-center text-[11px] font-semibold sm:text-sm ${
+                  className={`w-full truncate text-center text-xs font-semibold sm:text-sm ${
                     current ? 'text-neutral-200' : 'text-neutral-400'
                   }`}
                 >

@@ -181,7 +181,7 @@ export default function Logbook({ entries, onChange, showList = true, onSaved, p
             onClick={() => fileRef.current?.click()}
             disabled={photoBusy}
             data-testid="log-photo"
-            className="flex min-h-[44px] min-w-[44px] items-center gap-2 rounded-xl border border-white/15 px-3 text-sm font-semibold text-[#E0E0E0] active:border-white/50 disabled:opacity-60"
+            className="flex min-h-[44px] min-w-[44px] items-center gap-2 rounded-xl border border-white/15 px-3 text-sm font-semibold text-neutral-200 active:border-white/50 disabled:opacity-60"
           >
             <span aria-hidden="true" className="text-xl leading-none">
               📸
@@ -191,7 +191,7 @@ export default function Logbook({ entries, onChange, showList = true, onSaved, p
           {photo && (
             <>
               <NoteThumb photo={photo} label={t('ws.log.photoOpen')} onOpen={setViewer} testId="log-photo-thumb" />
-              <button type="button" onClick={() => setPhoto(null)} aria-label={t('ws.log.photoRemove')} data-testid="log-photo-remove" className="flex h-11 w-11 items-center justify-center text-[#E0E0E0]/60 active:text-red-400">
+              <button type="button" onClick={() => setPhoto(null)} aria-label={t('ws.log.photoRemove')} data-testid="log-photo-remove" className="flex h-11 w-11 items-center justify-center text-neutral-400 active:text-red-400">
                 ✕
               </button>
             </>

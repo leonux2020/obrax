@@ -36,7 +36,7 @@ export default function ProPaywall({ feature = 'promo', onClose }) {
       <div data-testid="pro-paywall" className="mx-auto max-w-lg pb-4">
         <div className="mb-5 mt-1 flex items-center gap-2 text-slate-300">
           <HelmetIcon size={32} />
-          <span className="rounded-md border border-slate-500/50 px-1.5 text-[11px] font-semibold tracking-wider">PRO</span>
+          <span className="rounded-md border border-slate-500/50 px-1.5 text-xs font-semibold">PRO</span>
         </div>
 
         {pro && (
@@ -51,7 +51,7 @@ export default function ProPaywall({ feature = 'promo', onClose }) {
           </p>
         )}
 
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-400">{t('pro.benefits')}</h3>
+        <h3 className="mb-2 text-xs font-semibold uppercase text-neutral-400">{t('pro.benefits')}</h3>
         <ul className="mb-6 divide-y divide-white/10 rounded-2xl border border-white/10" data-testid="pro-benefits">
           {BENEFITS.map((b) => (
             <li
@@ -70,7 +70,7 @@ export default function ProPaywall({ feature = 'promo', onClose }) {
           ))}
         </ul>
 
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-400" id="pro-plans-label">
+        <h3 className="mb-2 text-xs font-semibold uppercase text-neutral-400" id="pro-plans-label">
           {t('pro.plans')}
         </h3>
         <div role="radiogroup" aria-labelledby="pro-plans-label" className="flex flex-col gap-3">
@@ -85,15 +85,15 @@ export default function ProPaywall({ feature = 'promo', onClose }) {
                 data-testid={`pro-plan-${p.id}`}
                 data-featured={p.featured ? 'true' : undefined}
                 onClick={() => setPlan(p.id)}
-                className={`relative flex w-full items-center justify-between gap-3 rounded-2xl bg-black px-4 text-left transition active:scale-[0.99] ${
-                  p.featured ? 'min-h-[104px] border-2 py-5' : 'min-h-[72px] border py-3'
-                } ${on ? 'border-slate-400' : p.featured ? 'border-slate-500/50' : 'border-white/10 hover:border-white/40'}`}
+                className={`relative flex w-full items-center justify-between gap-3 rounded-2xl bg-white/5 px-4 text-left transition active:scale-[0.99] ${
+                  p.featured ? 'min-h-[104px] border py-5' : 'min-h-[72px] border py-3'
+                } ${on ? 'border-slate-400' : p.featured ? 'border-slate-500/50' : 'border-white/10 hover:bg-white/10'}`}
               >
                 <span className="min-w-0">
                   <span className="flex flex-wrap items-center gap-2">
                     <span className={`${p.featured ? 'text-lg' : 'text-base'} font-semibold text-neutral-200`}>{t(p.name)}</span>
                     {p.badges?.map((bd) => (
-                      <span key={bd} className="rounded-md border border-slate-500/50 px-1.5 text-[11px] font-semibold text-slate-300">
+                      <span key={bd} className="rounded-md border border-slate-500/50 px-1.5 text-xs font-semibold text-slate-300">
                         {t(bd)}
                       </span>
                     ))}

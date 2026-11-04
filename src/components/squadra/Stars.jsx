@@ -2,7 +2,7 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { RATINGS } from '../../lib/workers.js';
 
 const Star = ({ filled, size }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true" focusable="false" className={filled ? 'text-amber-400' : 'text-neutral-600'}>
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true" focusable="false" className={filled ? 'text-amber-400' : 'text-neutral-500'}>
     <path d="M12 2.8l2.85 5.95 6.4.85-4.7 4.45 1.2 6.45L12 17.3l-5.75 3.2 1.2-6.45-4.7-4.45 6.4-.85z" />
   </svg>
 );

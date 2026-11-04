@@ -188,8 +188,8 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
             <path d="M4 7V5a1 1 0 0 1 1-1h2M20 7V5a1 1 0 0 0-1-1h-2M4 17v2a1 1 0 0 0 1 1h2M20 17v2a1 1 0 0 1-1 1h-2M8 12h8" />
           </svg>
           {t('inv.cta')}
-          {!pro && <span className="rounded-md border border-slate-500/50 px-1.5 text-[11px] font-semibold tracking-wider">PRO</span>}
-          {pro === 'dev' && <span data-testid="ai-dev-badge" className="rounded-md border border-white/30 px-1.5 text-[11px] font-semibold tracking-wider text-neutral-300">DEV</span>}
+          {!pro && <span className="rounded-md border border-slate-500/50 px-1.5 text-xs font-semibold">PRO</span>}
+          {pro === 'dev' && <span data-testid="ai-dev-badge" className="rounded-md border border-white/30 px-1.5 text-xs font-semibold text-neutral-300">DEV</span>}
         </Button>
         <p className="mt-2 text-xs text-neutral-300">{t('inv.cta.hint')}</p>
         {applied > 0 && (
@@ -219,8 +219,8 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
               role="radio"
               aria-checked={active}
               onClick={() => setDraft((d) => ({ ...d, chainId: c.id }))}
-              className={`rounded-xl border-2 p-3 text-left transition ${
-                active ? 'border-brand bg-brand/10' : 'border-white/10 bg-black hover:border-white/30'
+              className={`rounded-xl border p-3 text-left transition ${
+                active ? 'border-brand bg-brand/10' : 'border-white/10 bg-white/5 hover:bg-white/10'
               }`}
             >
               <span className="block truncate text-sm font-medium">{c.label}</span>

@@ -51,7 +51,7 @@ function DonutBlock({ currency, liquid, shares, many, fmt, label }) {
     <div data-testid={`acc-donut-block-${currency}`} className="min-w-0">
       {many && <p className="mb-1 text-center text-xs font-medium tabular-nums text-neutral-400">{currency}</p>}
       <DonutChart segments={segments} size={224} testId={`acc-donut-${currency}`} label={`${t('acc.donut.aria')} ${currency}`}>
-        <span className="block whitespace-nowrap text-[11px] font-medium uppercase tracking-wider text-neutral-400">{label}</span>
+        <span className="block whitespace-nowrap text-xs font-medium uppercase text-neutral-400">{label}</span>
         <span
           data-testid={`acc-liquid-${currency}`}
           className={`mt-0.5 block whitespace-nowrap font-medium tracking-tight tabular-nums ${sizeFor(text)} ${liquid < 0 ? AMBER : liquid > 0 ? 'text-brand' : 'text-neutral-200'}`}
@@ -210,13 +210,13 @@ export default function GlobalAccounting({ projects, onOpenProject = null, onExp
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-semibold">{projectTitle(p) || t('proj.untitled')}</span>
                         <span className="block truncate text-xs text-neutral-400">{projectClient(p) || t('proj.noClient')}</span>
-                        <span data-testid={`acc-timeline-${p.id}`} className="mt-0.5 block truncate text-xs text-[#E0E0E0]/50">
+                        <span data-testid={`acc-timeline-${p.id}`} className="mt-0.5 block truncate text-xs text-neutral-500">
                           {[datesOf(p), pulseOf(p)].filter(Boolean).join(' · ')}
                         </span>
                         {late > 0 && (
                           <span
                             data-testid={`acc-late-${p.id}`}
-                            className="mt-1 inline-block max-w-full truncate rounded-full border border-orange-400/50 px-1.5 text-[10px] font-semibold text-orange-400"
+                            className="mt-1 inline-block max-w-full truncate rounded-full border border-orange-400/50 px-1.5 text-xs font-semibold text-orange-400"
                           >
                             {t('acc.card.late', { n: late })}
                           </span>
@@ -224,7 +224,7 @@ export default function GlobalAccounting({ projects, onOpenProject = null, onExp
                       </span>
                       <span className="shrink-0 text-right tabular-nums">
                         <span className={`block font-medium tabular-nums ${b.balance < 0 ? 'text-red-400' : 'text-brand'}`}>{fmt(b.balance)}</span>
-                        <span className="block text-[11px] text-neutral-400">{t('xl.balance')}</span>
+                        <span className="block text-xs text-neutral-400">{t('xl.balance')}</span>
                       </span>
                     </button>
                   </div>

@@ -35,8 +35,8 @@ export default function PartidaMachinery({ draft, result, index, regionCode, pro
               const on = m.included;
               const row = m.row;
               return (
-                <li key={m.id} data-testid={`partida-machine-${index}-${m.id}`} data-included={on ? 'true' : 'false'} className="flex items-center gap-3 py-3 text-[#E0E0E0]">
-                  <span className={on ? 'text-[#E0E0E0]' : 'text-neutral-500'}>
+                <li key={m.id} data-testid={`partida-machine-${index}-${m.id}`} data-included={on ? 'true' : 'false'} className="flex items-center gap-3 py-3 text-neutral-200">
+                  <span className={on ? 'text-neutral-200' : 'text-neutral-500'}>
                     <TractorIcon size={22} />
                   </span>
                   <span className="min-w-0 flex-1">
@@ -65,7 +65,7 @@ export default function PartidaMachinery({ draft, result, index, regionCode, pro
                     aria-label={`${t(`mach.${m.id}`)}: ${t(on ? 'ws.mach.on' : 'ws.mach.off')}`}
                     onClick={() => setDraft((d) => setMachineOn(d, m.id, !on))}
                     data-testid={`partida-machine-toggle-${index}-${m.id}`}
-                    className={`flex min-h-[44px] min-w-[84px] items-center justify-end gap-2 text-sm font-normal ${on ? 'text-[#E0E0E0]' : 'text-neutral-500'}`}
+                    className={`flex min-h-[44px] min-w-[84px] items-center justify-end gap-2 text-sm font-normal ${on ? 'text-neutral-200' : 'text-neutral-500'}`}
                   >
                     <span aria-hidden="true" className={`h-2 w-2 rounded-full ${on ? 'bg-brand' : 'border border-neutral-500'}`} />
                     {t(on ? 'ws.mach.on' : 'ws.mach.off')}

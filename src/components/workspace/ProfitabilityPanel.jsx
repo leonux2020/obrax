@@ -27,7 +27,7 @@ export default function ProfitabilityPanel({ project, budget = 0 }) {
   return (
     <section data-testid="audit-health" aria-label={t('aud.health')} className="space-y-6 px-3 pt-6">
       <div data-testid="audit-margin" data-state={state}>
-        <p className="text-xs font-medium uppercase tracking-wider text-neutral-400">{t('aud.margin')}</p>
+        <p className="text-xs font-medium uppercase text-neutral-400">{t('aud.margin')}</p>
         <p data-testid="audit-margin-value" className={`mt-1 text-5xl font-medium leading-none tracking-tight tabular-nums ${tone}`}>
           {money(x.margin)}
         </p>
@@ -35,7 +35,7 @@ export default function ProfitabilityPanel({ project, budget = 0 }) {
       </div>
 
       <div data-testid="audit-efficiency">
-        <p className="text-xs font-medium uppercase tracking-wider text-neutral-400">{t('aud.efficiency')}</p>
+        <p className="text-xs font-medium uppercase text-neutral-400">{t('aud.efficiency')}</p>
         {x.efficiency === null ? (
           <p data-testid="audit-efficiency-empty" className="mt-1 text-sm text-neutral-400">
             {t('aud.noBudget')}
@@ -51,7 +51,7 @@ export default function ProfitabilityPanel({ project, budget = 0 }) {
       </div>
 
       <div data-testid="audit-leaks">
-        <p className="text-xs font-medium uppercase tracking-wider text-neutral-400">{t('aud.leaks')}</p>
+        <p className="text-xs font-medium uppercase text-neutral-400">{t('aud.leaks')}</p>
         {x.suppliers.length === 0 ? (
           <p data-testid="audit-leaks-empty" className="mt-1 text-sm text-neutral-400">
             {t('aud.noSpend')}

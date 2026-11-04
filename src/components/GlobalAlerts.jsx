@@ -12,10 +12,10 @@ export default function GlobalAlerts({ alerts = [], onOpen, onClose }) {
   const { t } = useI18n();
   useBackLayer(onClose);
   return (
-    <div role="dialog" aria-modal="true" aria-label={t('ws.alerts.title')} data-testid="global-alerts" className="fixed inset-0 z-50 flex flex-col bg-black text-[#E0E0E0]">
+    <div role="dialog" aria-modal="true" aria-label={t('ws.alerts.title')} data-testid="global-alerts" className="fixed inset-0 z-50 flex flex-col bg-black text-neutral-200">
       <header className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pt-4">
         <h1 className="min-w-0 flex-1 truncate text-2xl font-normal">{t('ws.alerts.title')}</h1>
-        <button type="button" onClick={onClose} aria-label={t('common.close')} data-testid="global-alerts-close" className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/15 text-xl text-white/60 active:border-white/50">
+        <button type="button" onClick={onClose} aria-label={t('common.close')} data-testid="global-alerts-close" className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/15 text-xl text-neutral-400 active:border-white/50">
           ✕
         </button>
       </header>
@@ -39,7 +39,7 @@ export default function GlobalAlerts({ alerts = [], onOpen, onClose }) {
                 <AlertTriangleIcon size={22} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-xs text-neutral-400">{a.project}</span>
-                  <span className="block text-sm font-semibold uppercase leading-snug tracking-wider">{a.text}</span>
+                  <span className="block text-sm font-semibold uppercase leading-snug">{a.text}</span>
                 </span>
               </button>
             </li>

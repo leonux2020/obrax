@@ -108,7 +108,7 @@ describe('FREE user: the PRO button is the invitation', () => {
     expect(btn.dataset.pro).toBeUndefined();
     const pill = q('pro-pill');
     expect(pill.className).toContain('border-white/15');
-    expect(pill.className).toContain('text-white/60');
+    expect(pill.className).toContain('text-neutral-400');
     expect(pill.className).not.toMatch(/(^|\s)border-slate-500\/50/); // the active titanium border is NOT there
     expect(pill.className).not.toMatch(/(^|\s)text-slate-300/);
     for (const hat of host.querySelectorAll('[data-testid="logo-helmet"]')) expect(hat.getAttribute('class') || '').not.toMatch(FILTER);
@@ -125,7 +125,7 @@ describe('FREE user: the PRO button is the invitation', () => {
     await act(async () => setSimulatedPro(false)); // back to FREE
     expect(q('pro-scan')).not.toBeNull();
     expect(q('pro-active')).toBeNull();
-    expect(q('pro-pill').className).toContain('text-white/60');
+    expect(q('pro-pill').className).toContain('text-neutral-400');
     expect(q('pro-pill').className).not.toMatch(/(^|\s)text-slate-300/); // only the hover hint (group-hover:) may mention it
     expect(host.querySelector('[data-testid="logo-helmet"]').getAttribute('class') || '').not.toMatch(FILTER);
   });

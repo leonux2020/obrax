@@ -58,11 +58,11 @@ export default function HeaderZone({ project, model, title, client, region, offl
               {title}
             </h1>
           </div>
-          <p className="truncate text-sm text-[#E0E0E0]/80" data-testid="ws-client">
+          <p className="truncate text-sm text-neutral-300" data-testid="ws-client">
             {client || t('proj.noClient')}
             {where && (
               <>
-                <span className="text-[#E0E0E0]/50"> · </span>
+                <span className="text-neutral-500"> · </span>
                 <span data-testid="ws-location">{where}</span>
               </>
             )}
@@ -87,7 +87,7 @@ export default function HeaderZone({ project, model, title, client, region, offl
             </span>
           ) : (
             <>
-              <span data-testid="ws-due-label" className="block text-xs font-medium uppercase tracking-wider text-neutral-400">
+              <span data-testid="ws-due-label" className="block text-xs font-medium uppercase text-neutral-400">
                 {t('ws.due')}
               </span>
               <span data-testid="ws-due" className={`mt-1 block text-3xl font-medium leading-none tracking-tight tabular-nums ${known && cash.pending > 0 ? 'text-orange-400' : 'text-neutral-400'}`}>
@@ -111,7 +111,7 @@ export default function HeaderZone({ project, model, title, client, region, offl
             </span>
           )}
           {model.locked && (
-            <span data-testid="ws-lock-chip" className="mt-1 block text-[11px] font-medium text-[#e8c35f]">
+            <span data-testid="ws-lock-chip" className="mt-1 block text-xs font-medium text-[#e8c35f]">
               🔒 {t(model.locked === 'signed' ? 'ws.lock.signed' : 'ws.lock.frozen')}
             </span>
           )}
@@ -124,7 +124,7 @@ export default function HeaderZone({ project, model, title, client, region, offl
         </button>
       )}
       {offline && (
-        <p data-testid="ws-offline" className="mt-2 border-l-2 border-white/30 pl-2 text-[11px] text-[#E0E0E0]/70">
+        <p data-testid="ws-offline" className="mt-2 border-l-2 border-white/30 pl-2 text-xs text-neutral-400">
           {t('ws.offlineBase')}
         </p>
       )}

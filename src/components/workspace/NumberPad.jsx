@@ -57,8 +57,8 @@ export default function NumberPad({ title, unit = '', value, decimals = 2, max =
       <div role="dialog" aria-modal="true" aria-label={title} className="relative w-full max-w-lg rounded-t-3xl border border-b-0 border-white/10 bg-black px-4 pt-4 [padding-bottom:max(1rem,env(safe-area-inset-bottom))]">
         {top}
         <div className="flex items-baseline justify-between gap-3">
-          <p className="min-w-0 flex-1 truncate text-sm font-medium text-[#E0E0E0]/80">{title}</p>
-          <p className="text-xs text-[#E0E0E0]/60">{unit}</p>
+          <p className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-300">{title}</p>
+          <p className="text-xs text-neutral-400">{unit}</p>
         </div>
         {/* nothing typed yet: the "0" is a dim placeholder; the moment a key is pressed (even a "0") the number turns solid white = visible feedback */}
         <p
@@ -66,16 +66,16 @@ export default function NumberPad({ title, unit = '', value, decimals = 2, max =
           data-value={state.text}
           data-empty={state.text === '' ? 'true' : undefined}
           data-zero={padIsZero(state) ? 'true' : undefined}
-          className={`my-2 truncate text-right text-5xl font-medium tracking-tight tabular-nums ${state.text === '' ? 'text-white/30' : 'text-neutral-200'}`}
+          className={`my-2 truncate text-right text-5xl font-medium tracking-tight tabular-nums ${state.text === '' ? 'text-neutral-500' : 'text-neutral-200'}`}
           aria-live="polite"
         >
           {padDisplay(state, locale)}
         </p>
-        <p className="mb-3 min-h-[1rem] text-right text-xs text-[#E0E0E0]/60">{foot}</p>
+        <p className="mb-3 min-h-[1rem] text-right text-xs text-neutral-400">{foot}</p>
         <div className="grid grid-cols-3 gap-2">{KEYS.map(key)}</div>
         <div className={`mt-2 grid gap-2 ${onReset ? 'grid-cols-2' : 'grid-cols-1'}`}>
           {onReset && (
-            <button type="button" onClick={onReset} data-testid="pad-reset" className="min-h-[72px] rounded-2xl border border-white/20 px-3 text-sm font-semibold text-[#E0E0E0]/80 active:border-white/50">
+            <button type="button" onClick={onReset} data-testid="pad-reset" className="min-h-[72px] rounded-2xl border border-white/20 px-3 text-sm font-semibold text-neutral-300 active:border-white/50">
               {t('ws.pad.reset')}
             </button>
           )}

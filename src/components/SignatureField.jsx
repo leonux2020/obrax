@@ -79,7 +79,7 @@ export default function SignatureField({ model, signature, total, pricedAt, onCh
             data-testid="signature-preview"
           />
         ) : (
-          <span className="no-print flex h-full w-full items-center justify-center text-center text-sm font-light tracking-wide text-white/30" data-testid="signature-hint">
+          <span className="no-print flex h-full w-full items-center justify-center text-center text-sm font-light text-neutral-500" data-testid="signature-hint">
             {t('sign.hint')}
           </span>
         )}

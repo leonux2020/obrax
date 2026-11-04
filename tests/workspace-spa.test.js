@@ -637,7 +637,7 @@ describe('Parametri del preventivo: error-prevention lock', () => {
     const btn = q('finance-lock');
     expect(btn.dataset.state).toBe('locked');
     expect(btn.className).toContain('text-neutral-400');
-    expect(btn.className).toContain('border-neutral-600');
+    expect(btn.className).toContain('border-white/10');
     expect(btn.className).toContain('min-h-[60px]');
     expect(btn.textContent).toContain('Parámetros bloqueados');
     expect(svgOf(btn)).toContain('rect'); // the padlock body

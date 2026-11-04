@@ -172,14 +172,14 @@ export default function SnapGrid({ photos, setPhotos, projectId = '_', editMode:
                   onClick={() => snap(slot)}
                   data-testid={`snap-${slot}`}
                   aria-label={`${t('photo.addTo', { slot: label })}`}
-                  className="flex h-full w-full flex-col items-center justify-center gap-1.5 border-2 border-dashed border-white/15 text-neutral-400 transition hover:border-brand hover:text-brand active:bg-white/[0.04] disabled:opacity-60"
+                  className="flex h-full w-full flex-col items-center justify-center gap-1.5 border border-dashed border-white/15 text-neutral-400 transition hover:border-brand hover:text-brand active:bg-white/[0.04] disabled:opacity-60"
                 >
                   {working ? (
                     <span className="text-sm font-semibold">{t('photo.processing')}</span>
                   ) : (
                     <>
                       <CameraIcon />
-                      <span className="line-clamp-2 px-1.5 text-center text-[11px] font-semibold leading-tight sm:text-xs">{label}</span>
+                      <span className="line-clamp-2 px-1.5 text-center text-xs font-semibold leading-tight sm:text-xs">{label}</span>
                     </>
                   )}
                 </button>

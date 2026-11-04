@@ -150,7 +150,7 @@ export default function PhotoGallery({ photos, setPhotos, projectId = '_' }) {
                     disabled={working}
                     aria-label={`${t(photo ? 'photo.replaceWith' : 'photo.addTo', { slot: label })} (${t(`photo.${source}`)})`}
                     onClick={() => pick(slot, source)}
-                    className="min-h-[44px] rounded-lg border border-neutral-700 px-1 text-sm font-semibold hover:border-brand disabled:opacity-40"
+                    className="min-h-[44px] rounded-lg border border-white/10 bg-white/5 px-1 text-sm font-semibold hover:bg-white/10 disabled:opacity-40"
                   >
                     <span aria-hidden="true">{source === 'camera' ? '📷 ' : '🖼 '}</span>
                     {t(`photo.${source}`)}

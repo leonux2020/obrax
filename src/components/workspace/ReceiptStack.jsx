@@ -52,7 +52,7 @@ export default function ReceiptStack({ expenses, onChange = null }) {
                         )}
                         {e.currencyOriginal && (
                           // the FX snapshot: the line is shown (and added up) in the project's base currency; the paper's own amount stays beside it, dim
-                          <span className="block truncate text-[11px] tabular-nums text-neutral-600" data-testid="stack-fx" title={`1 ${e.currencyOriginal} = ${num(e.exchangeRate, 6)} ${e.currency || ''}`}>
+                          <span className="block truncate text-xs tabular-nums text-neutral-500" data-testid="stack-fx" title={`1 ${e.currencyOriginal} = ${num(e.exchangeRate, 6)} ${e.currency || ''}`}>
                             {moneyIn(e.amountOriginal, e.currencyOriginal)} · ×{num(e.exchangeRate, 4)}
                           </span>
                         )}

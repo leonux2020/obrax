@@ -18,7 +18,7 @@ function List({ title, ids, tone }) {
   const { t } = useI18n();
   return (
     <div>
-      <h4 className={`mb-2 text-sm font-semibold uppercase tracking-wide ${tone === 'brand' ? 'text-brand' : 'text-neutral-400'}`}>{title}</h4>
+      <h4 className={`mb-2 text-sm font-semibold uppercase ${tone === 'brand' ? 'text-brand' : 'text-neutral-400'}`}>{title}</h4>
       <ul className="space-y-2">
         {ids.map((key) => (
           <li key={key} className="flex gap-3 rounded-xl border border-white/10 p-3 text-base leading-snug">

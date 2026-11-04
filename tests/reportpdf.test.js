@@ -224,7 +224,7 @@ describe('real PDF generation per kind (no spies)', () => {
 describe('visual contract of the actions', () => {
   it('OLED: thin white/10 borders on the tabs and ghost buttons, no grey backgrounds', () => {
     const rep = read('components/steps/StepReport.jsx');
-    expect(rep).toContain("'border-white/10 hover:border-white/30'");
+    expect(rep).toContain("'border-white/10 bg-white/5 hover:bg-white/10'");
     expect(read('components/ui.jsx')).toContain("ghost: 'border border-white/10");
     expect(rep).not.toMatch(/bg-(neutral|gray|zinc|slate|stone)-\d/);
     expect(rep).not.toContain("download('client')");

@@ -14,17 +14,17 @@ import ExportSheet from './workspace/ExportSheet.jsx';
 
 const Stat = ({ id, label, value, tone, hint }) => (
   <div className="rounded-xl border border-white/10 p-3">
-    <p className="text-xs font-semibold text-[#E0E0E0]/70">{label}</p>
+    <p className="text-xs font-semibold text-neutral-400">{label}</p>
     <p data-testid={id} className="mt-0.5 break-words text-xl font-medium tabular-nums" style={tone ? { color: tone } : undefined}>
       {value}
     </p>
-    {hint && <p className="mt-0.5 text-xs text-[#E0E0E0]/60">{hint}</p>}
+    {hint && <p className="mt-0.5 text-xs text-neutral-400">{hint}</p>}
   </div>
 );
 
 const Section = ({ title, children, testId }) => (
   <section data-testid={testId} className="rounded-xl border border-l-2 border-white/10 border-l-white/30 p-3">
-    <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[#E0E0E0]/80">{title}</h2>
+    <h2 className="mb-3 text-sm font-semibold uppercase text-neutral-300">{title}</h2>
     {children}
   </section>
 );
@@ -66,7 +66,7 @@ export default function PostMortem({ project, parent = null, company, photos, se
   };
 
   return (
-    <main className="mx-auto min-h-[100dvh] w-full max-w-3xl bg-black pb-16 text-[#E0E0E0]" data-testid="project-postmortem">
+    <main className="mx-auto min-h-[100dvh] w-full max-w-3xl bg-black pb-16 text-neutral-200" data-testid="project-postmortem">
       <header data-testid="ws-zone-a" className="sticky top-0 z-20 border-b border-white/10 bg-black px-3 pb-3 pt-2">
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
@@ -78,9 +78,9 @@ export default function PostMortem({ project, parent = null, company, photos, se
                 {title}
               </h1>
             </div>
-            <p className="truncate text-sm text-[#E0E0E0]/80">
+            <p className="truncate text-sm text-neutral-300">
               {projectClient(project) || t('proj.noClient')}
-              <span className="text-[#E0E0E0]/50"> · </span>
+              <span className="text-neutral-500"> · </span>
               <span>{where || t('ws.noLocation')}</span>
             </p>
           </div>
@@ -88,7 +88,7 @@ export default function PostMortem({ project, parent = null, company, photos, se
         <p data-testid="pm-closed" className="mt-2 border-l-2 pl-2 text-sm font-semibold" style={{ borderLeftColor: LEVEL_COLOR.closed, color: LEVEL_COLOR.closed }}>
           {t('proj.closed')} · {t('pm.closedOn', { date: date(project.closedAt) })}
           {parent && (
-            <span data-testid="pm-parent" className="block text-xs font-semibold text-[#E0E0E0]/70">
+            <span data-testid="pm-parent" className="block text-xs font-semibold text-neutral-400">
               {t('pm.extOf', { name: projectTitle(parent) || t('proj.untitled') })}
             </span>
           )}
@@ -110,8 +110,8 @@ export default function PostMortem({ project, parent = null, company, photos, se
             />
           </div>
           {pm.pending > 0 && (
-            <p className="mt-2 text-xs text-[#E0E0E0]/70" data-testid="pm-pending">
-              {t('cash.pending')}: <b className="tabular-nums text-[#E0E0E0]">{money(pm.pending)}</b>
+            <p className="mt-2 text-xs text-neutral-400" data-testid="pm-pending">
+              {t('cash.pending')}: <b className="tabular-nums text-neutral-200">{money(pm.pending)}</b>
             </p>
           )}
         </Section>
@@ -130,7 +130,7 @@ export default function PostMortem({ project, parent = null, company, photos, se
 
         <Section title={t('pm.items')} testId="pm-items">
           {groups.length === 0 ? (
-            <p className="text-sm text-[#E0E0E0]/60">{t('pm.noItems')}</p>
+            <p className="text-sm text-neutral-400">{t('pm.noItems')}</p>
           ) : (
             <ul className="space-y-3">
               {groups.map((g, i) => (
@@ -142,7 +142,7 @@ export default function PostMortem({ project, parent = null, company, photos, se
                   {g.rows.length > 0 && (
                     <ul className="mt-1 divide-y divide-white/10 border-l border-white/10 pl-3">
                       {g.rows.map((r) => (
-                        <li key={r.id} className="flex items-baseline justify-between gap-3 py-1 text-xs text-[#E0E0E0]/80">
+                        <li key={r.id} className="flex items-baseline justify-between gap-3 py-1 text-xs text-neutral-300">
                           <span className="min-w-0 flex-1 truncate tabular-nums">
                             {t(`mat.${r.id}`)} · {num(r.packs)} {unit(r.saleUnit)}
                           </span>
@@ -159,12 +159,12 @@ export default function PostMortem({ project, parent = null, company, photos, se
 
         <Section title={`${t('pm.log')} (${pm.logbookCount})`} testId="pm-log">
           {log.length === 0 ? (
-            <p className="text-sm text-[#E0E0E0]/60">{t('pm.logEmpty')}</p>
+            <p className="text-sm text-neutral-400">{t('pm.logEmpty')}</p>
           ) : (
             <ul className="divide-y divide-white/10">
               {log.map((e) => (
                 <li key={e.id} className="py-2">
-                  <p className="text-xs font-semibold text-[#E0E0E0]/60">{date(e.at)}</p>
+                  <p className="text-xs font-semibold text-neutral-400">{date(e.at)}</p>
                   <p className="whitespace-pre-wrap break-words text-sm">{e.text}</p>
                 </li>
               ))}
@@ -177,15 +177,15 @@ export default function PostMortem({ project, parent = null, company, photos, se
             type="button"
             onClick={onExtend}
             data-testid="pm-extension"
-            className="flex min-h-[64px] w-full select-none flex-col items-center justify-center rounded-2xl border-2 border-brand bg-black px-5 text-lg font-medium text-brand transition active:scale-[0.98]"
+            className="flex min-h-[64px] w-full select-none flex-col items-center justify-center rounded-2xl px-5 text-lg transition active:scale-[0.98] bg-brand text-black font-semibold hover:bg-brand-light"
           >
             {t('pm.extension')}
-            <span className="text-xs font-semibold text-[#E0E0E0]/70">{t('pm.extension.hint')}</span>
+            <span className="text-xs font-semibold text-neutral-400">{t('pm.extension.hint')}</span>
           </button>
-          <button type="button" onClick={() => setExporting(true)} data-testid="pm-export" className="min-h-[48px] w-full rounded-xl border border-white/15 text-sm font-semibold text-[#E0E0E0]/80 active:border-white/50">
+          <button type="button" onClick={() => setExporting(true)} data-testid="pm-export" className="min-h-[48px] w-full rounded-xl border border-white/15 text-sm font-semibold text-neutral-300 active:border-white/50">
             {t('pm.export')}
           </button>
-          <button type="button" onClick={reopen} data-testid="pm-reopen" className="min-h-[44px] w-full text-xs font-semibold text-[#E0E0E0]/60 active:text-[#E0E0E0]">
+          <button type="button" onClick={reopen} data-testid="pm-reopen" className="min-h-[44px] w-full text-xs font-semibold text-neutral-400 active:text-neutral-200">
             {t('pm.reopen')}
           </button>
         </div>
