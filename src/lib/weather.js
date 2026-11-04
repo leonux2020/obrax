@@ -22,7 +22,7 @@ export function weatherLevel(temp) {
   return 'ok';
 }
 
-const round = (n, d) => Math.round(n * 10 ** d) / 10 ** d;
+export const round = (n, d) => Math.round(n * 10 ** d) / 10 ** d;
 
 /**
  * What to look up for a project: a saved GPS point ({ lat, lng }), else the city text ("Santiago, RM" -> "Santiago") with the country of
@@ -62,7 +62,7 @@ function writeCache(storage, entry) {
 }
 
 /** GET json with a hard timeout; null on ANY failure (offline, abort, non-2xx, not json). */
-async function getJson(fetchImpl, url, timeoutMs) {
+export async function getJson(fetchImpl, url, timeoutMs) {
   const ctl = typeof AbortController === 'function' ? new AbortController() : null;
   const timer = setTimeout(() => ctl?.abort(), timeoutMs);
   try {

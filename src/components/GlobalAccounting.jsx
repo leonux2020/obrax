@@ -139,7 +139,9 @@ export default function GlobalAccounting({ projects, onOpenProject = null, onExp
     <main className="mx-auto w-full max-w-3xl px-3 pb-44 pt-3 sm:px-4" data-testid="accounting">
       <header className="mb-2 flex min-h-[44px] items-center gap-2" data-testid="acc-header">
         <Logo size={24} />
-        <h1 className="min-w-0 flex-1 truncate text-lg font-medium tracking-tight">{t('nav.accountingShort')}</h1>
+        {/* no visible title: the bottom nav already says where you are (the heading stays for screen readers) */}
+        <h1 className="sr-only">{t('nav.accountingShort')}</h1>
+        <span className="flex-1" />
         <BackupBadge />
       </header>
 

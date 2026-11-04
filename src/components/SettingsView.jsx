@@ -271,10 +271,11 @@ export default function SettingsView({
     {layers}
     <div className="min-h-screen bg-black" data-testid="settings-view">
       <main className="mx-auto w-full max-w-3xl space-y-4 px-3 pb-44 pt-4 sm:px-4">
-        <div className="flex items-center justify-between gap-2">
-          <h1 className="text-2xl font-medium" data-testid="settings-title">
-            {t('settings.title')}
-          </h1>
+        {/* no visible page title: the bottom nav already says where you are. The heading stays for screen readers. */}
+        <h1 className="sr-only" data-testid="settings-title">
+          {t('settings.title')}
+        </h1>
+        <div className="flex items-center justify-end gap-2">
           <BackupBadge size={22} />
         </div>
 

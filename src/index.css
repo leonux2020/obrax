@@ -243,3 +243,16 @@ body.eco-mode *::after {
     display: none !important;
   }
 }
+
+/* The weather badge of a project card fades in when its reading lands (the card never waited for it) */
+@keyframes wx-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.wx-in {
+  animation: wx-in 0.5s ease-out;
+}

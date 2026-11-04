@@ -9,13 +9,16 @@ import { hasRentalDue } from '../lib/ledger.js';
 import { isClosed, projectClient, projectLevel, projectTitle } from '../lib/projects.js';
 import { LEVEL_COLOR, levelDetail } from './levelStyle.js';
 import Hourglass from './Hourglass.jsx';
+import WeatherBadge from './WeatherBadge.jsx';
+import { useCardWeather } from '../lib/useCardWeather.js';
 
 /**
  * One client job, full width. The WHOLE card is the button (no Open / Edit buttons): a hairline neutral outline and a
  * thick LEFT stripe that is the ONLY thing carrying the state colour, plus the country flag, the days
- * that matter and an hourglass when a rented tool is due back today.
+ * that matter, an hourglass when a rented tool is due back today and, once it lands, the local weather (temperature, sky and a wind
+ * warning above 30 km/h).
  */
-export default function ProjectCard({ project, now, onOpen }) {
+export default function ProjectCard({ project, now, onOpen, weatherOpts = null }) {
   const { t, lang } = useI18n();
   const region = getRegion(project.draft.regionCode);
   const closed = isClosed(project);
@@ -23,6 +26,8 @@ export default function ProjectCard({ project, now, onOpen }) {
   const level = closed ? 'closed' : info.level;
   const detail = closed ? t('proj.closed') : levelDetail(t, info);
   const rentalDue = !closed && hasRentalDue(project, now);
+  // passive weather: never awaited, a closed job has no use for it; with no signal / no place the badge simply does not exist
+  const wx = useCardWeather(project, project.draft.regionCode, { ...weatherOpts, ...(closed ? { enabled: false } : {}) });
 
   // Same inputs as the project screen; it re-prices whenever the market window rolls over (15 min) or the day changes.
   const priceTime = pricingTime(project.draft, now);
@@ -55,6 +60,7 @@ export default function ProjectCard({ project, now, onOpen }) {
             {client && <span className="block truncate text-sm text-neutral-300">{client}</span>}
           </span>
           {rentalDue && <Hourglass label={t('rental.dueToday')} />}
+          <WeatherBadge wx={wx} regionCode={project.draft.regionCode} />
           <span className="text-base leading-none" aria-hidden="true" data-testid="card-flag">
             {region?.flag}
           </span>
