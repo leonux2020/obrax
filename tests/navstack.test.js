@@ -161,6 +161,108 @@ describe('universal back stack: sheets inside the real app', () => {
     expect(layerDepth()).toBe(0);
   });
 
+  it('Ajustes -> Squadra: Back closes ONLY the sheet; Ajustes stays, and a second Back goes to Proyectos', async () => {
+    await click(q('nav-settings'));
+    await click(q('settings-squadra'));
+    expect(q('squadra-sheet') ?? document.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(layerDepth()).toBe(1);
+    await deviceBack();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(q('settings-view')).not.toBeNull(); // still on Ajustes
+    expect(q('project-card')).toBeNull();
+    expect(window.history.state).toEqual({ cubraxTab: 'settings' });
+    expect(layerDepth()).toBe(0);
+    await deviceBack();
+    expect(q('settings-view')).toBeNull();
+    expect(q('project-card')).not.toBeNull();
+  });
+
+  it('Ajustes -> firma: Back closes ONLY the signature sheet and Ajustes comes back intact (accordion still open)', async () => {
+    await click(q('nav-settings'));
+    await click(q('settings-signature'));
+    expect(q('contractor-sign-sheet')).not.toBeNull();
+    await deviceBack();
+    expect(q('contractor-sign-sheet')).toBeNull();
+    expect(q('settings-view')).not.toBeNull();
+    expect(q('settings-signature')).not.toBeNull(); // the accordion kept its state
+    expect(window.history.state).toEqual({ cubraxTab: 'settings' });
+    await deviceBack();
+    expect(q('project-card')).not.toBeNull();
+  });
+
+  it('Ajustes -> Squadra -> worker file: Back unwinds one layer at a time (file, directory, Ajustes, Proyectos)', async () => {
+    await click(q('nav-settings'));
+    await click(q('settings-squadra'));
+    await click([...document.querySelectorAll('button')].find((b) => /^worker-new|squadra-new/.test(b.dataset.testid || '')) ?? q('squadra-new'));
+    expect(layerDepth()).toBe(2);
+    await deviceBack();
+    expect(layerDepth()).toBe(1);
+    expect(q('settings-view')).not.toBeNull();
+    await deviceBack();
+    expect(layerDepth()).toBe(0);
+    expect(q('settings-view')).not.toBeNull();
+    await deviceBack();
+    expect(q('settings-view')).toBeNull();
+    expect(q('project-card')).not.toBeNull();
+  });
+
+  const openAcc = async (id) => {
+    const d = q(id);
+    d.open = true;
+    await act(async () => {
+      d.dispatchEvent(new Event('toggle'));
+    });
+    await flush(10);
+  };
+
+  it('Ajustes: an open accordion is a layer; Back folds the last opened first and Ajustes stays, then Proyectos', async () => {
+    await click(q('nav-settings'));
+    await openAcc('settings-profile');
+    await openAcc('settings-ops');
+    expect(layerDepth()).toBe(2);
+    await deviceBack();
+    expect(q('settings-ops').open).toBe(false);
+    expect(q('settings-profile').open).toBe(true);
+    expect(q('settings-view')).not.toBeNull();
+    await deviceBack();
+    expect(q('settings-profile').open).toBe(false);
+    expect(q('settings-view')).not.toBeNull();
+    expect(window.history.state).toEqual({ cubraxTab: 'settings' });
+    expect(layerDepth()).toBe(0);
+    await deviceBack();
+    expect(q('settings-view')).toBeNull();
+    expect(q('project-card')).not.toBeNull();
+  });
+
+  it('Ajustes: signature over an open accordion: Back closes the signature, then the accordion, then Ajustes', async () => {
+    await click(q('nav-settings'));
+    await openAcc('settings-ops');
+    await click(q('settings-signature'));
+    expect(q('contractor-sign-sheet')).not.toBeNull();
+    expect(layerDepth()).toBe(2); // the accordion layer was not remounted by the screen swap
+    await deviceBack();
+    expect(q('contractor-sign-sheet')).toBeNull();
+    expect(q('settings-ops').open).toBe(true);
+    await deviceBack();
+    expect(q('settings-ops').open).toBe(false);
+    expect(q('settings-view')).not.toBeNull();
+    await deviceBack();
+    expect(q('project-card')).not.toBeNull();
+    expect(layerDepth()).toBe(0);
+  });
+
+  it('Ajustes with an accordion open: tapping another tab, then Back, never strands the user', async () => {
+    await click(q('nav-settings'));
+    await openAcc('settings-profile');
+    await click(q('nav-accounting'));
+    expect(q('accounting')).not.toBeNull();
+    expect(layerDepth()).toBe(0);
+    await deviceBack();
+    await flush(30);
+    expect(q('accounting')).toBeNull();
+    expect(q('project-card')).not.toBeNull(); // (a leftover Ajustes entry may remain underneath: it is inert, nothing reacts to it)
+  });
+
   it('switching between tabs keeps ONE history entry: Contabilidad -> Ajustes -> Back lands on Proyectos', async () => {
     await click(q('nav-accounting'));
     await click(q('nav-settings'));

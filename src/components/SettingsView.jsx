@@ -8,6 +8,7 @@ import { detectCurrentRegion } from '../lib/geo.js';
 import { BACKUP_FOLDER } from '../lib/drive.js';
 import { compressLogo, LOGO_LIMITS } from '../lib/logo.js';
 import { PhotoError } from '../lib/photos.js';
+import { useBackLayer } from '../lib/backStack.js';
 import { CloudUploadIcon, FileSignatureIcon, GlobeIcon, SmartphoneIcon, UserIcon, UsersIcon } from './workspace/icons.jsx';
 import { Button, Switch, TextField } from './ui.jsx';
 import GoogleButton from './GoogleButton.jsx';
@@ -16,6 +17,12 @@ import RegionCombobox from './RegionCombobox.jsx';
 import InstallButton from './InstallButton.jsx';
 import ContractorSignatureSheet from './ContractorSignatureSheet.jsx';
 import SquadraSheet from './squadra/SquadraSheet.jsx';
+
+/** An open accordion is a back-stack layer: the device's Back folds it (one per press, the last opened first) and Ajustes stays on screen. */
+function OpenLayer({ onClose }) {
+  useBackLayer(onClose);
+  return null;
+}
 
 /** One collapsible block of Ajustes (closed by default). `open` is kept by the parent so it survives the signature canvas (which swaps the screen). */
 function Accordion({ testId, titleId, icon: Icon, title, open, onToggle, children, bodyClassName = '' }) {
@@ -226,8 +233,13 @@ export default function SettingsView({
     </div>
   );
 
+  // The layers live in a fragment OUTSIDE the swap below, so the signature canvas replacing the screen never remounts them (no stray history entries)
+  const layers = ['profile', 'ops', 'locale'].filter((k) => openAcc[k]).map((k) => <OpenLayer key={k} onClose={() => setOpenAcc((o) => ({ ...o, [k]: false }))} />);
+
   if (signing) {
     return (
+      <>
+        {layers}
       <ContractorSignatureSheet
         value={form.signature}
         onSave={(ink) => {
@@ -240,10 +252,13 @@ export default function SettingsView({
         }}
         onClose={() => setSigning(false)}
       />
+      </>
     );
   }
 
   return (
+    <>
+    {layers}
     <div className="min-h-screen bg-black" data-testid="settings-view">
       <main className="mx-auto w-full max-w-3xl space-y-4 px-3 pb-44 pt-4 sm:px-4">
         <div className="flex items-center justify-between gap-2">
@@ -542,5 +557,6 @@ export default function SettingsView({
       </main>
       {squadra && <SquadraSheet onClose={() => setSquadra(false)} />}
     </div>
+    </>
   );
 }
