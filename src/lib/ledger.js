@@ -110,6 +110,15 @@ export const normalizeCrew = (raw) =>
     return { id: idOf(w.id, used), name, specialty: WORKER_SPECIALTIES.includes(w.specialty) ? w.specialty : 'multi', notes: sanitizeText(w.notes, 120).trim(), ...(typeof w.ref === 'string' && ID_RE.test(w.ref) ? { ref: w.ref, ...(w.health === true ? { health: true } : {}) } : {}) }; // `ref`: the file of the global directory (workers.js) it was picked from; `health`: that file carried health notes when the person was added (safety net if the file is later deleted)
   });
 
+export const PHASE_LIMIT = 40;
+/** `project.phases` (the Cronograma): [{ id, name, startDate, endDate, done }]. Dates are ISO days or ''; an end before the start is dropped; the name may be empty (and keeps its spaces) while it is being typed. */
+export const normalizePhases = (raw) =>
+  listOf(raw, PHASE_LIMIT, (p, used) => {
+    const startDate = day(p.startDate);
+    const endDate = day(p.endDate);
+    return { id: idOf(p.id, used), name: sanitizeText(p.name, 60), startDate, endDate: startDate && endDate && endDate < startDate ? '' : endDate, done: p.done === true };
+  });
+
 /**
  * Splits the advances by person: `rows` = every crew member with the advances given to them and their total; `loose` = the advances
  * that belong to nobody (legacy records, or a person removed later) with their total. Nothing is lost: Σ rows + loose = Σ advances.

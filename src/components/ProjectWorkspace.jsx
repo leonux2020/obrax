@@ -29,6 +29,7 @@ import SnapGrid, { PhotoEditToggle } from './SnapGrid.jsx';
 import { Button } from './ui.jsx';
 import CashBlock from './workspace/CashBlock.jsx';
 import CrewBlock from './workspace/CrewBlock.jsx';
+import TimelineBlock from './workspace/TimelineBlock.jsx';
 import Dock from './workspace/Dock.jsx';
 import ExpensesBlock from './workspace/ExpensesBlock.jsx';
 import ExportSheet from './workspace/ExportSheet.jsx';
@@ -47,7 +48,7 @@ import { useConfirm } from './ConfirmSheet.jsx';
  * finance, report): nothing sends the user to another editor.
  *
  *   ZONE A  header that never scrolls away: name, client, place, traffic light + days, live total, bars.
- *   ZONE B  the living list, all accordions: partidas (measures + materials + prices), crew & schedule, machinery rentals,
+ *   ZONE B  the living list, all accordions: partidas (measures + materials + prices), crew, machinery rentals,
  *           selectors (labour / transport / contingencies / profit / tax) and expenses. Every number is typed on the app's
  *           own numpad; the quote recalculates on the next render and the price goes to the user's book in IndexedDB.
  *   ZONE C  bottom dock: Bitácora, Cámara, Boleta IA, Exportar (each one a bottom sheet).
@@ -55,7 +56,7 @@ import { useConfirm } from './ConfirmSheet.jsx';
  * Locked (PDF generated or client signature): Zone B is read-only and a tap answers "Precios bloqueados" until the user
  * unlocks it. Offline-first: nothing here needs the network (see the receipt queue, the base catalog and Blob photos).
  */
-const MENU_BLOCKS = ['crew', 'finance', 'cash', 'log', 'expenses']; // the grid tiles that open a bottom sheet
+const MENU_BLOCKS = ['crew', 'finance', 'cash', 'log', 'expenses', 'timeline']; // the grid tiles that open a bottom sheet
 
 /**
  * Navigation context of the detail view. The project opens in one of two modes:
@@ -213,11 +214,12 @@ function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, c
         <PartidaList draft={draft} groups={groups} open={ui.open} locked={Boolean(locked)} onBlocked={blocked} showErrors onToggle={toggle} onUpdate={updatePartida} onTask={changeTask} onAdd={addPartida} onRemove={removePartida} onPrice={openPrice} result={result} setDraft={setDraft} projectLocation={location} />
         {/* the quick-control grid (Android settings style): each circle opens its content in a bottom sheet */}
         <div className="grid grid-cols-3 gap-4 p-4" data-testid="ws-menu">
-        <CrewBlock project={project} result={result} locked={Boolean(locked)} onBlocked={blocked} setProject={setProject} open={ui.open.crew} onToggle={toggle} />
+        <CrewBlock project={project} result={result} setProject={setProject} open={ui.open.crew} onToggle={toggle} />
         <FinanceBlock draft={draft} locked={Boolean(locked)} onBlocked={blocked} setDraft={edit} open={ui.open.finance} onToggle={toggle} />
         <CashBlock projectId={project.id} total={total} payments={project.payments} onChange={setList('payments')} open={ui.open.cash} onToggle={toggle} />
         <LogBlock entries={project.logbook} onChange={setList('logbook')} open={ui.open.log} onToggle={toggle} projectId={project.id} />
         <ExpensesBlock expenses={project.expenses} queued={queued} receipts={receipts} onChange={setList('expenses')} open={ui.open.expenses} onToggle={toggle} />
+        <TimelineBlock project={project} setProject={setProject} onBlocked={blocked} open={ui.open.timeline} onToggle={toggle} />
         </div>
         {/* machinery has no module of its own: each task lists the machines it uses; exceptions surface in the tray */}
         <AlertTray alerts={projectAlerts(project, t, { now: Date.now(), budget: result.valid ? total : null, queue: queued, money: (n) => i18n.moneyIn(n, projectMarket(project).currency) }).filter((a) => a.kind !== 'deadline')} />

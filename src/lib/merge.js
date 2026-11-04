@@ -13,8 +13,9 @@
 import { mergeTomb, normalizeTomb } from './tombstones.js';
 import { MAX_PHOTOS } from './photos.js';
 import { mergeCapsule } from './capsule.js';
+import { syncDates } from './phases.js';
 
-export const RECORD_COLLECTIONS = Object.freeze(['payments', 'advances', 'expenses', 'crew', 'logbook']);
+export const RECORD_COLLECTIONS = Object.freeze(['payments', 'advances', 'expenses', 'crew', 'logbook', 'phases']);
 /** The money vectors: cobros (payments), anticipos (advances) and gastos (expenses). Their `amount` is forced to a real number on every merge. */
 export const FINANCIAL_COLLECTIONS = Object.freeze(['payments', 'advances', 'expenses']);
 
@@ -185,7 +186,7 @@ export function mergeProject(a, b) {
   const photoTomb = mergeTomb(a.photoTomb, b.photoTomb, MAX_PHOTOS);
   if (Object.keys(photoTomb).length) merged.photoTomb = photoTomb;
   else delete merged.photoTomb;
-  return merged;
+  return syncDates(merged); // the Cronograma was merged by phase: the project's dates follow the merged phases, on every device alike
 }
 
 /**

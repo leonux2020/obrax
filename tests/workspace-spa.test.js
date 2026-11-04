@@ -247,25 +247,17 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(crew.querySelector('[aria-hidden="true"].bg-brand')).toBeNull();
   });
 
-  it('two plain date fields (inicio / entrega) edit the project and the duration is the subtraction, shown statically', async () => {
+  it('Squadra is ONLY the people: no start / delivery dates, no day count (the schedule lives in the Cronograma); the title is just "Cuadrilla"', async () => {
     await mount(mk());
     await openCrew();
-    expect(q('crew-start').type).toBe('date');
-    expect(q('crew-start').value).toBe(day(-5));
-    expect(q('crew-end').value).toBe(day(20));
-    expect(q('crew-duration').dataset.days).toBe('25');
-    expect(q('crew-duration').textContent).toContain('25 días');
-    await typeInto(q('crew-end'), day(24));
-    expect(spy.project.endDate).toBe(day(24));
-    expect(q('crew-duration').dataset.days).toBe('29');
-    await typeInto(q('crew-start'), day(-4));
-    expect(spy.project.startDate).toBe(day(-4));
-    expect(q('crew-duration').dataset.days).toBe('28');
-    await typeInto(q('crew-end'), day(-4));
-    expect(q('crew-duration').textContent).toContain('0 días');
-    await typeInto(q('crew-end'), '');
-    expect(spy.project.endDate).toBe('');
-    expect(q('crew-duration').textContent).toContain('—');
+    for (const id of ['crew-dates', 'crew-start', 'crew-end', 'crew-duration']) expect(q(id), id).toBeNull();
+    expect(q('ws-crew-sheet').querySelector('input[type="date"]')).toBeNull();
+    expect(q('ws-crew-sheet').closest('[role="dialog"]').textContent).toContain(DICT.es['ws.crew.title']);
+    expect(DICT.es['ws.crew.title']).toBe('Cuadrilla');
+    expect(DICT.it['ws.crew.title']).toBe('Squadra'); // "Squadra e cronoprogramma" is gone from every language
+    for (const l of ['es', 'en', 'pt', 'fr', 'it', 'de']) expect(DICT[l]['ws.crew.title'], l).not.toMatch(/crono|schedule|planning|zeitplan| e | and | und | et /i);
+    expect(q('ws-crew').textContent).not.toMatch(/ · \d+ d\b/); // the tile no longer carries the days
+    expect(q('crew-bar').compareDocumentPosition(q('crew-master')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('the master search adds people (no dialog): the bar is always there, a typed name needs a tap, and the person shows up as a contact row', async () => {
@@ -813,20 +805,10 @@ describe('read-only while locked', () => {
     await click(q('partida-add') ?? qa('locked-shield')[0]);
   });
 
-  it('the Start / Delivery dates are read-only behind the shield while locked; the people and their advances stay editable', async () => {
+  it('while the quote is locked the people and their advances stay editable (the dates are in the Cronograma now)', async () => {
     await mount(lockedProject());
     await click(q('ws-crew'));
-    const dates = q('crew-dates');
-    expect(dates.closest('fieldset').disabled).toBe(true);
-    expect(q('crew-start').closest('fieldset').disabled).toBe(true); // the inputs sit inside the disabled fieldset: no focus, no keyboard
-    expect(q('crew-end').closest('fieldset').disabled).toBe(true);
-    const shield = dates.closest('[data-locked="true"]').querySelector('[data-testid="locked-shield"]');
     const before = spy.project;
-    await click(shield);
-    expect(q('toast').textContent).toBe('Precios bloqueados');
-    expect(spy.project.startDate).toBe(before.startDate);
-    expect(spy.project.endDate).toBe(before.endDate);
-    expect(q('crew-duration').dataset.days).toBe('25'); // still shown (statically)
     // operational: NOT locked
     expect(q('crew-search').closest('fieldset')).toBeNull();
     await typeInto(q('crew-search'), 'Luca');
@@ -847,10 +829,12 @@ describe('read-only while locked', () => {
     await click(q('ws-unlock'));
     await click(q('unlock-confirm'));
     expect(qa('locked-shield')).toHaveLength(0);
-    await click(q('ws-crew'));
-    expect(q('crew-start').closest('fieldset')).toBeNull();
-    await typeInto(q('crew-end'), day(24));
-    expect(spy.project.endDate).toBe(day(24));
+    await click(q('ws-timeline'));
+    await click(q('phase-add'));
+    const id = spy.project.phases[0].id;
+    expect(q(`phase-start-${id}`).closest('fieldset')).toBeNull();
+    await typeInto(q(`phase-start-${id}`), day(3));
+    expect(spy.project.phases[0].startDate).toBe(day(3));
   });
 });
 

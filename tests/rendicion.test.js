@@ -527,7 +527,7 @@ describe('ProjectAudit (ledger) + RenditionBar + the Contabilidad card', () => {
 
   it('none of the operational tools is mounted: no grid, no capture, no dock, no partidas', async () => {
     await audit();
-    for (const id of ['ws-menu', 'ws-crew', 'ws-finance', 'ws-cash', 'ws-log', 'ws-expenses', 'ws-zone-b', 'ws-zone-c', 'dock-log', 'dock-camera', 'dock-scan', 'dock-export', 'cash-amount', 'project-workspace']) expect(q(id), id).toBeNull();
+    for (const id of ['ws-menu', 'ws-crew', 'ws-finance', 'ws-cash', 'ws-log', 'ws-expenses', 'ws-timeline', 'ws-zone-b', 'ws-zone-c', 'dock-log', 'dock-camera', 'dock-scan', 'dock-export', 'cash-amount', 'project-workspace']) expect(q(id), id).toBeNull();
     expect(q('project-audit').querySelector('details')).toBeNull();
   });
 

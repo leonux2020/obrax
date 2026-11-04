@@ -3,50 +3,16 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { CREW_LIMIT, LEDGER_LIMITS, WORKER_SPECIALTIES, advancesByWorker, laborPool } from '../../lib/ledger.js';
 import { sanitizeText } from '../../lib/sanitize.js';
 import { hasHealthNotes, isBirthdayToday, loadWorkers } from '../../lib/workers.js';
-import { calendarDays, withAdvance, withProjectDates, withWorker, withWorkerEdited, withoutAdvance, withoutWorker } from '../../lib/workspaceModel.js';
+import { withAdvance, withWorker, withWorkerEdited, withoutAdvance, withoutWorker } from '../../lib/workspaceModel.js';
 import BottomSheet from '../BottomSheet.jsx';
 import { EditToggle, RowDelete } from '../EditControls.jsx';
 import BirthdayMark from '../squadra/BirthdayMark.jsx';
-import { DateInput, TextField } from '../ui.jsx';
+import { TextField } from '../ui.jsx';
 import Block from './Block.jsx';
 import { CREW_RANGES, DEFAULT_RANGE, LOCAL_KM, crewHealth, findByName, norm, rankWorkers } from '../../lib/crewMatch.js';
 import CrewSuggest, { initialsOf } from './CrewSuggest.jsx';
-import LockedZone from './LockedZone.jsx';
 import NumberPad from './NumberPad.jsx';
 import { CoinsIcon, Outline, UsersIcon } from './icons.jsx';
-
-/**
- * The two job dates, typed by hand, as ONE minimalist pill on a single line: "📅 23/10/2026 ➔ 25/10/2026 (2 días)". Each date is a real
- * date field (the whole field opens the calendar) stripped of its box; the days between them are a plain subtraction, no estimate.
- */
-function Dates({ project, setProject }) {
-  const { t } = useI18n();
-  const startId = useId();
-  const endId = useId();
-  const days = calendarDays(project);
-  const bare = '!min-h-[40px] !w-[8.6rem] !rounded-lg !border-transparent !bg-transparent !px-1.5 !py-0 text-center text-sm tabular-nums';
-  return (
-    <div className="flex min-h-[48px] flex-wrap items-center justify-center gap-x-1 gap-y-0 rounded-full border border-white/10 px-3 py-1" data-testid="crew-dates">
-      <span aria-hidden="true" className="text-base leading-none">
-        📅
-      </span>
-      <label className="sr-only" htmlFor={startId}>
-        {t('ws.crew.start')}
-      </label>
-      <DateInput id={startId} className={bare} value={project.startDate} onChange={(e) => setProject((p) => withProjectDates(p, { startDate: e.target.value }))} data-testid="crew-start" />
-      <span aria-hidden="true" className="text-neutral-400">
-        ➔
-      </span>
-      <label className="sr-only" htmlFor={endId}>
-        {t('ws.crew.end')}
-      </label>
-      <DateInput id={endId} className={bare} value={project.endDate} min={project.startDate || undefined} onChange={(e) => setProject((p) => withProjectDates(p, { endDate: e.target.value }))} data-testid="crew-end" />
-      <span className="text-sm tabular-nums text-neutral-300" data-testid="crew-duration" data-days={days ?? ''} aria-label={t('ws.crew.duration')}>
-        ({days === null ? '—' : t(days === 1 ? 'ws.crew.day1' : 'ws.crew.dayN', { n: days })})
-      </span>
-    </div>
-  );
-}
 
 /**
  * IN-SITU EMERGENCY PANEL (read only), at the very top of a person's sheet: the limiting conditions, allergies and emergency contact written in
@@ -266,12 +232,12 @@ function WorkerCard({ row, health = false, birthday = false, editing = false, ex
 }
 
 /**
- * ZONE B, "Squadra e cronoprogramma": the schedule is MANUAL (start date, delivery date, and the calendar days between them) and the
- * crew is a NOMINAL list of the people physically on site. Cash advances are handed to a person (their card has the "+ Anticipo"
+ * ZONE B, "Squadra": ONLY the people (the schedule lives in its own module, TimelineBlock). The crew is a NOMINAL list of the people physically
+ * on site, found and added from ONE master search. Cash advances are handed to a person (their card has the "+ Anticipo"
  * button, which opens the app's numpad); every advance is still one entry of `project.advances`, so the labour pool and the project's
  * cash (ledger.js) keep adding all of them. Nothing here is a theoretical estimate any more (no man-hours, no dead days, no bars).
  */
-export default function CrewBlock({ project, result, locked, onBlocked, setProject, open, onToggle }) {
+export default function CrewBlock({ project, result, setProject, open, onToggle }) {
   const { t, money, region } = useI18n();
   const [sheet, setSheet] = useState(null); // null | worker id (the sheet that edits one person)
   const [editMode, setEditMode] = useState(false); // the pencil of the header: the delete icons only exist while it is on
@@ -284,7 +250,6 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
   const crew = project.crew ?? [];
   const { rows, loose, looseTotal } = advancesByWorker(crew, project.advances);
   const pool = laborPool(result.valid ? result.quote.labor : 0, project.advances);
-  const days = calendarDays(project);
   const editing = sheet ? crew.find((w) => w.id === sheet) : null;
   // the directory is read again whenever a sheet or the dropdown opens or closes (its file may have just been edited)
   const directory = useMemo(() => loadWorkers(), [sheet, open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -356,14 +321,8 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
   );
 
   return (
-    <Block icon={<UsersIcon size={32} />} label={t('ws.menu.crew')} id="crew" title={t('ws.crew.title')} meta={`${t(crew.length === 1 ? 'ws.crew.count1' : 'ws.crew.countN', { n: crew.length })}${days !== null ? ` · ${days} ${t('sched.d')}` : ''}`} open={open} onToggle={onToggle} testId="ws-crew" tall headerAction={editToggle}>
+    <Block icon={<UsersIcon size={32} />} label={t('ws.menu.crew')} id="crew" title={t('ws.crew.title')} meta={t(crew.length === 1 ? 'ws.crew.count1' : 'ws.crew.countN', { n: crew.length })} open={open} onToggle={onToggle} testId="ws-crew" tall headerAction={editToggle}>
       <div className="space-y-3">
-        {/* the dates set the days of the machinery rental (a direct cost): read-only, with the shield, while the quote is frozen / signed.
-            The people and their advances below are operational, so they stay editable. */}
-        <LockedZone locked={locked} onBlocked={onBlocked}>
-          <Dates project={project} setProject={setProject} />
-        </LockedZone>
-
         {/* the labour balance is read BEFORE handing out an advance; under it ONE column, like the phone's contacts: the master search, one line of
             chips (distance + trade), the live suggestions of the company's directory and the crew on the job. No stacked sheets. */}
         <div className="space-y-2">

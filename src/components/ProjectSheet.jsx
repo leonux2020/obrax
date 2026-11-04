@@ -6,6 +6,7 @@ import { searchPlaces } from '../lib/forwardGeocode.js';
 import { SEARCH_DEBOUNCE_MS, useCitySearch } from '../lib/useCitySearch.js';
 import { REGIONS } from '../lib/regions.js';
 import { marketChangeImpact, quoteLock } from '../lib/workspaceModel.js';
+import { hasPhaseDates } from '../lib/phases.js';
 import { normalizeLocation } from '../lib/ledger.js';
 import { cleanCityOrRegion, isClosed, parseDay, toDayString } from '../lib/projects.js';
 import { sanitizeText } from '../lib/sanitize.js';
@@ -92,6 +93,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
   const start = parseDay(form.startDate);
   const end = parseDay(form.endDate);
   const badRange = Boolean(start && end && end < start);
+  const phased = editing && hasPhaseDates(project.phases);
 
   // The target button of the city field (the ONLY GPS control of the form): GPS fix -> Nominatim -> city name + saved coordinates. Silent: the icon pulses, no modal.
   const findCity = async () => {
@@ -196,11 +198,18 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
         )}
 
         {editing && <SectionTitle>{t('edit.sectionDates')}</SectionTitle>}
-        <div className="grid grid-cols-2 gap-3">
-          <DateField label={t('proj.start')} value={form.startDate} onChange={set('startDate')} />
-          <DateField label={t('proj.end')} value={form.endDate} onChange={set('endDate')} invalid={badRange} />
-        </div>
-        {badRange && (
+        {phased ? (
+          // the Cronograma has dates: they ARE the project's dates (earliest start, latest end), so there is nothing to type here
+          <p className="text-xs text-neutral-400" data-testid="project-dates-derived">
+            {[project.startDate, project.endDate].filter(Boolean).join(' → ')} · {t('proj.datesDerived')}
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <DateField label={t('proj.start')} value={form.startDate} onChange={set('startDate')} />
+            <DateField label={t('proj.end')} value={form.endDate} onChange={set('endDate')} invalid={badRange} />
+          </div>
+        )}
+        {badRange && !phased && (
           <p role="alert" className="text-sm font-medium text-red-400">
             {t('proj.endBeforeStart')}
           </p>

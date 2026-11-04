@@ -50,6 +50,7 @@ import { useHistoryBack } from './lib/useHistoryBack.js';
 import ToastHost from './components/workspace/ToastHost.jsx';
 import { isStandalone } from './pwa/installPrompt.js';
 import { withMarket, quoteLock } from './lib/workspaceModel.js';
+import { syncDates } from './lib/phases.js';
 import { askNotifyPermission, pushToast, systemNotify, updateToast } from './lib/notify.js';
 import { collectDossierImages, syncDossier } from './lib/driveExport.js';
 import { receiptQueue } from './lib/receiptQueue.js';
@@ -541,7 +542,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   };
 
   const editProject = (project, fields) => {
-    commit({
+    commit(syncDates({
       ...project,
       startDate: fields.startDate,
       endDate: fields.endDate,
@@ -555,7 +556,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
         frozen: fields.unfreeze ? null : project.draft.frozen,
         project: { name: sanitizeText(fields.name, 60).trim(), client: sanitizeText(fields.client, 60).trim() },
       },
-    });
+    })); // the Cronograma, when it has dates, owns the project's two dates
     if (REGIONS[fields.regionCode] && fields.regionCode !== project.draft.regionCode && !quoteLock(project.draft)) pushToast({ key: 'ws.market.done', tone: 'ok' });
     setSheet(null);
   };

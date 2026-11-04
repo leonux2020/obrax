@@ -128,17 +128,17 @@ describe('Squadra of a project: the unified selector', () => {
     expect(q('crew-list').contains(q(`worker-${spy.project.crew[0].id}`))).toBe(true);
   });
 
-  it('the structure of the sheet is the same in every project: dates, control line, master search, list', async () => {
+  it('the structure of the sheet is the same in every project: control line, master search, list', async () => {
     const order = async (extra) => {
       await mount(extra);
-      const ids = ['crew-dates', 'crew-bar', 'crew-master', 'crew-list'].filter((id) => q(id));
+      const ids = ['crew-bar', 'crew-master', 'crew-list'].filter((id) => q(id));
       act(() => root.unmount());
       root = createRoot(host);
       return ids;
     };
     const a = await order({ crew: [{ id: 'crew0001', name: 'Ana', specialty: 'multi' }] });
     const b = await order({ crew: [{ id: 'crew0001', name: 'Ana', specialty: 'multi' }], cityOrRegion: 'Maipú', startDate: '2026-01-01', endDate: '2026-02-01' });
-    expect(a).toEqual(['crew-dates', 'crew-bar', 'crew-master', 'crew-list']);
+    expect(a).toEqual(['crew-bar', 'crew-master', 'crew-list']);
     expect(b).toEqual(a);
   });
 });

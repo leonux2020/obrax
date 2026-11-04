@@ -371,7 +371,7 @@ describe('no way out to the old editor + queue list', () => {
   it('there is no "Editor avanzado": crew, finance, cash, log and expenses live in the screen; machinery has no module of its own any more', async () => {
     await mount({ initial: mk() });
     expect(q('ws-advanced')).toBeNull();
-    expect(['ws-crew', 'ws-finance', 'ws-cash', 'ws-log', 'ws-expenses'].map((k) => !!q(k))).toEqual([true, true, true, true, true]);
+    expect(['ws-crew', 'ws-finance', 'ws-cash', 'ws-log', 'ws-expenses', 'ws-timeline'].map((k) => !!q(k))).toEqual([true, true, true, true, true, true]);
     expect(q('ws-machinery')).toBeNull();
     expect(q('project-workspace').textContent).not.toMatch(/maquinaria y arriendos/i);
     expect(q('partida-machinery-0')).not.toBeNull(); // it lives inside the task now
@@ -379,7 +379,7 @@ describe('no way out to the old editor + queue list', () => {
 
   it('Zone B: every module is a circle with a thin outline icon (currentColor) and a short label under it', async () => {
     await mount({ initial: mk() });
-    for (const id of ['ws-crew', 'ws-finance', 'ws-cash', 'ws-log', 'ws-expenses']) {
+    for (const id of ['ws-crew', 'ws-finance', 'ws-cash', 'ws-log', 'ws-expenses', 'ws-timeline']) {
       const summary = q(id); // the grid tile
       const circle = q(`${id}-circle`);
       const icon = circle.querySelector('svg[data-outline-icon="true"]');
@@ -405,13 +405,13 @@ describe('no way out to the old editor + queue list', () => {
     // the partidas keep their task icon, same size family
     expect(q('partida-summary-0').querySelector('svg')).not.toBeNull();
     // the modules appear in this order
-    const order = [...document.querySelectorAll('[data-testid="ws-zone-b"], [data-testid="ws-crew"], [data-testid="ws-finance"], [data-testid="ws-cash"], [data-testid="ws-log"], [data-testid="ws-expenses"], [data-testid="ws-alerts"]')].map((n) => n.dataset.testid);
-    expect(order).toEqual(['ws-zone-b', 'ws-crew', 'ws-finance', 'ws-cash', 'ws-log', 'ws-expenses']); // no exceptions => no tray
+    const order = [...document.querySelectorAll('[data-testid="ws-zone-b"], [data-testid="ws-crew"], [data-testid="ws-finance"], [data-testid="ws-cash"], [data-testid="ws-log"], [data-testid="ws-expenses"], [data-testid="ws-timeline"], [data-testid="ws-alerts"]')].map((n) => n.dataset.testid);
+    expect(order).toEqual(['ws-zone-b', 'ws-crew', 'ws-finance', 'ws-cash', 'ws-log', 'ws-expenses', 'ws-timeline']); // no exceptions => no tray
     // a 3-column grid of tiles
     expect(q('ws-menu').className).toContain('grid-cols-3');
     expect(q('ws-menu').className).toContain('gap-4');
     expect(q('ws-menu').className).toContain('p-4');
-    expect(q('ws-menu').children).toHaveLength(5);
+    expect(q('ws-menu').children).toHaveLength(6); // the sixth circle: Cronograma (two full rows of three)
   });
 
   it('no exceptions: the alert tray is not rendered at all (absolute visual silence)', async () => {

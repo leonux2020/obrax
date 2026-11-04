@@ -7,7 +7,8 @@ import { getRegion } from './regions.js';
 import { normalizeDraft, normalizeCompany, newDraft, isCompanyEmpty } from './draft.js';
 import { sanitizeText } from './sanitize.js';
 import { normalizeLogo } from './logo.js';
-import { normalizeAdvances, normalizeCrew, normalizeExpenses, normalizeLocation, normalizeLogbook, normalizePayments } from './ledger.js';
+import { normalizeAdvances, normalizeCrew, normalizeExpenses, normalizeLocation, normalizeLogbook, normalizePayments, normalizePhases } from './ledger.js';
+import { syncDates } from './phases.js';
 
 export const MAX_PROJECTS = 200;
 const ID_RE = /^[a-z0-9]{6,24}$/;
@@ -152,6 +153,7 @@ export function newProject({ regionCode, mode = 'quick', company = null, logo = 
     ...(parentId && ID_RE.test(parentId) ? { parentId } : {}),
     payments: [],
     crew: [],
+    phases: [], // the Cronograma: once a phase has dates, startDate / endDate above follow them (lib/phases.js)
     advances: [],
     expenses: [],
     logbook: [],
@@ -200,7 +202,8 @@ export function normalizeProject(obj) {
   const endOk = parseDay(obj.endDate) && !(start && parseDay(start) > parseDay(obj.endDate));
   const created = Number(obj.createdAt);
   const updated = Number(obj.updatedAt);
-  return {
+  const phases = normalizePhases(obj.phases);
+  return syncDates({
     id: obj.id,
     createdAt: Number.isFinite(created) ? created : 0,
     updatedAt: Number.isFinite(updated) ? updated : Number.isFinite(created) ? created : 0,
@@ -213,6 +216,7 @@ export function normalizeProject(obj) {
     ...(typeof obj.parentId === 'string' && ID_RE.test(obj.parentId) ? { parentId: obj.parentId } : {}), // the job this one extends (older records have none)
     payments: normalizePayments(obj.payments),
     crew: normalizeCrew(obj.crew), // the people on site (older records have none)
+    phases, // the Cronograma (older records have none)
     advances: normalizeAdvances(obj.advances),
     expenses: normalizeExpenses(obj.expenses).map((e) => ({ ...e, projectId: obj.id })), // an expense always knows its project (old records get it here)
     logbook: normalizeLogbook(obj.logbook),
@@ -220,7 +224,7 @@ export function normalizeProject(obj) {
     ...(Object.keys(normalizeTomb(obj.photoTomb, 12)).length ? { photoTomb: normalizeTomb(obj.photoTomb, 12) } : {}), // slots of the camera photos deleted here ({ slot: deletedAt })
     draft: normalizeDraft(obj.draft, regionCode),
     ...(normalizeTotals(obj.totals) ? { totals: normalizeTotals(obj.totals) } : {}), // derived cache (total / paid / pending): recalculated by recalculateProjectTotals after every merge
-  };
+  });
 }
 
 export function normalizeProjects(list) {

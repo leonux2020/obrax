@@ -5,7 +5,8 @@ import { LEVEL_COLOR } from '../components/levelStyle.js';
 import { MAX_PRICE } from './pricing.js';
 import { dayDiff, isClosed, parseDay, projectLevel } from './projects.js';
 import { parseISODay, spanDays } from './schedule.js';
-import { CREW_LIMIT, LEDGER_LIMITS, newEntryId, normalizeAdvances, normalizeCrew } from './ledger.js';
+import { CREW_LIMIT, LEDGER_LIMITS, PHASE_LIMIT, newEntryId, normalizeAdvances, normalizeCrew, normalizePhases } from './ledger.js';
+import { syncDates } from './phases.js';
 import { DEFAULT_MACHINERY, MACHINE_IDS } from './machinery.js';
 import { savedMeta } from './priceBook.js';
 import { aiRetailer } from './suppliers.js';
@@ -149,6 +150,59 @@ export function withProjectDates(project, patch) {
 
 /** Calendar days between the two dates (delivery - start, so same day = 0), or null while one of them is missing. Pure subtraction, no estimate. */
 export const calendarDays = (project) => spanDays(project?.startDate, project?.endDate);
+
+// ---- the Cronograma: the job as a vertical list of phases -------------------------------------------------------------------------
+// The project's startDate / endDate are DERIVED from the phases (lib/phases.js `syncDates`): every function below returns a project whose two
+// dates already follow them. The dates are part of the quote (they set the days of the machinery rental): while it is frozen / signed a phase's
+// DATES are read-only (the SAME project comes back); its name and its "completed" mark stay operational.
+const cleanPhase = (p) => normalizePhases([p])[0] ?? null;
+const withPhaseList = (project, phases) => syncDates({ ...project, phases });
+
+/** Adds a phase (name only; dates come later). SAME project when the list is full. */
+export function withPhaseAdded(project, data = {}) {
+  const phases = project.phases ?? [];
+  const p = cleanPhase({ name: '', ...data, id: data.id ?? newEntryId(), done: false });
+  return p && phases.length < PHASE_LIMIT ? withPhaseList(project, [...phases, p]) : project;
+}
+
+/**
+ * Edits a phase: `patch` = { name?, startDate?, endDate?, done? }. Like the old pair of project dates: a start past the end drags the end to that
+ * day, an end before the start is refused, junk changes nothing. Dates are refused while the quote is locked. SAME project when nothing changes.
+ */
+export function withPhaseEdited(project, id, patch = {}) {
+  const phases = project.phases ?? [];
+  const cur = phases.find((x) => x.id === id);
+  if (!cur) return project;
+  const touchesDates = typeof patch.startDate === 'string' || typeof patch.endDate === 'string';
+  if (touchesDates && quoteLock(project.draft)) return project;
+  const next = { ...cur };
+  if (typeof patch.name === 'string') next.name = patch.name;
+  if (typeof patch.done === 'boolean') next.done = patch.done;
+  if (touchesDates) {
+    const startGiven = typeof patch.startDate === 'string';
+    let start = startGiven ? patch.startDate : cur.startDate;
+    let end = typeof patch.endDate === 'string' ? patch.endDate : cur.endDate;
+    if (!validDay(start) || !validDay(end)) return project;
+    if (start && end && parseISODay(end) < parseISODay(start)) {
+      if (!startGiven) return project;
+      end = start;
+    }
+    next.startDate = start;
+    next.endDate = end;
+  }
+  const clean = cleanPhase(next);
+  if (!clean || JSON.stringify(clean) === JSON.stringify(cur)) return project;
+  return withPhaseList(project, phases.map((x) => (x.id === id ? clean : x)));
+}
+
+/** Removes a phase. While the quote is locked a phase WITH dates stays (removing it would move the job's dates). The project's dates keep the last value when no phase has dates left. */
+export function withoutPhase(project, id) {
+  const phases = project.phases ?? [];
+  const cur = phases.find((x) => x.id === id);
+  if (!cur) return project;
+  if ((cur.startDate || cur.endDate) && quoteLock(project.draft)) return project;
+  return withPhaseList(project, phases.filter((x) => x.id !== id));
+}
 
 // ---- the crew: named people, and the cash advanced to each one ---------------------------------------------------------------------
 const cleanWorker = (w) => normalizeCrew([w])[0] ?? null;

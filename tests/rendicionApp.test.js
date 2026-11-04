@@ -145,7 +145,7 @@ describe('Contabilidad -> project in AUDIT mode (pure ledger)', () => {
     await h.mount();
     await flush(100);
     await openFinance();
-    for (const id of ['ws-menu', 'ws-crew', 'ws-finance', 'ws-cash', 'ws-log', 'ws-expenses', 'ws-zone-c', 'dock-log', 'dock-camera', 'dock-scan', 'dock-export', 'cash-amount', 'cash-add']) expect(q(id), id).toBeNull();
+    for (const id of ['ws-menu', 'ws-crew', 'ws-finance', 'ws-cash', 'ws-log', 'ws-expenses', 'ws-timeline', 'ws-zone-c', 'dock-log', 'dock-camera', 'dock-scan', 'dock-export', 'cash-amount', 'cash-add']) expect(q(id), id).toBeNull();
     expect(q('project-audit').querySelector('input, textarea, select, form')).toBeNull();
     expect(q('project-audit').querySelector('details')).toBeNull();
     // the only buttons of the screen: the "Cerrar Rendición" one
