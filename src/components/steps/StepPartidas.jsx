@@ -5,6 +5,7 @@ import { MAX_PARTIDAS, newPartida } from '../../lib/draft.js';
 import { partidaTitle } from '../../lib/reports.js';
 import { sanitizeText } from '../../lib/sanitize.js';
 import { Badge, Button, TextField } from '../ui.jsx';
+import { useConfirm } from '../ConfirmSheet.jsx';
 import TaskPicker, { TaskIcon } from '../TaskPicker.jsx';
 import DimsForm from '../DimsForm.jsx';
 import HseButton from '../HseSheet.jsx';
@@ -12,6 +13,7 @@ import HseButton from '../HseSheet.jsx';
 /** Project mode: list, add, edit and delete partidas. Shared materials are consolidated downstream. */
 export default function StepPartidas({ draft, setDraft, result, showErrors }) {
   const { t, num, unit } = useI18n();
+  const [ask, confirmNode] = useConfirm();
   const [editing, setEditing] = useState(() => draft.partidas.find((_, i) => !result.partidas[i]?.validation.valid)?.id ?? null);
 
   const update = (id, fn) =>
@@ -26,11 +28,11 @@ export default function StepPartidas({ draft, setDraft, result, showErrors }) {
     setEditing(p.id);
   };
 
-  const remove = (id) => {
-    if (!window.confirm(t('part.confirmDelete'))) return;
-    setDraft((d) => ({ ...d, partidas: d.partidas.filter((p) => p.id !== id) }));
-    if (editing === id) setEditing(null);
-  };
+  const remove = (id) =>
+    ask({ message: t('part.confirmDelete'), confirmLabel: t('common.delete') }, () => {
+      setDraft((d) => ({ ...d, partidas: d.partidas.filter((p) => p.id !== id) }));
+      if (editing === id) setEditing(null);
+    });
 
   const changeTask = (id, task) =>
     update(id, (p) => ({ ...p, task, dims: defaultDims(task, p.dims), waste: TASKS[task].defaultWaste }));
@@ -132,6 +134,7 @@ export default function StepPartidas({ draft, setDraft, result, showErrors }) {
       </Button>
       {draft.partidas.length >= MAX_PARTIDAS && <p className="text-sm text-neutral-400">{t('part.max', { n: MAX_PARTIDAS })}</p>}
       {draft.partidas.length > 1 && <p className="text-sm text-brand">{t('part.consolidated')}</p>}
+    {confirmNode}
     </section>
   );
 }

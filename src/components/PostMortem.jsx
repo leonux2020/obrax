@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
+import { useConfirm } from './ConfirmSheet.jsx';
 import { computeAll } from '../lib/engine.js';
 import { planningTimeline, pricingTime } from '../lib/signature.js';
 import { locationLabel } from '../lib/ledger.js';
@@ -40,6 +41,7 @@ export default function PostMortem({ project, parent = null, company, photos, se
   const { t, money, num, unit, locale, region } = i18n;
   const draft = project.draft;
   const regionCode = draft.regionCode;
+  const [ask, confirmNode] = useConfirm();
   const [exporting, setExporting] = useState(false);
   const book = useProjectBook(regionCode, project.location);
   const priceTime = pricingTime(draft, project.closedAt); // priced as of the day it was finished
@@ -61,9 +63,7 @@ export default function PostMortem({ project, parent = null, company, photos, se
   const log = [...(project.logbook ?? [])].sort((a, b) => b.at - a.at);
 
   const exportDoc = (kind) => runExport(kind, { project, result, total, priceTime, company, photos, i18n, setDraft }); // the sheet shows the error
-  const reopen = () => {
-    if (window.confirm(t('pm.reopen.confirm'))) onReopen();
-  };
+  const reopen = () => ask({ message: t('pm.reopen.confirm'), confirmLabel: t('pm.reopen'), danger: false }, onReopen);
 
   return (
     <main className="mx-auto min-h-[100dvh] w-full max-w-3xl bg-black pb-16 text-neutral-200" data-testid="project-postmortem">
@@ -192,6 +192,7 @@ export default function PostMortem({ project, parent = null, company, photos, se
       </div>
 
       {exporting && <ExportSheet canPdf={result.valid} onExport={exportDoc} onClose={() => setExporting(false)} />}
+      {confirmNode}
     </main>
   );
 }

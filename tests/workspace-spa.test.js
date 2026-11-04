@@ -395,8 +395,12 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     await click(q(`worker-adv-${id}`));
     await keys('1000');
     await click(q('pad-done'));
-    expect(q(`worker-advlist-${id}`)).toBeNull(); // quiet by default
-    expect(q(`worker-total-${id}`)).toBeNull();
+    expect(q(`worker-advlist-${id}`)).toBeNull(); // the detail is quiet by default...
+    expect(q(`worker-total-${id}`).dataset.total).toBe('1000'); // ...but the TOTAL already advanced is always on the row, passive
+    expect(q(`worker-edit-${id}`).contains(q(`worker-total-${id}`))).toBe(true);
+    for (const cls of ['text-neutral-400', 'text-xs', 'font-medium']) expect(q(`worker-total-${id}`).className).toContain(cls);
+    expect(q(`worker-total-${id}`).nextElementSibling).toBeNull();
+    expect(q(`worker-total-${id}`).closest('div').contains(q(`worker-adv-${id}`))).toBe(true); // same line as the advance button
     await click(q('crew-edit-toggle'));
     const list = q(`worker-advlist-${id}`);
     expect(card.contains(list)).toBe(true);
@@ -478,8 +482,7 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     const [juan, marta] = spy.project.crew;
     const pool0 = Number(q('labor-pool').dataset.available);
     expect(pool0).toBeGreaterThan(0);
-    await click(q('crew-edit-toggle')); // the totals and their detail are read in edit mode
-    expect(q(`worker-total-${juan.id}`).textContent).toBe('Sin anticipos');
+    expect(q(`worker-total-${juan.id}`)).toBeNull(); // nothing advanced yet: nothing to show
     await click(q(`worker-adv-${juan.id}`));
     expect(q('advance-pad')).not.toBeNull();
     expect(host.querySelector('input:focus')).toBeNull();
@@ -489,14 +492,15 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(spy.project.advances).toHaveLength(1);
     expect(spy.project.advances[0]).toMatchObject({ workerId: juan.id, worker: 'Juan', amount: 5000 });
     expect(q(`worker-total-${juan.id}`).dataset.total).toBe('5000');
-    expect(q(`worker-total-${marta.id}`).dataset.total).toBe('0');
+    expect(q(`worker-total-${marta.id}`)).toBeNull();
     await click(q(`worker-adv-${marta.id}`));
     await keys('1200');
     await click(q('pad-done'));
     await click(q(`worker-adv-${juan.id}`));
     await keys('300');
     await click(q('pad-done'));
-    expect(q(`worker-total-${juan.id}`).dataset.total).toBe('5300'); // the card's history adds up
+    expect(q(`worker-total-${juan.id}`).dataset.total).toBe('5300'); // the row's total adds up
+    await click(q('crew-edit-toggle')); // the detail of each advance is read (and can be deleted) in edit mode
     expect(q(`worker-advlist-${juan.id}`).children).toHaveLength(2);
     expect(q(`worker-total-${marta.id}`).dataset.total).toBe('1200');
     expect(Number(q('labor-pool').dataset.available)).toBe(pool0 - 6500); // the pool discounts EVERY advance

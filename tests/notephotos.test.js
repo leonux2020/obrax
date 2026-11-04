@@ -310,8 +310,8 @@ describe('📸 photo notes', () => {
     await click(q('ws-log'));
     await flush(30);
     expect(q('wlog-thumb-log001')).not.toBeNull(); // read back from the store
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     await click(q('wlog-del-log001'));
+    await click(q('confirm-sheet-ok'));
     await flush(30);
     expect(await notePhotosFor(p.id).get('log001')).toBeNull();
     expect((await stored()).logbook).toHaveLength(0);

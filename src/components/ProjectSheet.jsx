@@ -8,6 +8,7 @@ import { cleanCityOrRegion, isClosed, parseDay, toDayString } from '../lib/proje
 import { sanitizeText } from '../lib/sanitize.js';
 import { Button, DateInput, Switch, TextField } from './ui.jsx';
 import BottomSheet from './BottomSheet.jsx';
+import { useConfirm } from './ConfirmSheet.jsx';
 import RegionCombobox from './RegionCombobox.jsx';
 
 function DateField({ label, value, onChange, invalid }) {
@@ -45,6 +46,7 @@ const ModeIcon = ({ mode }) => (
  */
 export default function ProjectSheet({ project, onSave, onDelete, onClose, locate = currentPosition, detectRegion = detectCurrentRegion, defaultRegion = null }) {
   const { t } = useI18n();
+  const [ask, confirmNode] = useConfirm();
   const editing = Boolean(project);
   const [form, setForm] = useState(() => ({
     name: project?.draft.project.name ?? '',
@@ -237,14 +239,13 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
           <Button
             variant="danger"
             className="w-full !min-h-[44px] text-sm"
-            onClick={() => {
-              if (window.confirm(t('proj.delete.confirm'))) onDelete();
-            }}
+            onClick={() => ask({ message: t('proj.delete.confirm'), confirmLabel: t('proj.delete') }, onDelete)}
           >
             {t('proj.delete')}
           </Button>
         )}
       </form>
+      {confirmNode}
     </BottomSheet>
   );
 }

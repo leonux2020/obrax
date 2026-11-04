@@ -6,7 +6,8 @@ const SWIPE_CLOSE_PX = 90;
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
 /**
- * Bottom sheet (one-hand ergonomics): anchored to the bottom of the screen, pure #000 with an ultra
+ * Bottom sheet (one-hand ergonomics): EVERY sheet of the app rises from the bottom (`sheet-slide`, a short ease-out) over a softly fading backdrop;
+ * `prefers-reduced-motion` and the battery `eco-mode` switch every animation off in index.css. Anchored to the bottom of the screen, pure #000 with an ultra
  * thin border (`tall`: an expanded sheet, 85 % of the screen, for dense lists). `headerAction` REPLACES the x of the header with another
  * control (the photo sheet shows its Edit toggle there): that sheet closes the native way (device Back, swipe down, backdrop, Escape). Focus is trapped inside, Escape / backdrop close it and focus returns to the opener.
  */
@@ -79,7 +80,7 @@ export default function BottomSheet({ title, subtitle, onClose, fullscreen = fal
 
   return (
     <div
-      className="no-print fixed inset-0 z-50 flex items-end justify-center bg-black/80"
+      className="sheet-fade no-print fixed inset-0 z-50 flex items-end justify-center bg-black/80"
       data-testid="sheet-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose(); // only the dark area: a tap inside the sheet does nothing
@@ -93,7 +94,7 @@ export default function BottomSheet({ title, subtitle, onClose, fullscreen = fal
         tabIndex={-1}
         data-swipe-close={swipeToClose ? 'true' : undefined}
         {...swipe}
-        className={`${swipeToClose ? 'sheet-slide ' : ''}relative w-full outline-none overflow-y-auto overscroll-contain border border-white/10 bg-black p-5 [padding-bottom:max(1.25rem,env(safe-area-inset-bottom))] ${
+        className={`sheet-slide relative w-full outline-none overflow-y-auto overscroll-contain border border-white/10 bg-black p-5 [padding-bottom:max(1.25rem,env(safe-area-inset-bottom))] ${
           fullscreen ? 'h-[100dvh] max-w-none border-0 sm:mx-auto sm:max-w-3xl sm:border' : tall ? 'h-[85vh] max-h-[92vh] max-w-lg rounded-t-3xl border-b-0' : 'max-h-[92vh] max-w-lg rounded-t-3xl border-b-0'
         }`}
       >

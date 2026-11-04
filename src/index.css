@@ -162,7 +162,18 @@ input[type='range'].slider-min:focus-visible {
   border-radius: 9999px;
 }
 
-/* Bottom sheet that slides up (swipeToClose sheets) */
+/* Bottom sheets: ALL of them rise from below and the backdrop fades in (no motion under prefers-reduced-motion / body.eco-mode, see below) */
+@keyframes sheet-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.sheet-fade {
+  animation: sheet-fade 0.18s ease-out;
+}
 @keyframes sheet-up {
   from {
     transform: translateY(40px);

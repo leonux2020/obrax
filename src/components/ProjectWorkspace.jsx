@@ -40,6 +40,7 @@ import AlertTray from './workspace/AlertTray.jsx';
 import { projectAlerts } from '../lib/alerts.js';
 import SupplierPad from './workspace/SupplierPad.jsx';
 import PartidaList from './workspace/PartidaList.jsx';
+import { useConfirm } from './ConfirmSheet.jsx';
 
 /**
  * The project as ONE screen (SPA). It replaces the old project view AND the whole wizard (measures, prices, crew, machinery,
@@ -104,6 +105,7 @@ function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, c
   const partidaOpen = useMemo(() => Object.fromEntries(Object.entries(ui.open).filter(([id]) => !MENU_BLOCKS.includes(id))), [ui.open]);
   useAccordionBack(partidaOpen, (id) => dispatch({ type: 'toggle', id, open: false }));
   const closeSheet = () => dispatch({ type: 'closeSheet' });
+  const [ask, confirmNode] = useConfirm();
 
   useEffect(() => {
     warmPdfEngine(); // the PDF engine is loaded now, so exporting works without a network later
@@ -135,10 +137,8 @@ function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, c
     dispatch({ type: 'toggle', id: p.id, open: true });
     return undefined;
   };
-  const removePartida = (id) => {
-    if (!window.confirm(t('part.confirmDelete'))) return;
-    edit((d) => ({ ...d, partidas: d.partidas.filter((p) => p.id !== id) }));
-  };
+  const removePartida = (id) =>
+    ask({ message: t('part.confirmDelete'), confirmLabel: t('common.delete') }, () => edit((d) => ({ ...d, partidas: d.partidas.filter((p) => p.id !== id) })));
 
   // ---- material prices: numpad -> project -> computeAll -> IndexedDB (the user's standard price) ------------------------------
   const openPrice = (id) => (locked ? blocked() : dispatch({ type: 'openPad', kind: 'material', id }));
@@ -269,6 +269,7 @@ function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, c
       )}
       {ui.sheet === 'camera' && <PhotoSheet photos={photos} setPhotos={setPhotos} projectId={project.id} onClose={closeSheet} />}
       {ui.sheet === 'scan' && <ReceiptSheet onSave={saveExpenses} existing={project.expenses} onQueue={park} onClose={closeSheet} />}
+      {confirmNode}
     </main>
   );
 }

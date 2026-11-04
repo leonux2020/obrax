@@ -167,9 +167,10 @@ function WorkerSheet({ worker, file = null, health = false, onSave, onDelete, on
 }
 
 /**
- * One person as a MINIMAL row: the name (tap it for their sheet), the birthday cake on the day, the orange health triangle and the compact
- * [coins Anticipo] button, all on one line. Nothing else lives on the row. In EDIT MODE (the pencil of the sheet's header) the row also wears
- * its delete icon on the left and reveals what was handed over (total + detail, each entry deletable) right under the line.
+ * One person as a MINIMAL row: the name (tap it for their sheet), the birthday cake on the day, the orange health triangle, the total already
+ * advanced to them (quiet, always visible, right next to the button: it is read BEFORE handing out more money) and the compact [coins Anticipo]
+ * button, all on one line. In EDIT MODE (the pencil of the sheet's header) the row also wears its delete icon on the left and reveals the
+ * detail of each advance (deletable) right under the line.
  */
 function WorkerCard({ row, health = false, birthday = false, editing = false, onEdit, onAdvance, onRemove, onRemoveAdvance }) {
   const { t, money, locale } = useI18n();
@@ -179,7 +180,7 @@ function WorkerCard({ row, health = false, birthday = false, editing = false, on
     <li className="rounded-xl border border-white/10 bg-black" data-testid={`worker-${w.id}`} data-specialty={w.specialty}>
       <div className="flex items-center gap-1 pr-2">
         {editing && <RowDelete name={w.name} testId={`worker-del-${w.id}`} onConfirm={onRemove} />}
-        <button type="button" onClick={onEdit} data-testid={`worker-edit-${w.id}`} aria-label={`${t('ws.crew.sheetEdit')}: ${w.name}${health ? ` · ⚠ ${t('squadra.healthFlag')}` : ''}`} className={`flex min-h-[56px] min-w-0 flex-1 items-center gap-2 py-1.5 text-left ${editing ? 'pl-1' : 'pl-4'}`}>
+        <button type="button" onClick={onEdit} data-testid={`worker-edit-${w.id}`} aria-label={`${t('ws.crew.sheetEdit')}: ${w.name}${health ? ` · ⚠ ${t('squadra.healthFlag')}` : ''}${total > 0 ? ` · ${t('ws.crew.advanced')}: ${money(total)}` : ''}`} className={`flex min-h-[56px] min-w-0 flex-1 items-center gap-2 py-1.5 text-left ${editing ? 'pl-1' : 'pl-4'}`}>
           <span className="min-w-0 truncate text-base font-medium text-neutral-200" data-testid={`worker-name-${w.id}`}>
             {w.name}
           </span>
@@ -188,6 +189,11 @@ function WorkerCard({ row, health = false, birthday = false, editing = false, on
           {health && (
             <span role="img" aria-label={t('squadra.healthFlag')} title={t('squadra.healthFlag')} data-testid={`worker-health-${w.id}`} className="shrink-0 text-lg leading-none text-orange-500">
               ⚠
+            </span>
+          )}
+          {total > 0 && (
+            <span className="ml-auto shrink-0 pl-2 text-xs font-medium tabular-nums text-neutral-400" data-testid={`worker-total-${w.id}`} data-total={total}>
+              {money(total)}
             </span>
           )}
         </button>
@@ -204,12 +210,8 @@ function WorkerCard({ row, health = false, birthday = false, editing = false, on
       </div>
       {editing && (
         <div className="border-t border-white/5 px-4 py-1.5" data-testid={`worker-detail-${w.id}`}>
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-medium text-neutral-500">{t('ws.crew.advanced')}</p>
-            <p className="text-sm font-medium tabular-nums" data-testid={`worker-total-${w.id}`} data-total={total}>
-              {total > 0 ? money(total) : t('ws.crew.noAdvances')}
-            </p>
-          </div>
+          <p className="text-xs font-medium text-neutral-500">{t('ws.crew.advanced')}</p>
+          {list.length === 0 && <p className="text-xs font-medium text-neutral-500">{t('ws.crew.noAdvances')}</p>}
           {list.length > 0 && (
             <ul className="mt-0.5 divide-y divide-white/5" data-testid={`worker-advlist-${w.id}`}>
               {list.map((a) => (

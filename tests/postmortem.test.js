@@ -292,8 +292,8 @@ describe('Post-Mortem screen', () => {
     await openHistory();
     await click(q('project-card'));
     expect(window.history.state?.cubraxProject).toBeTruthy();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     await click(q('pm-reopen'));
+    await click(q('confirm-sheet-ok'));
     expect(q('project-postmortem')).toBeNull();
     expect(q('project-workspace')).not.toBeNull();
     await flush(300);

@@ -5,6 +5,7 @@ import { sanitizeText } from '../../lib/sanitize.js';
 import { PhotoError } from '../../lib/photos.js';
 import { notePhotosFor, prepareNotePhoto } from '../../lib/notePhotos.js';
 import { useDictation } from '../../lib/useDictation.js';
+import { useConfirm } from '../ConfirmSheet.jsx';
 import Block from './Block.jsx';
 import { NoteThumb, PhotoLightbox, useNotePhoto } from './NotePhoto.jsx';
 import { BookOpenIcon } from './icons.jsx';
@@ -208,6 +209,7 @@ function NoteRow({ entry, store, editing, setEditing, onDelete, onOpenPhoto, onS
 export default function LogBlock({ entries, onChange, open, onToggle, projectId = '_' }) {
   const { t, locale } = useI18n();
   const store = useMemo(() => notePhotosFor(projectId), [projectId]);
+  const [ask, confirmNode] = useConfirm();
   const [editing, setEditing] = useState(null); // { id, text, photo: 'keep' | 'remove' | { blob, width, height } }
   const [viewer, setViewer] = useState('');
   const [saveError, setSaveError] = useState('');
@@ -228,12 +230,12 @@ export default function LogBlock({ entries, onChange, open, onToggle, projectId 
     onChange(editNote(entries, id, editing.text, photo === 'keep' ? undefined : photo !== 'remove'));
     setEditing(null);
   };
-  const remove = (e) => {
-    if (!window.confirm(t('ws.log.confirmDelete'))) return;
-    onChange(entries.filter((x) => x.id !== e.id));
-    if (e.photo) store.remove(e.id).catch(() => {});
-    if (editing?.id === e.id) setEditing(null);
-  };
+  const remove = (e) =>
+    ask({ message: t('ws.log.confirmDelete'), confirmLabel: t('common.delete') }, () => {
+      onChange(entries.filter((x) => x.id !== e.id));
+      if (e.photo) store.remove(e.id).catch(() => {});
+      if (editing?.id === e.id) setEditing(null);
+    });
 
   return (
     <Block icon={<BookOpenIcon size={32} />} label={t('ws.menu.log')} id="log" title={t('ws.log.title')} meta={entries.length ? String(entries.length) : ''} open={open} onToggle={onToggle} testId="ws-log">
@@ -249,6 +251,7 @@ export default function LogBlock({ entries, onChange, open, onToggle, projectId 
         </ul>
       )}
       {viewer && <PhotoLightbox url={viewer} onClose={() => setViewer('')} />}
+      {confirmNode}
     </Block>
   );
 }

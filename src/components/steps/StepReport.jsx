@@ -5,6 +5,7 @@ import { savePdf } from '../../lib/pdf.js';
 import { createReportPdf, kindForView, pdfToFile, sharePdfFile, warmPdfEngine } from '../../lib/reportPdf.js';
 import { photosForReport, countPhotos } from '../../lib/photos.js';
 import { Button, Logo, Switch } from '../ui.jsx';
+import { useConfirm } from '../ConfirmSheet.jsx';
 import SignatureField from '../SignatureField.jsx';
 
 /** On-screen 2x2 photo grid (also what gets printed). */
@@ -326,6 +327,7 @@ function TechView({ model, photos }) {
 export default function StepReport({ draft, setDraft, result, pricedAt, photos, company, onNewProject }) {
   const i18n = useI18n();
   const { t, region } = i18n;
+  const [ask, confirmNode] = useConfirm();
   const [view, setView] = useState('client');
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(null); // 'download' | 'share' | null: one PDF job at a time
@@ -485,13 +487,12 @@ export default function StepReport({ draft, setDraft, result, pricedAt, photos, 
       <Button
         variant="danger"
         className="no-print w-full"
-        onClick={() => {
-          if (window.confirm(t('report.confirmNew'))) onNewProject();
-        }}
+        onClick={() => ask({ message: t('report.confirmNew'), confirmLabel: t('report.newProject') }, onNewProject)}
       >
         {t('report.newProject')}
       </Button>
       <p className="no-print text-center text-xs text-neutral-500">{t('report.generatedBy')}</p>
+    {confirmNode}
     </section>
   );
 }

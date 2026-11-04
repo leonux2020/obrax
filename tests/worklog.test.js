@@ -169,11 +169,15 @@ describe('Bitácora de obra accordion (Zone B)', () => {
   it('delete: asks first; confirmed it leaves the list and the stored project; declined it stays', async () => {
     await open(active());
     await click(q('ws-log'));
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const native = vi.spyOn(window, 'confirm');
     await click(q('wlog-del-log002'));
+    expect(q('confirm-sheet')).not.toBeNull(); // the app's own sheet, not the system pop-up
+    await click(document.querySelector('[data-testid="confirm-sheet-cancel"]'));
     expect(qa('wlog-note')).toHaveLength(2);
+    expect(q('confirm-sheet')).toBeNull();
     await click(q('wlog-del-log002'));
-    expect(confirm).toHaveBeenCalledTimes(2);
+    await click(document.querySelector('[data-testid="confirm-sheet-ok"]'));
+    expect(native).not.toHaveBeenCalled();
     expect(qa('wlog-note')).toHaveLength(1);
     const stored = await saved();
     expect(stored.logbook.map((e) => e.id)).toEqual(['log001']);
