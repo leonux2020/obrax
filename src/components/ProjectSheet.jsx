@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { currentPosition, detectCurrentRegion } from '../lib/geo.js';
+import { reverseCity } from '../lib/reverseGeocode.js';
 import { REGIONS } from '../lib/regions.js';
 import { quoteLock } from '../lib/workspaceModel.js';
 import { locationLabel, normalizeLocation } from '../lib/ledger.js';
@@ -25,6 +26,15 @@ function DateField({ label, value, onChange, invalid }) {
 
 const SectionTitle = ({ children }) => <h3 className="pt-2 text-xs font-semibold uppercase text-neutral-400">{children}</h3>;
 
+/** Target / GPS crosshair of the city field: it pulses while the place is being looked up. */
+const TargetIcon = ({ busy }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" data-outline-icon="true" data-icon="target" className={busy ? 'animate-pulse' : undefined}>
+    <circle cx="12" cy="12" r="7" />
+    <circle cx="12" cy="12" r="2" />
+    <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+  </svg>
+);
+
 const ModeIcon = ({ mode }) => (
   <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {mode === 'quick' ? (
@@ -44,8 +54,8 @@ const ModeIcon = ({ mode }) => (
  * New job: the agile form (name, client, Partida Única / Proyecto Completo, dates, "ubicación actual"), no money.
  * Edit job (the pencil inside the project): the same fields + finished / frozen switches + delete.
  */
-export default function ProjectSheet({ project, onSave, onDelete, onClose, locate = currentPosition, detectRegion = detectCurrentRegion, defaultRegion = null }) {
-  const { t } = useI18n();
+export default function ProjectSheet({ project, onSave, onDelete, onClose, locate = currentPosition, detectRegion = detectCurrentRegion, defaultRegion = null, reverse = reverseCity }) {
+  const { t, lang } = useI18n();
   const [ask, confirmNode] = useConfirm();
   const editing = Boolean(project);
   const [form, setForm] = useState(() => ({
@@ -62,6 +72,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
     unfreeze: false,
   }));
   const [geo, setGeo] = useState('idle'); // idle | asking | unsupported | denied | unavailable | timeout
+  const [cityGeo, setCityGeo] = useState('idle'); // idle | asking | unsupported | denied | unavailable | timeout | offline | notfound | failed
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }));
 
   const marketLocked = editing && Boolean(quoteLock(project.draft)); // a signed / frozen quote keeps its market
@@ -81,6 +92,20 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
       setGeo('idle');
     } catch (err) {
       setGeo(['unsupported', 'denied', 'unavailable', 'timeout'].includes(err?.code) ? err.code : 'unavailable');
+    }
+  };
+
+  // Target button of the city field: GPS fix -> Nominatim -> the name of the city / town / village goes into the field. Silent: the icon pulses, no modal.
+  const findCity = async () => {
+    if (cityGeo === 'asking') return;
+    setCityGeo('asking');
+    try {
+      const pos = await locate();
+      const city = await reverse({ lat: Number(pos?.lat), lng: Number(pos?.lng) }, { lang });
+      setForm((f) => ({ ...f, cityOrRegion: cleanCityOrRegion(city) }));
+      setCityGeo('idle');
+    } catch (err) {
+      setCityGeo(['unsupported', 'denied', 'unavailable', 'timeout', 'offline', 'notfound', 'failed'].includes(err?.code) ? err.code : 'failed');
     }
   };
 
@@ -167,7 +192,38 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
           )}
         </div>
 
-        <TextField label={t('project.city')} placeholder={t('project.city.ph')} value={form.cityOrRegion} maxLength={80} testId="project-city" sanitize={(v) => sanitizeText(v, 80)} onChange={set('cityOrRegion')} />
+        <div>
+          <TextField
+            label={t('project.city')}
+            placeholder={t('project.city.ph')}
+            value={form.cityOrRegion}
+            maxLength={80}
+            testId="project-city"
+            sanitize={(v) => sanitizeText(v, 80)}
+            onChange={(v) => {
+              set('cityOrRegion')(v);
+              if (cityGeo !== 'idle' && cityGeo !== 'asking') setCityGeo('idle');
+            }}
+            end={
+              <button
+                type="button"
+                onClick={findCity}
+                aria-busy={cityGeo === 'asking'}
+                aria-label={t('project.city.locate')}
+                title={t('project.city.locate')}
+                data-testid="project-city-locate"
+                className="flex h-11 w-11 items-center justify-center rounded-xl text-neutral-400 transition hover:text-white"
+              >
+                <TargetIcon busy={cityGeo === 'asking'} />
+              </button>
+            }
+          />
+          {!['idle', 'asking'].includes(cityGeo) && (
+            <p role="status" data-testid="project-city-error" className="mt-1.5 text-sm font-medium text-red-400">
+              {t(['unsupported', 'denied', 'unavailable', 'timeout'].includes(cityGeo) ? `newp.geo.${cityGeo}` : `project.city.err.${cityGeo}`)}
+            </p>
+          )}
+        </div>
 
         <div>
           {editing && <SectionTitle>{t('loc.title')}</SectionTitle>}

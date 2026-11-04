@@ -250,7 +250,7 @@ describe('ProjectCard: the place under the title', () => {
       root.render(h(I18nProvider, { lang: 'es', regionCode: 'CL' }, h('ul', null, h(ProjectCard, { project, now: Date.now(), onOpen: () => {} }))));
     });
 
-  it('shows a quiet pin + the city right under the title, before the client (text-neutral-400 text-xs font-medium)', async () => {
+  it('the city sits in the RIGHT column (environment) under flag + weather, right-aligned, quiet (text-neutral-400 text-xs font-medium)', async () => {
     await mount({ cityOrRegion: 'Valparaíso' });
     const place = q('card-place');
     expect(place.textContent).toBe('Valparaíso');
@@ -258,9 +258,18 @@ describe('ProjectCard: the place under the title', () => {
     expect(place.className).toContain('text-neutral-400');
     expect(place.className).toContain('text-xs');
     expect(place.className).toContain('font-medium');
+    expect(place.className).toContain('justify-end');
+    const env = q('card-env');
+    expect(env.className).toContain('items-end');
+    expect(env.className).toContain('text-right');
+    expect(env.contains(place)).toBe(true);
+    expect(env.contains(q('card-flag'))).toBe(true);
+    // flag block first, the city after it (below)
+    expect(q('card-flag').compareDocumentPosition(place) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // the LEFT column is only business: title + client, no place
     const title = q('project-card').querySelector('.text-lg');
-    expect(title.nextElementSibling).toBe(place);
-    expect(place.nextElementSibling.textContent).toBe('Luis');
+    expect(title.parentElement.contains(place)).toBe(false);
+    expect(title.nextElementSibling.textContent).toBe('Luis');
   });
 
   it('falls back to the label of the saved point, never to bare coordinates', async () => {

@@ -60,18 +60,23 @@ export default function ProjectCard({ project, now, onOpen, weatherOpts = null }
         <span className="flex items-start gap-3">
           <span className="min-w-0 flex-1">
             <span className="block truncate text-lg font-semibold">{title}</span>
+            {client && <span className="block truncate text-sm text-neutral-300">{client}</span>}
+          </span>
+          {/* right column = the ENVIRONMENT (flag, weather, city), aligned to the right edge; the left one is the business (project, client, days) */}
+          <span className="flex min-w-0 max-w-[45%] shrink-0 flex-col items-end gap-1 text-right" data-testid="card-env">
+            <span className="flex items-start gap-3">
+              {rentalDue && <Hourglass label={t('rental.dueToday')} />}
+              <WeatherBadge wx={wx} regionCode={project.draft.regionCode} />
+              <span className="text-base leading-none" aria-hidden="true" data-testid="card-flag">
+                {region?.flag}
+              </span>
+            </span>
             {place && (
-              <span className="mt-0.5 flex items-center gap-1 text-xs font-medium text-neutral-400" data-testid="card-place">
+              <span className="flex max-w-full items-center justify-end gap-1 text-xs font-medium text-neutral-400" data-testid="card-place">
                 <MapPinIcon size={12} />
                 <span className="min-w-0 truncate">{place}</span>
               </span>
             )}
-            {client && <span className="block truncate text-sm text-neutral-300">{client}</span>}
-          </span>
-          {rentalDue && <Hourglass label={t('rental.dueToday')} />}
-          <WeatherBadge wx={wx} regionCode={project.draft.regionCode} />
-          <span className="text-base leading-none" aria-hidden="true" data-testid="card-flag">
-            {region?.flag}
           </span>
         </span>
         <span className="mt-3 flex items-end justify-between gap-3">

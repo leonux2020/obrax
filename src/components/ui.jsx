@@ -237,7 +237,7 @@ export function DateInput({ className = '', onClick, ...props }) {
   );
 }
 
-export function TextField({ label, value, onChange, onBlur, placeholder, maxLength = 80, optional, sanitize, testId, type = 'text', inputMode }) {
+export function TextField({ label, value, onChange, onBlur, placeholder, maxLength = 80, optional, sanitize, testId, type = 'text', inputMode, end = null }) {
   const id = useId();
   return (
     <div>
@@ -245,19 +245,22 @@ export function TextField({ label, value, onChange, onBlur, placeholder, maxLeng
         {label}
         {optional && <span className="ml-2 font-normal text-neutral-400">({optional})</span>}
       </label>
-      <input
-        id={id}
-        type={type}
-        inputMode={inputMode || (type === 'tel' ? 'tel' : undefined)}
-        autoComplete="off"
-        maxLength={maxLength}
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(sanitize ? sanitize(e.target.value) : e.target.value)}
-        onBlur={onBlur}
-        data-testid={testId}
-        className="field-input"
-      />
+      <div className={end ? 'relative' : undefined}>
+        <input
+          id={id}
+          type={type}
+          inputMode={inputMode || (type === 'tel' ? 'tel' : undefined)}
+          autoComplete="off"
+          maxLength={maxLength}
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(sanitize ? sanitize(e.target.value) : e.target.value)}
+          onBlur={onBlur}
+          data-testid={testId}
+          className={end ? 'field-input pr-12' : 'field-input'}
+        />
+        {end && <span className="absolute inset-y-0 right-0 flex items-center">{end}</span>}
+      </div>
     </div>
   );
 }
