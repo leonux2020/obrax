@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchCardWeather, readCardWeather } from './weatherService.js';
 import { weatherPlace } from './weather.js';
+import { isHidden, onForeground } from './foreground.js';
 
 const IDLE_MS = 250; // the card is painted first; the lookup starts a moment later (and never during the first frame)
 
@@ -22,6 +23,7 @@ export function useCardWeather(project, regionCode, { enabled = import.meta.env.
     let alive = true;
     let timer = 0;
     const run = () => {
+      if (isHidden()) return; // background: no request; coming back to the front re-checks (a fresh cache answers without one)
       const opts = { online: typeof navigator === 'undefined' || navigator.onLine !== false, ...cacheOpts };
       if (fetchImpl) opts.fetchImpl = fetchImpl;
       fetchCardWeather(place, opts).then((w) => alive && w && setWx(w));
@@ -30,9 +32,11 @@ export function useCardWeather(project, regionCode, { enabled = import.meta.env.
     timer = setTimeout(run, IDLE_MS);
     const back = () => run(); // signal is back: try again (a fresh cache answers without a request)
     window.addEventListener('online', back);
+    const offForeground = onForeground(run);
     return () => {
       alive = false;
       clearTimeout(timer);
+      offForeground();
       window.removeEventListener('online', back);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

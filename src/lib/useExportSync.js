@@ -60,7 +60,8 @@ export function useExportSync({ upload, ensureToken, notify, enabled = true, que
     const waiting = rows.filter((r) => r.status === 'pending');
     if (!waiting.length) return undefined;
     const next = Math.min(...waiting.map((r) => r.nextAt));
-    timer.current = setTimeout(() => isOnline() && run(), Math.min(Math.max(next - Date.now(), 1_000), 5 * 60_000));
+    // hidden: nothing is sent; the visibilitychange wake-up above resumes the queue when the app is back in front
+    timer.current = setTimeout(() => isOnline() && document.visibilityState !== 'hidden' && run(), Math.min(Math.max(next - Date.now(), 1_000), 5 * 60_000));
     return () => clearTimeout(timer.current);
   }, [rows, enabled, run]);
 

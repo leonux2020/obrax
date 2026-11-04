@@ -17,7 +17,7 @@ function useNow(intervalMs = 60_000) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const tick = () => setNow(Date.now());
-    const id = setInterval(tick, intervalMs);
+    const id = setInterval(() => document.visibilityState !== 'hidden' && tick(), intervalMs); // nobody is looking: no re-render
     const onVis = () => document.visibilityState === 'visible' && tick();
     document.addEventListener('visibilitychange', onVis);
     return () => {

@@ -188,20 +188,39 @@ input[type='range'].slider-min:focus-visible {
   animation: sheet-up 0.2s ease-out;
 }
 
+/* Calm motion (CPU / GPU / battery). Two switches, ONE rule: the user's "reduce motion" setting and the battery eco-mode (body.eco-mode,
+   see useEcoMode) do not slow animations down, they REMOVE them: no keyframes, no transitions, no smooth scroll, no sheet slide / fade,
+   no pulses or spinners (the element just stays still), and none of the GPU-heavy extras (blur, compositing hints). */
 @media (prefers-reduced-motion: reduce) {
-  * {
+  html {
+    scroll-behavior: auto !important;
+  }
+  *,
+  *::before,
+  *::after {
     animation: none !important;
     transition: none !important;
+    scroll-behavior: auto !important;
+    will-change: auto !important;
   }
 }
 
 /* Eco-OLED: battery at 20 % or less and not charging (useEcoMode) -> nothing moves, the phone lasts the whole day on site */
+body.eco-mode,
 body.eco-mode *,
 body.eco-mode *::before,
 body.eco-mode *::after {
   animation: none !important;
   transition: none !important;
   scroll-behavior: auto !important;
+  will-change: auto !important;
+}
+body.eco-mode *,
+body.eco-mode *::before,
+body.eco-mode *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  text-shadow: none !important;
 }
 
 /* Printing: ink-friendly white sheet with only the report */

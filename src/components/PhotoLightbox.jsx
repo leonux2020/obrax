@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useI18n } from '../lib/i18n.jsx';
 import { useBackLayer } from '../lib/backStack.js';
+import { scrollBehavior } from '../lib/motion.js';
 
 const CLOSE_SWIPE_PX = 90;
 
@@ -26,7 +27,7 @@ export default function PhotoLightbox({ items, start = 0, onClose }) {
     const el = strip.current;
     const next = Math.min(Math.max(0, i), last);
     setIndex(next);
-    if (el) el.scrollTo?.({ left: next * el.clientWidth, behavior: 'smooth' });
+    if (el) el.scrollTo?.({ left: next * el.clientWidth, behavior: scrollBehavior() });
   };
 
   useEffect(() => {

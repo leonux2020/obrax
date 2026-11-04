@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { fetchWeather, weatherPlace } from '../../lib/weather.js';
+import { isHidden, onForeground } from '../../lib/foreground.js';
 
 const Thermo = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -26,6 +27,7 @@ export default function WeatherChip({ project, regionCode = '', enabled = import
     }
     let alive = true;
     const run = () => {
+      if (isHidden()) return; // background: no request; the return to the foreground asks again (the 2-hour cache answers while it is fresh)
       const online = typeof navigator === 'undefined' || navigator.onLine !== false;
       const opts = { online };
       if (fetchImpl) opts.fetchImpl = fetchImpl;
@@ -36,8 +38,10 @@ export default function WeatherChip({ project, regionCode = '', enabled = import
     run();
     const back = () => run(); // signal is back: try again (served from the cache while it is fresh)
     window.addEventListener('online', back);
+    const offForeground = onForeground(run);
     return () => {
       alive = false;
+      offForeground();
       window.removeEventListener('online', back);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

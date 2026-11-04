@@ -8,6 +8,7 @@
 //  - Readings live in ONE map in localStorage (a city appears on many cards), 2 hours each, at most 40 places.
 //  - Privacy: only a city name or coordinates rounded to ~1 km leave the device.
 
+import { isHidden, onForeground } from './foreground.js';
 import { FORECAST_URL, GEOCODE_URL, WEATHER_TIMEOUT_MS, WEATHER_TTL_MS, getJson, round, weatherLevel } from './weather.js';
 
 export const WIND_ALERT_KMH = 30; // strictly above: a danger for work at height and for structures (scaffolds, formwork, crane loads)
@@ -83,7 +84,20 @@ let running = 0;
 const waiting = [];
 const inflight = new Map();
 
+let resumeHooked = false;
 function pump() {
+  // Smart Sync: in the background nothing new leaves the device; the waiting lookups stay parked and the first return to the foreground wakes them softly
+  if (isHidden()) {
+    if (waiting.length && !resumeHooked && typeof document !== 'undefined') {
+      resumeHooked = true;
+      const off = onForeground(() => {
+        off();
+        resumeHooked = false;
+        pump();
+      });
+    }
+    return;
+  }
   while (running < MAX_PARALLEL && waiting.length) {
     const job = waiting.shift();
     running += 1;
