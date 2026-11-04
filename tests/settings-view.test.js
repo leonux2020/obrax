@@ -2,7 +2,7 @@
 // Ajustes is a TOP-LEVEL full-screen view wired to the bottom-nav tab (like native tabs), never a floating sheet.
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
-import { CLIENT, q, flush, click, createHost } from './helpers/appHarness.js';
+import { CLIENT, q, flush, click, createHost, deviceBack } from './helpers/appHarness.js';
 import { clearDriveToken } from '../src/lib/driveToken.js';
 
 let App;
@@ -367,7 +367,7 @@ describe('Ajustes loads almost empty: three closed accordions', () => {
     await click(q('settings-signature'));
     expect(q('contractor-sign-sheet')).not.toBeNull();
     expect(q('settings-ops')).toBeNull();
-    await click(document.querySelector('[data-sheet-close]'));
+    await deviceBack(); // the signature sheet has no x: the device Back closes it
     expect(q('settings-ops').open).toBe(true); // still open: not collapsed behind the user's back
     expect(q('settings-locale').open).toBe(false);
   });

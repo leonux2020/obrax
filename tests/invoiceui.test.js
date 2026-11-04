@@ -248,7 +248,8 @@ describe('"Activar PRO de prueba": immediate, closes the modal, enables the read
     expect(q('pro-paywall')).toBeNull(); // closed
     expect(q('invoice-sheet')).not.toBeNull(); // and the function is already enabled: no second tap
     expect(q('invoice-sheet').dataset.phase).toBe('pick');
-    await click(document.querySelector('[data-sheet-close]'));
+    await act(async () => window.history.back()); // no x: a full-screen sheet closes with the device Back
+    await flush(30);
     expect(q('invoice-sheet')).toBeNull();
     expect(q('invoice-open').textContent).not.toMatch(/PRO$/); // badge gone at once
     await click(q('invoice-open')); // from now on it never goes back to the paywall

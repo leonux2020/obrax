@@ -404,15 +404,13 @@ describe('Vista Contabilidad Global', () => {
     expect(q('acc-sheet-liquid-EUR').textContent).toMatch(/121/);
   });
 
-  it('se cierra con ✕ (≥44 px), tocando fuera, Escape y deslizando hacia abajo', async () => {
+  it('no tiene ✕: se cierra tocando fuera, Escape y deslizando hacia abajo', async () => {
     await render([sized(mk('CL', { payments: [pay(10, back(1))] }))]);
-    const close = () => document.querySelector('[data-sheet-close]');
     const dialog = () => document.querySelector('[role="dialog"]');
     await click(q('acc-hud'));
-    expect(close().className).toContain('h-11');
-    expect(close().className).toContain('w-11');
+    expect(document.querySelector('[data-sheet-close]')).toBeNull();
     expect(dialog().className).toContain('bg-black');
-    await click(close());
+    await click(q('sheet-backdrop'));
     expect(q('acc-sheet')).toBeNull();
     await click(q('acc-hud'));
     await click(q('sheet-backdrop')); // backdrop
@@ -466,7 +464,7 @@ describe('Vista Contabilidad Global', () => {
     expect(q('acc-sheet')).toBeNull();
   });
 
-  it('cada forma de cerrar (✕, fondo, deslizar) retira la entrada del historial con UN solo history.back()', async () => {
+  it('cada forma de cerrar (fondo, deslizar) retira la entrada del historial con UN solo history.back()', async () => {
     const dialog = () => document.querySelector('[role="dialog"]');
     const swipe = async () => {
       const touch = (type, y) =>
@@ -479,7 +477,7 @@ describe('Vista Contabilidad Global', () => {
       await touch('touchmove', 200);
       await touch('touchend', 200);
     };
-    const ways = [() => click(document.querySelector('[data-sheet-close]')), () => click(q('sheet-backdrop')), swipe];
+    const ways = [() => click(q('sheet-backdrop')), swipe];
     for (const closeIt of ways) {
       window.history.replaceState(null, '');
       const spy = vi.spyOn(window.history, 'back');
@@ -513,10 +511,10 @@ describe('Vista Contabilidad Global', () => {
     expect(seen).not.toHaveBeenCalled(); // consumed: stopImmediatePropagation
   });
 
-  it('cerrar con ✕ retira la entrada del historial (no se acumula) y no toca el marcador de proyecto', async () => {
+  it('cerrar tocando fuera retira la entrada del historial (no se acumula) y no toca el marcador de proyecto', async () => {
     await render([sized(mk('CL', { payments: [pay(10, back(1))] }))]);
     await click(q('acc-hud'));
-    await click(document.querySelector('[data-sheet-close]'));
+    await click(q('sheet-backdrop'));
     await flush(50);
     expect(window.history.state?.cubraxLayer).toBeUndefined();
     expect(window.history.state?.cubraxProject).toBeUndefined();

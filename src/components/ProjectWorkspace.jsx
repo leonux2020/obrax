@@ -288,7 +288,6 @@ export function PhotoSheet({ photos, setPhotos, projectId, onClose }) {
       title={t('snap.title')}
       onClose={onClose}
       tall
-      swipeToClose
       autoFocus={false}
       headerAction={<PhotoEditToggle active={editing} disabled={count === 0} onToggle={() => setEdit((v) => !v)} />}
     >

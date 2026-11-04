@@ -611,7 +611,7 @@ describe('finance + expenses inside the same screen', () => {
     await mount(p);
     const total0 = q('ws-total').textContent;
     await click(q('ws-finance'));
-    await click(q('finance-lock')); // the parameters start locked
+    await click(q('finance-edit-toggle')); // the parameters start locked: the pencil turns the edit mode on
     const slider = q('slider-profit-input');
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(slider, '20');
@@ -628,9 +628,8 @@ describe('finance + expenses inside the same screen', () => {
 });
 
 describe('Parametri del preventivo: error-prevention lock', () => {
-  const svgOf = (el) => el.querySelector('svg').innerHTML;
 
-  it('starts locked: inputs disabled, dimmed, numbers still high-contrast, grey toggle with a closed padlock', async () => {
+  it('starts locked: inputs disabled, dimmed, numbers still high-contrast; NO padlock button anywhere, a pencil in the header instead', async () => {
     await mount(mk());
     await click(q('ws-finance'));
     const params = q('finance-params');
@@ -642,44 +641,41 @@ describe('Parametri del preventivo: error-prevention lock', () => {
       expect(q(`slider-${k}-value`).className).toContain('text-neutral-200'); // the number is not dimmed
       expect(q(`slider-${k}-value`).className).not.toContain('bg-brand');
     }
-    const btn = q('finance-lock');
-    expect(btn.dataset.state).toBe('locked');
-    expect(btn.className).toContain('text-neutral-400');
-    expect(btn.className).toContain('border-white/10');
-    expect(btn.className).toContain('min-h-[60px]');
-    expect(btn.textContent).toContain('Parámetros bloqueados');
-    expect(svgOf(btn)).toContain('rect'); // the padlock body
-    expect(svgOf(btn)).toContain('v4'); // closed shackle
-    // it is the LAST thing of the section, after the controls
-    expect(params.compareDocumentPosition(btn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(q('finance-lock')).toBeNull(); // the padlock is gone
+    expect(q('ws-finance-sheet').querySelector('svg rect')).toBeNull();
+    const dialog = q('ws-finance-sheet').closest('[role="dialog"]');
+    expect(dialog.querySelector('[data-sheet-close]')).toBeNull(); // and so is the x
+    const pencil = q('finance-edit-toggle');
+    expect(dialog.querySelector('h2').nextElementSibling.contains(pencil)).toBe(true); // top right
+    expect(pencil.querySelector('svg[data-icon="pencil"]')).not.toBeNull();
+    expect(pencil.getAttribute('aria-pressed')).toBe('false');
+    expect(pencil.className).not.toMatch(/\b(border|bg-|ring|shadow)/); // floating, no box
   });
 
-  it('unlocking enables the controls and turns the button amber with an open padlock; locking again restores it', async () => {
+  it('the pencil enables the controls (a check while on); touching it again locks them', async () => {
     await mount(mk());
     await click(q('ws-finance'));
-    await click(q('finance-lock'));
-    const btn = q('finance-lock');
+    await click(q('finance-edit-toggle'));
+    const toggle = q('finance-edit-toggle');
     expect(q('finance-params').disabled).toBe(false);
     expect(q('slider-profit-input').disabled).toBe(false);
-    expect(btn.dataset.state).toBe('unlocked');
-    expect(btn.className).toContain('text-amber-500');
-    expect(btn.className).toContain('border-amber-500');
-    expect(btn.textContent).toContain('Bloquear parámetros');
-    expect(svgOf(btn)).toContain('9.9-1'); // open shackle
-    await click(btn);
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    expect(toggle.getAttribute('aria-label')).toBe('Terminar edición');
+    expect(toggle.querySelector('svg[data-icon="check"]')).not.toBeNull();
+    await click(toggle);
     expect(q('finance-params').disabled).toBe(true);
-    expect(q('finance-lock').dataset.state).toBe('locked');
+    expect(q('finance-edit-toggle').getAttribute('aria-pressed')).toBe('false');
   });
 
   it('closing and reopening the section locks it again', async () => {
     await mount(mk());
     await click(q('ws-finance'));
-    await click(q('finance-lock'));
+    await click(q('finance-edit-toggle'));
     expect(q('finance-params').disabled).toBe(false);
-    await click(q('ws-finance-sheet').closest('[role="dialog"]').querySelector('[data-sheet-close]')); // close the sheet
+    await click(q('sheet-backdrop')); // close the sheet (tap outside)
     await click(q('ws-finance')); // enter again
     expect(q('finance-params').disabled).toBe(true);
-    expect(q('finance-lock').dataset.state).toBe('locked');
+    expect(q('finance-edit-toggle').getAttribute('aria-pressed')).toBe('false');
   });
 });
 

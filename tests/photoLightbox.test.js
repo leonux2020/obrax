@@ -116,7 +116,7 @@ describe('photo gallery, edit mode and native close', () => {
     expect(dialog.querySelector('[data-sheet-close]')).toBeNull(); // no x
     expect(dialog.textContent).not.toContain('×');
     const toggle = q('photo-edit-toggle');
-    expect(dialog.querySelector('h2').nextElementSibling).toBe(toggle); // top right, where the x used to be
+    expect(dialog.querySelector('h2').nextElementSibling.contains(toggle)).toBe(true); // top right, where the x used to be
     expect(toggle.getAttribute('aria-label')).toBe('Editar fotos');
     expect(toggle.getAttribute('aria-pressed')).toBe('false');
     expect(toggle.querySelector('svg[data-icon="pencil"]')).not.toBeNull();

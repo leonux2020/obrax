@@ -43,13 +43,13 @@ afterEach(() => {
 describe('fluid sheets: every BottomSheet animates by default', () => {
   const css = readFileSync('src/index.css', 'utf8');
 
-  it('a plain sheet (no swipeToClose, not tall) already carries the rise animation and the soft backdrop fade', async () => {
+  it('a plain sheet (no props at all) already carries the rise animation and the soft backdrop fade', async () => {
     await render(React.createElement(BottomSheet, { title: 'Plain', onClose: () => {} }, React.createElement('p', null, 'hola')));
     const backdrop = q('sheet-backdrop');
     const dialog = backdrop.querySelector('[role="dialog"]');
     expect(dialog.className).toContain('sheet-slide');
     expect(backdrop.className).toContain('sheet-fade');
-    expect(dialog.hasAttribute('data-swipe-close')).toBe(false); // the swipe is still opt-in
+    expect(dialog.getAttribute('data-swipe-close')).toBe('true'); // swipe down closes it by default
   });
   it('fullscreen and tall sheets too', async () => {
     await render(React.createElement(BottomSheet, { title: 'Full', fullscreen: true, onClose: () => {} }));

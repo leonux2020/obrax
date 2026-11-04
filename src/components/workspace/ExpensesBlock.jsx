@@ -39,7 +39,6 @@ export default function ExpensesBlock({ expenses, queued, receipts, onChange, op
       open={open}
       onToggle={onToggle}
       testId="ws-expenses"
-      swipeToClose
       headerAction={<TotalAuditor expenses={expenses} />}
     >
       <QueueList rows={queued} onRetry={receipts?.retry} onDiscard={receipts?.discard} onAccept={receipts?.accept} />

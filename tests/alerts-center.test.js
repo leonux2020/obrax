@@ -11,7 +11,7 @@ import Dashboard from '../src/components/Dashboard.jsx';
 import { newProject, toDayString } from '../src/lib/projects.js';
 import { projectAlerts } from '../src/lib/alerts.js';
 import { DICT } from '../src/lib/dict.js';
-import { click, q } from './helpers/appHarness.js';
+import { click, q, deviceBack } from './helpers/appHarness.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const h = React.createElement;
@@ -144,12 +144,14 @@ describe('Dashboard bell + GlobalAlerts', () => {
     await click(q('dash-bell'));
     const view = q('global-alerts');
     expect(view).not.toBeNull();
-    expect(view.querySelector('h1').textContent).toBe('Allarmi');
+    expect(view.closest('[role="dialog"]').querySelector('h2').textContent).toBe('Allarmi');
     const empty = q('global-alerts-empty');
     expect(empty.textContent).toBe('Nessun allarme per oggi');
     expect(empty.className).toContain('text-neutral-500');
     expect(empty.className).toContain('text-center');
-    await click(q('global-alerts-close'));
+    expect(q('global-alerts-close')).toBeNull(); // no x: a full-screen sheet closed by Back / swipe
+    expect(q('global-alerts').closest('[role="dialog"]')).not.toBeNull();
+    await deviceBack();
     expect(q('global-alerts')).toBeNull();
   });
 

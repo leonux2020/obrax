@@ -27,6 +27,19 @@ const click = async (el) => {
   });
   await flush(10);
 };
+/** A thumb dragging the topmost sheet down past the close threshold. */
+const swipeDown = async () => {
+  const dialog = [...document.querySelectorAll('[role="dialog"]')].at(-1);
+  const touch = (type, y) =>
+    act(async () => {
+      const e = new Event(type, { bubbles: true });
+      e.touches = type === 'touchend' ? [] : [{ clientY: y }];
+      dialog.dispatchEvent(e);
+    });
+  await touch('touchstart', 0);
+  await touch('touchmove', 200);
+  await touch('touchend', 200);
+};
 const deviceBack = async () => {
   await act(async () => {
     window.history.back();
@@ -159,15 +172,16 @@ describe('universal back stack: sheets inside the real app', () => {
     expect(window.history.state).toBeNull();
   });
 
-  it('closing a real sheet with its x or the backdrop leaves no entry behind (no "Back twice")', async () => {
+  it('closing a real sheet with the backdrop or a swipe leaves no entry behind (no "Back twice"); there is no x', async () => {
     const back = vi.spyOn(window.history, 'back');
     await click(q('fab-new'));
-    await click(document.querySelector('[data-sheet-close]'));
+    expect(document.querySelector('[data-sheet-close]')).toBeNull();
+    await click(q('sheet-backdrop'));
     await flush(30);
     expect(back).toHaveBeenCalledTimes(1);
     expect(window.history.state).toBeNull();
     await click(q('fab-new'));
-    await click(q('sheet-backdrop'));
+    await swipeDown();
     await flush(30);
     expect(back).toHaveBeenCalledTimes(2);
     expect(window.history.state).toBeNull();
@@ -192,7 +206,7 @@ describe('universal back stack: sheets inside the real app', () => {
   it('opening a project from a sheet action (create flow) is not undone by the sheet cleanup', async () => {
     await click(q('project-card'));
     await click(q('ws-edit')); // the edit sheet is a layer; closing it by the app must not pop the project entry
-    await click(document.querySelector('[data-sheet-close]'));
+    await swipeDown(); // the edit sheet is full screen: it closes with a swipe (or the device Back)
     await flush(30);
     expect(q('ws-title')).not.toBeNull();
     expect(window.history.state?.cubraxProject).toBeTruthy();
@@ -327,7 +341,8 @@ describe('global styles: no pull-to-refresh', () => {
     const css = readFileSync('src/index.css', 'utf8');
     expect(css).toMatch(/html,\s*body\s*\{[^}]*overscroll-behavior-y:\s*none/);
     const sheet = readFileSync('src/components/BottomSheet.jsx', 'utf8');
-    expect(sheet).toContain('onTouchStart');
+    expect(sheet).toContain('useSheetSwipe');
+    expect(readFileSync('src/lib/useSheetSwipe.js', 'utf8')).toContain('onTouchStart');
     expect(sheet).toContain('overscroll-contain');
   });
 });
@@ -396,7 +411,7 @@ describe('device Back and the accordions of a project (Parámetros, Diario, Anti
   it('closing it by hand cleans the fake entry: ONE Back leaves the project (never twice)', async () => {
     await openProject();
     await click(summary('ws-cash'));
-    await click(q('ws-cash-sheet').closest('[role="dialog"]').querySelector('[data-sheet-close]')); // closed by the user (x)
+    await click(q('sheet-backdrop')); // closed by the user (tap outside)
     await flush(30);
     expect(!!q('ws-cash-sheet')).toBe(false);
     expect(window.history.state?.modalOpen).toBeUndefined();

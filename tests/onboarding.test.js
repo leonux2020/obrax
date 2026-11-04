@@ -346,7 +346,7 @@ describe('PRO button and benefits screen', () => {
     expect(q('pro-note').textContent).toContain('ningún cobro');
   });
 
-  it('there is always a way out: Volver, the × button and Escape', async () => {
+  it('there is always a way out: Volver, the swipe down and Escape', async () => {
     await setup();
     await click(q('pro-scan'));
     expect(q('pro-back').textContent).toBe('Volver');
@@ -355,7 +355,15 @@ describe('PRO button and benefits screen', () => {
     expect(q('dash-empty')).not.toBeNull();
 
     await click(q('pro-scan'));
-    await click(document.querySelector('[data-sheet-close]'));
+    expect(document.querySelector('[data-sheet-close]')).toBeNull(); // no x
+    await act(async () => {
+      const dialog = [...document.querySelectorAll('[role="dialog"]')].at(-1);
+      for (const [type, y] of [['touchstart', 0], ['touchmove', 200], ['touchend', 200]]) {
+        const e = new Event(type, { bubbles: true });
+        e.touches = type === 'touchend' ? [] : [{ clientY: y }];
+        dialog.dispatchEvent(e);
+      }
+    });
     expect(q('pro-paywall')).toBeNull();
 
     await click(q('pro-scan'));

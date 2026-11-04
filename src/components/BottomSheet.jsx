@@ -1,55 +1,30 @@
 import { useEffect, useId, useRef } from 'react';
-import { useI18n } from '../lib/i18n.jsx';
 import { useBackLayer } from '../lib/backStack.js';
+import { useSheetSwipe } from '../lib/useSheetSwipe.js';
 
-const SWIPE_CLOSE_PX = 90;
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
 /**
  * Bottom sheet (one-hand ergonomics): EVERY sheet of the app rises from the bottom (`sheet-slide`, a short ease-out) over a softly fading backdrop;
- * `prefers-reduced-motion` and the battery `eco-mode` switch every animation off in index.css. Anchored to the bottom of the screen, pure #000 with an ultra
- * thin border (`tall`: an expanded sheet, 85 % of the screen, for dense lists). `headerAction` REPLACES the x of the header with another
- * control (the photo sheet shows its Edit toggle there): that sheet closes the native way (device Back, swipe down, backdrop, Escape). Focus is trapped inside, Escape / backdrop close it and focus returns to the opener.
+ * `prefers-reduced-motion` and the battery `eco-mode` switch every animation off in index.css. There is NO close x: the header is the title on the
+ * left and, optionally, ONE control on the right (`headerAction`: a pencil, a total, a filter). Every sheet closes the native way: swipe down
+ * (on by default, `swipeToClose={false}` is the explicit opt-out nobody uses), the device Back (back stack), the backdrop and Escape. Anchored to the bottom of the screen, pure #000 with an ultra
+ * thin border (`tall`: an expanded sheet, 85 % of the screen, for dense lists). Focus is trapped inside and returns to the opener.
  */
-export default function BottomSheet({ title, subtitle, onClose, fullscreen = false, tall = false, swipeToClose = false, autoFocus = true, headerAction = null, children }) {
-  const { t } = useI18n();
+export default function BottomSheet({ title, subtitle, onClose, fullscreen = false, tall = false, swipeToClose = true, autoFocus = true, headerAction = null, children }) {
   const titleId = useId();
   const ref = useRef(null);
   // Back-stack layer: opening pushes one history entry; the device's Back closes only this sheet (or the topmost layer above it);
-  // closing by x / backdrop / swipe / Escape drops the entry again (see lib/backStack.js).
+  // closing by backdrop / swipe / Escape drops the entry again (see lib/backStack.js).
   useBackLayer(onClose);
-  const drag = useRef(null); // { y0, dy } while a downward swipe that started at the very top of the sheet is under way
-
-  // opt-in swipe down to close: only when the sheet is scrolled to its top, past SWIPE_CLOSE_PX it closes, otherwise it springs back
-  const swipe = !swipeToClose
-    ? {}
-    : {
-        onTouchStart: (e) => {
-          drag.current = e.touches.length === 1 && (ref.current?.scrollTop ?? 0) <= 0 ? { y0: e.touches[0].clientY, dy: 0 } : null;
-        },
-        onTouchMove: (e) => {
-          const d = drag.current;
-          if (!d || !ref.current) return;
-          d.dy = Math.max(0, e.touches[0].clientY - d.y0);
-          ref.current.style.transform = d.dy > 0 ? `translateY(${d.dy}px)` : '';
-        },
-        onTouchEnd: () => {
-          const d = drag.current;
-          drag.current = null;
-          if (!d || !ref.current) return;
-          ref.current.style.transform = '';
-          if (d.dy > SWIPE_CLOSE_PX) onClose();
-        },
-        onTouchCancel: () => {
-          drag.current = null;
-          if (ref.current) ref.current.style.transform = '';
-        },
-      };
+  const swipe = useSheetSwipe(ref, onClose, swipeToClose);
 
   useEffect(() => {
     const previous = document.activeElement;
     // menu sheets (autoFocus={false}) focus the dialog itself: no field grabs the focus (and the on-screen keyboard) just by opening one
-    (autoFocus ? ref.current?.querySelector('input, select, button:not([data-sheet-close])') : ref.current)?.focus({ preventScroll: true });
+    // the first field / button of the BODY (never the control of the header)
+    const first = autoFocus ? [...(ref.current?.querySelectorAll('input, select, button') ?? [])].find((n) => !n.closest('[data-sheet-header]')) : null;
+    (first ?? ref.current)?.focus({ preventScroll: true });
     const onKey = (e) => {
       // sheets can be stacked (a form sheet over a menu sheet): only the topmost one (the last dialog in the document) answers the keyboard
       if ([...document.querySelectorAll('[role="dialog"]')].at(-1) !== ref.current) return;
@@ -98,21 +73,15 @@ export default function BottomSheet({ title, subtitle, onClose, fullscreen = fal
           fullscreen ? 'h-[100dvh] max-w-none border-0 sm:mx-auto sm:max-w-3xl sm:border' : tall ? 'h-[85vh] max-h-[92vh] max-w-lg rounded-t-3xl border-b-0' : 'max-h-[92vh] max-w-lg rounded-t-3xl border-b-0'
         }`}
       >
-        {swipeToClose && <div aria-hidden="true" className="mx-auto -mt-2 mb-2 h-1 w-10 rounded-full bg-white/20" />}
-        <div className="mb-1 flex items-start justify-between gap-3">
-          <h2 id={titleId} className="text-2xl font-medium tracking-tight">
+        {swipeToClose && <div aria-hidden="true" data-testid="sheet-handle" className="mx-auto -mt-2 mb-2 h-1 w-10 rounded-full bg-white/20" />}
+        <div className="mb-1 flex min-h-[44px] items-start justify-between gap-3">
+          <h2 id={titleId} className="min-w-0 text-2xl font-medium tracking-tight">
             {title}
           </h2>
-          {headerAction ?? (
-            <button
-              type="button"
-              data-sheet-close
-              onClick={onClose}
-              aria-label={t('common.close')}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 text-xl hover:border-brand"
-            >
-              ×
-            </button>
+          {headerAction && (
+            <div data-sheet-header className="shrink-0">
+              {headerAction}
+            </div>
           )}
         </div>
         {subtitle && <p className="mb-4 text-sm text-neutral-300">{subtitle}</p>}

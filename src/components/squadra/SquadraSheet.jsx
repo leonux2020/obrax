@@ -81,7 +81,6 @@ export default function SquadraSheet({ onClose }) {
     <>
       <BottomSheet
         fullscreen
-        swipeToClose
         autoFocus={false}
         title={t('squadra.title')}
         subtitle={t('squadra.subtitle')}

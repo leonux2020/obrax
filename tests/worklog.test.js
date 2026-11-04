@@ -210,7 +210,7 @@ describe('Bitácora de obra accordion (Zone B)', () => {
     await open(active());
     await click(q('ws-log'));
     expect(q('ws-log-sheet')).not.toBeNull();
-    await click(q('ws-log-sheet').closest('[role="dialog"]').querySelector('[data-sheet-close]'));
+    await click(q('sheet-backdrop'));
     expect(q('ws-log-sheet')).toBeNull();
   });
 

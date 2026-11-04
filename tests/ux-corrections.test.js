@@ -125,7 +125,7 @@ describe('2. Anticipos y pagos del cliente', () => {
     expect(block.textContent).toContain('Anticipos');
     await click(block);
     expect(q('ws-cash-sheet').closest('[role="dialog"]').textContent).toContain('Anticipos y pagos del cliente');
-    await click(q('ws-cash-sheet').closest('[role="dialog"]').querySelector('[data-sheet-close]'));
+    await click(q('sheet-backdrop'));
     expect(block.compareDocumentPosition(q('ws-finance') ?? q('ws-crew')) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
   });
 

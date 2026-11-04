@@ -41,7 +41,7 @@ describe('ExpensesBlock header', () => {
     // the title is on the left and the total on the right of the same header row
     const row = sheet.querySelector('h2').parentElement;
     expect(row.className).toContain('justify-between');
-    expect(row.lastElementChild).toBe(q('expenses-total'));
+    expect(row.lastElementChild.contains(q('expenses-total'))).toBe(true);
     expect(sheet.hasAttribute('data-swipe-close')).toBe(true);
   });
   it('the total is reactive: a new receipt, a deleted line (and the empty list) update it', async () => {

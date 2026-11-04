@@ -289,7 +289,7 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
   );
 
   return (
-    <Block icon={<UsersIcon size={32} />} label={t('ws.menu.crew')} id="crew" title={t('ws.crew.title')} meta={`${t(crew.length === 1 ? 'ws.crew.count1' : 'ws.crew.countN', { n: crew.length })}${days !== null ? ` · ${days} ${t('sched.d')}` : ''}`} open={open} onToggle={onToggle} testId="ws-crew" tall swipeToClose headerAction={editToggle}>
+    <Block icon={<UsersIcon size={32} />} label={t('ws.menu.crew')} id="crew" title={t('ws.crew.title')} meta={`${t(crew.length === 1 ? 'ws.crew.count1' : 'ws.crew.countN', { n: crew.length })}${days !== null ? ` · ${days} ${t('sched.d')}` : ''}`} open={open} onToggle={onToggle} testId="ws-crew" tall headerAction={editToggle}>
       <div className="space-y-3">
         {/* the dates set the days of the machinery rental (a direct cost): read-only, with the shield, while the quote is frozen / signed.
             The people and their advances below are operational, so they stay editable. */}

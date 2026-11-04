@@ -31,7 +31,7 @@ export default function GlobalBreakdownSheet({ breakdown, moneyOf, onClose }) {
   const many = breakdown.length > 1;
 
   return (
-    <BottomSheet title={t('acc.sheet.title')} onClose={onClose} swipeToClose>
+    <BottomSheet title={t('acc.sheet.title')} onClose={onClose}>
       <div className="space-y-4" data-testid="acc-sheet">
         {breakdown.map((l) => {
           const money = moneyOf(l.regionCode);

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { FINANCE_LIMITS, TAX_LIMITS } from '../../lib/draft.js';
+import { EditToggle } from '../EditControls.jsx';
 import PercentSlider from '../PercentSlider.jsx';
 import Block from './Block.jsx';
 import LockedZone from './LockedZone.jsx';
 import NumberPad from './NumberPad.jsx';
-import { CalculatorIcon, LockIcon, UnlockIcon } from './icons.jsx';
+import { CalculatorIcon } from './icons.jsx';
 
 const KEYS = ['labor', 'transport', 'contingency', 'profit'];
 
@@ -15,7 +16,7 @@ const KEYS = ['labor', 'transport', 'contingency', 'profit'];
  *
  * Error prevention: these values are sensitive and easy to nudge by accident outdoors, so they are LOCKED every time the section is
  * entered (opened or closed again): the sliders and the tax button are disabled (a native <fieldset disabled>), dimmed but with the
- * numbers in full contrast. A big button at the end toggles the lock: grey and quiet when locked, amber while editing.
+ * numbers in full contrast. The pencil in the header of the sheet turns the edit mode on (a check while it is on); there is no lock button.
  */
 export default function FinanceBlock({ draft, locked, onBlocked, setDraft, open, onToggle }) {
   const { t, num, region } = useI18n();
@@ -27,9 +28,23 @@ export default function FinanceBlock({ draft, locked, onBlocked, setDraft, open,
   }, [open]);
   const set = (key) => (value) => setDraft((d) => ({ ...d, finance: { ...d.finance, [key]: value } }));
   const official = num(region.taxRate * 100);
+  // the pencil of the header (no box) turns the edit mode on / off; while the whole budget is frozen the shield already says so, so it is off
+  const editToggle = (
+    <EditToggle
+      active={!safe}
+      disabled={Boolean(locked)}
+      onToggle={() => {
+        setSafe((v) => !v);
+        setPad(false);
+      }}
+      label={t('params.edit')}
+      doneLabel={t('crew.edit.done')}
+      testId="finance-edit-toggle"
+    />
+  );
 
   return (
-    <Block icon={<CalculatorIcon size={32} />} label={t('ws.menu.finance')} id="finance" title={t('pv.selectors')} open={open} onToggle={onToggle} testId="ws-finance">
+    <Block icon={<CalculatorIcon size={32} />} label={t('ws.menu.finance')} id="finance" title={t('pv.selectors')} open={open} onToggle={onToggle} testId="ws-finance" headerAction={editToggle}>
       <LockedZone locked={locked} onBlocked={onBlocked} className="space-y-4">
         <fieldset disabled={safe} data-testid="finance-params" data-safe={safe ? 'true' : 'false'} className="m-0 min-w-0 space-y-4 border-0 p-0">
           {KEYS.map((k) => (
@@ -44,28 +59,6 @@ export default function FinanceBlock({ draft, locked, onBlocked, setDraft, open,
         </fieldset>
       </LockedZone>
 
-      {/* the lock switch, last in the list. While the whole budget is frozen the shield already says so: no second lock then. */}
-      {!locked && (
-        <button
-          type="button"
-          onClick={() => {
-            setSafe((v) => !v);
-            setPad(false);
-          }}
-          aria-pressed={!safe}
-          data-testid="finance-lock"
-          data-state={safe ? 'locked' : 'unlocked'}
-          className={`mt-4 flex min-h-[60px] w-full items-center justify-center gap-3 rounded-xl border px-4 text-base font-normal transition active:scale-[0.98] ${
-            safe ? 'border-white/10 bg-white/5 text-neutral-400' : 'border-amber-500/40 bg-amber-500/10 text-amber-500'
-          }`}
-        >
-          {safe ? <LockIcon size={26} /> : <UnlockIcon size={26} />}
-          <span className="flex flex-col items-start text-left leading-tight">
-            <span>{t(safe ? 'ws.params.locked' : 'ws.params.lock')}</span>
-            {safe && <span className="text-sm text-neutral-500">{t('ws.params.unlockHint')}</span>}
-          </span>
-        </button>
-      )}
       {pad && (
         <NumberPad
           testId="tax-pad"

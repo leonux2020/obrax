@@ -1,6 +1,7 @@
-import { useReducer } from 'react';
+import { useReducer, useRef } from 'react';
 import { useBackLayer } from '../../lib/backStack.js';
 import { useI18n } from '../../lib/i18n.jsx';
+import { useSheetSwipe } from '../../lib/useSheetSwipe.js';
 import { padDisplay, padInit, padIsZero, padReduce, padValue } from '../../lib/numpad.js';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'dot', '0', 'back'];
@@ -20,6 +21,8 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'dot', '0', 'back'];
 export default function NumberPad({ title, unit = '', value, decimals = 2, max = null, foot = '', top = null, onChange, onEmpty = null, onReset = null, onClose, testId = 'price-numpad' }) {
   const { t, locale } = useI18n();
   useBackLayer(onClose); // the device's Back closes the pad only
+  const dialog = useRef(null);
+  const swipe = useSheetSwipe(dialog, onClose); // and so does a swipe down (it keeps what is typed, like Done)
   const [state, dispatch] = useReducer(padReduce, undefined, () => padInit(value, decimals));
   const decimal = new Intl.NumberFormat(locale).formatToParts(1.5).find((p) => p.type === 'decimal')?.value ?? '.';
 
@@ -54,7 +57,7 @@ export default function NumberPad({ title, unit = '', value, decimals = 2, max =
   return (
     <div className="no-print fixed inset-0 z-50 flex items-end justify-center" data-testid={testId}>
       <button type="button" tabIndex={-1} aria-hidden="true" className="absolute inset-0 cursor-default bg-black/60" onClick={onClose} />
-      <div role="dialog" aria-modal="true" aria-label={title} className="sheet-slide relative w-full max-w-lg rounded-t-3xl border border-b-0 border-white/10 bg-black px-4 pt-4 [padding-bottom:max(1rem,env(safe-area-inset-bottom))]">
+      <div ref={dialog} role="dialog" aria-modal="true" aria-label={title} data-swipe-close="true" {...swipe} className="sheet-slide relative w-full max-w-lg rounded-t-3xl border border-b-0 border-white/10 bg-black px-4 pt-4 [padding-bottom:max(1rem,env(safe-area-inset-bottom))]">
         {top}
         <div className="flex items-baseline justify-between gap-3">
           <p className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-300">{title}</p>
