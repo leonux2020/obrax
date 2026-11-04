@@ -5,7 +5,7 @@ import { reverseCity } from '../lib/reverseGeocode.js';
 import { searchPlaces } from '../lib/forwardGeocode.js';
 import { SEARCH_DEBOUNCE_MS, useCitySearch } from '../lib/useCitySearch.js';
 import { REGIONS } from '../lib/regions.js';
-import { quoteLock } from '../lib/workspaceModel.js';
+import { marketChangeImpact, quoteLock } from '../lib/workspaceModel.js';
 import { normalizeLocation } from '../lib/ledger.js';
 import { cleanCityOrRegion, isClosed, parseDay, toDayString } from '../lib/projects.js';
 import { sanitizeText } from '../lib/sanitize.js';
@@ -13,6 +13,7 @@ import { Button, DateInput, Switch, TextField } from './ui.jsx';
 import BottomSheet from './BottomSheet.jsx';
 import { useConfirm } from './ConfirmSheet.jsx';
 import RegionCombobox from './RegionCombobox.jsx';
+import { Outline } from './workspace/icons.jsx';
 
 function DateField({ label, value, onChange, invalid }) {
   const id = useId();
@@ -86,6 +87,8 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
 
   const marketLocked = editing && Boolean(quoteLock(project.draft)); // a signed / frozen quote keeps its market
   const marketChanged = editing && Boolean(form.regionCode) && form.regionCode !== project.draft.regionCode;
+  // the note about the currency exists ONLY when the change really touches something: a new job or an empty project has nothing to lose
+  const marketNote = marketChanged && marketChangeImpact(project).affected;
   const start = parseDay(form.startDate);
   const end = parseDay(form.endDate);
   const badRange = Boolean(start && end && end < start);
@@ -217,9 +220,14 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
               {REGIONS[form.regionCode].flag} {REGIONS[form.regionCode].currency}
             </p>
           )}
-          {editing && marketChanged && (
-            <p role="status" className="mt-1.5 text-sm font-medium text-[#e8c35f]" data-testid="project-market-warn">
-              {t('ws.market.warn')}
+          {marketNote && (
+            <p role="status" className="mt-1.5 flex items-start gap-1.5 text-xs text-neutral-400" data-testid="project-market-warn">
+              <Outline size={14} icon="info" className="mt-0.5 text-neutral-500">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 11v5" />
+                <path d="M12 8h.01" />
+              </Outline>
+              <span>{t('ws.market.warn')}</span>
             </p>
           )}
         </div>

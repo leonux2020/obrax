@@ -151,6 +151,16 @@ describe('ProjectSheet: the city autocomplete', () => {
     expect(saved[0]).toMatchObject({ cityOrRegion: 'Colonia del Sacramento', regionCode: 'UY', location: { lat: -34.4714, lng: -57.8442, label: 'Colonia del Sacramento' } });
   });
 
+  it('picking a city of another country in a NEW project switches the market without any currency warning', async () => {
+    const br = [{ place_id: 9, lat: '-23.55', lon: '-46.63', address: { city: 'São Paulo', state: 'SP', country: 'Brasil', country_code: 'br' } }];
+    await mount({ search: async () => parsePlaces(br) }, 'it');
+    await type('Sao Paulo');
+    await flush(80);
+    await act(async () => q('project-city-option-0').click());
+    expect(q('project-market-hint').textContent).toContain('BRL');
+    expect(q('project-market-warn')).toBeNull();
+  });
+
   it('a country the app has no market for leaves the market alone (the city and the point are still saved)', async () => {
     const saved = [];
     await mount({ search: async () => places(), onSave: (p) => saved.push(p) });

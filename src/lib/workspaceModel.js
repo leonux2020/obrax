@@ -69,6 +69,19 @@ export function withMarket(draft, code) {
 }
 
 /**
+ * What a change of market would actually touch in this project: the prices typed by hand and a tax typed by hand (both are dropped), and the money
+ * already booked in payments / expenses / advances (kept, but NOT converted to the new currency). `affected` is false for an empty project: then
+ * there is nothing to warn about.
+ */
+export function marketChangeImpact(project) {
+  const d = project?.draft ?? {};
+  const prices = Object.keys(d.overrides ?? {}).length > 0;
+  const tax = d.finance?.tax !== null && d.finance?.tax !== undefined;
+  const booked = [project?.payments, project?.expenses, project?.advances].some((l) => Array.isArray(l) && l.length > 0);
+  return { prices, tax, booked, affected: prices || tax || booked };
+}
+
+/**
  * The small line under a price: WHO says so. The supplier the user named ("Ferretería Don Pepe · 3 km"), the AI estimate
  * attributed to the market's reference retailer ("Estimación IA (Sodimac)") or the bundled reference price. '' when the
  * user's own price has no supplier.

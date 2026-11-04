@@ -79,9 +79,10 @@ describe('ProjectSheet: the market of an existing project can be corrected (flag
   });
   const open = (props) => act(async () => root.render(React.createElement(I18nProvider, { lang: 'it', regionCode: 'CL' }, React.createElement(ProjectSheet, { onSave: () => {}, onClose: () => {}, ...props }))));
 
-  it('shows the project market, warns when it changes and sends the new regionCode', async () => {
+  it('shows the project market, warns (only when money is at stake) when it changes and sends the new regionCode', async () => {
     const saved = [];
-    await open({ project: newProject({ regionCode: 'CL', name: 'Casa' }), onSave: (f) => saved.push(f), onDelete: () => {} });
+    const withMoney = { ...newProject({ regionCode: 'CL', name: 'Casa' }), payments: [{ id: 'p1', amount: 1000, at: 1, note: '' }] };
+    await open({ project: withMoney, onSave: (f) => saved.push(f), onDelete: () => {} });
     const input = () => qs('project-market').querySelector('input[role="combobox"]');
     expect(input().value).toBe('🇨🇱 Cile');
     expect(qs('project-market-warn')).toBeNull();
@@ -317,5 +318,76 @@ describe('CSP + critical CSS', () => {
     // it must not break the app: no fixed 100vw/100vh box (it would cut the sticky header) and no body padding reset (safe-area insets)
     const style = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
     expect(style).not.toMatch(/100vw|height:\s*100vh|padding:\s*0/);
+  });
+});
+
+describe('ProjectSheet: the currency note only exists when something is affected', () => {
+  let host;
+  let root;
+  const qs = (id) => document.querySelector(`[data-testid="${id}"]`);
+  beforeEach(() => {
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+  });
+  afterEach(() => {
+    act(() => root.unmount());
+    host.remove();
+  });
+  const open = (props) => act(async () => root.render(React.createElement(I18nProvider, { lang: 'it', regionCode: 'CL' }, React.createElement(ProjectSheet, { onSave: () => {}, onClose: () => {}, onDelete: () => {}, ...props }))));
+  const changeTo = async (code) => {
+    await click(qs('project-market').querySelector('input[role="combobox"]'));
+    await click(document.querySelector(`[role="option"][id$="-opt-${code}"]`));
+  };
+
+  it('an EMPTY existing project changes market without any note in the DOM', async () => {
+    await open({ project: newProject({ regionCode: 'CL', name: 'Vacio' }) });
+    await changeTo('BR');
+    expect(qs('project-market-hint').textContent).toContain('BRL');
+    expect(qs('project-market-warn')).toBeNull();
+  });
+
+  it('a NEW project never shows it, whatever the market chosen', async () => {
+    await open({ project: undefined });
+    await changeTo('BR');
+    expect(qs('project-market-hint').textContent).toContain('BRL');
+    expect(qs('project-market-warn')).toBeNull();
+  });
+
+  it('it appears for every kind of money at stake: typed prices, a typed tax, payments, expenses, advances', async () => {
+    const base = () => newProject({ regionCode: 'CL', name: 'Con dinero' });
+    const cases = {
+      prices: (p) => ({ ...p, draft: { ...p.draft, overrides: { cement: 5000 } } }),
+      tax: (p) => ({ ...p, draft: { ...p.draft, finance: { ...p.draft.finance, tax: 0.1 } } }),
+      payments: (p) => ({ ...p, payments: [{ id: 'a', amount: 1, at: 1, note: '' }] }),
+      expenses: (p) => ({ ...p, expenses: [{ id: 'e', amount: 1, at: 1 }] }),
+      advances: (p) => ({ ...p, advances: [{ id: 'v', amount: 1, at: 1 }] }),
+    };
+    for (const [name, make] of Object.entries(cases)) {
+      await open({ project: make(base()) });
+      await changeTo('BR');
+      expect(qs('project-market-warn'), name).not.toBeNull();
+      act(() => root.unmount());
+      root = createRoot(host);
+    }
+  });
+
+  it('when it shows it is a quiet note: text-xs neutral-400 with a faint info icon, no yellow', async () => {
+    await open({ project: { ...newProject({ regionCode: 'CL', name: 'Casa' }), payments: [{ id: 'a', amount: 1, at: 1, note: '' }] } });
+    await changeTo('BR');
+    const note = qs('project-market-warn');
+    expect(note.className).toContain('text-xs');
+    expect(note.className).toContain('text-neutral-400');
+    expect(note.outerHTML).not.toMatch(/e8c35f|yellow|amber|font-medium/);
+    expect(note.querySelector('svg[data-icon="info"]')).not.toBeNull();
+    expect(note.querySelector('svg').getAttribute('class')).toContain('text-neutral-500');
+    expect(note.textContent).toContain('prezzi');
+  });
+
+  it('marketChangeImpact: the pure rule', async () => {
+    const { marketChangeImpact } = await import('../src/lib/workspaceModel.js');
+    expect(marketChangeImpact(newProject({ regionCode: 'CL' })).affected).toBe(false);
+    expect(marketChangeImpact(null).affected).toBe(false);
+    expect(marketChangeImpact({ ...newProject({ regionCode: 'CL' }), payments: [{ id: 'a' }] })).toMatchObject({ booked: true, affected: true });
   });
 });
