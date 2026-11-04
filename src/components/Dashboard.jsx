@@ -7,7 +7,6 @@ import { isClosed, projectLevel, projectTitle, sortProjects } from '../lib/proje
 import { usePro } from '../lib/usePro.js';
 import { Logo, Wordmark } from './ui.jsx';
 import BackupBadge from './BackupBadge.jsx';
-import HelmetIcon from './HelmetIcon.jsx';
 import { LEVEL_COLOR } from './levelStyle.js';
 import ProjectCard from './ProjectCard.jsx';
 import GlobalAlerts from './GlobalAlerts.jsx';
@@ -101,7 +100,7 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro, 
           <BellIcon size={24} />
           {alerts.length > 0 && <span aria-hidden="true" data-testid="dash-bell-dot" className="absolute right-2.5 top-2.5 h-2.5 w-2.5 rounded-full bg-amber-500" />}
         </button>
-        {/* PRO: always a real button that opens the plans screen (also when PRO is already active). Titanium / silver hard hat + label side by side: a slim pill (36 px) inside a 44 px touch area. */}
+        {/* PRO: always a real button that opens the plans screen (also when PRO is already active). A tiny flat tag (no icon, no glow) centred in a 44 px touch area, on the same line as the logo and the bell. */}
         <button
           type="button"
           onClick={() => onPro()}
@@ -112,12 +111,11 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro, 
         >
           <span
             data-testid="pro-pill"
-            className={`flex h-9 items-center gap-1.5 rounded-lg border px-2.5 transition-shadow duration-200 group-hover:shadow-[0_0_12px_rgba(203,213,225,0.35)] group-focus-visible:shadow-[0_0_12px_rgba(203,213,225,0.35)] group-active:shadow-[0_0_16px_rgba(226,232,240,0.45)] ${
+            className={`flex items-center rounded-md border px-1.5 py-0.5 transition-colors ${
               pro ? 'border-slate-500/50 text-slate-300' : 'border-white/15 text-neutral-400 group-hover:border-slate-400/70 group-hover:text-slate-300'
             }`}
           >
-            <HelmetIcon size={20} />
-            <span className="text-xs font-semibold leading-none">PRO</span>
+            <span className="text-xs font-medium leading-none">PRO</span>
           </span>
         </button>
       </header>
@@ -148,7 +146,7 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro, 
         </ul>
       )}
 
-      <div role="tablist" aria-label={t('nav.projects')} className="mb-3 grid grid-cols-2 border-b border-white/10">
+      <div role="tablist" aria-label={t('nav.projects')} className="mb-3 grid grid-cols-2 border-b border-neutral-700/50">
         {[
           ['active', 'dash.tab.active', active.length],
           ['history', 'dash.tab.history', history.length],
@@ -160,13 +158,13 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro, 
             aria-selected={tab === id}
             data-testid={`tab-${id}`}
             onClick={() => onTab(id)}
-            className={`min-h-[48px] border-b-2 text-base font-semibold transition ${
+            className={`-mb-px min-h-[48px] border-b text-base font-normal transition ${
               tab === id
-                ? `text-neutral-200 ${id === 'history' ? 'border-neutral-500' : 'border-brand'}` // Activos: green; Historial: cement grey (closed work is not "go")
-                : 'border-transparent text-neutral-500 hover:text-neutral-300' // the section you are NOT in is dimmed
+                ? `text-neutral-200 ${id === 'history' ? 'border-neutral-500' : 'border-brand'}` // a 1 px thread: Activos green, Historial cement grey (closed work is not "go")
+                : 'border-transparent text-neutral-400 hover:text-neutral-300' // the section you are NOT in is dimmed
             }`}
           >
-            {t(key)} <span className={`text-sm font-semibold ${tab === id ? 'text-neutral-400' : 'text-neutral-500'}`}>{n}</span>
+            {t(key)} <span className={`text-sm font-normal ${tab === id ? 'text-neutral-400' : 'text-neutral-500'}`}>{n}</span>
           </button>
         ))}
       </div>
@@ -188,9 +186,9 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro, 
         onClick={onNew}
         data-testid="fab-new"
         aria-label={t('dash.new')}
-        className="no-print fixed right-3 z-30 flex h-[52px] w-[52px] items-center justify-center rounded-full bg-brand-dark text-black shadow-[0_2px_10px_rgba(22,163,74,0.22)] transition active:scale-95 [bottom:calc(5.25rem+env(safe-area-inset-bottom))]"
+        className="no-print fixed right-3 z-30 flex h-[52px] w-[52px] items-center justify-center rounded-full bg-[#16a34a] text-black transition active:scale-95 [bottom:calc(5.25rem+env(safe-area-inset-bottom))]"
       >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
           <path d="M12 5v14M5 12h14" />
         </svg>
       </button>

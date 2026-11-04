@@ -1,7 +1,7 @@
 import { useI18n } from '../lib/i18n.jsx';
 
 const Icon = ({ children }) => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {children}
   </svg>
 );
@@ -19,8 +19,8 @@ export default function BottomNav({ active, onProjects, onAccounting, onSettings
       onClick={onClick}
       data-testid={`nav-${id}`}
       aria-current={active === id ? 'page' : undefined}
-      className={`flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold leading-tight transition ${
-        active === id ? 'text-brand' : 'text-neutral-300 hover:text-neutral-200'
+      className={`flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-light leading-tight transition ${
+        active === id ? 'text-brand' : 'text-neutral-400 hover:text-neutral-200'
       }`}
     >
       {icon}

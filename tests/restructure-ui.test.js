@@ -127,20 +127,17 @@ describe('Dashboard: counters instead of sentences, tabs, full-width clickable c
     expect(Object.values(LEVEL_COLOR).slice(0, 4)).toEqual(Object.values(colors));
   });
 
-  it('PRO button: titanium hard hat beside the label in a slim pill, subtle silver glow on hover / touch, always opens the plans screen', async () => {
+  it('PRO button: a flat tag with just the label (no helmet, no glow), always opens the plans screen', async () => {
     const onPro = vi.fn();
     await render(React.createElement(Dashboard, { projects: [], tab: 'active', onTab: () => {}, onNew: () => {}, onOpen: () => {}, onPro }));
     const btn = q('pro-scan');
     expect(btn.tagName).toBe('BUTTON');
     expect(btn.className).toContain('min-h-[44px]'); // 44 px touch area...
     const pill = q('pro-pill');
-    expect(pill.className).toContain('h-9'); // ...around a slim 36 px pill
-    expect(pill.className).not.toContain('flex-col'); // hat and label on ONE line
-    const [hat, label] = [pill.firstElementChild, pill.lastElementChild];
-    expect(hat.getAttribute('data-testid')).toBe('helmet-icon'); // left...
-    expect(label.textContent).toBe('PRO'); // ...the text
-    expect(pill.className).toMatch(/group-hover:shadow-\[0_0_\d+px_rgba\(203,213,225/); // silver glow
-    expect(pill.className).toMatch(/group-active:shadow-/);
+    expect(pill.className).toContain('px-1.5 py-0.5'); // ...around a tiny flat tag
+    expect(pill.querySelector('[data-testid="helmet-icon"]')).toBeNull(); // no helmet inside the badge
+    expect(pill.textContent).toBe('PRO');
+    expect(pill.className).not.toMatch(/shadow/); // no glow
     expect(btn.outerHTML).not.toMatch(/d4af37|e8c35f|yellow|amber|rgba\(212,175,55/i); // no gold at all
     await click(btn);
     expect(onPro).toHaveBeenCalledTimes(1);
@@ -171,13 +168,13 @@ describe('Dashboard: counters instead of sentences, tabs, full-width clickable c
     expect(cls('tab-active')).toContain('border-brand');
     expect(cls('tab-active')).toContain('text-neutral-200');
     expect(cls('tab-history')).toContain('border-transparent');
-    expect(cls('tab-history')).toContain('text-neutral-500'); // inactive: dimmed
+    expect(cls('tab-history')).toContain('text-neutral-400'); // inactive: dimmed
     await click(q('tab-history'));
     expect(cls('tab-history')).toContain('border-neutral-500'); // NOT green
     expect(cls('tab-history')).not.toContain('border-brand');
     expect(cls('tab-history')).toContain('text-neutral-200');
     expect(cls('tab-active')).toContain('border-transparent');
-    expect(cls('tab-active')).toContain('text-neutral-500');
+    expect(cls('tab-active')).toContain('text-neutral-400');
     expect(cls('tab-active')).not.toContain('border-brand');
     await click(q('tab-active'));
     expect(cls('tab-active')).toContain('border-brand');

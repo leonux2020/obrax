@@ -68,11 +68,10 @@ describe('one-hand ergonomics', () => {
     expect(dash).toMatch(/h-\[52px\] w-\[52px\]/);
     expect(dash).not.toMatch(/h-16 w-16/);
     expect(dash).toContain('<svg width="24" height="24"'); // the + shrank with the button
-    // calmer on OLED: a tone darker than the brand green and a soft, low-alpha shadow instead of the 24 px / .35 glow
-    const fab = dash.slice(dash.indexOf('data-testid="fab-new"'));
-    expect(fab).toContain('bg-brand-dark');
-    expect(fab).toContain('shadow-[0_2px_10px_rgba(22,163,74,0.22)]');
-    expect(fab).not.toContain('0_0_24px');
+    // calmer on OLED: a matte green (a tone darker than the brand) and NO shadow / glow / ring at all
+    const fab = dash.slice(dash.indexOf('data-testid="fab-new"'), dash.indexOf('</button>', dash.indexOf('data-testid="fab-new"')));
+    expect(fab).toContain('bg-[#16a34a]');
+    expect(fab).not.toMatch(/shadow|drop-shadow|ring|0_0_24px/);
     expect(dash).toMatch(/pb-44/); // the last card scrolls fully above the button
   });
 });

@@ -109,3 +109,49 @@ describe('restored sheets still mount and work on their own', async () => {
     await unmount();
   });
 });
+
+describe('Phase 7: OLED calm (less light, less stress)', () => {
+  const dash = read('src/components/Dashboard.jsx');
+  const nav = read('src/components/BottomNav.jsx');
+
+  it('BottomNav: hairline icons and light 12 px labels', () => {
+    expect(nav).toContain('strokeWidth="1.5"');
+    expect(nav).not.toMatch(/strokeWidth="2"/);
+    expect(nav).toMatch(/text-xs font-light/);
+    expect(nav).not.toMatch(/font-semibold|font-bold/);
+  });
+
+  it('Dashboard tabs: a 1 px line (no border-b-2), normal weight, inactive neutral-400', () => {
+    const i = dash.indexOf('role="tablist"');
+    const tabs = dash.slice(i, i + 1400);
+    expect(tabs).toContain('border-b border-neutral-700/50');
+    expect(tabs).not.toMatch(/border-b-2|font-semibold/);
+    expect(tabs).toContain('font-normal');
+    expect(tabs).toContain('text-neutral-400');
+  });
+
+  it('FAB: matte green and not a single shadow / ring', () => {
+    const i = dash.indexOf('data-testid="fab-new"');
+    const fab = dash.slice(i, dash.indexOf('</button>', i));
+    expect(fab).toContain('bg-[#16a34a]');
+    expect(fab).not.toMatch(/shadow|ring/);
+  });
+
+  it('PRO badge: no helmet, no glow, small flat tag on the same line as logo and bell', () => {
+    const i = dash.indexOf('data-testid="pro-pill"');
+    const pro = dash.slice(i - 200, dash.indexOf('PRO</span>', i));
+    expect(dash).not.toMatch(/HelmetIcon/);
+    expect(pro).not.toMatch(/shadow|Helmet/);
+    expect(pro).toContain('px-1.5 py-0.5');
+    // header line: everything centred on one axis
+    expect(dash).toMatch(/data-testid="dash-header">/);
+    expect(dash).toMatch(/mb-2 flex items-center gap-2" data-testid="dash-header"/);
+  });
+
+  it('the status triangles are untouched (hairline 1.25 stroke, light numbers, glow kept)', () => {
+    expect(dash).toContain('<polygon points="30,3 57,51 3,51"');
+    expect(dash).toMatch(/strokeWidth="1\.25"/);
+    expect(dash).toMatch(/text-xl font-light leading-none tabular-nums/);
+    expect(dash).toContain('drop-shadow(0 0 3px ${color}55)');
+  });
+});
