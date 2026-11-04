@@ -5,7 +5,6 @@ import { typeInto as padType } from './helpers/appHarness.js';
 import React, { act, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { I18nProvider } from '../src/lib/i18n.jsx';
-import StepPrices from '../src/components/steps/StepPrices.jsx';
 import { newDraft } from '../src/lib/draft.js';
 import { computeAll } from '../src/lib/engine.js';
 import { CATALOG } from '../src/lib/catalog.js';
@@ -172,118 +171,6 @@ describe('1b. feed + IndexedDB: the user value is saved at once, persisted, and 
 });
 
 // ---------------------------------------------------------------------------------------------------------------
-describe('2. editable prices in the price screen', () => {
-  let host;
-  let root;
-  const q = (id) => document.querySelector(`[data-testid="${id}"]`);
-  const probe = {};
-  const typeInto = (input, value) =>
-    input.dataset?.numpad === 'true' ? padType(input, value) : act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value);
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      await new Promise((r) => setTimeout(r, 5));
-    });
-  function Harness() {
-    const [draft, setDraft] = useState(() => {
-      const d = draftOf();
-      d.partidas[0] = { ...d.partidas[0], task: 'slab' };
-      return d;
-    });
-    probe.draft = draft;
-    const book = usePriceBook('CL'); // re-renders when the registry changes, exactly like the real wizard
-    const result = useMemo(() => computeAll(draft, NOW), [draft, book]); // eslint-disable-line react-hooks/exhaustive-deps
-    probe.result = result;
-    return React.createElement(I18nProvider, { lang: 'es', regionCode: 'CL' }, React.createElement(StepPrices, { draft, setDraft, result, now: NOW, onRefresh: () => {}, onPro: () => {} }));
-  }
-  beforeEach(async () => {
-    await priceStore.clear();
-    host = document.createElement('div');
-    document.body.appendChild(host);
-    root = createRoot(host);
-  });
-  afterEach(async () => {
-    await flushUserPrices();
-    act(() => root.unmount());
-    host.remove();
-  });
-
-  it('every material price is an editable numeric input showing the price in use, with an AI / saved / reference indicator', async () => {
-    publish('CL', { book: normalizeBook(aiBook(1.3), 'CL'), state: 'fresh', at: NOW });
-    await act(async () => root.render(React.createElement(Harness)));
-    const items = probe.result.quote.items;
-    expect(items.length).toBeGreaterThan(2);
-    const inputs = [...host.querySelectorAll('li.card input[type="text"]')].filter((i) => /Precio manual/.test(i.getAttribute('aria-label') || ''));
-    expect(inputs).toHaveLength(items.length);
-    inputs.forEach((input, i) => expect(Number(input.value.replace(',', '.'))).toBe(items[i].unitPrice)); // the value itself, not a placeholder
-    const rents = new Set(probe.result.machinery.items.map((i) => i.id)).size;
-    expect(host.querySelectorAll('[data-testid="src-ai"]').length).toBe(items.length + rents); // green AI indicator on each material and rental
-    expect(host.querySelector('[data-testid="src-ai"] svg')).not.toBeNull();
-    expect(host.querySelector('[data-testid="prices-save-hint"]')).not.toBeNull();
-  });
-
-  it('editing a price updates the quote in real time and saves it as the user\'s standard price in IndexedDB', async () => {
-    publish('CL', { book: normalizeBook(aiBook(1.3), 'CL'), state: 'fresh', at: NOW });
-    await act(async () => root.render(React.createElement(Harness)));
-    const first = probe.result.quote.items[0];
-    const totalBefore = probe.result.quote.total;
-    const input = [...host.querySelectorAll('li.card input[type="text"]')].find((i) => /Precio manual/.test(i.getAttribute('aria-label') || ''));
-    const newPrice = first.unitPrice * 3;
-    await typeInto(input, String(newPrice));
-    expect(probe.result.quote.total).toBeGreaterThan(totalBefore); // total moves immediately
-    expect(probe.result.quote.items[0].unitPrice).toBe(newPrice);
-    expect(probe.draft.overrides[first.id]).toBe(newPrice); // this project
-    expect(savedMaterial(currentBook('CL'), 'CL', first.id)).toBe(newPrice); // the device's standard price
-    await act(async () => { await flushUserPrices(); });
-    expect((await priceStore.load('CL')).user.materials[first.id]).toBe(newPrice); // persisted
-    expect(host.querySelector('[data-testid="src-saved"]')).not.toBeNull(); // gold "Tu precio" indicator replaces the AI one
-    // a NEW project of the same region starts from the saved price (priority 1) instead of the AI value
-    const fresh = computeAll(draftOf(), NOW);
-    expect(fresh.quote.items.find((i) => i.id === first.id)).toMatchObject({ unitPrice: newPrice, source: 'saved' });
-    // "use reference" forgets it everywhere
-    const reset = [...host.querySelectorAll('li.card button')].find((b) => b.textContent === 'Usar referencia');
-    await act(async () => { reset.dispatchEvent(new MouseEvent('click', { bubbles: true })); await new Promise((r) => setTimeout(r, 5)); });
-    expect(probe.draft.overrides[first.id]).toBeUndefined();
-    expect(savedMaterial(currentBook('CL'), 'CL', first.id)).toBeUndefined();
-    expect(probe.result.quote.items[0].source).toBe('ai');
-  });
-
-  it('empty or zero while typing is ignored (the price in use does not collapse)', async () => {
-    publish('CL', { book: normalizeBook(aiBook(1.3), 'CL'), state: 'fresh', at: NOW });
-    await act(async () => root.render(React.createElement(Harness)));
-    const first = probe.result.quote.items[0];
-    const input = [...host.querySelectorAll('li.card input[type="text"]')].find((i) => /Precio manual/.test(i.getAttribute('aria-label') || ''));
-    await typeInto(input, '');
-    await typeInto(input, '0');
-    expect(probe.result.quote.items[0].unitPrice).toBe(first.unitPrice);
-    expect(probe.draft.overrides[first.id]).toBeUndefined();
-  });
-
-  it('machinery rentals are editable too: the daily rate moves the quote and is saved as the user\'s rate', async () => {
-    publish('CL', { book: normalizeBook(aiBook(1.3), 'CL'), state: 'fresh', at: NOW });
-    await act(async () => root.render(React.createElement(Harness)));
-    const mixer = probe.result.machinery.items.find((i) => i.id === 'mixer');
-    if (!mixer) throw new Error('the test project needs a concrete mixer');
-    expect(q('rent-prices')).not.toBeNull();
-    expect(q('rent-mixer').querySelector('[data-testid="src-ai"]')).not.toBeNull();
-    const input = q('rent-mixer').querySelector('input[type="text"]');
-    expect(Number(input.value.replace(',', '.'))).toBe(mixer.rate);
-    const totalBefore = probe.result.quote.total;
-    await typeInto(input, String(mixer.rate * 2));
-    expect(probe.result.machinery.items.find((i) => i.id === 'mixer').rate).toBe(mixer.rate * 2);
-    expect(probe.result.quote.total).toBeGreaterThan(totalBefore);
-    expect(savedRent(currentBook('CL'), 'CL', 'mixer')).toBe(mixer.rate * 2);
-    await act(async () => { await flushUserPrices(); });
-    expect((await priceStore.load('CL')).user.rent.mixer).toBe(mixer.rate * 2);
-    expect(q('rent-mixer').querySelector('[data-testid="src-saved"]')).not.toBeNull();
-  });
-
-  it('with no AI data at all the indicator says reference (simulation)', async () => {
-    await act(async () => root.render(React.createElement(Harness)));
-    expect(host.querySelectorAll('[data-testid="src-ref"]').length).toBe(probe.result.quote.items.length + new Set(probe.result.machinery.items.map((i) => i.id)).size);
-    expect(host.querySelector('[data-testid="src-ai"]')).toBeNull();
-  });
-});
-
 // ---------------------------------------------------------------------------------------------------------------
 describe('3. server prompt: expert quoter of the received country', () => {
   it('uses the strict instruction with the country code and lists that country\'s local retailers', () => {

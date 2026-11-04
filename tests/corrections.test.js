@@ -5,7 +5,6 @@ import path from 'node:path';
 import React, { act, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { I18nProvider, makeI18n } from '../src/lib/i18n.jsx';
-import ProfileSheet from '../src/components/ProfileSheet.jsx';
 import ContractorSignatureSheet from '../src/components/ContractorSignatureSheet.jsx';
 import { newDraft, normalizeDraft, normalizeCompany, EMPTY_COMPANY, saveCompany, loadCompany } from '../src/lib/draft.js';
 import { computeAll } from '../src/lib/engine.js';
@@ -90,11 +89,7 @@ describe('Cronograma manual: the dates the user types drive the machinery', () =
     expect(normalizeDraft({ regionCode: 'CL', crewAuto: false, crew: 7 }, 'CL').crew).toBeUndefined();
   });
 
-  it('the wizard and the dashboard card pass the project dates to the engine', () => {
-    const w = read('components/Wizard.jsx');
-    expect(w).toMatch(/planningTimeline\(draft, \{ startDate, endDate \}\)/);
-    expect(w).toMatch(/computeAll\(draft, priceTime, \{ timeline, book \}\)/);
-    expect(read('App.jsx')).toMatch(/startDate=\{active\.startDate\}/);
+  it('the dashboard card passes the project dates to the engine', () => {
     expect(read('components/ProjectCard.jsx')).toMatch(/planningTimeline\(project\.draft, project\)/);
   });
 });
@@ -173,9 +168,6 @@ describe('prices and rentals refresh continuously', () => {
     vi.setSystemTime(NOW + MARKET_WINDOW_MS * 2);
     act(() => q('refresh').dispatchEvent(new MouseEvent('click', { bubbles: true })));
     expect(Number(q('bucket').textContent)).toBe(marketBucket(NOW) + 2);
-    expect(read('components/Wizard.jsx')).toContain('useMarketClock()');
-    expect(read('components/steps/StepPrices.jsx')).toContain("t('prices.auto')");
-    expect(DICT.es['prices.auto']).toContain('guardados en el proyecto');
   });
 
   it('the dashboard card re-prices on every market window and day change', () => {
@@ -229,13 +221,6 @@ describe('contractor signature saved in the profile', () => {
     expect(withSig).toBeGreaterThan(noSig); // the contractor's ink is an extra image (PNG + its alpha mask)
   });
 
-  it('the report screen shows it above the contractor line and the app falls back to the profile one', () => {
-    const rep = read('components/steps/StepReport.jsx');
-    expect(rep).toContain('data-testid="contractor-signature-img"');
-    expect(rep).toContain('sig-img'); // inverted on the black screen, printed black on paper
-    expect(read('App.jsx')).toMatch(/documentCompany\(project\.company, company\)/); // the profile's signature is authoritative for every project
-  });
-
   // fake canvas: happy-dom has no 2D context
   function fakeCanvas() {
     const ctx = new Proxy({}, { get: (_, k) => (k === 'canvas' ? {} : () => {}), set: () => true });
@@ -274,27 +259,6 @@ describe('contractor signature saved in the profile', () => {
     vi.restoreAllMocks();
   });
 
-  it('Ajustes -> profile: the field opens the canvas (not nested), saves into the profile form and goes with "Guardar"', async () => {
-    fakeCanvas();
-    let saved = null;
-    const company = { ...EMPTY_COMPANY, name: 'Aurora', proName: 'Ana Ruiz' };
-    await act(async () => root.render(withI18n(React.createElement(ProfileSheet, { company, logo: '', drive: true, onSave: async (v) => { saved = v; }, onClose: () => {} }))));
-    expect(q('profile-signature')).not.toBeNull();
-    expect(q('profile-signature-preview')).toBeNull();
-    await click(q('profile-signature-box'));
-    expect(q('contractor-sign-sheet')).not.toBeNull();
-    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1); // replaces, never stacks
-    draw(q('signature-canvas'));
-    await click(q('contractor-sign-accept'));
-    expect(q('contractor-sign-sheet')).toBeNull();
-    expect(q('profile-signature-preview').getAttribute('src')).toBe(PNG);
-    expect(document.querySelector('input').value).not.toBeUndefined(); // the form (and its data) is still there
-    await click(q('profile-save'));
-    expect(saved.signature).toMatchObject({ dataUrl: PNG });
-    expect(saved.name).toBe('Aurora');
-    vi.restoreAllMocks();
-  });
-
   it('the first-run setup stays minimal: no signature field there', () => {
     expect(read('components/ProfileSetup.jsx')).not.toMatch(/onSign|ContractorSignature/);
   });
@@ -330,9 +294,6 @@ describe('PDF export includes the attached photos', () => {
     expect(images(raw((await createReportPdf('tech', off)).doc))).toBeGreaterThanOrEqual(4);
   });
 
-  it('the switch records the user choice (so old defaults can never override it)', () => {
-    expect(read('components/steps/StepReport.jsx')).toContain('attachPhotos: v, photosChoice: true');
-  });
 });
 
 describe('strings of this round exist in six languages', () => {
@@ -400,10 +361,7 @@ describe('signed documents are frozen: later date edits cannot move the machiner
     expect(normalizeSignature({ ...legacy.signature, timeline: { startDate: 'x', endDate: '2026-01-02' } }).timeline).toEqual({ startDate: '', endDate: '2026-01-02' });
   });
 
-  it('the wizard stamps through every draft update and the project card uses the frozen dates', () => {
-    const w = read('components/Wizard.jsx');
-    expect(w).toMatch(/freezeSignature\(d, /);
-    expect(w).toMatch(/planningTimeline\(draft, \{ startDate, endDate \}\)/);
+  it('the project card uses the frozen dates', () => {
     expect(read('components/ProjectCard.jsx')).toMatch(/planningTimeline\(project\.draft, project\)/);
   });
 });

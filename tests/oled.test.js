@@ -51,14 +51,13 @@ describe('one-hand ergonomics', () => {
 
   it('main navigation and key actions are fixed to the bottom', () => {
     expect(read('components/BottomNav.jsx')).toMatch(/fixed inset-x-0 bottom-0/);
-    expect(read('components/Wizard.jsx')).toMatch(/fixed inset-x-0 bottom-0/);
   });
 
   it('forms are bottom sheets anchored to the bottom edge', () => {
     const sheet = read('components/BottomSheet.jsx');
     expect(sheet).toMatch(/items-end/);
     expect(sheet).toMatch(/rounded-t-3xl/);
-    for (const f of ['ProjectSheet', 'ProfileSheet']) expect(read(`components/${f}.jsx`)).toContain('BottomSheet');
+    for (const f of ['ProjectSheet']) expect(read(`components/${f}.jsx`)).toContain('BottomSheet');
   });
 
   it('touch targets are at least 44 px', () => {

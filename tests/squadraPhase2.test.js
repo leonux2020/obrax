@@ -296,6 +296,6 @@ describe('every pencil button of the source is a clean floating icon', () => {
   it('the floating style is the neutral-400 -> white one', () => {
     const src = readFileSync('src/components/EditControls.jsx', 'utf8');
     expect(src).toContain('text-neutral-400 hover:text-white');
-    for (const f of ['src/components/workspace/HeaderZone.jsx', 'src/components/ProjectView.jsx', 'src/components/workspace/LogBlock.jsx']) expect(readFileSync(f, 'utf8'), f).toContain('text-neutral-400 transition hover:text-white');
+    for (const f of ['src/components/workspace/HeaderZone.jsx', 'src/components/workspace/LogBlock.jsx']) expect(readFileSync(f, 'utf8'), f).toContain('text-neutral-400 transition hover:text-white');
   });
 });

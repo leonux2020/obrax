@@ -5,8 +5,7 @@ import React, { act, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import fs from 'node:fs';
 import { I18nProvider } from '../src/lib/i18n.jsx';
-import { Logbook } from '../src/components/ProjectView.jsx';
-import StepPrices from '../src/components/steps/StepPrices.jsx';
+import Logbook from '../src/components/Logbook.jsx';
 import { createDictation } from '../src/lib/speech.js';
 import { newDraft } from '../src/lib/draft.js';
 import { computeAll } from '../src/lib/engine.js';
@@ -141,45 +140,11 @@ describe('voice logbook', () => {
 });
 
 // ---------------------------------------------------------------------------------------------------------------
-describe('price source indicator', () => {
-  function Harness() {
-    const [draft, setDraft] = useState(() => {
-      const d = newDraft('CL');
-      d.partidas[0].dims = { ...d.partidas[0].dims, length: 6, width: 4 };
-      return d;
-    });
-    const result = useMemo(() => computeAll(draft, NOW), [draft]);
-    return h(I18nProvider, { lang: 'es', regionCode: 'CL' }, h(StepPrices, { draft, setDraft, result, now: NOW, onRefresh: () => {}, onPro: () => {} }));
-  }
-  const feed = () => q('prices-feed');
-
-  it('says where the numbers come from: AI request / saved prices (Offline) / simulation mode / live AI', async () => {
-    await act(async () => root.render(h(Harness)));
-    expect(feed().dataset.state).toBe('idle');
-    expect(feed().textContent).toContain('Modo Simulación');
-
-    await act(async () => publish('CL', { state: 'loading' }));
-    expect(feed().dataset.state).toBe('loading');
-    expect(feed().textContent).toContain('Obteniendo precios de IA');
-    expect(feed().querySelector('span[aria-hidden]').className).toContain('animate-pulse');
-
-    await act(async () => publish('CL', { state: 'cached', at: NOW, reason: 'offline' }));
-    expect(feed().textContent).toContain('Usando precios guardados (Offline)');
-    expect(feed().dataset.reason).toBe('offline');
-
-    await act(async () => publish('CL', { state: 'sim', reason: 'not_configured' }));
-    expect(feed().textContent).toContain('Modo Simulación');
-    expect(q('prices-feed-why').textContent).toContain('clave de IA'); // the actionable diagnosis
-
-    await act(async () => publish('CL', { state: 'fresh', at: NOW }));
-    expect(feed().textContent).toContain('IA');
-    expect(q('prices-feed-why')).toBeNull();
-  });
-
-  it('every language words the three states', () => {
+describe('price feed diagnostics', () => {
+  it('every language words the dictation network error', () => {
     for (const lang of ['es', 'en', 'pt', 'fr', 'it', 'de']) {
       const { t } = makeI18n(lang, 'CL');
-      for (const k of ['prices.live.updating', 'prices.live.cached', 'prices.live.sim', 'prices.live.noKey', 'log.dictateNetwork']) expect(t(k, { date: 'x' }), `${lang} ${k}`).not.toBe(k);
+      for (const k of ['log.dictateNetwork']) expect(t(k, { date: 'x' }), `${lang} ${k}`).not.toBe(k);
     }
   });
 

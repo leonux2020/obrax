@@ -148,14 +148,12 @@ describe('splash + dashboard', () => {
     expect(host.querySelector('[data-testid="splash-start"]')).not.toBeNull();
   });
 
-  it('the dashboard, accounting and the top bar carry a compact isotype (24 px = h-6) next to the CUBRAX lettering', async () => {
+  it('the dashboard and accounting carry a compact isotype (24 px = h-6) next to the CUBRAX lettering', async () => {
     const fs = await import('node:fs');
     const src = fs.readFileSync('src/components/Dashboard.jsx', 'utf8');
     expect(src).toContain('<Wordmark');
     expect(src).toContain('<Logo size={24}');
     expect(fs.readFileSync('src/components/GlobalAccounting.jsx', 'utf8')).toContain('<Logo size={24}');
-    expect(fs.readFileSync('src/components/Header.jsx', 'utf8')).toContain('<Logo size={24}');
-    expect(fs.readFileSync('src/components/Header.jsx', 'utf8')).toContain('<Wordmark');
   });
 });
 

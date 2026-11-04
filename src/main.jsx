@@ -7,6 +7,11 @@ import { consumeOAuthCallback } from './lib/oauthCallback.js';
 import { startInstallCapture } from './pwa/installPrompt.js';
 import './index.css';
 
+try {
+  localStorage.removeItem('cp.flag.workspace'); // the old "?workspace=0" opt-out is gone: forget what it stored on this device
+} catch {
+  /* blocked storage */
+}
 installShield();
 startInstallCapture(); // `beforeinstallprompt` fires once and early: keep it for the Instalar App buttons
 // Google may send the user back with its answer in the address (Drive consent by redirect). Catch it BEFORE the app

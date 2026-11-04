@@ -12,8 +12,6 @@ import { getRegion, LANGS, REGIONS } from './lib/regions.js';
 import { wipeLocalData } from './lib/session.js';
 import { adoptCompany, cleanCityOrRegion, documentCompany, isClosed, newExtension, newProject, projectTitle, toDayString } from './lib/projects.js';
 import { normalizeLocation } from './lib/ledger.js';
-import { computeAll } from './lib/engine.js';
-import { planningTimeline, pricingTime } from './lib/signature.js';
 import { detectCurrentRegion, languageFor } from './lib/geo.js';
 import { sanitizeText } from './lib/sanitize.js';
 import {
@@ -46,14 +44,11 @@ import { usePWA } from './pwa/usePWA.js';
 import RegionSelect from './components/RegionSelect.jsx';
 import Login from './components/Login.jsx';
 import Header from './components/Header.jsx';
-import Wizard from './components/Wizard.jsx';
-import ProjectView from './components/ProjectView.jsx';
 import ProjectWorkspace from './components/ProjectWorkspace.jsx';
 import PostMortem from './components/PostMortem.jsx';
 import { useHistoryBack } from './lib/useHistoryBack.js';
 import ToastHost from './components/workspace/ToastHost.jsx';
 import { isStandalone } from './pwa/installPrompt.js';
-import { workspaceEnabled } from './lib/flags.js';
 import { withMarket, quoteLock } from './lib/workspaceModel.js';
 import { askNotifyPermission, pushToast, systemNotify, updateToast } from './lib/notify.js';
 import { collectDossierImages, syncDossier } from './lib/driveExport.js';
@@ -182,11 +177,9 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   const [sheet, setSheet] = useState(null); // { type: 'new' | 'edit', id? }
   const [tab, setTab] = useState('projects'); // bottom navigation: 'projects' | 'accounting' | 'settings' (all three are top-level screens)
   const [dashTab, setDashTab] = useState('active'); // dashboard tabs: 'active' | 'history'
-  const [editor, setEditor] = useState(false); // the technical editor (measures, prices, schedule) of the open project
   const [pickingRegion, setPickingRegion] = useState(false);
   const [paywall, setPaywall] = useState(null); // null | 'promo' | 'projects' | 'drive' | 'ai': which locked feature opened the PRO screen
   const [photos, setPhotos] = useState(emptySlots);
-  const [wsOn] = useState(workspaceEnabled); // single-screen project workspace (flag, see lib/flags.js)
 
   const region = getRegion(settings.region);
   // live material / rental prices for the regions in use (the user's country + every project's); only inside the app
@@ -462,7 +455,6 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     openedId.current = id;
     setFromAccounting(context?.fromAccounting === true);
     setActiveId(id);
-    setEditor(false);
     setPhotos(emptySlots());
     photoStoreFor(id)
       .load()
@@ -476,7 +468,6 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     openedId.current = null;
     setActiveId(null);
     setFromAccounting(false);
-    setEditor(false);
     setPhotos(emptySlots());
   }, []);
 
@@ -491,7 +482,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   // device's Back goes ordered to the previous screen (Proyectos) instead of leaving the app; tapping "Proyectos" drops that entry.
   useHistoryBack(tab !== 'projects' ? tab : null, () => setTab('projects'), 'cubraxTab');
 
-  // The open project's draft: all wizard / project-view edits flow through here.
+  // The open project's draft: all the workspace's edits of the quote flow through here.
   const setDraft = useCallback(
     (update) =>
       setProjects((list) =>
@@ -519,18 +510,8 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     [activeId]
   );
 
-  // The editor opens where the work is: the task / measures while the quote is incomplete, the measures afterwards.
-  const openEditor = () => {
-    const p = activeRef.current;
-    if (!p) return;
-    const valid = computeAll(p.draft, pricingTime(p.draft, Date.now()), { timeline: planningTimeline(p.draft, p), chains: false }).valid;
-    setDraft((d) => ({ ...d, step: valid || d.mode === 'project' ? 1 : 0 }));
-    setEditor(true);
-    window.scrollTo({ top: 0 });
-  };
-
   // A NEW project lands in the workspace (the SPA): its first partida is already open to type the measures, and
-  // "Proyecto completo" starts with "+ Agregar partida". (Legacy flow, ?workspace=0: the wizard opens first, then ProjectView.)
+  // "Proyecto completo" starts with "+ Agregar partida".
   const createProject = (fields) => {
     // The company profile is COPIED into the new project: later profile changes never rewrite it.
     // the market of a new job is the one picked in the form (it starts with where the device is NOW), never blindly the stored one
@@ -544,8 +525,6 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     setSheet(null);
     setTab('projects');
     openProject(project.id);
-    // the workspace is the whole project (measures included): a new job lands right in it; only the legacy flow opens the wizard
-    if (!wsOn) setEditor(true);
   };
 
   // "Crear extensión": a NEW phase of a finished job (same client, place and market, no items), linked by parentId.
@@ -1055,7 +1034,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
         <Login onLogin={signIn} />
       ) : (
         <>
-          <Header bare={!(active && editor)} subtitle={active ? projectTitle(active) || user.name : user.name} pwa={pwa} />
+          <Header pwa={pwa} />
 
           {projects === null ? (
             <>
@@ -1071,56 +1050,19 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
               rendition={{ onClose: submitRendition, onRetry: exportSync.retry, onReconnect: reconnectDrive, needsReconnect: driveNeedsReconnect }}
             />
           ) : active ? (
-            wsOn ? (
-              isClosed(active) ? (
-                <PostMortem
-                  key={active.id}
-                  project={active}
-                  parent={active.parentId ? projects.find((p) => p.id === active.parentId) ?? null : null}
-                  company={projectCompany(active, company)}
-                  photos={photos}
-                  setDraft={setDraft}
-                  onReopen={() => commit({ ...active, closedAt: 0, updatedAt: Date.now() })}
-                  onExtend={() => createExtension(active)}
-                />
-              ) : (
-                <ProjectWorkspace
-                  key={active.id}
-                  project={active}
-                  setProject={setProject}
-                  setDraft={setDraft}
-                  photos={photos}
-                  setPhotos={changePhotos}
-                  company={projectCompany(active, company)}
-                  receipts={receipts}
-                  enqueueReceipt={enqueueReceipt}
-                  onSyncDossier={syncExpediente}
-                  dossierBusy={dossierBusy.includes(active.id)}
-                  onBack={closeProject}
-                  onEdit={() => setSheet({ type: 'edit', id: active.id })}
-                  onPro={openPaywall}
-                />
-              )
-            ) : editor ? (
-              <Wizard
+            isClosed(active) ? (
+              <PostMortem
                 key={active.id}
-                projectId={active.id}
-                draft={active.draft}
-                setDraft={setDraft}
-                photos={photos}
-                setPhotos={changePhotos}
+                project={active}
+                parent={active.parentId ? projects.find((p) => p.id === active.parentId) ?? null : null}
                 company={projectCompany(active, company)}
-                startDate={active.startDate}
-                endDate={active.endDate}
-                onNewProject={() => {
-                  closeProject();
-                  requestNewProject();
-                }}
-                onPro={openPaywall}
-                onExit={() => setEditor(false)}
+                photos={photos}
+                setDraft={setDraft}
+                onReopen={() => commit({ ...active, closedAt: 0, updatedAt: Date.now() })}
+                onExtend={() => createExtension(active)}
               />
             ) : (
-              <ProjectView
+              <ProjectWorkspace
                 key={active.id}
                 project={active}
                 setProject={setProject}
@@ -1128,9 +1070,12 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
                 photos={photos}
                 setPhotos={changePhotos}
                 company={projectCompany(active, company)}
+                receipts={receipts}
+                enqueueReceipt={enqueueReceipt}
+                onSyncDossier={syncExpediente}
+                dossierBusy={dossierBusy.includes(active.id)}
                 onBack={closeProject}
                 onEdit={() => setSheet({ type: 'edit', id: active.id })}
-                onEditor={openEditor}
                 onPro={openPaywall}
               />
             )

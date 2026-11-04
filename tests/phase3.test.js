@@ -5,7 +5,6 @@ import { defaultDims, TASK_IDS } from '../src/lib/tasks.js';
 import { computeAll } from '../src/lib/engine.js';
 import { spanDays, toISODay } from '../src/lib/schedule.js';
 import { MACHINE_IDS, MACHINES, machineryRate } from '../src/lib/machinery.js';
-import { HSE, ERGO_IDS, PPE_IDS, WASTE_IDS, hseFor, hseKeys } from '../src/lib/hse.js';
 import { buildClientModel, buildTechModel } from '../src/lib/reports.js';
 import { renderTechPdf, pdfMoneyFormatter } from '../src/lib/pdf.js';
 import { makeI18n } from '../src/lib/i18n.jsx';
@@ -194,47 +193,7 @@ describe('draft: crew and machinery persistence', () => {
   });
 });
 
-describe('HSE guide', () => {
-  it('has a guide for every task with mandatory PPE, ergonomics and waste advice', () => {
-    for (const task of TASK_IDS) {
-      const g = hseFor(task);
-      expect(g, task).not.toBeNull();
-      expect(g.mandatory.length, task).toBeGreaterThanOrEqual(4);
-      expect(g.recommended.length, task).toBeGreaterThan(0);
-      expect(g.ergonomics.length, task).toBeGreaterThanOrEqual(4);
-      expect(g.waste.length, task).toBeGreaterThanOrEqual(4);
-      expect(new Set(g.mandatory).size).toBe(g.mandatory.length);
-      expect(g.mandatory.filter((k) => g.recommended.includes(k))).toEqual([]);
-    }
-    expect(hseFor('nope')).toBeNull();
-  });
-
-  it('only references known ids and the task-critical PPE is there', () => {
-    for (const task of TASK_IDS) {
-      const g = HSE[task];
-      for (const id of [...g.ppe.mandatory, ...g.ppe.recommended]) expect(PPE_IDS).toContain(id);
-      for (const id of g.ergonomics) expect(ERGO_IDS).toContain(id);
-      for (const id of g.waste) expect(WASTE_IDS).toContain(id);
-    }
-    expect(HSE.roof.ppe.mandatory).toContain('harness');
-    expect(HSE.slab.ppe.mandatory).toContain('gloves_chem');
-    expect(HSE.paint.ppe.recommended).toContain('respirator');
-    expect(HSE.drywall.ppe.mandatory).toContain('mask');
-  });
-
-  it('every id resolves to a real, translated sentence in the six languages', () => {
-    for (const lang of LANGS) {
-      for (const key of [...hseKeys(), ...PPE_IDS.map((i) => `hse.ppe.${i}`), ...ERGO_IDS.map((i) => `hse.erg.${i}`), ...WASTE_IDS.map((i) => `hse.waste.${i}`)]) {
-        expect(DICT[lang][key], `${lang} ${key}`).toBeTruthy();
-      }
-    }
-    // no orphan texts: every catalog entry is used by at least one task
-    const used = new Set(hseKeys());
-    for (const id of PPE_IDS) expect(used.has(`hse.ppe.${id}`), id).toBe(true);
-    for (const id of ERGO_IDS) expect(used.has(`hse.erg.${id}`), id).toBe(true);
-    for (const id of WASTE_IDS) expect(used.has(`hse.waste.${id}`), id).toBe(true);
-  });
-
+describe('machinery texts', () => {
   it('machinery keys needed by the engine exist in every language', () => {
     for (const lang of LANGS) {
       for (const id of MACHINE_IDS) {
@@ -242,79 +201,5 @@ describe('HSE guide', () => {
         expect(DICT[lang][`mach.why.${id}`]).toBeTruthy();
       }
     }
-  });
-});
-
-describe('Phase 3 UI structure and OLED compliance', () => {
-  const read = (rel) => fs.readFileSync(new URL(`../src/${rel}`, import.meta.url), 'utf8');
-
-  it('the HSE sheet is a bottom sheet and the buttons are in the dims and partida views', () => {
-    expect(read('components/HseSheet.jsx')).toContain('BottomSheet');
-    expect(read('components/steps/StepDims.jsx')).toContain('HseButton');
-    expect(read('components/steps/StepPartidas.jsx')).toContain('HseButton');
-  });
-
-  it('no grey backgrounds in the new components, only thin white/10 borders', () => {
-    for (const f of ['components/HseSheet.jsx', 'components/MachineryCard.jsx']) {
-      const text = read(f);
-      expect(text, f).not.toMatch(/bg-(neutral|gray|zinc|slate|stone)-\d/);
-      if (!f.includes('Machinery')) expect(text, f).toContain('border-white/10'); // the machinery card is built from the shared Switch / card
-    }
-  });
-});
-
-describe('Phase 3 components render (server-side smoke test, every language)', () => {
-  it('HSE sheet, machinery card and the entry buttons render real content', async () => {
-    const React = (await import('react')).default;
-    const { renderToStaticMarkup } = await import('react-dom/server');
-    const { I18nProvider } = await import('../src/lib/i18n.jsx');
-    const { HseSheet, default: HseButton } = await import('../src/components/HseSheet.jsx');
-    const { default: MachineryCard } = await import('../src/components/MachineryCard.jsx');
-    const draft = project(['slab', 'roof']);
-    const result = computeAll(draft, NOW);
-    const noop = () => {};
-    for (const lang of LANGS) {
-      const wrap = (el) => renderToStaticMarkup(React.createElement(I18nProvider, { lang, regionCode: 'CL' }, el));
-      for (const task of TASK_IDS) {
-        const html = wrap(React.createElement(HseSheet, { task, onClose: noop }));
-        expect(html, `${lang} ${task}`).toContain(DICT[lang]['hse.ppe']);
-        expect(html).toContain(DICT[lang][hseFor(task).mandatory[0]]);
-        expect(html).not.toMatch(/hse\.(ppe|erg|waste)\./); // a missing translation would print the raw key
-      }
-      expect(wrap(React.createElement(HseButton, { task: 'roof' }))).toContain('data-testid="hse-open"');
-      const mach = wrap(React.createElement(MachineryCard, { draft, setDraft: noop, result }));
-      expect(mach).toContain(DICT[lang]['mach.mixer']);
-      expect(mach).toContain(DICT[lang]['mach.scaffold']);
-      expect(mach).toContain(DICT[lang]['mach.nohand']);
-    }
-  });
-});
-
-describe('steps that host the Phase 3 entry points', () => {
-  it('Finance renders with a valid and with an incomplete draft; Dims/Partidas expose the HSE button', async () => {
-    const React = (await import('react')).default;
-    const { renderToStaticMarkup } = await import('react-dom/server');
-    const { I18nProvider } = await import('../src/lib/i18n.jsx');
-    const { default: StepFinance } = await import('../src/components/steps/StepFinance.jsx');
-    const { default: StepDims } = await import('../src/components/steps/StepDims.jsx');
-    const { default: StepPartidas } = await import('../src/components/steps/StepPartidas.jsx');
-    const noop = () => {};
-    const render = (el) => renderToStaticMarkup(React.createElement(I18nProvider, { lang: 'es', regionCode: 'CL' }, el));
-
-    const good = project(['slab', 'roof']);
-    const goodResult = computeAll(good, NOW);
-    const fin = render(React.createElement(StepFinance, { draft: good, setDraft: noop, result: goodResult }));
-    expect(fin).not.toContain('schedule-open'); // the planner sheet is gone
-    expect(fin).toContain('data-testid="machinery-card"');
-    expect(fin).toContain(DICT.es['mach.total']);
-
-    const bad = newDraft('CL'); // empty slab: not computable yet
-    const badResult = computeAll(bad, NOW);
-    expect(badResult.valid).toBe(false);
-    const finBad = render(React.createElement(StepFinance, { draft: bad, setDraft: noop, result: badResult }));
-
-    expect(render(React.createElement(StepDims, { draft: bad, setDraft: noop, result: badResult, showErrors: false }))).toContain('data-testid="hse-open"');
-    const parts = render(React.createElement(StepPartidas, { draft: good, setDraft: noop, result: goodResult, showErrors: false }));
-    expect((parts.match(/data-testid="hse-open"/g) || []).length).toBe(2);
   });
 });

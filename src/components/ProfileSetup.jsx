@@ -12,7 +12,7 @@ import SignaturePad from './SignaturePad.jsx';
  * The ONE configuration screen of the first run (after "Iniciar"):
  *   company form + country / currency (detected silently, shown as a chip) + signature canvas + the Google Drive
  *   request (Google's own OAuth consent: this app never has a field for a password) + "Continuar".
- * Later edits do NOT happen here: they live in Ajustes (see ProfileSheet).
+ * Later edits do NOT happen here: they live in Ajustes (see SettingsView).
  */
 export default function ProfileSetup({ onSave, onChangeRegion = null, requestDrive = connectDrive, onDriveConnected = null, returned = null }) {
   const { t, region, lang } = useI18n();

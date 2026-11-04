@@ -97,7 +97,7 @@ export default function SettingsView({
   const cloud = Boolean(backup?.enabled);
   const busy = phase === 'syncing';
 
-  // keep the card in sync when Ajustes re-opens with a newer profile (e.g. after ProfileSheet)
+  // keep the card in sync when Ajustes re-opens with a newer profile
   const baseline = useRef('');
   useEffect(() => {
     if (dirty.current) return; // typing / pending autosave: never rewrite the inputs (would eat the trailing space and jump the caret)

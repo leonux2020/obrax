@@ -205,7 +205,7 @@ describe('after onboarding, the profile lives only in Ajustes', () => {
   });
 
   it('nothing else can open a profile editor modal', () => {
-    for (const f of ['components/Dashboard.jsx', 'components/BottomNav.jsx', 'components/steps/StepReport.jsx', 'components/Wizard.jsx', 'App.jsx']) {
+    for (const f of ['components/Dashboard.jsx', 'components/BottomNav.jsx', 'App.jsx']) {
       expect(read(f), f).not.toMatch(/onEditProfile|setSheet\(\{ type: 'profile'/);
     }
   });
@@ -427,7 +427,7 @@ describe('data model and copy', () => {
   });
 
   it('OLED: the new screens use pure black, thin borders and no grey fills', () => {
-    for (const f of ['SplashScreen', 'ProfileSetup', 'ProfileFields', 'ProfileSheet']) {
+    for (const f of ['SplashScreen', 'ProfileSetup', 'ProfileFields']) {
       const text = read(`components/${f}.jsx`);
       expect(text, f).not.toMatch(/bg-(neutral|gray|zinc|slate|stone)-\d/);
     }

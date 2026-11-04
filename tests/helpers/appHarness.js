@@ -40,15 +40,10 @@ export const deviceBack = async () => {
   await flush(30);
 };
 
-// A NEW project opens in the project workspace (the SPA): its back arrow returns to the list. With the legacy flag
-// (?workspace=0) it opens in the editor instead: leave it (wizard back -> project view -> back).
+// A project (new or opened) lives in the workspace / post-mortem: neither has a back arrow, so the device's Back returns to the list.
 export async function backToDashboard() {
-  for (let i = 0; i < 8; i += 1) {
-    if (q('project-workspace') || q('project-postmortem')) return deviceBack(); // neither has a back arrow
-    if (q('pv-back')) return click(q('pv-back'));
-    if (q('wizard-back')) await click(q('wizard-back'));
-    else return;
-  }
+  if (q('project-workspace') || q('project-postmortem')) return deviceBack();
+  return undefined;
 }
 
 export function installFakeGoogle(drive, behavior = {}) {

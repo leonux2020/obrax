@@ -9,7 +9,7 @@ import path from 'node:path';
 import { I18nProvider } from '../src/lib/i18n.jsx';
 import { DateInput } from '../src/components/ui.jsx';
 import InstallButton from '../src/components/InstallButton.jsx';
-import { Logbook } from '../src/components/ProjectView.jsx';
+import Logbook from '../src/components/Logbook.jsx';
 import { __resetInstallForTests, startInstallCapture, getInstallState, promptInstall } from '../src/pwa/installPrompt.js';
 import { createFakeDrive } from './helpers/fakeDrive.js';
 import { CLIENT, backToDashboard, q, flush, click, typeInto, installFakeGoogle, createHost } from './helpers/appHarness.js';
@@ -160,9 +160,7 @@ describe('3. a new project goes to the kind of work + measures, not to the finan
     h = createHost(App);
     await h.mount();
     await create('Casa', 'quick');
-    expect(q('project-workspace')).not.toBeNull(); // the SPA, not the wizard
-    expect(q('wizard-back')).toBeNull();
-    expect(q('pv-back')).toBeNull();
+    expect(q('project-workspace')).not.toBeNull(); // the SPA is the only project screen
     expect(q('partida-0').open).toBe(true);
     expect(h.host.textContent).toContain('Radier');
     expect(h.host.textContent).toContain('Pintura');
@@ -174,30 +172,6 @@ describe('3. a new project goes to the kind of work + measures, not to the finan
     await create('Edificio', 'project');
     expect(q('project-workspace')).not.toBeNull();
     expect(q('partida-add')).not.toBeNull();
-    await backToDashboard();
-    expect(h.host.querySelectorAll('[data-testid="project-card"]')).toHaveLength(1);
-  });
-
-  it('legacy flow (?workspace=0): "Partida simple" opens the work-type picker (Radier, Pintura, Tabiquería...), and only leaving the editor shows the finances', async () => {
-    localStorage.setItem('cp.flag.workspace', '0');
-    h = createHost(App);
-    await h.mount();
-    await create('Casa', 'quick');
-    expect(q('pv-back')).toBeNull(); // NOT the financial module
-    expect(h.host.textContent).toContain('Radier');
-    expect(h.host.textContent).toContain('Pintura');
-    expect(q('wizard-back')).not.toBeNull();
-    await click(q('wizard-back')); // step 0 -> leaves the editor -> project view (finances)
-    expect(q('pv-back')).not.toBeNull();
-  });
-
-  it('legacy flow (?workspace=0): "Trabajo completo" opens the partidas list', async () => {
-    localStorage.setItem('cp.flag.workspace', '0');
-    h = createHost(App);
-    await h.mount();
-    await create('Edificio', 'project');
-    expect(q('pv-back')).toBeNull();
-    expect(h.host.textContent).toMatch(/partida/i);
     await backToDashboard();
     expect(h.host.querySelectorAll('[data-testid="project-card"]')).toHaveLength(1);
   });
@@ -572,10 +546,9 @@ describe('6. AI scanner bypass: localhost + Vite dev server only', () => {
     expect(devAiBypass({ dev: true, mode: 'development', host: '' })).toBe(false);
   });
 
-  it('the test runner never gets the bypass (paywall stays testable) and both AI gates use useAiAccess', () => {
+  it('the test runner never gets the bypass (paywall stays testable) and the workspace AI gate uses useAiAccess', () => {
     expect(devAiBypass()).toBe(false);
     expect(aiAccess()).toBeNull();
-    expect(read('src/components/ProjectView.jsx')).toContain('useAiAccess()');
-    expect(read('src/components/steps/StepPrices.jsx')).toContain('useAiAccess()');
+    expect(read('src/components/ProjectWorkspace.jsx')).toContain('useAiAccess()');
   });
 });

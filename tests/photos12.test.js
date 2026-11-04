@@ -7,7 +7,6 @@ import { createRoot } from 'react-dom/client';
 import { readFileSync } from 'node:fs';
 import { I18nProvider, makeI18n } from '../src/lib/i18n.jsx';
 import SnapGrid from '../src/components/SnapGrid.jsx';
-import PhotoGallery from '../src/components/PhotoGallery.jsx';
 import { MAX_PHOTOS, PHOTO_LIMITS, compressSource, emptySlots, formatStampDate, stampDate } from '../src/lib/photos.js';
 import { q } from './helpers/appHarness.js';
 
@@ -123,18 +122,6 @@ describe('12 slots in the UI', () => {
     expect(host.querySelectorAll('[data-testid^="snap-remove-"]')).toHaveLength(0); // deleting is hidden until the edit mode is on
     await mount(h(SnapGrid, { photos: full(), setPhotos: () => {}, projectId: 'proyecto1', editMode: true }));
     expect(host.querySelectorAll('[data-testid^="snap-remove-"]')).toHaveLength(12);
-  });
-
-  it('PhotoGallery (wizard) counts n/12 and lays the cards out on 2 columns (3 from sm)', async () => {
-    await mount(h(PhotoGallery, { photos: full().map((p, i) => (i < 5 ? p : null)), setPhotos: () => {}, projectId: 'proyecto1' }));
-    expect(host.textContent).toContain('5/12 fotos');
-    expect(host.textContent).toContain('Hasta 12 fotos');
-    expect(host.textContent).toContain('1080 px');
-    expect(host.textContent).not.toContain('1200 px');
-    const grid = q('photo-list');
-    expect(grid.className).toContain('grid-cols-2');
-    expect(grid.className).toContain('sm:grid-cols-3');
-    expect(grid.children).toHaveLength(12);
   });
 
   it('the labels exist in the six languages ("Avance 7", "Progress 7", ...) and all differ from Spanish', () => {

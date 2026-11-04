@@ -312,16 +312,6 @@ describe('UI structure (OLED + one-hand ergonomics)', () => {
     expect(pad).toContain('border-white/10');
   });
 
-  it('the summary screen has the signature area and the breakdown switch before the PDF buttons', () => {
-    const rep = read('components/steps/StepReport.jsx');
-    const sig = rep.indexOf('<SignatureField');
-    const toggle = rep.indexOf("t('bd.toggle')");
-    const pdf = rep.indexOf("runPdf('download')");
-    expect(sig).toBeGreaterThan(0);
-    expect(toggle).toBeGreaterThan(sig);
-    expect(pdf).toBeGreaterThan(toggle);
-  });
-
   it('setup screen: actions fixed to the bottom, Drive switch and professional data present', () => {
     const w = read('components/ProfileSetup.jsx');
     expect(w).toMatch(/fixed inset-x-0 bottom-0/);

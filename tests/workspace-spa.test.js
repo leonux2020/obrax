@@ -806,8 +806,8 @@ describe('structure: one export module, no old editor, OLED black', () => {
     for (const f of workspaceFiles()) expect(read(f), f).not.toMatch(/ProjectView|Wizard|onAdvanced|ws-advanced/);
   });
 
-  it('exports go ONLY through lib/exportActions.js (the workspace and the classic project view alike)', () => {
-    for (const f of ['src/components/ProjectWorkspace.jsx', 'src/components/ProjectView.jsx']) {
+  it('exports go ONLY through lib/exportActions.js (the workspace is the only project screen)', () => {
+    for (const f of ['src/components/ProjectWorkspace.jsx']) {
       const src = read(f);
       expect(src, f).toMatch(/exportActions\.js/);
       expect(src, f).not.toMatch(/createReportPdf|buildRenditionFile|shareOrDownload|freezeQuote|pdfToFile/);

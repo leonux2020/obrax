@@ -1,13 +1,13 @@
 // @vitest-environment happy-dom
-// ProjectWorkspace inside the real App (behind the ?workspace=1 flag) and the global deferred-receipt sync.
+// ProjectWorkspace inside the real App (the only project screen) and the global deferred-receipt sync.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import React, { act } from 'react';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRoot } from 'react-dom/client';
 import App from '../src/App.jsx';
 import { projectStore } from '../src/lib/projectStore.js';
 import { receiptQueue } from '../src/lib/receiptQueue.js';
 import { resetToasts } from '../src/lib/notify.js';
-import { DEFAULT_WORKSPACE, workspaceEnabled } from '../src/lib/flags.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const JPEG = `data:image/jpeg;base64,${Buffer.from(Array.from({ length: 300 }, (_, i) => i % 200)).toString('base64')}`;
@@ -67,18 +67,19 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('feature flag', () => {
-  it('is ON by default; ?workspace=0 is the remembered emergency opt-out and ?workspace=1 brings it back', () => {
-    expect(DEFAULT_WORKSPACE).toBe(true);
-    expect(workspaceEnabled()).toBe(true);
+describe('App with the workspace (the only project screen)', () => {
+  it('there is no flag any more: an old "?workspace=0" opt-out stored on the device is ignored and the file is gone from the source', async () => {
     localStorage.setItem('cp.flag.workspace', '0');
-    expect(workspaceEnabled()).toBe(false);
-    localStorage.setItem('cp.flag.workspace', '1');
-    expect(workspaceEnabled()).toBe(true);
+    await mount();
+    await newProjectIntoWorkspace();
+    expect(q('project-workspace')).not.toBeNull();
+    expect(q('wizard-back')).toBeNull();
+    expect(q('pv-back')).toBeNull();
+    expect(existsSync('src/lib/flags.js')).toBe(false);
+    for (const gone of ['components/Wizard.jsx', 'components/ProjectView.jsx', 'components/steps']) expect(existsSync(`src/${gone}`), gone).toBe(false);
+    expect(readFileSync('src/App.jsx', 'utf8')).not.toMatch(/Wizard|ProjectView|workspaceEnabled|wsOn|setEditor/);
   });
-});
 
-describe('App with the workspace (default)', () => {
   it('a NEW project goes straight into the workspace (never the wizard), with the first partida open; back returns to the dashboard', async () => {
     await mount(); // no flag stored: the default is on
     await newProjectIntoWorkspace();
@@ -92,20 +93,6 @@ describe('App with the workspace (default)', () => {
     expect(q('dash-empty') || q('project-card')).not.toBeNull();
     await click(document.querySelector('[data-testid="project-card"]')); // opening an existing project lands in the workspace too
     expect(q('project-workspace')).not.toBeNull();
-  });
-
-  it('emergency opt-out (?workspace=0): the classic wizard + project view are still there', async () => {
-    localStorage.setItem('cp.flag.workspace', '0');
-    await mount();
-    await click(q('fab-new'));
-    typeInto(document.querySelector('[role="dialog"] input'), 'Casa Soto');
-    await click(q('project-save'));
-    for (let i = 0; i < 8 && !q('pv-back'); i += 1) {
-      if (q('wizard-back')) await click(q('wizard-back'));
-      else break;
-    }
-    expect(q('project-view')).not.toBeNull();
-    expect(q('project-workspace')).toBeNull();
   });
 
   it('a receipt parked while offline is sent when the network returns, lands in ITS project and the user is told', async () => {
