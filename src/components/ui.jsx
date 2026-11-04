@@ -237,7 +237,7 @@ export function DateInput({ className = '', onClick, ...props }) {
   );
 }
 
-export function TextField({ label, value, onChange, onBlur, placeholder, maxLength = 80, optional, sanitize, testId, type = 'text', inputMode, end = null }) {
+export function TextField({ label, value, onChange, onBlur, placeholder, maxLength = 80, optional, sanitize, testId, type = 'text', inputMode, end = null, flat = false }) {
   const id = useId();
   return (
     <div>
@@ -257,7 +257,7 @@ export function TextField({ label, value, onChange, onBlur, placeholder, maxLeng
           onChange={(e) => onChange(sanitize ? sanitize(e.target.value) : e.target.value)}
           onBlur={onBlur}
           data-testid={testId}
-          className={end ? 'field-input pr-12' : 'field-input'}
+          className={`field-input ${end ? 'pr-12' : ''} ${flat ? 'border-transparent bg-neutral-900/50' : ''}`.trim()}
         />
         {end && <span className="absolute inset-y-0 right-0 flex items-center">{end}</span>}
       </div>

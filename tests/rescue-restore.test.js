@@ -171,20 +171,21 @@ describe('Phase 8: minimalism in Gastos y Caja', () => {
   it('the shared input style is the soft fill: bg-neutral-900 + 1 px white/10, no heavy borders in any money form', () => {
     expect(read('src/index.css')).toMatch(/\.field-input\s*\{\s*@apply[^}]*border border-white\/10 bg-neutral-900/);
     for (const f of all) expect(read(f), f).not.toMatch(/\bborder-2\b|border-neutral-700|border-white\/(15|20|25|30)\b/);
-    expect(read(files.cash)).toMatch(/data-testid="cash-amount" className="[^"]*border border-white\/10 bg-neutral-900/);
+    expect(read(files.cash)).toMatch(/data-testid="cash-amount" className="[^"]*bg-neutral-900\/50/); // Phase 10: the amount is a borderless soft fill
   });
 
   it('no ghost (outline-only) buttons: primaries are solid brand, secondaries a soft white/5 fill', () => {
     expect(read(files.receipt)).not.toContain('variant="ghost"');
     expect(read(files.cashSheet)).not.toContain('variant="ghost"');
     expect(read(files.cash)).toMatch(/data-testid="cash-add" className="[^"]*bg-brand[^"]*text-black/);
-    for (const f of [files.cash, files.cashSheet, files.queue, files.pad]) expect(read(f), f).toMatch(/border border-white\/10 bg-white\/5/);
+    for (const f of [files.cashSheet, files.queue, files.pad]) expect(read(f), f).toMatch(/border border-white\/10 bg-white\/5/);
+    expect(read(files.cash)).not.toMatch(/\bborder border-white|\bborder-2\b/); // Phase 10: the client-payments view has no borders at all
     expect(read(files.stack)).not.toMatch(/borderColor/); // the due-date tool no longer gets a gold outline
   });
 
   it('the history rows are clean: no box around each item, date on the left, amount on the right, calm colours', () => {
     const cash = read(files.cash);
-    expect(cash).toMatch(/divide-y divide-white\/5" data-testid="cash-list"/);
+    expect(cash).toMatch(/space-y-1" data-testid="cash-list"/);
     expect(cash).toMatch(/data-testid=\{`cash-amount-\$\{p\.id\}`\}/);
     expect(cash).toContain('text-neutral-200');
     expect(read(files.cashSheet)).not.toMatch(/rounded-2xl border border-white\/10" data-testid="cash-list"/);

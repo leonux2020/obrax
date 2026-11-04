@@ -34,7 +34,7 @@ export function useNotePhoto(store, noteId, enabled) {
 }
 
 /** Square thumbnail beside the note; a tap opens it full screen. Renders nothing while (or if) the picture is not there. */
-export function NoteThumb({ photo, label, onOpen, size = 56, testId }) {
+export function NoteThumb({ photo, label, onOpen, size = 56, testId, bare = false }) {
   const url = useBlobUrl(photo?.blob);
   if (!photo || !url) return null;
   return (
@@ -44,7 +44,7 @@ export function NoteThumb({ photo, label, onOpen, size = 56, testId }) {
       aria-label={label}
       data-testid={testId}
       style={{ width: size, height: size }}
-      className="shrink-0 overflow-hidden rounded-lg border border-white/15 bg-black active:border-white/50"
+      className={`shrink-0 overflow-hidden rounded-lg bg-black ${bare ? 'active:opacity-80' : 'border border-white/15 active:border-white/50'}`}
     >
       <img src={url} alt="" width={photo.width} height={photo.height} decoding="async" draggable="false" className="h-full w-full object-cover" />
     </button>

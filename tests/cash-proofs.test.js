@@ -91,7 +91,8 @@ describe('payment method chips (zero typing)', () => {
     for (const c of chips) {
       expect(c.getAttribute('role')).toBe('radio');
       expect(c.querySelector('svg[data-outline-icon="true"]')).not.toBeNull();
-      expect(c.className).toMatch(/min-h-\[(6\d)px\]/); // big touch target
+      expect(c.className).toMatch(/min-h-\[44px\]/); // a real touch target, but a slim pill (no giant squares)
+      expect(c.className).not.toMatch(/\bborder\b/); // no borders between the options
     }
     expect(chips[0].querySelector('rect[width="20"][height="12"]')).not.toBeNull(); // Banknote
     expect(chips[1].querySelector('path[d^="M12 2 20 7"]')).not.toBeNull(); // Landmark
@@ -134,13 +135,13 @@ describe('payment method chips (zero typing)', () => {
 });
 
 describe('photo of the proof', () => {
-  it('a camera button (capture=environment) prepares a photo; saving stores the Blob in IndexedDB scope BEFORE flagging the payment', async () => {
+  it('a camera button (capture=environment) prepares a photo; the payment is registered at once and the Blob is written to the IndexedDB scope in the background', async () => {
     await mount('proj-p1');
     const input = q('cash-photo-input');
     expect(input.getAttribute('capture')).toBe('environment');
     expect(input.getAttribute('accept')).toBe('image/*');
     expect(q('cash-photo').querySelector('svg path[d^="M14.5 4h-5"]')).not.toBeNull(); // Camera
-    expect(q('cash-photo').className).toMatch(/min-h-\[52px\]/);
+    expect(q('cash-photo').className).toMatch(/min-h-\[44px\]/);
     expect(q('cash-photo-preview')).toBeNull();
     await pickFile(input);
     expect(q('cash-photo-preview')).not.toBeNull();
@@ -192,13 +193,15 @@ describe('photo of the proof', () => {
 });
 
 describe('percentage shortcuts: clean and secondary', () => {
-  it('[25 %] [50 %] [75 %] [Saldo] stay, as hairline-bordered small regular buttons that do not compete with the amount or the confirm button', async () => {
+  it('[25 %] [50 %] [75 %] [Saldo] are borderless pill chips that do not compete with the amount or the confirm button', async () => {
     await mount();
     const row = q('cash-quick');
     const btns = [...row.querySelectorAll('button')];
     expect(btns.map((b) => b.textContent)).toEqual(['25 %', '50 %', '75 %', 'Saldo']);
     for (const b of btns) {
-      expect(b.className).toContain('border-white/10');
+      expect(b.className).toContain('border-none');
+      expect(b.className).toContain('rounded-full');
+      expect(b.className).toContain('bg-neutral-900');
       expect(b.className).toContain('text-xs');
       expect(b.className).toContain('font-medium');
       expect(b.className).not.toMatch(/font-(bold|extrabold|black|semibold)/);
@@ -237,5 +240,94 @@ describe('model', () => {
   it('every new string exists in the six languages', () => {
     const keys = ['ws.cash.m.cash', 'ws.cash.m.transfer', 'ws.cash.m.check', 'ws.cash.method', 'ws.cash.noteAdd', 'ws.cash.photoAdd', 'ws.cash.photoChange', 'ws.cash.photoOpen', 'ws.cash.photoRemove'];
     for (const l of ['es', 'en', 'pt', 'fr', 'it', 'de']) for (const k of keys) expect(DICT[l][k], `${l}:${k}`).toBeTruthy();
+  });
+});
+
+describe('Phase 10: the client payments view has no borders and saves at once', () => {
+  it('top indicators: "Manca" leads, the quote and what was collected are quiet text, none of them in a bordered box', async () => {
+    await mount();
+    const panel = q('cash-panel');
+    const dd = (id) => q(id);
+    for (const c of ['text-lg', 'font-medium', 'text-neutral-200']) expect(dd('cash-pending').className).toContain(c);
+    for (const id of ['cash-total', 'cash-paid']) expect(dd(id).closest('div').className).toMatch(/text-xs text-neutral-500|flex/);
+    expect(panel.querySelector('dl').className).not.toMatch(/grid-cols-3/);
+    for (const el of panel.querySelectorAll('dl, dl *')) expect(el.className?.toString() || '').not.toMatch(/\bborder\b/);
+  });
+
+  it('nothing in the panel carries a border (amount, chips, methods, optionals, rows)', async () => {
+    await mount();
+    await click(q('cash-note-open'));
+    await addPayment('1000');
+    const bad = [...q('cash-panel').querySelectorAll('*')].filter((el) => /(^|\s)border(-[trblxy])?(\s|$)|border-white|border-neutral/.test(el.getAttribute('class') || '') && !/border-none|border-transparent|border-l-2 border-\[#e8c35f\]/.test(el.getAttribute('class') || ''));
+    expect(bad.map((e) => e.getAttribute('class'))).toEqual([]);
+  });
+
+  it('the amount is a big light number on a soft fill, with no border', async () => {
+    await mount();
+    expect(q('cash-amount').className).toMatch(/bg-neutral-900\/50/);
+    expect(q('cash-amount').className).not.toMatch(/\bborder\b/);
+    expect(q('cash-amount').querySelector('span:last-child').className).toMatch(/text-3xl font-light/);
+  });
+
+  it('the chip in use changes tone and goes back to quiet when the amount is typed by hand', async () => {
+    await mount();
+    await click(q('cash-quick-0.5'));
+    expect(q('cash-quick-0.5').getAttribute('aria-pressed')).toBe('true');
+    expect(q('cash-quick-0.5').className).toContain('bg-white/10');
+    expect(q('cash-quick-0.25').className).toContain('text-neutral-400');
+    await click(q('cash-amount'));
+    await keys('7');
+    await click(q('pad-done'));
+    expect(q('cash-quick-0.5').getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('methods are a segmented control: only the active segment is lit (bg-white/10, off-white text: never pure white on OLED)', async () => {
+    await mount();
+    expect(q('cash-methods').className).toMatch(/rounded-full bg-neutral-900/);
+    await click(q('cash-method-transfer'));
+    expect(q('cash-method-transfer').className).toContain('bg-white/10 text-neutral-100');
+    expect(q('cash-method-cash').className).not.toContain('bg-white/10');
+  });
+
+  it('photo and note live in ONE quiet row (icon + text-xs), right above the register button', async () => {
+    await mount();
+    const photo = q('cash-photo');
+    const note = q('cash-note-open');
+    expect(photo.parentElement).toBe(note.parentElement);
+    for (const b of [photo, note]) {
+      expect(b.className).toMatch(/text-xs text-neutral-400/);
+      expect(b.className).not.toMatch(/\bborder\b/);
+      expect(b.querySelector('svg')).not.toBeNull();
+    }
+    expect(photo.parentElement.nextElementSibling).toBe(q('cash-add'));
+  });
+
+  it('registering is optimistic: the row, the totals and a clean form are there in the same tick, and the view goes to the history', async () => {
+    const scrolled = vi.fn();
+    Element.prototype.scrollIntoView = scrolled;
+    await mount();
+    await click(q('cash-amount'));
+    await keys('2500');
+    await click(q('pad-done'));
+    await act(async () => q('cash-add').click()); // no awaiting of anything else
+    expect(spy.payments).toHaveLength(1);
+    expect(q(`cash-row-${spy.payments[0].id}`)).not.toBeNull();
+    expect(q('cash-amount').textContent).toContain('—'); // the form is clean again
+    await flush(10);
+    expect(scrolled).toHaveBeenCalled();
+    expect(scrolled.mock.contexts[0]).toBe(q('cash-history'));
+    delete Element.prototype.scrollIntoView;
+  });
+
+  it('a photo that the device refuses does not lose the payment: it only loses its photo flag', async () => {
+    await mount('proj-fail');
+    await pickFile(q('cash-photo-input'));
+    const spyPut = vi.spyOn(paymentPhotosFor('proj-fail'), 'put').mockRejectedValue(new Error('quota'));
+    await addPayment('1500');
+    await flush(20);
+    expect(spy.payments).toHaveLength(1);
+    expect(spy.payments[0].amount).toBe(1500);
+    expect(spy.payments[0].photo).toBeUndefined();
+    spyPut.mockRestore();
   });
 });

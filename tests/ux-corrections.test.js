@@ -290,6 +290,6 @@ describe('3. new project: the closing button', () => {
 
   it('structure: the OLED rules still hold for the new classes', () => {
     const src = read('src/components/ProjectSheet.jsx') + read('src/components/workspace/CashBlock.jsx') + read('src/components/workspace/HeaderZone.jsx');
-    expect(src.replaceAll('h-0.5 bg-neutral-800', 'h-0.5').replaceAll('border-white/10 bg-neutral-900', 'border-white/10')).not.toMatch(/bg-(neutral|gray|zinc|slate|stone)-\d/); // (but the 2 px progress track)
+    expect(src.replaceAll('h-0.5 bg-neutral-800', 'h-0.5').replaceAll('border-white/10 bg-neutral-900', 'border-white/10').replaceAll('bg-neutral-900/50', '').replaceAll('border-none bg-neutral-900', 'border-none').replaceAll('rounded-full bg-neutral-900 p-1', 'rounded-full p-1')).not.toMatch(/bg-(neutral|gray|zinc|slate|stone)-\d/); // (but the 2 px progress track)
   });
 });
