@@ -4,7 +4,7 @@ import { currentPosition, detectCurrentRegion } from '../lib/geo.js';
 import { reverseCity } from '../lib/reverseGeocode.js';
 import { REGIONS } from '../lib/regions.js';
 import { quoteLock } from '../lib/workspaceModel.js';
-import { locationLabel, normalizeLocation } from '../lib/ledger.js';
+import { normalizeLocation } from '../lib/ledger.js';
 import { cleanCityOrRegion, isClosed, parseDay, toDayString } from '../lib/projects.js';
 import { sanitizeText } from '../lib/sanitize.js';
 import { Button, DateInput, Switch, TextField } from './ui.jsx';
@@ -51,7 +51,7 @@ const ModeIcon = ({ mode }) => (
 );
 
 /**
- * New job: the agile form (name, client, Partida Única / Proyecto Completo, dates, "ubicación actual"), no money.
+ * New job: the agile form (name, client, Partida Única / Proyecto Completo, dates, city with its GPS target), no money.
  * Edit job (the pencil inside the project): the same fields + finished / frozen switches + delete.
  */
 export default function ProjectSheet({ project, onSave, onDelete, onClose, locate = currentPosition, detectRegion = detectCurrentRegion, defaultRegion = null, reverse = reverseCity }) {
@@ -71,7 +71,6 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
     closed: project ? isClosed(project) : false,
     unfreeze: false,
   }));
-  const [geo, setGeo] = useState('idle'); // idle | asking | unsupported | denied | unavailable | timeout
   const [cityGeo, setCityGeo] = useState('idle'); // idle | asking | unsupported | denied | unavailable | timeout | offline | notfound | failed
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -81,28 +80,18 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
   const end = parseDay(form.endDate);
   const badRange = Boolean(start && end && end < start);
 
-  const useHere = async () => {
-    if (geo === 'asking') return;
-    setGeo('asking');
-    try {
-      const pos = await locate();
-      const location = normalizeLocation(pos);
-      if (!location) throw Object.assign(new Error('geo'), { code: 'unavailable' });
-      setForm((f) => ({ ...f, location }));
-      setGeo('idle');
-    } catch (err) {
-      setGeo(['unsupported', 'denied', 'unavailable', 'timeout'].includes(err?.code) ? err.code : 'unavailable');
-    }
-  };
-
-  // Target button of the city field: GPS fix -> Nominatim -> the name of the city / town / village goes into the field. Silent: the icon pulses, no modal.
+  // The target button of the city field (the ONLY GPS control of the form): GPS fix -> Nominatim -> city name + saved coordinates. Silent: the icon pulses, no modal.
   const findCity = async () => {
     if (cityGeo === 'asking') return;
     setCityGeo('asking');
     try {
       const pos = await locate();
-      const city = await reverse({ lat: Number(pos?.lat), lng: Number(pos?.lng) }, { lang });
-      setForm((f) => ({ ...f, cityOrRegion: cleanCityOrRegion(city) }));
+      const point = normalizeLocation(pos);
+      if (!point) throw Object.assign(new Error('geo'), { code: 'unavailable' });
+      const city = cleanCityOrRegion(await reverse({ lat: point.lat, lng: point.lng }, { lang }));
+      // ONE tap, both jobs: the name of the place goes into the field AND the point is saved in the project (the weather, the supplier
+      // radius and the "how to get there" link read it). The label of the point is the city, so the card can show it too.
+      setForm((f) => ({ ...f, cityOrRegion: city, location: { ...point, label: city } }));
       setCityGeo('idle');
     } catch (err) {
       setCityGeo(['unsupported', 'denied', 'unavailable', 'timeout', 'offline', 'notfound', 'failed'].includes(err?.code) ? err.code : 'failed');
@@ -193,6 +182,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
         </div>
 
         <div>
+          {editing && <SectionTitle>{t('loc.title')}</SectionTitle>}
           <TextField
             label={t('project.city')}
             placeholder={t('project.city.ph')}
@@ -201,7 +191,8 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
             testId="project-city"
             sanitize={(v) => sanitizeText(v, 80)}
             onChange={(v) => {
-              set('cityOrRegion')(v);
+              // typing a different place by hand: the saved point no longer describes it (it would feed the weather and the nearby prices), so it goes
+              setForm((f) => ({ ...f, cityOrRegion: v, location: null }));
               if (cityGeo !== 'idle' && cityGeo !== 'asking') setCityGeo('idle');
             }}
             end={
@@ -221,36 +212,6 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
           {!['idle', 'asking'].includes(cityGeo) && (
             <p role="status" data-testid="project-city-error" className="mt-1.5 text-sm font-medium text-red-400">
               {t(['unsupported', 'denied', 'unavailable', 'timeout'].includes(cityGeo) ? `newp.geo.${cityGeo}` : `project.city.err.${cityGeo}`)}
-            </p>
-          )}
-        </div>
-
-        <div>
-          {editing && <SectionTitle>{t('loc.title')}</SectionTitle>}
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" className="flex-1 !min-h-[52px]" onClick={useHere} disabled={geo === 'asking'} data-testid="project-locate">
-              <span aria-hidden="true">📍</span> {geo === 'asking' ? t('newp.locating') : form.location ? t('newp.located') : t('newp.locate')}
-            </Button>
-            {form.location && (
-              <button
-                type="button"
-                onClick={() => set('location')(null)}
-                aria-label={t('newp.locate.clear')}
-                data-testid="project-locate-clear"
-                className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-xl border border-white/10 text-xl hover:border-red-500"
-              >
-                ×
-              </button>
-            )}
-          </div>
-          {form.location && (
-            <p className="mt-1.5 break-words text-sm text-neutral-300" data-testid="project-location">
-              {locationLabel(form.location)}
-            </p>
-          )}
-          {['unsupported', 'denied', 'unavailable', 'timeout'].includes(geo) && (
-            <p role="alert" data-testid="project-locate-error" className="mt-1.5 text-sm font-medium text-red-400">
-              {t(`newp.geo.${geo}`)}
             </p>
           )}
         </div>

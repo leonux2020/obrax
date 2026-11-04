@@ -169,3 +169,74 @@ describe('ProjectSheet: the target button of the city field', () => {
     expect(q('project-city').value).toBe('Roma');
   });
 });
+
+describe('ProjectSheet: ONE GPS control (the target) does both jobs', () => {
+  let host;
+  let root;
+  const saved = [];
+  beforeEach(() => {
+    saved.length = 0;
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+  });
+  afterEach(async () => {
+    await act(async () => root.unmount());
+    host.remove();
+  });
+  const mount = (props) =>
+    act(async () => {
+      root.render(h(I18nProvider, { lang: 'it', regionCode: 'IT' }, h(ProjectSheet, { onSave: (p) => saved.push(p), onClose: () => {}, ...props })));
+    });
+  const tap = async () => {
+    await act(async () => {
+      q('project-city-locate').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    await flush(5);
+  };
+  const type = (v) =>
+    act(async () => {
+      const input = q('project-city');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, v);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  const save = async () => {
+    await act(async () => {
+      q('project-save').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+  };
+
+  it('one tap fills the city AND saves the coordinates (label = the city) in the saved project', async () => {
+    await mount({ locate: vi.fn().mockResolvedValue({ lat: 45.4642, lng: 9.19 }), reverse: vi.fn().mockResolvedValue('Milano') });
+    await tap();
+    expect(q('project-city').value).toBe('Milano');
+    await save();
+    expect(saved[0]).toMatchObject({ cityOrRegion: 'Milano', location: { lat: 45.4642, lng: 9.19, label: 'Milano' } });
+  });
+
+  it('the old GPS controls are gone: no big button, no clear x, no coordinates line, no emoji pin', async () => {
+    await mount({});
+    for (const id of ['project-locate', 'project-locate-clear', 'project-location', 'project-locate-error']) expect(q(id), id).toBeNull();
+    expect(document.body.textContent).not.toContain('📍');
+    expect(document.querySelectorAll('[data-testid="project-city-locate"]')).toHaveLength(1);
+    const src = readFileSync('src/components/ProjectSheet.jsx', 'utf8');
+    expect(src).not.toMatch(/useHere|project-locate"|newp\.locate/);
+  });
+
+  it('if the lookup of the NAME fails nothing is half-saved (no coordinates without a city)', async () => {
+    await mount({ locate: vi.fn().mockResolvedValue({ lat: 1, lng: 2 }), reverse: vi.fn().mockRejectedValue(Object.assign(new Error('x'), { code: 'offline' })) });
+    await tap();
+    expect(q('project-city-error')).not.toBeNull();
+    await save();
+    expect(saved[0].location).toBeNull();
+    expect(saved[0].cityOrRegion).toBe('');
+  });
+
+  it('typing another place by hand drops the old point (it would feed the weather of the wrong city)', async () => {
+    await mount({ locate: vi.fn().mockResolvedValue({ lat: 45.4642, lng: 9.19 }), reverse: vi.fn().mockResolvedValue('Milano') });
+    await tap();
+    await type('Torino');
+    await save();
+    expect(saved[0]).toMatchObject({ cityOrRegion: 'Torino', location: null });
+  });
+});

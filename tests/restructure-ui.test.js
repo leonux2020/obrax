@@ -242,10 +242,11 @@ describe('Dashboard: counters instead of sentences, tabs, full-width clickable c
 });
 
 describe('New project sheet: agile form, no money', () => {
-  it('name, client, visual mode selector, dates and a one-tap current location; saves one payload', async () => {
+  it('name, client, visual mode selector, dates and the city target that fills the name AND saves the point; saves one payload', async () => {
     const saved = [];
     const locate = vi.fn().mockResolvedValue({ lat: -33.4489, lng: -70.6693 });
-    await render(React.createElement(ProjectSheet, { onSave: (p) => saved.push(p), onClose: () => {}, locate }));
+    const reverse = vi.fn().mockResolvedValue('Valparaíso');
+    await render(React.createElement(ProjectSheet, { onSave: (p) => saved.push(p), onClose: () => {}, locate, reverse }));
     const dialog = document.querySelector('[role="dialog"]');
     expect(dialog.querySelectorAll('input[type="date"]')).toHaveLength(2);
     expect(dialog.querySelectorAll('[role="radio"]')).toHaveLength(2);
@@ -257,22 +258,24 @@ describe('New project sheet: agile form, no money', () => {
     await type(text[0], 'Casa Lo Barnechea');
     await type(text[1], 'María');
     expect(text).toHaveLength(4); // name, client, the country / market combobox, "Ciudad o Región de la Obra"
-    await type(doc.querySelector('[data-testid="project-city"]'), 'Valparaíso');
     await click(doc.querySelector('[data-testid="mode-project"]'));
     expect(doc.querySelector('[data-testid="mode-project"]').getAttribute('aria-checked')).toBe('true');
-    await click(doc.querySelector('[data-testid="project-locate"]'));
+    await click(doc.querySelector('[data-testid="project-city-locate"]'));
+    await flush(5);
     expect(locate).toHaveBeenCalled();
-    expect(doc.querySelector('[data-testid="project-location"]').textContent).toContain('-33.4489');
+    expect(doc.querySelector('[data-testid="project-city"]').value).toBe('Valparaíso');
+    expect(doc.querySelector('[data-testid="project-locate"]')).toBeNull(); // the old big GPS button is gone
     await click(doc.querySelector('[data-testid="project-save"]'));
     expect(saved).toHaveLength(1);
-    expect(saved[0]).toMatchObject({ name: 'Casa Lo Barnechea', client: 'María', mode: 'project', cityOrRegion: 'Valparaíso', location: { lat: -33.4489, lng: -70.6693 }, regionCode: 'CL' });
+    expect(saved[0]).toMatchObject({ name: 'Casa Lo Barnechea', client: 'María', mode: 'project', cityOrRegion: 'Valparaíso', location: { lat: -33.4489, lng: -70.6693, label: 'Valparaíso' }, regionCode: 'CL' });
   });
 
   it('a refused location is a small message, not a blocker; editing shows the closed / unfreeze switches', async () => {
     const locate = vi.fn().mockRejectedValue(Object.assign(new Error('x'), { code: 'denied' }));
     await render(React.createElement(ProjectSheet, { onSave: () => {}, onClose: () => {}, locate }));
-    await click(document.querySelector('[data-testid="project-locate"]'));
-    expect(document.querySelector('[data-testid="project-locate-error"]')).not.toBeNull();
+    await click(document.querySelector('[data-testid="project-city-locate"]'));
+    await flush(5);
+    expect(document.querySelector('[data-testid="project-city-error"]')).not.toBeNull();
     expect(document.querySelector('[data-testid="project-save"]').disabled).toBe(false);
     expect(document.querySelector('[data-testid="project-closed"]')).toBeNull();
     act(() => root.unmount());
@@ -289,19 +292,20 @@ describe('New project sheet: agile form, no money', () => {
 describe('Edit modal (the pencil)', () => {
   it('opens a clean full-height modal with name, client, dates and location in labelled sections', async () => {
     const saved = [];
-    const p = { ...sized(mk('Casa', -2, 30)), location: { lat: -33.4489, lng: -70.6693, label: '' } };
-    await render(React.createElement(ProjectSheet, { project: p, onSave: (v) => saved.push(v), onDelete: () => {}, onClose: () => {}, locate: async () => ({ lat: 10, lng: 20 }) }));
+    const p = { ...sized(mk('Casa', -2, 30)), cityOrRegion: 'Valparaíso', location: { lat: -33.4489, lng: -70.6693, label: 'Valparaíso' } };
+    await render(React.createElement(ProjectSheet, { project: p, onSave: (v) => saved.push(v), onDelete: () => {}, onClose: () => {}, locate: async () => ({ lat: 10, lng: 20 }), reverse: async () => 'Roma' }));
     const dialog = document.querySelector('[role="dialog"]');
     expect(dialog.className).toContain('h-[100dvh]');
     const headings = [...dialog.querySelectorAll('h3')].map((h) => h.textContent);
     expect(headings).toEqual(['Datos de la obra', 'Fechas', 'Ubicación', 'Estado de la obra']);
     expect(dialog.querySelectorAll('input[type="text"]')).toHaveLength(4); // name + client + the market combobox + city/region
     expect(dialog.querySelectorAll('input[type="date"]')).toHaveLength(2);
-    expect(document.querySelector('[data-testid="project-location"]').textContent).toContain('-33.4489');
-    await click(document.querySelector('[data-testid="project-locate"]'));
-    expect(document.querySelector('[data-testid="project-location"]').textContent).toContain('10.0000');
+    expect(document.querySelector('[data-testid="project-locate"]')).toBeNull();
+    await click(document.querySelector('[data-testid="project-city-locate"]'));
+    await flush(5);
+    expect(document.querySelector('[data-testid="project-city"]').value).toBe('Roma');
     await click(document.querySelector('[data-testid="project-save"]'));
-    expect(saved[0]).toMatchObject({ name: 'Casa', location: { lat: 10, lng: 20 } });
+    expect(saved[0]).toMatchObject({ name: 'Casa', cityOrRegion: 'Roma', location: { lat: 10, lng: 20, label: 'Roma' } });
   });
 });
 
