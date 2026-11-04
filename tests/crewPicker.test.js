@@ -57,6 +57,10 @@ describe('crewMatch: the emulated distance and the ranking', () => {
     expect(names({ specialty: 'plumber', range: 'local' })).toEqual(['Beto Soto']);
     expect(names({ query: 'DIAZ' })).toEqual(['Carla Díaz']);
     expect(names({ query: 'ana ru' })).toEqual(['Ana Ruiz']); // every typed word is looked for in the name
+    const label = (id) => ({ electrician: 'Electricista', plumber: 'Fontanero', mason: 'Albañil' })[id] ?? id;
+    expect(names({ query: 'ELECTRI', label })).toEqual(['Beto Soto', 'Ana Ruiz', 'Dante Mora']); // ...or in the label of one of their trades
+    expect(names({ query: 'electri' })).toEqual([]); // without labels only the name counts
+    expect(names({ query: 'ana electri', label })).toEqual(['Ana Ruiz']); // name + trade together
     expect(rankWorkers(DIRECTORY, { project: place, range: 'local' }).hidden).toBe(1); // Eva has no address
     expect(rankWorkers(DIRECTORY, { project: place, range: 'all' }).hidden).toBe(0);
   });
@@ -120,7 +124,12 @@ const mount = async (extra = place) => {
   });
   await flush();
   await click(q('ws-crew'));
-  await click(q('crew-add'));
+};
+/** The master search adds from the directory: widen the reach, type the person's name, tap the suggestion. */
+const pick = async (id) => {
+  if (q('crew-range-all')?.getAttribute('aria-checked') !== 'true') await click(q('crew-range-all'));
+  await typeInto(q('crew-search'), loadWorkers().find((w) => w.id === id).name);
+  await click(q(`crew-pick-${id}`));
 };
 const listed = () => qa('crew-pick-name').map((n) => n.textContent);
 
@@ -139,171 +148,209 @@ afterEach(() => {
   localStorage.clear();
 });
 
-describe('CrewPicker: the hybrid selector', () => {
-  it('is an inline DROPDOWN, not a stacked modal: it unfolds under the control line of the crew and the [+] folds it again', async () => {
+describe('crew master search: ONE bar to find and add people (no modal, no boxes on boxes)', () => {
+  const type = (text) => typeInto(q('crew-search'), text);
+  const trade = async (id) => click(q(`crew-filter-${id}`));
+  const reach = async (r) => click(q(`crew-range-${r}`));
+
+  it('there is NO add dialog: the [+] and the dropdown are gone, the master search sits under the labour line, then ONE line of chips, then the crew', async () => {
     await mount();
-    expect(q('crew-selector')).not.toBeNull();
-    expect(q('crew-add').getAttribute('aria-expanded')).toBe('true');
-    expect(q('ws-crew-sheet').contains(q('crew-selector'))).toBe(true); // inside the crew sheet itself
-    expect(qa('sheet-backdrop')).toHaveLength(1); // no second sheet above it
-    expect(q('crew-bar').compareDocumentPosition(q('crew-selector')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    await click(q('crew-add'));
+    expect(q('crew-add')).toBeNull();
     expect(q('crew-selector')).toBeNull();
-    expect(q('crew-add').getAttribute('aria-expanded')).toBe('false');
+    expect(qa('sheet-backdrop')).toHaveLength(1); // only the crew sheet itself
+    expect(q('crew-search').placeholder).toBe(DICT.es['ws.crew.search']);
+    expect(q('ws-crew-sheet').contains(q('crew-search'))).toBe(true); // already there with an empty crew: it is how people are added
+    expect(q('crew-suggest')).toBeNull(); // nothing is suggested until you type or pick a trade
+    expect(q('crew-bar').compareDocumentPosition(q('crew-master')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(q('crew-master').contains(q('crew-search'))).toBe(true);
+    expect(q('crew-master').contains(q('crew-filters'))).toBe(true);
+    expect(q('crew-search').compareDocumentPosition(q('crew-filters')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await pick('wk000002');
+    expect(q('crew-master').compareDocumentPosition(q('crew-list')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(q('crew-master').className).toContain('sticky'); // anchored while the crew scrolls
   });
 
-  it('replaces the plain input: the directory is listed below the name field; rows show name, stars and the ⚠ only for health notes', async () => {
+  it('the distance capsules sit in the SAME line as the trade chips and look exactly like them (matte bg-white/5, quiet text, active bg-white/10)', async () => {
     await mount();
-    expect(q('worker-form')).not.toBeNull();
-    expect(q('crew-name')).not.toBeNull();
-    expect(q('crew-directory')).not.toBeNull();
+    const strip = q('crew-filters');
+    for (const cls of ['overflow-x-auto', 'hide-scrollbar', 'flex']) expect(strip.className).toContain(cls);
+    expect(q('crew-range')).not.toBeNull();
+    expect(strip.contains(q('crew-range'))).toBe(true);
+    const chips = [...strip.querySelectorAll('button')].map((b) => b.dataset.testid);
+    expect(chips).toEqual(['crew-range-local', 'crew-range-regional', 'crew-range-all', ...WORKER_SPECIALTIES.map((s) => `crew-filter-${s}`)]); // ONE row: distance first, then trades
+    expect([...q('crew-range').querySelectorAll('button')].map((c) => c.textContent)).toEqual(['Local (< 70 km)', 'Regional', 'Todos']);
+    expect([...q('crew-range').querySelectorAll('button')].map((c) => c.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false']); // local by default
+    for (const c of strip.querySelectorAll('button')) {
+      expect(c.className).toContain('rounded-full');
+      expect(c.className).toContain('text-xs');
+      expect(c.className).not.toMatch(/\bborder\b|\bw-full\b|min-h-\[44px\]|grid/); // not the old giant buttons
+    }
+    expect(q('crew-range-regional').className).toBe(q('crew-filter-plumber').className); // identical look when idle
+    expect(q('crew-range-regional').className).toContain('bg-white/5');
+    expect(q('crew-range-regional').className).toContain('text-neutral-400');
+    expect(q('crew-range-local').className).toContain('bg-white/10'); // the active one
+    expect(q('crew-range-local').className).toBe(q('crew-filter-plumber').className.replace('bg-white/5 text-neutral-400', 'bg-white/10 text-neutral-100'));
+    await trade('plumber');
+    expect(q('crew-filter-plumber').className).toBe(q('crew-range-local').className); // active trade = active distance
+    expect(q('crew-filter-plumber').getAttribute('aria-pressed')).toBe('true');
+    await trade('plumber');
+    expect(q('crew-filter-plumber').getAttribute('aria-pressed')).toBe('false'); // a second tap clears
+  });
+
+  it('typing a NAME suggests the company directory in real time: tap a suggestion and the person joins the job at once, linked to the file', async () => {
+    await mount();
+    await type('bet');
+    expect(q('crew-suggest')).not.toBeNull();
+    expect(listed()).toEqual(['Beto Soto']);
+    expect(spy.project.crew).toHaveLength(0); // nothing is added until you tap
+    await click(q('crew-pick-wk000002'));
+    expect(spy.project.crew).toHaveLength(1);
+    expect(spy.project.crew[0]).toMatchObject({ name: 'Beto Soto', specialty: 'electrician', ref: 'wk000002' });
+    expect(q('crew-search').value).toBe(''); // the bar is clean again
+    expect(q('crew-suggest')).toBeNull();
+    expect(q(`worker-${spy.project.crew[0].id}`)).not.toBeNull();
+    expect(qa('sheet-backdrop')).toHaveLength(1); // no sheet opened on the way
+  });
+
+  it('typing a TRADE ("electri") suggests the people of that trade (nearest first); accents and case do not matter', async () => {
+    await mount();
+    await type('ELÉCTRI');
+    expect(listed()).toEqual(['Beto Soto', 'Ana Ruiz']); // local by default
+    await reach('all');
+    expect(listed()).toEqual(['Beto Soto', 'Ana Ruiz', 'Dante Mora']);
+    await type('albanil');
+    expect(listed()).toEqual(['Eva Lara']);
+  });
+
+  it('the suggestions are quiet contact rows: avatar, name, trade · distance, stars, the ⚠ only for health notes; no boxes', async () => {
+    await mount();
+    await type('ruiz');
     const ana = q('crew-pick-wk000001');
     expect(ana.querySelector('[data-testid="stars"]').dataset.rating).toBe('3');
     expect(ana.querySelector('[data-testid="crew-pick-health"]')).not.toBeNull();
+    expect(ana.querySelector('[data-testid="crew-pick-note"]').textContent).toBe('Electricista · Local');
+    expect(ana.closest('li').className).toContain('border-b border-white/5');
+    expect(ana.className).not.toMatch(/\bborder\b|rounded-xl/);
+    await type('beto');
     expect(q('crew-pick-wk000002').querySelector('[data-testid="crew-pick-health"]')).toBeNull();
-    for (const c of ana.querySelectorAll('[data-testid="crew-pick-chip"]')) for (const cls of ['text-xs', 'bg-neutral-800', 'text-neutral-300']) expect(c.className).toContain(cls);
   });
 
-  it('REACH: three chips, "Local (< 70 km)" active by default; the list is local, nearest and best rated first', async () => {
+  it('REACH: Local (< 70 km) is the default; Regional adds the region, Todos the whole directory; the count without address is told quietly', async () => {
     await mount();
-    const chips = [...q('crew-range').querySelectorAll('button')];
-    expect(chips.map((c) => c.dataset.testid)).toEqual(['crew-range-local', 'crew-range-regional', 'crew-range-all']);
-    expect(chips.map((c) => c.textContent)).toEqual(['Local (< 70 km)', 'Regional', 'Todos']);
-    expect(chips.map((c) => c.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false']);
-    for (const c of chips) expect(c.className).toContain('text-xs'); // quiet
-    expect(listed()).toEqual(['Beto Soto', 'Ana Ruiz']);
-    expect(q('crew-hidden').textContent).toBe('1 sin dirección: solo aparecen en «Todos».');
-  });
-
-  it('widening the reach is one tap: Regional adds the region, Todos the whole directory (order still nearest first)', async () => {
-    await mount();
-    await click(q('crew-range-regional'));
-    expect(listed()).toEqual(['Beto Soto', 'Ana Ruiz', 'Carla Díaz']);
+    await trade('plumber');
+    expect(listed()).toEqual(['Beto Soto']);
+    await reach('regional');
+    expect(listed()).toEqual(['Beto Soto', 'Carla Díaz']);
     expect(q('crew-range-regional').getAttribute('aria-checked')).toBe('true');
     expect(q('crew-range-local').getAttribute('aria-checked')).toBe('false');
-    expect(q('crew-pick-wk000003').querySelector('[data-testid="crew-pick-note"]').textContent).toBe('Regional');
-    expect(q('crew-pick-wk000002').querySelector('[data-testid="crew-pick-note"]').textContent).toBe('Local');
-    await click(q('crew-range-all'));
-    expect(listed()).toEqual(['Beto Soto', 'Ana Ruiz', 'Carla Díaz', 'Dante Mora', 'Eva Lara']);
+    expect(q('crew-pick-wk000003').querySelector('[data-testid="crew-pick-note"]').textContent).toBe('Plomero · Regional');
+    await trade('plumber');
+    await trade('mason');
+    expect(listed()).toEqual([]);
+    await reach('local');
+    expect(q('crew-pick-hint').textContent).toBe('Nadie en este alcance: amplía el radio.');
+    expect(q('crew-hidden').textContent).toBe('1 sin dirección: solo aparecen en «Todos».');
+    await reach('all');
+    expect(listed()).toEqual(['Eva Lara']);
     expect(q('crew-hidden')).toBeNull();
-    await click(q('crew-range-local')); // and back
-    expect(listed()).toEqual(['Beto Soto', 'Ana Ruiz']);
   });
 
-  it('TRADE CHIPS: a horizontally scrolling row with every trade; one tap filters at once, a second one clears', async () => {
+  it('the trade chip filters BOTH the crew on the job and the suggestions', async () => {
     await mount();
-    const row = q('crew-filters');
-    expect(row.className).toContain('overflow-x-auto');
-    expect(qa('crew-filters')[0].querySelectorAll('button')).toHaveLength(WORKER_SPECIALTIES.length);
-    await click(q('crew-range-all'));
-    await click(q('crew-filter-electrician'));
-    expect(q('crew-filter-electrician').getAttribute('aria-pressed')).toBe('true');
-    expect(listed()).toEqual(['Beto Soto', 'Ana Ruiz', 'Dante Mora']);
-    await click(q('crew-filter-plumber'));
-    expect(listed()).toEqual(['Beto Soto', 'Carla Díaz']);
-    expect(q('crew-filter-electrician').getAttribute('aria-pressed')).toBe('false'); // one trade at a time
-    await click(q('crew-filter-plumber'));
-    expect(listed()).toHaveLength(5);
+    await pick('wk000002'); // Beto, electrician
+    await pick('wk000003'); // Carla, plumber
+    expect(qa('crew-list')[0].children).toHaveLength(2);
+    await trade('plumber');
+    expect(qa('crew-list')[0].children).toHaveLength(1);
+    expect(q('crew-list').textContent).toContain('Carla Díaz');
+    expect(listed()).toEqual([]); // Beto and Carla are on the job already: not suggested again
+    await trade('plumber');
+    expect(qa('crew-list')[0].children).toHaveLength(2);
   });
 
-  it('typing filters the directory by name as you write (and only that: nothing is added until you say so)', async () => {
+  it('whoever is already on the job is not suggested again', async () => {
     await mount();
-    await click(q('crew-range-all'));
-    await typeInto(q('crew-name'), 'bet');
-    expect(listed()).toEqual(['Beto Soto']);
-    expect(spy.project.crew).toHaveLength(0);
-  });
-
-  it('FLOW 1: tapping a worker of the directory adds him / her at once, linked to the file, with the first trade; the sheet closes', async () => {
-    await mount();
-    await click(q('crew-pick-wk000002'));
-    expect(q('worker-form')).toBeNull();
-    expect(spy.project.crew).toHaveLength(1);
-    expect(spy.project.crew[0]).toMatchObject({ name: 'Beto Soto', specialty: 'electrician', ref: 'wk000002' });
-    expect(q(`worker-${spy.project.crew[0].id}`)).not.toBeNull(); // the card of the project
-    await click(q('crew-add'));
-    const row = q('crew-pick-wk000002'); // already in: shown, locked, not addable twice
-    expect(row.disabled).toBe(true);
-    expect(row.querySelector('[data-testid="crew-pick-note"]').textContent).toBe('En el proyecto');
-    await click(row);
+    await pick('wk000002');
+    await type('beto');
+    expect(listed()).toEqual([]);
+    expect(q('crew-pick-hint').textContent).toBe('Nadie coincide: se añadirá como texto simple.');
     expect(spy.project.crew).toHaveLength(1);
   });
 
   it('with a trade chip on, the person is added with THAT trade (the one they were looked up for)', async () => {
     await mount();
-    await click(q('crew-filter-plumber'));
-    await click(q('crew-range-all'));
-    await click(q('crew-pick-wk000002')); // Beto: electrician + plumber
+    await trade('plumber');
+    await click(q('crew-pick-wk000002')); // Beto: electrician + plumber, local
     expect(spy.project.crew[0]).toMatchObject({ name: 'Beto Soto', specialty: 'plumber', ref: 'wk000002' });
   });
 
-  it('FLOW 2 (urgency): a name that is not in the directory goes in as PLAIN TEXT in one tap: no file, no medical form, the directory untouched', async () => {
+  it('URGENCY: a name that is not in the directory goes in as PLAIN TEXT in one tap: no file, no medical form, the directory untouched', async () => {
     await mount();
-    await typeInto(q('crew-name'), 'Pedro Urgente');
+    expect(q('crew-add-text')).toBeNull(); // nothing noisy while you just browse
+    await type('Pedro Urgente');
     expect(listed()).toEqual([]);
     expect(q('crew-pick-hint').textContent).toBe('Nadie coincide: se añadirá como texto simple.');
-    expect(q('crew-save').textContent).toBe('Añadir «Pedro Urgente»');
-    await click(q('crew-save'));
-    expect(q('worker-form')).toBeNull();
+    expect(q('crew-add-text').textContent).toBe('+ Añadir «Pedro Urgente»');
+    await click(q('crew-add-text'));
     expect(spy.project.crew).toHaveLength(1);
     expect(spy.project.crew[0]).toMatchObject({ name: 'Pedro Urgente', specialty: 'multi' });
     expect(spy.project.crew[0]).not.toHaveProperty('ref');
-    expect(loadWorkers()).toHaveLength(5); // nothing created in the global directory
+    expect(loadWorkers()).toHaveLength(5);
     expect(host.querySelector('[data-testid="worker-block-safety"]')).toBeNull();
+    expect(q('crew-search').value).toBe('');
+    await type('');
+    expect(q('crew-add-text')).toBeNull();
   });
 
-  it('Enter in the field adds the typed name too, with the active trade chip as its specialty', async () => {
+  it('Enter in the bar adds the typed name too, with the active trade chip as its specialty', async () => {
     await mount();
-    await click(q('crew-filter-mason'));
-    await typeInto(q('crew-name'), 'Luis Albañil');
+    await trade('mason');
+    await type('Luis Albañil');
     await act(async () => {
-      q('worker-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      q('crew-master').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     });
     expect(spy.project.crew[0]).toMatchObject({ name: 'Luis Albañil', specialty: 'mason' });
   });
 
   it('typing the exact name of someone in the directory links his file instead of creating a lookalike', async () => {
     await mount();
-    await typeInto(q('crew-name'), 'carla diaz');
-    await click(q('crew-save'));
+    await type('carla diaz');
+    await act(async () => {
+      q('crew-master').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
     expect(spy.project.crew[0]).toMatchObject({ name: 'Carla Díaz', ref: 'wk000003', specialty: 'plumber' });
-  });
-
-  it('the add-as-text button needs text: it only appears once something is typed (nothing noisy while you just browse the directory)', async () => {
-    await mount();
-    expect(q('crew-save')).toBeNull();
-    await typeInto(q('crew-name'), 'X');
-    expect(q('crew-save')).not.toBeNull();
-    expect(q('crew-save').disabled).toBe(false);
-    await typeInto(q('crew-name'), '');
-    expect(q('crew-save')).toBeNull();
+    expect(spy.project.crew).toHaveLength(1);
   });
 
   it('a job with no city cannot filter by reach: says so and offers everybody', async () => {
     await mount({ cityOrRegion: '' });
+    await trade('electrician');
     expect(q('crew-noplace').textContent).toContain('Indica la ciudad de la obra');
-    expect(listed()).toHaveLength(5);
+    expect(listed()).toEqual(['Beto Soto', 'Dante Mora', 'Ana Ruiz']); // no distance to rank by: best rated first
   });
 
-  it('an empty range explains how to widen it; an empty directory still lets you type a name', async () => {
-    await mount({ cityOrRegion: 'Punta Arenas' });
-    expect(listed()).toEqual([]);
-    expect(q('crew-pick-hint').textContent).toBe('Nadie en este alcance: amplía el radio.');
-    await click(q('crew-range-all'));
-    expect(listed()).toHaveLength(5);
-    act(() => root.unmount());
-    root = createRoot(host);
+  it('an empty directory: no distance capsules, a quiet note, and a name can still be typed in', async () => {
     localStorage.clear();
     await mount();
+    expect(q('crew-range')).toBeNull();
+    await type('Solo Texto');
     expect(q('crew-pick-hint').textContent).toContain('El directorio está vacío');
-    await typeInto(q('crew-name'), 'Solo Texto');
-    await click(q('crew-save'));
+    await click(q('crew-add-text'));
     expect(spy.project.crew[0].name).toBe('Solo Texto');
+  });
+
+  it('Escape clears the search first (the sheet stays open)', async () => {
+    await mount();
+    await type('bet');
+    await act(async () => q('crew-search').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(q('crew-search').value).toBe('');
+    expect(q('crew-suggest')).toBeNull();
+    expect(q('ws-crew-sheet')).not.toBeNull();
   });
 
   it('the person of the project is still edited with the old sheet (name, trade, notes) and keeps the directory link', async () => {
     await mount();
-    await click(q('crew-pick-wk000001'));
+    await pick('wk000001');
     const id = spy.project.crew[0].id;
     await unfold(id);
     await click(q(`worker-edit-${id}`));
@@ -320,9 +367,8 @@ describe('safety: the ⚠ of the file follows the worker onto the job', () => {
 
   it('a worker picked from the directory with health notes carries the ⚠ on his / her card (orange, always visible); one without notes does not', async () => {
     await mount();
-    await click(q('crew-pick-wk000001')); // Ana: allergy
-    await click(q('crew-add'));
-    await click(q('crew-pick-wk000002')); // Beto: nothing to warn about
+    await pick('wk000001'); // Ana: allergy
+    await pick('wk000002'); // Beto: nothing to warn about
     const ana = idOf('Ana Ruiz');
     const beto = idOf('Beto Soto');
     expect(spy.project.crew.find((w) => w.id === ana)).toMatchObject({ ref: 'wk000001', health: true });
@@ -341,14 +387,14 @@ describe('safety: the ⚠ of the file follows the worker onto the job', () => {
   it('a limiting condition alone is enough to raise it', async () => {
     saveWorkers([{ id: 'wk000009', name: 'Fito Vega', specialties: ['mason'], rating: 2, address: 'Maipú', limiting: 'Vértigo: no trabajar en altura' }]);
     await mount();
-    await click(q('crew-pick-wk000009'));
+    await pick('wk000009');
     expect(card(spy.project.crew[0].id)).not.toBeNull();
   });
 
   it('typed as plain text there is no file and no ⚠ (nothing is invented)', async () => {
     await mount();
-    await typeInto(q('crew-name'), 'Pedro Urgente');
-    await click(q('crew-save'));
+    await typeInto(q('crew-search'), 'Pedro Urgente');
+    await click(q('crew-add-text'));
     expect(card(spy.project.crew[0].id)).toBeNull();
   });
 
@@ -373,7 +419,7 @@ describe('safety: the ⚠ of the file follows the worker onto the job', () => {
 
   it('it survives editing the person on the job, saving the project and loading it again, and the advance flow does not hide it', async () => {
     await mount();
-    await click(q('crew-pick-wk000001'));
+    await pick('wk000001');
     const id = spy.project.crew[0].id;
     await unfold(id);
     await click(q(`worker-edit-${id}`));
@@ -416,7 +462,7 @@ describe('emergency: the health data is READ on site (the person\'s sheet in the
   it('tapping a person with a health warning shows, at the TOP of the sheet, the conditions, allergies and emergency contact of the file, in an orange panel', async () => {
     saveWorkers([FULL]);
     await mount();
-    await click(q('crew-pick-wk000009'));
+    await pick('wk000009');
     await open('Fito Vega');
     const panel = q('crew-emergency');
     expect(panel).not.toBeNull();
@@ -438,7 +484,7 @@ describe('emergency: the health data is READ on site (the person\'s sheet in the
   it('only what exists is shown; a missing emergency contact is said out loud', async () => {
     saveWorkers([{ ...FULL, limiting: '', emergencyName: '', emergencyPhone: '' }]);
     await mount();
-    await click(q('crew-pick-wk000009'));
+    await pick('wk000009');
     await open('Fito Vega');
     expect(q('crew-emergency-limiting')).toBeNull();
     expect(q('crew-emergency-allergies').textContent).toContain('Penicilina');
@@ -449,13 +495,11 @@ describe('emergency: the health data is READ on site (the person\'s sheet in the
   it('it follows the live file: after the notes of the file change, the next opening of the sheet reads the new text', async () => {
     saveWorkers([FULL]);
     await mount();
-    await click(q('crew-pick-wk000009'));
+    await pick('wk000009');
     await open('Fito Vega');
     expect(q('crew-emergency-allergies').textContent).toContain('Penicilina');
     await click(qa('sheet-backdrop').at(-1));
     saveWorkers([{ ...FULL, allergies: 'Abejas' }]); // edited in Ajustes meanwhile
-    await click(q('crew-add')); // opening the dropdown re-reads the directory
-    await click(q('crew-add')); // and folding it again
     await open('Fito Vega');
     expect(q('crew-emergency-allergies').textContent).toContain('Abejas');
     expect(q('crew-emergency-allergies').textContent).not.toContain('Penicilina');
@@ -464,12 +508,10 @@ describe('emergency: the health data is READ on site (the person\'s sheet in the
   it('NO panel for people with no health warning: plain text, a file with no notes, or a file with only an emergency contact', async () => {
     saveWorkers([{ id: 'wk000008', name: 'Gaby Paz', specialties: ['mason'], rating: 1, address: 'Maipú', emergencyName: 'Luis', emergencyPhone: '+56 9 1' }, ...DIRECTORY.slice(1, 2)]);
     await mount();
-    await click(q('crew-pick-wk000008'));
-    await click(q('crew-add'));
-    await typeInto(q('crew-name'), 'Pedro Urgente');
-    await click(q('crew-save'));
-    await click(q('crew-add'));
-    await click(q('crew-pick-wk000002')); // Beto: no notes
+    await pick('wk000008');
+    await typeInto(q('crew-search'), 'Pedro Urgente');
+    await click(q('crew-add-text'));
+    await pick('wk000002'); // Beto: no notes
     for (const name of ['Gaby Paz', 'Pedro Urgente', 'Beto Soto']) {
       await open(name);
       expect(q('worker-form'), name).not.toBeNull();
@@ -499,7 +541,7 @@ describe('emergency: the health data is READ on site (the person\'s sheet in the
   it('works in every language and the sheet still edits normally under the panel (name, trade, notes, delete)', async () => {
     saveWorkers([FULL]);
     await mount();
-    await click(q('crew-pick-wk000009'));
+    await pick('wk000009');
     await open('Fito Vega');
     await typeInto(q('crew-notes'), 'Tablero');
     await click(q('crew-save'));
@@ -518,7 +560,7 @@ describe('emergency panel: the blood group, big and red', () => {
   it('shows the group first in the orange panel as a red badge, large and semibold, announced with its label', async () => {
     saveWorkers([FILE]);
     await mount();
-    await click(q('crew-pick-wk000009'));
+    await pick('wk000009');
     await openSheet('Fito Vega');
     const badge = q('crew-emergency-blood');
     expect(badge.textContent).toBe('O-');
@@ -535,7 +577,7 @@ describe('emergency panel: the blood group, big and red', () => {
     for (const b of ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']) {
       saveWorkers([{ ...FILE, bloodType: b }]);
       await mount();
-      await click(q('crew-pick-wk000009'));
+      await pick('wk000009');
       await openSheet('Fito Vega');
       expect(q('crew-emergency-blood').textContent).toBe(b);
       act(() => root.unmount());
@@ -546,7 +588,7 @@ describe('emergency panel: the blood group, big and red', () => {
   it('a health panel with no group says it is not specified (never silence)', async () => {
     saveWorkers([{ ...FILE, bloodType: '' }]);
     await mount();
-    await click(q('crew-pick-wk000009'));
+    await pick('wk000009');
     await openSheet('Fito Vega');
     expect(q('crew-emergency-blood')).toBeNull();
     expect(q('crew-emergency-blood-none').textContent).toBe('Grupo sanguíneo: no especificado');
@@ -555,7 +597,7 @@ describe('emergency panel: the blood group, big and red', () => {
   it('the group alone is medical data: it opens the panel even with no allergy or condition (the card has no ⚠: that is only for risks)', async () => {
     saveWorkers([{ id: 'wk000008', name: 'Gaby Paz', specialties: ['mason'], rating: 1, address: 'Maipú', bloodType: 'B+' }]);
     await mount();
-    await click(q('crew-pick-wk000008'));
+    await pick('wk000008');
     const id = spy.project.crew[0].id;
     expect(q(`worker-health-${id}`)).toBeNull();
     await openSheet('Gaby Paz');
@@ -567,7 +609,7 @@ describe('emergency panel: the blood group, big and red', () => {
 
   it('a file with neither notes nor group still shows no panel', async () => {
     await mount();
-    await click(q('crew-pick-wk000002')); // Beto
+    await pick('wk000002'); // Beto
     await openSheet('Beto Soto');
     expect(q('crew-emergency')).toBeNull();
   });

@@ -64,24 +64,25 @@ export function proximity(project, worker) {
   return regionHit(address) ? 1 : 2;
 }
 
-const matchesQuery = (worker, query) => {
+/** Every typed word is found in the name OR in the label of one of the worker's trades ("electri" finds the electricians). `label` maps a trade id to its words. */
+const matchesQuery = (worker, query, label) => {
   const words = norm(query).split(' ').filter(Boolean);
-  const name = norm(worker.name);
-  return words.every((w) => name.includes(w));
+  const hay = [worker.name, ...(label ? worker.specialties.map((id) => label(id)) : [])].map(norm);
+  return words.every((w) => hay.some((h) => h.includes(w)));
 };
 
 /**
- * The directory for this job: [{ worker, near }] filtered by the typed text, the trade chip (`specialty` id or '') and the range, and ordered
+ * The directory for this job: [{ worker, near }] filtered by the typed text (name, or trade when `label` is given), the trade chip (`specialty` id or '') and the range, and ordered
  * NEAREST first, then best rated, then by name. `placed` tells whether the range could be applied (the job has a place); `hidden` counts the workers
  * left out only because they have no city nor address.
  */
-export function rankWorkers(workers, { project, specialty = '', range = DEFAULT_RANGE, query = '' } = {}) {
+export function rankWorkers(workers, { project, specialty = '', range = DEFAULT_RANGE, query = '', label = null } = {}) {
   const placed = Boolean(projectPlaces(project).city);
   let hidden = 0;
   const rows = [];
   for (const worker of normalizeWorkers(workers)) {
     if (specialty && !worker.specialties.includes(specialty)) continue;
-    if (query && !matchesQuery(worker, query)) continue;
+    if (query && !matchesQuery(worker, query, label)) continue;
     const near = proximity(project, worker);
     if (placed && range !== 'all') {
       const ok = range === 'local' ? near === 0 : near <= 1;

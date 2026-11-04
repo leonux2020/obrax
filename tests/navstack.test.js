@@ -497,13 +497,17 @@ describe('device Back and the accordions of a project (Parámetros, Diario, Anti
     expect(q('ws-title')).toBeNull();
   });
 
-  it('Escape folds the selector dropdown first (inside the Personal sheet), then closes the menu sheet', async () => {
+  it('Escape clears the master search first (inside the Personal sheet), then closes the menu sheet', async () => {
     await openProject();
     await click(summary('ws-crew'));
-    await click(q('crew-add'));
-    expect(q('worker-form')).not.toBeNull();
-    await act(async () => q('crew-name').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-    expect(q('worker-form')).toBeNull();
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(q('crew-search'), 'Pedro');
+      q('crew-search').dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(q('crew-suggest')).not.toBeNull();
+    await act(async () => q('crew-search').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(q('crew-suggest')).toBeNull();
+    expect(q('crew-search').value).toBe('');
     expect(!!q('ws-crew-sheet')).toBe(true);
     await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
     expect(!!q('ws-crew-sheet')).toBe(false);

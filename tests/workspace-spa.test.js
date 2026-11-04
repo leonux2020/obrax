@@ -225,12 +225,12 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     await click(q('ws-crew'));
   };
   const addWorker = async (name, specialty = null, notes = '') => {
-    await click(q('crew-add'));
-    await typeInto(q('crew-name'), name);
+    await typeInto(q('crew-search'), name); // the master search: whatever is typed can go in as plain text
     if (specialty) await click(q(`crew-filter-${specialty}`)); // the trade chip becomes the specialty of a person added as plain text
-    await click(q('crew-save'));
+    await click(q('crew-add-text'));
+    if (specialty) await click(q(`crew-filter-${specialty}`)); // chip off again: the next person starts from a clean bar
     if (notes) {
-      // the picker adds fast (name + trade); the optional line of tasks is written from the person's card
+      // adding is fast (name + trade); the optional line of tasks is written from the person's card
       const id = spy.project.crew.at(-1).id;
       await unfold(id);
       await click(q(`worker-edit-${id}`));
@@ -268,21 +268,20 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(q('crew-duration').textContent).toContain('—');
   });
 
-  it('"+ Añadir trabajador" unfolds the selector dropdown (name, trade filters, optional notes later); the person shows up as a minimal row', async () => {
+  it('the master search adds people (no dialog): the bar is always there, a typed name needs a tap, and the person shows up as a contact row', async () => {
     await mount(mk());
     await openCrew();
     expect(q('crew-empty')).not.toBeNull();
-    await click(q('crew-add'));
-    expect(q('worker-form')).not.toBeNull();
-    expect([...q('crew-filters').querySelectorAll('button')].map((b) => b.dataset.testid.replace('crew-filter-', ''))).toEqual(WORKER_SPECIALTIES);
-    expect(q('crew-save')).toBeNull(); // a name is required: the add-as-text button appears once something is typed
-    await typeInto(q('crew-name'), 'Luca Rossi');
-    expect(q('crew-save').disabled).toBe(false);
-    await click(q('crew-add')); // folding the dropdown without saving adds nobody
-    expect(q('worker-form')).toBeNull();
+    expect(q('crew-add')).toBeNull(); // no [+] and no dropdown
+    expect([...q('crew-filters').querySelectorAll('button')].map((b) => b.dataset.testid).filter((id) => id.startsWith('crew-filter-')).map((id) => id.replace('crew-filter-', ''))).toEqual(WORKER_SPECIALTIES);
+    expect(q('crew-add-text')).toBeNull(); // a name is required: the add row appears once something is typed
+    await typeInto(q('crew-search'), 'Luca Rossi');
+    expect(q('crew-add-text').disabled).toBe(false);
+    expect(spy.project.crew).toHaveLength(0); // typing alone adds nobody
+    await typeInto(q('crew-search'), '');
+    expect(q('crew-add-text')).toBeNull();
     expect(spy.project.crew).toHaveLength(0);
     await addWorker('Luca Rossi', 'electrician', 'Tablero general');
-    expect(q('worker-form')).toBeNull();
     expect(spy.project.crew).toHaveLength(1);
     const w = spy.project.crew[0];
     expect(w).toMatchObject({ name: 'Luca Rossi', specialty: 'electrician', notes: 'Tablero general' });
@@ -392,7 +391,7 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(q(`worker-detail-${b}`)).toBeNull();
   });
 
-  it('agenda search: a quiet field (bg-neutral-900/50, no hard border) that finds people by name (no accents, any case) or by trade', async () => {
+  it('master search: a quiet field (bg-neutral-900/50, no hard border) that finds the crew by name (no accents, any case) or by trade', async () => {
     await mount(mk());
     await openCrew();
     await addWorker('José Pérez', 'painter');
@@ -413,39 +412,61 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(q(`worker-${jose}`)).toBeNull();
     await typeInto(box, 'zzz');
     expect(q('crew-list')).toBeNull();
-    expect(q('crew-nomatch').textContent).toBe(DICT.es['ws.crew.noMatch']);
+    expect(q('crew-add-text').textContent).toBe('+ Añadir «zzz»'); // nobody matches: the bar offers to add it instead of a dead end
+    expect(q('crew-nomatch')).toBeNull();
     await typeInto(box, '');
     expect(qa('crew-list')).toHaveLength(1);
     expect(q(`worker-${jose}`)).not.toBeNull();
     expect(q(`worker-${marta}`)).not.toBeNull();
   });
 
-  it('specialty chips: a horizontal, scrollbar-less strip of round chips ("Todos" + the trades really on the crew); the active one is quietly lit', async () => {
+  it('control line: "Mano de obra: X (Gastado: Y)" on the right, ABOVE the master search; no [+], no big bottom button or budget text; the balance moves with each advance', async () => {
     await mount(mk());
     await openCrew();
-    expect(q('crew-search')).toBeNull(); // empty crew: no agenda tools
+    await addWorker('Juan');
+    const bar = q('crew-bar');
+    const pool = q('labor-pool');
+    expect(bar.contains(pool)).toBe(true);
+    expect(pool.className).toContain('text-right');
+    expect(pool.textContent).toMatch(/^Mano de obra: .*\(Gastado: .*\)$/);
+    expect(bar.querySelector('button')).toBeNull();
+    expect(q('crew-add')).toBeNull();
+    expect(bar.compareDocumentPosition(q('crew-search')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(bar.compareDocumentPosition(q('crew-list')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(q('ws-crew-sheet').textContent).not.toContain('Mano de obra disponible');
+    const before = Number(pool.dataset.available);
+    const id = spy.project.crew[0].id;
+    await unfold(id);
+    await click(q(`worker-adv-${id}`));
+    await keys('2500');
+    await click(q('pad-done'));
+    expect(Number(q('labor-pool').dataset.available)).toBe(before - 2500);
+    expect(Number(q('labor-pool').dataset.spent)).toBe(2500);
+  });
+
+  it('trade chips: ONE horizontal, scrollbar-less strip of round chips (every trade); the active one is quietly lit and filters the crew', async () => {
+    await mount(mk());
+    await openCrew();
+    expect(q('crew-search')).not.toBeNull(); // the bar exists with an empty crew: it is how people are added
     await addWorker('Ana', 'painter');
     await addWorker('Ana B', 'painter');
-    expect(q('crew-filters')).toBeNull(); // one trade only: nothing to choose
     await addWorker('Beto', 'electrician');
     const [ana, anaB, beto] = spy.project.crew.map((w) => w.id);
     const strip = q('crew-filters');
     for (const cls of ['overflow-x-auto', 'hide-scrollbar', 'flex']) expect(strip.className).toContain(cls);
-    const chips = [...strip.querySelectorAll('button')];
-    expect(chips.map((c) => c.dataset.testid)).toEqual(['crew-filter-all', 'crew-filter-painter', 'crew-filter-electrician'].sort((x, y) => (x === 'crew-filter-all' ? -1 : y === 'crew-filter-all' ? 1 : WORKER_SPECIALTIES.indexOf(x.slice(12)) - WORKER_SPECIALTIES.indexOf(y.slice(12)))));
-    expect(chips[0].textContent).toBe(DICT.es['ws.crew.filterAll']);
+    const chips = [...strip.querySelectorAll('button')].filter((c) => c.dataset.testid.startsWith('crew-filter-'));
+    expect(chips.map((c) => c.dataset.testid)).toEqual(WORKER_SPECIALTIES.map((s2) => `crew-filter-${s2}`));
     for (const c of chips) {
       expect(c.className).toContain('rounded-full');
       expect(c.className).toContain('text-xs');
       expect(c.className).not.toMatch(/\bborder\b/);
+      expect(c.className).toContain('bg-white/5'); // idle: matte
+      expect(c.getAttribute('aria-pressed')).toBe('false');
     }
-    expect(q('crew-filter-all').getAttribute('aria-pressed')).toBe('true');
-    expect(q('crew-filter-all').className).toContain('bg-white/10');
-    expect(q('crew-filter-painter').className).toContain('bg-white/5');
     await click(q('crew-filter-painter'));
     expect(q('crew-filter-painter').getAttribute('aria-pressed')).toBe('true');
     expect(q('crew-filter-painter').className).toContain('bg-white/10');
-    expect(q('crew-filter-all').className).toContain('bg-white/5');
+    expect(q('crew-filter-electrician').className).toContain('bg-white/5');
     expect(q(`worker-${ana}`)).not.toBeNull();
     expect(q(`worker-${anaB}`)).not.toBeNull();
     expect(q(`worker-${beto}`)).toBeNull();
@@ -454,12 +475,14 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(q(`worker-${ana}`)).toBeNull();
     await typeInto(q('crew-search'), '');
     await click(q('crew-filter-electrician'));
+    expect(q('crew-filter-painter').getAttribute('aria-pressed')).toBe('false'); // one trade at a time
     expect(q(`worker-${beto}`)).not.toBeNull();
     expect(q(`worker-${ana}`)).toBeNull();
-    await click(q('crew-filter-all'));
-    expect(qa('crew-filter-all')).toHaveLength(1);
+    await click(q('crew-filter-electrician')); // a second tap clears it
     expect(q(`worker-${ana}`)).not.toBeNull();
     expect(q(`worker-${beto}`)).not.toBeNull();
+    await click(q('crew-filter-mason')); // a trade nobody has: a quiet line, no dead end
+    expect(q('crew-nomatch').textContent).toBe(DICT.es['ws.crew.noMatch']);
   });
 
   it('the agenda keeps its edit mode: the pencil adds the delete icons to the rows and the crosses to the unfolded advances; a filtered-out person is not touched', async () => {
@@ -489,17 +512,16 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(css).toMatch(/\.hide-scrollbar::-webkit-scrollbar\s*\{[^}]*display:\s*none/);
     expect(css).toMatch(/\.acc-open\s*\{[^}]*animation:\s*acc-open/);
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)[\s\S]*animation: none !important/); // one global rule removes every keyframe
-    for (const l of ['es', 'en', 'pt', 'fr', 'it', 'de']) for (const k of ['ws.crew.search', 'ws.crew.filterAll', 'ws.crew.filter', 'ws.crew.noMatch']) expect(DICT[l][k], `${l} ${k}`).toBeTruthy();
+    for (const l of ['es', 'en', 'pt', 'fr', 'it', 'de']) for (const k of ['ws.crew.search', 'ws.crew.fromDirectory', 'ws.crew.filter', 'ws.crew.noMatch']) expect(DICT[l][k], `${l} ${k}`).toBeTruthy();
   });
 
-  it('the [+] opens the personnel selector with the proximity radar (Local / Regional / Todos) and the trade filters', async () => {
+  it('with an empty company directory there are no distance capsules (nothing to reach) and the bar says so when you type', async () => {
     await mount(mk());
     await openCrew();
-    await click(q('crew-add'));
-    expect(q('crew-range')).not.toBeNull();
-    expect([...q('crew-range').querySelectorAll('button')].map((b) => b.dataset.testid)).toEqual(['crew-range-local', 'crew-range-regional', 'crew-range-all']);
+    expect(q('crew-range')).toBeNull();
     expect(q('crew-filters')).not.toBeNull();
-    expect(q('crew-directory') ?? q('crew-pick-hint') ?? q('crew-noplace')).not.toBeNull();
+    await typeInto(q('crew-search'), 'Ana');
+    expect(q('crew-pick-hint').textContent).toContain(DICT.es['crew.pick.noDir'].slice(0, 10));
   });
 
   it('the specialty list covers the trades of the job site, each with its own icon and a translation in the six languages', async () => {
@@ -522,9 +544,7 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     // the select lists them all and the card shows the icon + the label of a new trade
     await mount(mk());
     await openCrew();
-    await click(q('crew-add'));
     expect([...q('crew-filters').querySelectorAll('button')].map((b) => b.dataset.testid.replace('crew-filter-', ''))).toEqual(WORKER_SPECIALTIES);
-    await click(q('crew-add')); // fold the dropdown
     await addWorker('Pía', 'painter');
     await addWorker('Tito', 'operator');
     await addWorker('Jefe', 'foreman');
@@ -808,10 +828,9 @@ describe('read-only while locked', () => {
     expect(spy.project.endDate).toBe(before.endDate);
     expect(q('crew-duration').dataset.days).toBe('25'); // still shown (statically)
     // operational: NOT locked
-    expect(q('crew-add').closest('fieldset')).toBeNull();
-    await click(q('crew-add'));
-    await typeInto(q('crew-name'), 'Luca');
-    await click(q('crew-save'));
+    expect(q('crew-search').closest('fieldset')).toBeNull();
+    await typeInto(q('crew-search'), 'Luca');
+    await click(q('crew-add-text'));
     expect(spy.project.crew).toHaveLength(1);
     const id = spy.project.crew[0].id;
     await unfold(id);

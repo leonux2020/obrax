@@ -88,9 +88,15 @@ const mount = async (extra = {}) => {
   await flush();
   await click(q('ws-crew'));
 };
+const typeSearch = (text) =>
+  act(() => {
+    const input = q('crew-search');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, text);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 const pick = async (workerId) => {
-  await click(q('crew-add'));
   await click(q('crew-range-all'));
+  await typeSearch(DIRECTORY.find((w) => w.id === workerId).name);
   await click(q(`crew-pick-${workerId}`));
 };
 
@@ -110,29 +116,29 @@ afterEach(() => {
 });
 
 describe('Squadra of a project: the unified selector', () => {
-  it('picking a master from the dropdown adds him / her at once to the simple list below and folds the dropdown', async () => {
+  it('picking a master from the live suggestions adds him / her at once to the simple list below and the suggestions fold away', async () => {
     await mount();
-    await click(q('crew-add'));
-    expect(q('crew-selector')).not.toBeNull();
     await click(q('crew-range-all'));
+    await typeSearch('carla');
+    expect(q('crew-suggest')).not.toBeNull();
     await click(q('crew-pick-wk000003'));
-    expect(q('crew-selector')).toBeNull();
+    expect(q('crew-suggest')).toBeNull();
     expect(spy.project.crew).toHaveLength(1);
     expect(spy.project.crew[0]).toMatchObject({ name: 'Carla Díaz', ref: 'wk000003' });
     expect(q('crew-list').contains(q(`worker-${spy.project.crew[0].id}`))).toBe(true);
   });
 
-  it('the structure of the sheet is the same in every project: dates, control line, (dropdown), list', async () => {
+  it('the structure of the sheet is the same in every project: dates, control line, master search, list', async () => {
     const order = async (extra) => {
       await mount(extra);
-      const ids = ['crew-dates', 'crew-bar', 'crew-list'].filter((id) => q(id));
+      const ids = ['crew-dates', 'crew-bar', 'crew-master', 'crew-list'].filter((id) => q(id));
       act(() => root.unmount());
       root = createRoot(host);
       return ids;
     };
     const a = await order({ crew: [{ id: 'crew0001', name: 'Ana', specialty: 'multi' }] });
     const b = await order({ crew: [{ id: 'crew0001', name: 'Ana', specialty: 'multi' }], cityOrRegion: 'Maipú', startDate: '2026-01-01', endDate: '2026-02-01' });
-    expect(a).toEqual(['crew-dates', 'crew-bar', 'crew-list']);
+    expect(a).toEqual(['crew-dates', 'crew-bar', 'crew-master', 'crew-list']);
     expect(b).toEqual(a);
   });
 });
