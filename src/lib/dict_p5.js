@@ -21,7 +21,7 @@ export const P5 = {
     'sched.deadline.over': 'No cabe en el plazo del proyecto: faltan {days} d. Sube la cuadrilla.',
     'sched.deadline.impossible': 'El plazo no se puede cumplir ni con la cuadrilla máxima: la espera técnica ya lo supera.',
     'sched.noEnd': 'Pon una fecha de término al proyecto y la cuadrilla se calculará sola.',
-    'prices.auto': 'Los precios de materiales y arriendos se actualizan solos cada 15 minutos.',
+    'prices.auto': 'Los precios quedan guardados en el proyecto: todos tus dispositivos ven el mismo total. Toca Actualizar para tomar los del mercado.',
   },
   en: {
     'splash.enter': "Sign in",
@@ -42,7 +42,7 @@ export const P5 = {
     'sched.deadline.over': 'Does not fit the project deadline: {days} d short. Add workers.',
     'sched.deadline.impossible': 'The deadline cannot be met even with the maximum crew: the technical waiting time already exceeds it.',
     'sched.noEnd': 'Set an end date on the project and the crew is calculated for you.',
-    'prices.auto': 'Material and rental prices refresh by themselves every 15 minutes.',
+    'prices.auto': 'Prices are saved inside the project: all your devices show the same total. Tap Refresh to take the market ones.',
   },
   pt: {
     'splash.enter': "Entrar",
@@ -63,7 +63,7 @@ export const P5 = {
     'sched.deadline.over': 'Não cabe no prazo do projeto: faltam {days} d. Aumente a equipe.',
     'sched.deadline.impossible': 'O prazo não pode ser cumprido nem com a equipe máxima: a espera técnica já o ultrapassa.',
     'sched.noEnd': 'Defina uma data de término no projeto e a equipe será calculada sozinha.',
-    'prices.auto': 'Os preços de materiais e aluguéis se atualizam sozinhos a cada 15 minutos.',
+    'prices.auto': 'Os preços ficam guardados no projeto: todos os seus dispositivos mostram o mesmo total. Toque em Atualizar para usar os do mercado.',
   },
   fr: {
     'splash.enter': "Se connecter",
@@ -84,7 +84,7 @@ export const P5 = {
     'sched.deadline.over': 'Ne tient pas dans le délai du projet : il manque {days} j. Augmentez l\'équipe.',
     'sched.deadline.impossible': 'Le délai ne peut pas être tenu, même avec l\'équipe maximale : l\'attente technique le dépasse déjà.',
     'sched.noEnd': 'Indiquez une date de fin au projet et l\'équipe sera calculée automatiquement.',
-    'prices.auto': 'Les prix des matériaux et des locations se mettent à jour tout seuls toutes les 15 minutes.',
+    'prices.auto': 'Les prix sont enregistrés dans le projet : tous vos appareils affichent le même total. Touchez Actualiser pour prendre ceux du marché.',
   },
   it: {
     'splash.enter': "Accedi",
@@ -105,7 +105,7 @@ export const P5 = {
     'sched.deadline.over': 'Non rientra nella scadenza del progetto: mancano {days} g. Aumenta la squadra.',
     'sched.deadline.impossible': 'La scadenza non può essere rispettata nemmeno con la squadra massima: l\'attesa tecnica la supera già.',
     'sched.noEnd': 'Imposta una data di fine al progetto e la squadra verrà calcolata da sola.',
-    'prices.auto': 'I prezzi di materiali e noleggi si aggiornano da soli ogni 15 minuti.',
+    'prices.auto': 'I prezzi restano salvati nel progetto: tutti i tuoi dispositivi mostrano lo stesso totale. Tocca Aggiorna per prendere quelli di mercato.',
   },
   de: {
     'splash.enter': "Anmelden",
@@ -126,6 +126,6 @@ export const P5 = {
     'sched.deadline.over': 'Passt nicht in die Projektfrist: {days} T fehlen. Kolonne vergrößern.',
     'sched.deadline.impossible': 'Die Frist ist auch mit der maximalen Kolonne nicht einzuhalten: Die technische Wartezeit überschreitet sie bereits.',
     'sched.noEnd': 'Legen Sie im Projekt ein Enddatum fest, dann wird die Kolonne automatisch berechnet.',
-    'prices.auto': 'Material- und Mietpreise aktualisieren sich alle 15 Minuten von selbst.',
+    'prices.auto': 'Die Preise sind im Projekt gespeichert: alle Ihre Geräte zeigen dieselbe Summe. Tippen Sie auf Aktualisieren, um die Marktpreise zu übernehmen.',
   },
 };

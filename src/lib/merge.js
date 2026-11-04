@@ -12,6 +12,7 @@
 
 import { mergeTomb, normalizeTomb } from './tombstones.js';
 import { MAX_PHOTOS } from './photos.js';
+import { mergeCapsule } from './capsule.js';
 
 export const RECORD_COLLECTIONS = Object.freeze(['payments', 'advances', 'expenses', 'crew', 'logbook']);
 /** The money vectors: cobros (payments), anticipos (advances) and gastos (expenses). Their `amount` is forced to a real number on every merge. */
@@ -19,7 +20,7 @@ export const FINANCIAL_COLLECTIONS = Object.freeze(['payments', 'advances', 'exp
 
 /** A top-level list of records with ids (the known collections, or any future one such as invoices): merged BY ID like the rest. */
 const isRecordList = (key, value) =>
-  RECORD_COLLECTIONS.includes(key) || (key !== 'draft' && Array.isArray(value) && value.length > 0 && value.every((r) => r && typeof r === 'object' && typeof r.id === 'string'));
+  Array.isArray(value) && (RECORD_COLLECTIONS.includes(key) || (key !== 'draft' && value.length > 0 && value.every((r) => r && typeof r === 'object' && typeof r.id === 'string')));
 
 /** A financial record with its amount as a finite NUMBER ("1250,50" / "100" from a backup would otherwise concatenate: "100" + 20 = "10020"). */
 function sanitizeAmount(record) {
@@ -84,6 +85,26 @@ function mergeRecords(aList, bList, aFirst, tomb) {
   return out;
 }
 
+/**
+ * The quote draft, merged line by line. The budget lines are its `partidas` (chapters, each with an id): a partida that only one device
+ * has is KEPT (device A adds "Pintura", device B adds "Cerámica": both survive), on both sides the newest `updatedAt` wins and a tombstone newer
+ * than the partida deletes it. The prices / rentals / tax the quote was built with (the capsule) are merged entry by entry. Everything else
+ * of the draft (finance %, chain, manual prices, machinery switches...) comes from the side whose project was updated last.
+ */
+function mergeDraft(a, b, aFirst, tomb) {
+  const da = a?.draft;
+  const db = b?.draft;
+  if (!da || !db) return (aFirst ? da : db) || da || db;
+  const base = aFirst ? da : db;
+  let partidas = mergeRecords(da.partidas, db.partidas, aFirst, tomb);
+  if (base.mode === 'quick') partidas = partidas.slice(0, 1); // a quick quote is ONE partida: the base's own
+  const merged = { ...base, partidas };
+  const capsule = mergeCapsule(da.capsule, db.capsule);
+  if (capsule) merged.capsule = capsule;
+  else delete merged.capsule;
+  return merged;
+}
+
 /** Merge two versions of ONE project (same id). */
 export function mergeProject(a, b) {
   if (!a) return b;
@@ -100,7 +121,8 @@ export function mergeProject(a, b) {
     lists[key] = mergeRecords(clean(a[key]), clean(b[key]), aFirst, tomb);
     if (key === 'expenses') lists[key] = lists[key].map((e) => (e.projectId === base.id ? e : { ...e, projectId: base.id }));
   }
-  const merged = { ...base, ...lists, updatedAt: Math.max(projectStamp(a), projectStamp(b)) };
+  const merged = { ...base, ...lists, draft: mergeDraft(a, b, aFirst, tomb), updatedAt: Math.max(projectStamp(a), projectStamp(b)) };
+  delete merged.totals; // derived: recalculated from the merged data (recalculateProjectTotals), never carried over from one side
   if (Object.keys(tomb).length) merged.tomb = tomb;
   else delete merged.tomb;
   // photo deletions ({ slot: deletedAt }) are unioned like any tombstone: the newest deletion of each slot survives the merge
@@ -112,12 +134,17 @@ export function mergeProject(a, b) {
 
 /**
  * Merge two lists of projects by id and apply the project tombstones.
+ * `finalize(project)` runs on every project that was merged with an incoming one, right after the merge and BEFORE the caller saves it
+ * (the post-merge recalculation of the totals: recalculateProjectTotals).
  * @returns {{ projects: object[], removed: string[] }} `removed`: ids dropped because a newer deletion exists
  */
-export function mergeProjectLists(local, incoming, tombs = {}, limit = 200) {
+export function mergeProjectLists(local, incoming, tombs = {}, limit = 200, finalize = null) {
   const byId = new Map();
   for (const p of local || []) byId.set(p.id, p);
-  for (const p of incoming || []) byId.set(p.id, mergeProject(byId.get(p.id), p));
+  for (const p of incoming || []) {
+    const merged = mergeProject(byId.get(p.id), p);
+    byId.set(p.id, finalize ? finalize(merged) : merged);
+  }
   const removed = [];
   const projects = [];
   for (const p of byId.values()) {
@@ -159,6 +186,32 @@ export function stampProject(prev, next, now = Date.now()) {
       }
     }
     if (touched) out = { ...out, [key]: stamped };
+  }
+  // the budget lines (draft.partidas) are records too: changed ones are stamped, deleted ones go to the tombstones
+  const bp = Array.isArray(prev.draft?.partidas) ? prev.draft.partidas : null;
+  const ap = Array.isArray(next.draft?.partidas) ? next.draft.partidas : null;
+  if (bp && ap && bp !== ap) {
+    const beforeMap = new Map(bp.map((r) => [r.id, r]));
+    let touched = false;
+    const stamped = ap.map((r) => {
+      const old = beforeMap.get(r.id);
+      if (old === r) return r;
+      if (old) {
+        const { updatedAt: _a, ...oldBody } = old;
+        const { updatedAt: _b, ...newBody } = r;
+        if (canon(oldBody) === canon(newBody)) return r;
+      }
+      touched = true;
+      return { ...r, updatedAt: now };
+    });
+    const ids = new Set(ap.map((r) => r.id));
+    for (const r of bp) {
+      if (!ids.has(r.id)) {
+        tomb[r.id] = now;
+        tombChanged = true;
+      }
+    }
+    if (touched) out = { ...out, draft: { ...out.draft, partidas: stamped } };
   }
   if (tombChanged) out = { ...out, tomb: normalizeTomb(tomb, RECORD_TOMB_LIMIT) };
   return out;

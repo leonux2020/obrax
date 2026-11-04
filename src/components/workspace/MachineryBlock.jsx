@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { MACHINE_IDS } from '../../lib/machinery.js';
+import { withCapsuleRent } from '../../lib/capsule.js';
 import { flushUserPrices } from '../../lib/priceFeed.js';
 import { priceCaption, rentRows, toggleMachine, withMachinery } from '../../lib/workspaceModel.js';
 import { Switch } from '../ui.jsx';
@@ -75,6 +76,7 @@ export default function MachineryBlock({ draft, result, regionCode, projectLocat
           value={target.rate}
           decimals={region.digits}
           foot={t('ws.rent.foot')}
+          onApply={(n) => setDraft((d) => withCapsuleRent(d, target.id, n))} // the typed rate also goes INTO the project (its capsule)
           onClose={() => {
             setPad(null);
             flushUserPrices(); // the last typed rate is written now, not 400 ms later

@@ -7,6 +7,7 @@ import { refreshPrices, saveUserPrice } from '../../lib/priceFeed.js';
 import { createRateLimiter, humanVerified } from '../../lib/shield.js';
 import { chainLabel } from '../../lib/regions.js';
 import { savedMaterial } from '../../lib/priceBook.js';
+import { releaseCapsule, withCapsuleRent } from '../../lib/capsule.js';
 import { MACHINE_IDS } from '../../lib/machinery.js';
 import { Badge, Button, NumberField } from '../ui.jsx';
 import InvoiceSheet from '../InvoiceSheet.jsx';
@@ -94,16 +95,25 @@ export default function StepPrices({ draft, setDraft, result, now, onRefresh, on
     saveUserPrice(regionCode, 'materials', id, null);
   };
   const editRent = (id, n) => {
-    if (valid(n)) saveUserPrice(regionCode, 'rent', id, n);
+    if (!valid(n)) return;
+    setDraft((d) => withCapsuleRent(d, id, n)); // this project's capsule holds the rate the user typed
+    saveUserPrice(regionCode, 'rent', id, n);
   };
-  const resetRent = (id) => saveUserPrice(regionCode, 'rent', id, null);
+  const resetRent = (id) => {
+    saveUserPrice(regionCode, 'rent', id, null);
+    setDraft((d) => withCapsuleRent(d, id, null)); // the capsule takes the current rate again
+  };
 
   const refresh = () => {
     const allowed = humanVerified() ? humanLimiter.current() : botLimiter.current();
     if (allowed) {
       setLimited(false);
       onRefresh();
-      refreshPrices(draft.regionCode, { force: true }); // ask the price service again (falls back to the last saved values)
+      // the prices live INSIDE the project (its capsule): "Update" releases them and takes the current market ones again, now and when the answer lands
+      setDraft((d) => releaseCapsule(d));
+      Promise.resolve(refreshPrices(draft.regionCode, { force: true })) // ask the price service again (falls back to the last saved values)
+        .then(() => setDraft((d) => releaseCapsule(d)))
+        .catch(() => {});
     } else setLimited(true);
   };
 

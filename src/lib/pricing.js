@@ -57,10 +57,18 @@ export function referencePrice(materialId, region, chain, bucket = marketBucket(
  * the live AI price > the built-in simulation.
  * @returns {Record<string,{price:number, ref:number, source:'manual'|'saved'|'ai'|'ref', chainId:string}>}
  */
-export function resolvePrices({ ids, regionCode, chainId, overrides = {}, bucket = marketBucket(), book = null }) {
+export function resolvePrices({ ids, regionCode, chainId, overrides = {}, bucket = marketBucket(), book = null, snapshot = null }) {
   const region = getRegion(regionCode);
   const out = {};
   for (const id of ids) {
+    // the project's CAPSULE: the price this material had when it joined the quote (a manual price of the project still wins).
+    // Nothing global (price book, supplier directory, market clock) is read for it.
+    const snap = snapshot?.[id];
+    const manualOverride = overrides[id];
+    if (snap && !(typeof manualOverride === 'number' && manualOverride > 0 && manualOverride <= MAX_PRICE)) {
+      out[id] = { price: snap.p, ref: snap.r ?? snap.p, source: snap.s, chainId: snap.c };
+      continue;
+    }
     let chain;
     let ref;
     if (chainId === 'best' || !region.chains.some((c) => c.id === chainId)) {
@@ -222,7 +230,7 @@ function toPartidas({ partidas, lines, finance }) {
  * Build the full quote: consolidated purchase lines (whole sale units), labor/transport,
  * official VAT breakdown and the amount allocated to every partida (chapter).
  */
-export function buildQuote({ partidas, lines, plan, prices, finance, regionCode, machinery = null }) {
+export function buildQuote({ partidas, lines, plan, prices, finance, regionCode, machinery = null, taxFallback = null }) {
   const region = getRegion(regionCode);
   const parts = toPartidas({ partidas, lines, finance });
   const planned = plan || planAll(parts);
@@ -262,7 +270,7 @@ export function buildQuote({ partidas, lines, plan, prices, finance, regionCode,
   const contingency = roundMoney((direct * (finance.contingency || 0)) / 100, region);
   const profit = roundMoney(((direct + contingency) * (finance.profit || 0)) / 100, region);
   const subtotal = roundMoney(direct + contingency + profit, region);
-  const taxRate = taxRateFor(region, finance);
+  const taxRate = taxRateFor(region, finance, taxFallback);
   const tax = roundMoney(subtotal * taxRate, region);
   const total = roundMoney(subtotal + tax, region);
 
@@ -303,13 +311,13 @@ export function buildQuote({ partidas, lines, plan, prices, finance, regionCode,
 }
 
 /** Estimated materials total for each chain (for the comparison chips). */
-export function chainTotals({ partidas, lines, regionCode, wastePct = 0, overrides, bucket = marketBucket(), book = null }) {
+export function chainTotals({ partidas, lines, regionCode, wastePct = 0, overrides, bucket = marketBucket(), book = null, capsulePrices = null }) {
   const region = getRegion(regionCode);
   const parts = partidas || [{ lines, waste: wastePct }];
   const plan = planAll(parts);
   const ids = plan.map((p) => p.id);
   const totalFor = (chainId) => {
-    const prices = resolvePrices({ ids, regionCode, chainId, overrides, bucket, book });
+    const prices = resolvePrices({ ids, regionCode, chainId, overrides, bucket, book, snapshot: capsulePrices?.[chainId] });
     return buildQuote({
       partidas: parts,
       plan,

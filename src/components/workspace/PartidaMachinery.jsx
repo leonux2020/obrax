@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { MACHINE_IDS } from '../../lib/machinery.js';
+import { withCapsuleRent } from '../../lib/capsule.js';
 import { flushUserPrices } from '../../lib/priceFeed.js';
 import { partidaMachines, priceCaption, setMachineOn } from '../../lib/workspaceModel.js';
 import LockedZone from './LockedZone.jsx';
@@ -90,6 +91,7 @@ export default function PartidaMachinery({ draft, result, index, regionCode, pro
           value={target.rate}
           decimals={region.digits}
           foot={t('ws.rent.foot')}
+          onApply={(n) => setDraft((d) => withCapsuleRent(d, target.id, n))} // the typed rate also goes INTO the project (its capsule)
           onClose={() => {
             setPad(null);
             flushUserPrices(); // the last typed rate is written now, not 400 ms later

@@ -175,7 +175,7 @@ describe('prices and rentals refresh continuously', () => {
     expect(Number(q('bucket').textContent)).toBe(marketBucket(NOW) + 2);
     expect(read('components/Wizard.jsx')).toContain('useMarketClock()');
     expect(read('components/steps/StepPrices.jsx')).toContain("t('prices.auto')");
-    expect(DICT.es['prices.auto']).toContain('15 minutos');
+    expect(DICT.es['prices.auto']).toContain('guardados en el proyecto');
   });
 
   it('the dashboard card re-prices on every market window and day change', () => {

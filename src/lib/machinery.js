@@ -39,8 +39,9 @@ function hash(str) {
  * Daily rental rate in the region's currency. Like the material prices it follows the 15-minute market
  * window (a slow +-1.5 % drift on top of a stable per-country spread), so rentals refresh together with them.
  */
-export function machineryRate(id, regionCode, bucket = marketBucket(), book = null) {
+export function machineryRate(id, regionCode, bucket = marketBucket(), book = null, rents = null) {
   const region = getRegion(regionCode);
+  if (rents?.[id]) return roundMoney(rents[id].p, region); // the rate this project's CAPSULE holds: no book, no market clock
   const noise = (seed) => (hash(seed) / 4294967295) * 2 - 1;
   const spread = 1 + noise(`${region.code}|machine|${id}`) * 0.05;
   const drift = 1 + noise(`${bucket}|${region.code}|machine|${id}`) * 0.015;
@@ -53,7 +54,7 @@ export function machineryRate(id, regionCode, bucket = marketBucket(), book = nu
 }
 
 /** Where a machine's daily rate comes from: the user's saved rate, the live AI rate or the built-in simulation. */
-export const rentSource = (id, regionCode, book) => (savedRent(book, regionCode, id) > 0 ? 'saved' : liveRent(book, regionCode, id) > 0 ? 'ai' : 'ref');
+export const rentSource = (id, regionCode, book, rents = null) => rents?.[id] ? rents[id].s : (savedRent(book, regionCode, id) > 0 ? 'saved' : liveRent(book, regionCode, id) > 0 ? 'ai' : 'ref');
 
 /** Logical use of each machine inside the days of ITS partida (documented so it is easy to review and tune). */
 export const MACHINE_USE = Object.freeze({
@@ -104,13 +105,13 @@ export const DEFAULT_MACHINERY = Object.freeze({ include: true, excluded: [] });
  * `config` = { include: master switch, excluded: machine ids the user turned off }.
  * @returns {{items, total, byPartida, suggested}} total and byPartida count only the INCLUDED items.
  */
-export function planMachinery({ partidas, siteDays = null, regionCode, config = DEFAULT_MACHINERY, bucket = marketBucket(), book = null }) {
+export function planMachinery({ partidas, siteDays = null, regionCode, config = DEFAULT_MACHINERY, bucket = marketBucket(), book = null, rents = null }) {
   const region = getRegion(regionCode);
   const include = config?.include !== false;
   const excluded = new Set(config?.excluded ?? []);
   const items = suggestMachinery(partidas, siteDays).map((s) => {
-    const rate = machineryRate(s.id, regionCode, bucket, book);
-    return { ...s, rate, source: rentSource(s.id, regionCode, book), total: roundMoney(s.qty * s.days * rate, region), included: include && !excluded.has(s.id) };
+    const rate = machineryRate(s.id, regionCode, bucket, book, rents);
+    return { ...s, rate, source: rentSource(s.id, regionCode, book, rents), total: roundMoney(s.qty * s.days * rate, region), included: include && !excluded.has(s.id) };
   });
   const byPartida = partidas.map(() => 0);
   let total = 0;

@@ -11,6 +11,7 @@ import { normalizeCompany, normalizeProfileMeta, normalizeSettings, isCompanyEmp
 import { normalizeLogo } from './logo.js';
 import { normalizeProjects } from './projects.js';
 import { canon, canonById, mergePhotoSlots, mergeProjectLists } from './merge.js';
+import { recalculateProjectTotals } from './projectTotals.js';
 import { hasTombs, loadTombs, mergeTombs, normalizeTombs, saveTombs } from './tombstones.js';
 import { normalizePhoto, normalizePhotos } from './photos.js';
 import { writeNotePhotos } from './notePhotos.js';
@@ -135,7 +136,8 @@ export const isDeviceEmpty = ({ projects, company, meta }) => !(projects || []).
  */
 export function mergeBackup(local, backup) {
   const tombs = mergeTombs(local.tombs, backup.tombs);
-  const { projects, removed } = mergeProjectLists(local.projects || [], backup.projects, tombs.projects);
+  // the middleware: each merged project is recalculated (capsule sealed, totals rewritten) BEFORE it is compared and saved
+  const { projects, removed } = mergeProjectLists(local.projects || [], backup.projects, tombs.projects, 200, recalculateProjectTotals);
   const mine = new Map((local.projects || []).map((p) => [p.id, p]));
   const theirs = new Map(backup.projects.map((p) => [p.id, p]));
   const won = [];
@@ -144,9 +146,10 @@ export function mergeBackup(local, backup) {
   for (const p of projects) {
     const before = mine.get(p.id);
     const remote = theirs.get(p.id);
-    if (!before || canon(before) !== canon(p)) won.push(p.id);
+    // "changed" is judged against what this device would hold for the project after its own recalculation (a copy that only lacks the derived cache is the same data)
+    if (!before || canon(recalculateProjectTotals(before)) !== canon(recalculateProjectTotals(p))) won.push(p.id);
     if (remote && (!before || remote.updatedAt > before.updatedAt)) remoteWon.push(p.id);
-    if (!remote || canon(remote) !== canon(p)) needsPush = true;
+    if (!remote || canon(recalculateProjectTotals(remote)) !== canon(recalculateProjectTotals(p))) needsPush = true;
   }
   const profileRestored = isCompanyEmpty(local.company) && !local.meta?.onboarded && (!isCompanyEmpty(backup.company) || backup.meta.onboarded);
   return {

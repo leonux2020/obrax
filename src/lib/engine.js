@@ -15,7 +15,10 @@ import { currentBook } from './priceRegistry.js';
  *  - project mode: any number of partidas; shared materials (e.g. cement bags from a slab and a wall)
  *                  are summed into a single purchase line before rounding to whole sale units.
  */
-export function computeAll(draft, now = Date.now(), { timeline = null, book: liveBook, chains = true } = {}) {
+export function computeAll(draft, now = Date.now(), { timeline = null, book: liveBook, chains = true, ignoreCapsule = false } = {}) {
+  // The project's CAPSULE (lib/capsule.js): prices, rental rates and the tax rate frozen INSIDE the project. What it holds is never looked up
+  // in the price book, the supplier directory or the market clock, so every device that has the same project computes the same total.
+  const capsule = ignoreCapsule ? null : draft.capsule ?? null;
   const partidas = draft.partidas.map((p) => {
     const validation = validateDims(p.task, p.dims);
     return {
@@ -46,18 +49,20 @@ export function computeAll(draft, now = Date.now(), { timeline = null, book: liv
     overrides: draft.overrides,
     bucket,
     book,
+    snapshot: capsule?.prices?.[draft.chainId],
   });
   // The job's real duration is the one the contractor typed (delivery date - start date): the major machinery rented for it is
   // priced per day of use, at the same 15-minute market window as materials. No theoretical crew / man-hours plan exists.
   const siteDays = spanDays(timeline?.startDate, timeline?.endDate);
-  const machinery = planMachinery({ partidas, siteDays, regionCode: draft.regionCode, config: draft.machinery ?? DEFAULT_MACHINERY, bucket, book });
-  const quote = buildQuote({ partidas: inputs, plan, prices, finance: draft.finance, regionCode: draft.regionCode, machinery });
+  const machinery = planMachinery({ partidas, siteDays, regionCode: draft.regionCode, config: draft.machinery ?? DEFAULT_MACHINERY, bucket, book, rents: capsule?.rents });
+  const quote = buildQuote({ partidas: inputs, plan, prices, finance: draft.finance, regionCode: draft.regionCode, machinery, taxFallback: capsule?.tax?.rate ?? null });
   const totals = !chains ? null : chainTotals({
     partidas: inputs,
     regionCode: draft.regionCode,
     overrides: draft.overrides,
     bucket,
     book,
+    capsulePrices: capsule?.prices,
   });
   return {
     valid: true,
@@ -70,5 +75,7 @@ export function computeAll(draft, now = Date.now(), { timeline = null, book: liv
     machinery,
     chainTotals: totals,
     book, // the price book that priced this quote (null = built-in reference prices)
+    // true when EVERYTHING of this quote came out of the project's capsule (no global value was read)
+    sealed: Boolean(capsule?.tax) && plan.every((i) => Boolean(prices[i.id]) && (draft.overrides?.[i.id] > 0 || Boolean(capsule?.prices?.[draft.chainId]?.[i.id]))) && machinery.items.every((it) => Boolean(capsule?.rents?.[it.id])),
   };
 }

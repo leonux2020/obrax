@@ -2,6 +2,7 @@
 // Everything here is pure so the rules are unit-testable in Node.
 
 import { normalizeTomb } from './tombstones.js';
+import { normalizeTotals } from './capsule.js';
 import { getRegion } from './regions.js';
 import { normalizeDraft, normalizeCompany, newDraft, isCompanyEmpty } from './draft.js';
 import { sanitizeText } from './sanitize.js';
@@ -218,6 +219,7 @@ export function normalizeProject(obj) {
     ...(Object.keys(normalizeTomb(obj.tomb, 200)).length ? { tomb: normalizeTomb(obj.tomb, 200) } : {}), // ids of records deleted here (so a merge with another device does not bring them back)
     ...(Object.keys(normalizeTomb(obj.photoTomb, 12)).length ? { photoTomb: normalizeTomb(obj.photoTomb, 12) } : {}), // slots of the camera photos deleted here ({ slot: deletedAt })
     draft: normalizeDraft(obj.draft, regionCode),
+    ...(normalizeTotals(obj.totals) ? { totals: normalizeTotals(obj.totals) } : {}), // derived cache (total / paid / pending): recalculated by recalculateProjectTotals after every merge
   };
 }
 

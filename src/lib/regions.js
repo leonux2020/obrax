@@ -191,9 +191,12 @@ export function searchRegions(query, lang = 'es') {
   return [...hits].sort((a, b) => regionName(a, lang).localeCompare(regionName(b, lang), lang));
 }
 
-/** Tax rate actually applied: the user's value for editable regions, otherwise the official rate. */
-export function taxRateFor(region, finance) {
+/**
+ * Tax rate actually applied: the user's value for editable regions, otherwise the rate the PROJECT carries in its capsule
+ * (`fallback`, snapshotted when the quote was built) and only without a capsule the market's official rate.
+ */
+export function taxRateFor(region, finance, fallback = null) {
   const custom = finance && typeof finance.tax === 'number' ? finance.tax : null;
   if (region.taxEditable && custom !== null && custom >= 0 && custom <= 50) return custom / 100;
-  return region.taxRate;
+  return typeof fallback === 'number' && Number.isFinite(fallback) && fallback >= 0 && fallback <= 1 ? fallback : region.taxRate;
 }

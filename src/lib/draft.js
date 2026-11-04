@@ -7,6 +7,7 @@ import { MATERIAL_IDS } from './catalog.js';
 import { MAX_PRICE } from './pricing.js';
 import { normalizeSignature, normalizeInk, normalizeFrozen } from './signature.js';
 import { MACHINE_IDS, DEFAULT_MACHINERY } from './machinery.js';
+import { normalizeCapsule } from './capsule.js';
 import {
   coerceNumber,
   sanitizeText,
@@ -149,7 +150,8 @@ export function normalizePartida(obj, usedIds = new Set()) {
   while (usedIds.has(id)) id = newPartidaId();
   usedIds.add(id);
   const waste = coerceNumber(obj.waste, { min: WASTE_LIMITS.min, max: WASTE_LIMITS.max, decimals: 0, fallback: null });
-  return { id, name: sanitizeText(obj.name, 60).trim(), task, dims, waste: waste === null ? def.defaultWaste : waste };
+  const stamp = Number(obj.updatedAt); // when this partida last changed (set by stampProject): the merge reconciles the quote line by line with it
+  return { id, name: sanitizeText(obj.name, 60).trim(), task, dims, waste: waste === null ? def.defaultWaste : waste, ...(Number.isFinite(stamp) && stamp > 0 ? { updatedAt: stamp } : {}) };
 }
 
 /**
@@ -212,6 +214,7 @@ export function normalizeDraft(obj, regionCode) {
     signature,
     machinery: normalizeMachinery(obj.machinery, signature),
     frozen: normalizeFrozen(obj.frozen),
+    ...(normalizeCapsule(obj.capsule) ? { capsule: normalizeCapsule(obj.capsule) } : {}), // the prices / rents / tax this quote was built with (lib/capsule.js)
     regionCode,
   };
 }

@@ -61,7 +61,7 @@ import { receiptQueue } from './lib/receiptQueue.js';
 import { exportQueue } from './lib/exportQueue.js';
 import { closeGlobalRendition, closeRendition, uploadRendition } from './lib/exportSync.js';
 import { useExportSync } from './lib/useExportSync.js';
-import { projectTotals } from './lib/projectTotals.js';
+import { projectTotals, recalculateProjectTotals } from './lib/projectTotals.js';
 import { addExpenses, registerBackgroundSync } from './lib/receiptSync.js';
 import { dropDuplicateExpenses } from './lib/receipt.js';
 import { useReceiptSync } from './lib/useReceiptSync.js';
@@ -370,7 +370,10 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     Promise.all([logoStore.load().catch(() => ''), bootProjects(settings.region)]).then(([l, list]) => {
       if (!alive) return;
       setLogo(l);
-      setProjects(list);
+      // projects that predate the capsule are sealed once (the prices they show NOW are copied into them) and get their totals cache; no edit stamp
+      const sealed = list.map((p) => recalculateProjectTotals(p));
+      sealed.forEach((p, i) => p !== list[i] && projectStore.save(p).catch(() => {}));
+      setProjects(sealed);
     });
     return () => {
       alive = false;
@@ -399,7 +402,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
 
   // ---- project actions -------------------------------------------------------------------------------------
   const commit = useCallback((project) => {
-    const stamped = stampProject(projectsRef.current?.find((p) => p.id === project.id), project); // records changed / deleted by this commit are marked for the merge
+    const stamped = recalculateProjectTotals(stampProject(projectsRef.current?.find((p) => p.id === project.id), project), { at: project.draft?.capsule ? Date.now() : 1 }); // records changed / deleted by this commit are marked for the merge
     setProjects((list) => (list.some((p) => p.id === stamped.id) ? list.map((p) => (p.id === stamped.id ? stamped : p)) : [stamped, ...list]));
     projectStore.save(stamped).catch(() => {});
   }, [setProjects]);
@@ -424,7 +427,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
       }
     }
     if (!expenses.length) return false; // nothing new: the queued photo is dropped, there is nothing to announce as saved
-    const next = addExpenses(target, expenses);
+    const next = recalculateProjectTotals(addExpenses(target, expenses), { at: target.draft?.capsule ? Date.now() : 1 });
     projectsRef.current = projectsRef.current.map((p) => (p.id === projectId ? next : p)); // two receipts in a row stack up
     setProjects((list) => list.map((p) => (p.id === projectId ? addExpenses(p, expenses) : p)));
     if (activeRef.current?.id !== projectId) projectStore.save(next).catch(() => {}); // the open project saves itself
@@ -489,7 +492,10 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
         list.map((p) => {
           if (p.id !== activeId) return p;
           const draft = typeof update === 'function' ? update(p.draft) : update;
-          return draft === p.draft ? p : { ...p, draft, updatedAt: Date.now() };
+          if (draft === p.draft) return p;
+          // every edit of the quote seals what it needs into the project's capsule (price / rate / tax copied INTO the project) and refreshes its stored totals
+          const now = Date.now();
+          return recalculateProjectTotals({ ...p, draft, updatedAt: now }, { now, at: draft.capsule ? now : 1 });
         })
       ),
     [activeId]
@@ -501,7 +507,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
         list.map((p) => {
           if (p.id !== activeId) return p;
           const next = typeof update === 'function' ? update(p) : update;
-          return next === p ? p : { ...next, updatedAt: Date.now() };
+          return next === p ? p : recalculateProjectTotals({ ...next, updatedAt: Date.now() }, { at: next.draft?.capsule ? Date.now() : 1 }); // the stored totals follow the payments / expenses
         })
       ),
     [activeId]
@@ -829,7 +835,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
           if (merged.wonProjects.length || merged.removedProjects.length) {
             skipDirty.current = true;
             latest.current = { ...latest.current, projects: merged.projects }; // an upload that starts right now already sees the merge
-            setProjectsRaw((list) => mergeProjectLists(list || [], found.value.projects, merged.tombs.projects).projects); // against the CURRENT list
+            setProjectsRaw((list) => mergeProjectLists(list || [], found.value.projects, merged.tombs.projects, 200, recalculateProjectTotals).projects); // against the CURRENT list, through the same recalculation middleware as the stored copy
           }
           if (merged.wonProjects.length || merged.photosChanged.length) {
             // tell the open screens that the background pull changed projects (their derived amounts recompute from the new state at once; no F5)
