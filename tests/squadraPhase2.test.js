@@ -153,7 +153,7 @@ describe('Squadra of a project: the minimal row and the birthday', () => {
     expect(q(`worker-birthday-${beto}`)).toBeNull();
     expect(q(`worker-birthday-${carla}`)).toBeNull();
     for (const id of [ana, beto, carla]) {
-      expect([...q(`worker-${id}`).querySelectorAll('button')].map((b) => b.dataset.testid)).toEqual([`worker-edit-${id}`, `worker-adv-${id}`]);
+      expect([...q(`worker-${id}`).querySelectorAll('button')].map((b) => b.dataset.testid)).toEqual([`worker-toggle-${id}`, `worker-pay-${id}`]);
       expect(q(`worker-spec-${id}`)).toBeNull();
     }
   });

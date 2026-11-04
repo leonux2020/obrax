@@ -40,9 +40,9 @@ describe('icon preservation', () => {
     expect(svg).toContain('data-icon="coins"');
   });
 
-  it('the advance button is the only user of CoinsIcon; the cobros block keeps its BanknoteIcon', () => {
+  it('the coin of the crew row is the only user of CoinsIcon; the cobros block keeps its BanknoteIcon', () => {
     const crew = readFileSync('src/components/workspace/CrewBlock.jsx', 'utf8');
-    expect(crew).toContain('<CoinsIcon size={20} />');
+    expect(crew).toContain('<CoinsIcon size={22} />'); // the coin of the contact row (Phase 10 agenda)
     expect(crew).not.toMatch(/Banknote|CashIcon/);
     const cash = readFileSync('src/components/workspace/CashBlock.jsx', 'utf8');
     expect(cash).toContain('<BanknoteIcon size={32} />');

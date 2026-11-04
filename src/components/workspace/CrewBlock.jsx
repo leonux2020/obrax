@@ -13,7 +13,7 @@ import { crewHealth } from '../../lib/crewMatch.js';
 import CrewPicker from './CrewPicker.jsx';
 import LockedZone from './LockedZone.jsx';
 import NumberPad from './NumberPad.jsx';
-import { CoinsIcon, UsersIcon } from './icons.jsx';
+import { CoinsIcon, Outline, UsersIcon } from './icons.jsx';
 
 /**
  * The two job dates, typed by hand, as ONE minimalist pill on a single line: "📅 23/10/2026 ➔ 25/10/2026 (2 días)". Each date is a real
@@ -166,65 +166,103 @@ function WorkerSheet({ worker, file = null, health = false, onSave, onDelete, on
   );
 }
 
+/** Two letters for the avatar: first letter of the first and of the last word ("Luca Rossi" -> "LR", "Pedro" -> "P"). */
+const initials = (name) => {
+  const words = String(name ?? '').trim().split(/\s+/).filter(Boolean);
+  const first = (w) => (w ? Array.from(w)[0] : '');
+  return (first(words[0]) + (words.length > 1 ? first(words[words.length - 1]) : '')).toUpperCase() || '?';
+};
+/** Lower case, no accents: "Électricien" and "electricien" are the same search. */
+const fold = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const specOf = (w) => (WORKER_SPECIALTIES.includes(w.specialty) ? w.specialty : 'multi');
+
+/** The magnifier of the search field (local, outline: the shared icon set stays frozen). */
+const SearchIcon = (props) => (
+  <Outline size={18} icon="search" {...props}>
+    <circle cx="11" cy="11" r="6.5" />
+    <path d="M16 16l4 4" />
+  </Outline>
+);
+
 /**
- * One person as a MINIMAL row: the name (tap it for their sheet), the birthday cake on the day, the orange health triangle, the total already
- * advanced to them (quiet, always visible, right next to the button: it is read BEFORE handing out more money) and the compact [coins Anticipo]
- * button, all on one line. In EDIT MODE (the pencil of the sheet's header) the row also wears its delete icon on the left and reveals the
- * detail of each advance (deletable) right under the line.
+ * One person as a CONTACT of the agenda (WhatsApp / Phone style), no box: a continuous row with a hairline under it. Left an avatar with
+ * the initials, in the middle the name (birthday cake, orange health triangle) and the trade under it, on the right the total already
+ * advanced (quiet) and a discreet coin. Tapping the row, or the coin, UNFOLDS it (accordion, one at a time): the dated list of the
+ * advances and two text actions without a frame, "+ Advance" (the app's numpad) and "Edit" (the worker's sheet). In EDIT MODE (the pencil
+ * of the sheet's header) the row also wears its delete icon on the left and each advance of the unfolded detail its own cross.
  */
-function WorkerCard({ row, health = false, birthday = false, editing = false, onEdit, onAdvance, onRemove, onRemoveAdvance }) {
+function WorkerCard({ row, health = false, birthday = false, editing = false, expanded = false, onToggle, onEdit, onAdvance, onRemove, onRemoveAdvance }) {
   const { t, money, locale } = useI18n();
   const { worker: w, list, total } = row;
+  const panelId = `worker-panel-${w.id}`;
   const stamp = (ms) => (ms ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(ms)) : '');
   return (
-    <li className="rounded-xl border border-white/10 bg-black" data-testid={`worker-${w.id}`} data-specialty={w.specialty}>
-      <div className="flex items-center gap-1 pr-2">
+    <li className="border-b border-white/5" data-testid={`worker-${w.id}`} data-specialty={w.specialty}>
+      <div className="flex items-center gap-1">
         {editing && <RowDelete name={w.name} testId={`worker-del-${w.id}`} onConfirm={onRemove} />}
-        <button type="button" onClick={onEdit} data-testid={`worker-edit-${w.id}`} aria-label={`${t('ws.crew.sheetEdit')}: ${w.name}${health ? ` · ⚠ ${t('squadra.healthFlag')}` : ''}${total > 0 ? ` · ${t('ws.crew.advanced')}: ${money(total)}` : ''}`} className={`flex min-h-[56px] min-w-0 flex-1 items-center gap-2 py-1.5 text-left ${editing ? 'pl-1' : 'pl-4'}`}>
-          <span className="min-w-0 truncate text-base font-medium text-neutral-200" data-testid={`worker-name-${w.id}`}>
-            {w.name}
+        <button type="button" onClick={onToggle} aria-expanded={expanded} aria-controls={panelId} data-testid={`worker-toggle-${w.id}`} aria-label={`${w.name}${health ? ` · ⚠ ${t('squadra.healthFlag')}` : ''}${total > 0 ? ` · ${t('ws.crew.advanced')}: ${money(total)}` : ''}`} className={`flex min-h-[64px] min-w-0 flex-1 items-center gap-3 py-2 text-left ${editing ? 'pl-1' : ''}`}>
+          <span aria-hidden="true" data-testid={`worker-avatar-${w.id}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-sm font-medium text-neutral-400">
+            {initials(w.name)}
           </span>
-          {birthday && <BirthdayMark testId={`worker-birthday-${w.id}`} />}
-          {/* safety: the warning of the worker's file (limiting condition / allergy) stays on the row for as long as they are on the job */}
-          {health && (
-            <span role="img" aria-label={t('squadra.healthFlag')} title={t('squadra.healthFlag')} data-testid={`worker-health-${w.id}`} className="shrink-0 text-lg leading-none text-orange-500">
-              ⚠
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2">
+              <span className="min-w-0 truncate text-base font-medium text-neutral-200" data-testid={`worker-name-${w.id}`}>
+                {w.name}
+              </span>
+              {birthday && <BirthdayMark testId={`worker-birthday-${w.id}`} />}
+              {/* safety: the warning of the worker's file (limiting condition / allergy) stays on the row for as long as they are on the job */}
+              {health && (
+                <span role="img" aria-label={t('squadra.healthFlag')} title={t('squadra.healthFlag')} data-testid={`worker-health-${w.id}`} className="shrink-0 text-lg leading-none text-orange-500">
+                  ⚠
+                </span>
+              )}
             </span>
-          )}
+            <span className="block truncate text-xs text-neutral-500" data-testid={`worker-role-${w.id}`}>
+              {t(`ws.spec.${specOf(w)}`)}
+            </span>
+          </span>
           {total > 0 && (
-            <span className="ml-auto shrink-0 pl-2 text-xs font-medium tabular-nums text-neutral-400" data-testid={`worker-total-${w.id}`} data-total={total}>
+            <span className="shrink-0 pl-2 text-xs font-medium tabular-nums text-neutral-400" data-testid={`worker-total-${w.id}`} data-total={total}>
               {money(total)}
             </span>
           )}
         </button>
-        {/* the row's main action, compact and on the name's own line (OLED: black ground, coloured border + text) */}
-        <button
-          type="button"
-          onClick={onAdvance}
-          data-testid={`worker-adv-${w.id}`}
-          className="flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-xl border border-emerald-500 bg-black px-3 text-sm font-medium text-emerald-400 transition active:scale-[0.98] active:border-emerald-300"
-        >
-          <CoinsIcon size={20} />
-          <span>{t('ws.crew.advance')}</span>
+        {/* the payment: a coin, no frame. It does the same as the row: unfolds the detail of the advances */}
+        <button type="button" onClick={onToggle} aria-expanded={expanded} aria-controls={panelId} aria-label={`${t('ws.crew.advanced')}: ${w.name}`} title={t('ws.crew.advanced')} data-testid={`worker-pay-${w.id}`} className={`flex h-11 w-11 shrink-0 items-center justify-center transition ${expanded ? 'text-emerald-400' : 'text-neutral-400'}`}>
+          <CoinsIcon size={22} />
         </button>
       </div>
-      {editing && (
-        <div className="border-t border-white/5 px-4 py-1.5" data-testid={`worker-detail-${w.id}`}>
-          <p className="text-xs font-medium text-neutral-500">{t('ws.crew.advanced')}</p>
-          {list.length === 0 && <p className="text-xs font-medium text-neutral-500">{t('ws.crew.noAdvances')}</p>}
-          {list.length > 0 && (
-            <ul className="mt-0.5 divide-y divide-white/5" data-testid={`worker-advlist-${w.id}`}>
-              {list.map((a) => (
-                <li key={a.id} className="flex min-h-[36px] items-center gap-3">
-                  <span className="min-w-0 flex-1 text-xs font-medium text-neutral-500">{stamp(a.at)}</span>
-                  <span className="text-xs font-medium tabular-nums">{money(a.amount)}</span>
-                  <button type="button" onClick={() => onRemoveAdvance(a.id)} aria-label={`${t('common.delete')}: ${w.name}`} data-testid={`worker-adv-del-${a.id}`} className="flex h-9 w-9 shrink-0 items-center justify-center text-base text-red-400/80 hover:text-red-400">
-                    ×
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+      {expanded && (
+        <div className="acc-open" id={panelId} data-testid={`worker-detail-${w.id}`}>
+          <div className="min-h-0 overflow-hidden">
+            <div className="pb-2 pl-[3.25rem] pr-1">
+              <p className="text-xs font-medium text-neutral-500">{t('ws.crew.advanced')}</p>
+              {list.length === 0 && <p className="mt-0.5 text-xs font-medium text-neutral-500">{t('ws.crew.noAdvances')}</p>}
+              {list.length > 0 && (
+                <ul className="mt-0.5 divide-y divide-white/5" data-testid={`worker-advlist-${w.id}`}>
+                  {list.map((a) => (
+                    <li key={a.id} className="flex min-h-[36px] items-center gap-3">
+                      <span className="min-w-0 flex-1 text-xs font-medium text-neutral-500">{stamp(a.at)}</span>
+                      <span className="text-xs font-medium tabular-nums text-neutral-300">{money(a.amount)}</span>
+                      {editing && (
+                        <button type="button" onClick={() => onRemoveAdvance(a.id)} aria-label={`${t('common.delete')}: ${w.name}`} data-testid={`worker-adv-del-${a.id}`} className="row-fade flex h-9 w-9 shrink-0 items-center justify-center text-base text-red-400/80 hover:text-red-400">
+                          ×
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="mt-1 flex items-center gap-5">
+                <button type="button" onClick={onAdvance} data-testid={`worker-adv-${w.id}`} className="min-h-[44px] text-sm font-medium text-emerald-400 transition active:text-emerald-300">
+                  + {t('ws.crew.advance')}
+                </button>
+                <button type="button" onClick={onEdit} data-testid={`worker-edit-${w.id}`} className="min-h-[44px] text-sm text-neutral-400 transition active:text-neutral-200">
+                  {t('ws.crew.sheetEdit')}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </li>
@@ -243,6 +281,9 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
   const [picking, setPicking] = useState(false); // the inline dropdown to add people
   const [editMode, setEditMode] = useState(false); // the pencil of the header: the delete icons only exist while it is on
   const [advFor, setAdvFor] = useState(null); // worker id whose advance is being typed on the pad
+  const [unfolded, setUnfolded] = useState(null); // accordion: the id of the ONE unfolded row (null = all folded)
+  const [query, setQuery] = useState(''); // the search field of the agenda
+  const [spec, setSpec] = useState('all'); // the specialty chip: 'all' or one of WORKER_SPECIALTIES
   const amount = useRef(0);
   const crew = project.crew ?? [];
   const { rows, loose, looseTotal } = advancesByWorker(crew, project.advances);
@@ -251,6 +292,11 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
   const editing = sheet ? crew.find((w) => w.id === sheet) : null;
   // the directory is read again whenever a sheet or the dropdown opens or closes (its file may have just been edited)
   const directory = useMemo(() => loadWorkers(), [sheet, picking]); // eslint-disable-line react-hooks/exhaustive-deps
+  // the agenda: the chips only offer the trades that are really on this crew (and only when there is a choice to make); the search reads name and trade
+  const present = WORKER_SPECIALTIES.filter((s) => crew.some((w) => specOf(w) === s));
+  const activeSpec = present.includes(spec) ? spec : 'all';
+  const needle = fold(query.trim());
+  const visible = rows.filter((r) => (activeSpec === 'all' || specOf(r.worker) === activeSpec) && (!needle || fold(r.worker.name).includes(needle) || fold(t(`ws.spec.${specOf(r.worker)}`)).includes(needle)));
   const healthOf = (w) => crewHealth(w, directory);
   const birthdayOf = (w) => isBirthdayToday(directory.find((f) => f.id === w.ref)?.birthDate); // local date of the device, plain-text people have no file
 
@@ -267,6 +313,9 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
     if (!open) {
       setEditMode(false);
       setPicking(false);
+      setUnfolded(null);
+      setQuery('');
+      setSpec('all');
     }
   }, [open]);
   useEffect(() => {
@@ -336,25 +385,58 @@ export default function CrewBlock({ project, result, locked, onBlocked, setProje
               {t('ws.crew.empty')}
             </p>
           ) : (
-            <ul className="space-y-2" data-testid="crew-list">
-              {rows.map((row) => (
-                <WorkerCard
-                  key={row.worker.id}
-                  row={row}
-                  health={healthOf(row.worker)}
-                  birthday={birthdayOf(row.worker)}
-                  editing={editMode}
-                  onEdit={() => setSheet(row.worker.id)}
-                  onRemove={() => setProject((p) => withoutWorker(p, row.worker.id))}
-                  onAdvance={() => {
-                    if (advanceFull) return;
-                    amount.current = 0;
-                    setAdvFor(row.worker.id);
-                  }}
-                  onRemoveAdvance={(id) => setProject((p) => withoutAdvance(p, id))}
+            <>
+              <div className="relative" data-testid="crew-search-box">
+                <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(sanitizeText(e.target.value, 40))}
+                  maxLength={40}
+                  placeholder={t('ws.crew.search')}
+                  aria-label={t('ws.crew.search')}
+                  autoComplete="off"
+                  data-testid="crew-search"
+                  className="min-h-[44px] w-full rounded-xl border-0 bg-neutral-900/50 pl-10 pr-4 text-base text-neutral-100 outline-none placeholder:text-neutral-500 focus:bg-white/5"
                 />
-              ))}
-            </ul>
+              </div>
+              {present.length > 1 && (
+                <div role="group" aria-label={t('ws.crew.filter')} data-testid="crew-filters" className="hide-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 py-0.5">
+                  {['all', ...present].map((s) => (
+                    <button key={s} type="button" onClick={() => setSpec(s)} aria-pressed={activeSpec === s} data-testid={`crew-filter-${s}`} className={`min-h-[36px] shrink-0 rounded-full px-3.5 text-xs font-medium transition ${activeSpec === s ? 'bg-white/10 text-neutral-100' : 'bg-white/5 text-neutral-400'}`}>
+                      {s === 'all' ? t('ws.crew.filterAll') : t(`ws.spec.${s}`)}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {visible.length === 0 ? (
+                <p className="py-3 text-center text-sm text-neutral-400" data-testid="crew-nomatch">
+                  {t('ws.crew.noMatch')}
+                </p>
+              ) : (
+                <ul data-testid="crew-list">
+                  {visible.map((row) => (
+                    <WorkerCard
+                      key={row.worker.id}
+                      row={row}
+                      health={healthOf(row.worker)}
+                      birthday={birthdayOf(row.worker)}
+                      editing={editMode}
+                      expanded={unfolded === row.worker.id}
+                      onToggle={() => setUnfolded((id) => (id === row.worker.id ? null : row.worker.id))}
+                      onEdit={() => setSheet(row.worker.id)}
+                      onRemove={() => setProject((p) => withoutWorker(p, row.worker.id))}
+                      onAdvance={() => {
+                        if (advanceFull) return;
+                        amount.current = 0;
+                        setAdvFor(row.worker.id);
+                      }}
+                      onRemoveAdvance={(id) => setProject((p) => withoutAdvance(p, id))}
+                    />
+                  ))}
+                </ul>
+              )}
+            </>
           )}
         </div>
 

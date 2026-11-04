@@ -279,3 +279,29 @@ body.eco-mode *::after {
 .wx-in {
   animation: wx-in 0.5s ease-out;
 }
+
+/* The accordion of a contact row (crew agenda): the detail unfolds from 0 to its height; removed, not slowed, under reduced-motion / eco-mode */
+@keyframes acc-open {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+.acc-open {
+  display: grid;
+  grid-template-rows: 1fr;
+  animation: acc-open 0.2s ease-out;
+}
+
+/* A horizontal strip (the specialty chips) that scrolls with the thumb and shows no scrollbar */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}

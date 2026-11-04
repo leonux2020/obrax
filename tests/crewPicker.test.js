@@ -89,6 +89,10 @@ let root;
 let spy;
 const q = (id) => host.querySelector(`[data-testid="${id}"]`);
 const qa = (id) => [...host.querySelectorAll(`[data-testid="${id}"]`)];
+/** Crew agenda: unfolds the accordion row of a worker (when folded) so its "+ Anticipo" / "Editar" actions exist. */
+const unfold = async (id) => {
+  if (!q(`worker-adv-${id}`)) await click(q(`worker-toggle-${id}`));
+};
 const flush = (ms = 0) => act(async () => new Promise((r) => setTimeout(r, ms)));
 const click = async (el) => {
   await act(async () => {
@@ -301,6 +305,7 @@ describe('CrewPicker: the hybrid selector', () => {
     await mount();
     await click(q('crew-pick-wk000001'));
     const id = spy.project.crew[0].id;
+    await unfold(id);
     await click(q(`worker-edit-${id}`));
     expect(q('crew-specialty')).not.toBeNull();
     await typeInto(q('crew-notes'), 'Tablero');
@@ -329,8 +334,8 @@ describe('safety: the ⚠ of the file follows the worker onto the job', () => {
     expect(flag.getAttribute('aria-label')).toBe('Tiene datos de salud');
     expect(q(`worker-${ana}`).contains(flag)).toBe(true); // on the card itself, not behind a tap
     expect(card(beto)).toBeNull();
-    expect(q(`worker-edit-${ana}`).getAttribute('aria-label')).toContain('⚠'); // announced with the name by a screen reader
-    expect(q(`worker-edit-${beto}`).getAttribute('aria-label')).not.toContain('⚠');
+    expect(q(`worker-toggle-${ana}`).getAttribute('aria-label')).toContain('⚠'); // announced with the name by a screen reader
+    expect(q(`worker-toggle-${beto}`).getAttribute('aria-label')).not.toContain('⚠');
   });
 
   it('a limiting condition alone is enough to raise it', async () => {
@@ -370,6 +375,7 @@ describe('safety: the ⚠ of the file follows the worker onto the job', () => {
     await mount();
     await click(q('crew-pick-wk000001'));
     const id = spy.project.crew[0].id;
+    await unfold(id);
     await click(q(`worker-edit-${id}`));
     await typeInto(q('crew-notes'), 'Tablero');
     await click(q('crew-save'));
@@ -378,7 +384,7 @@ describe('safety: the ⚠ of the file follows the worker onto the job', () => {
     const reloaded = normalizeProject(JSON.parse(JSON.stringify(spy.project)));
     expect(reloaded.crew[0]).toMatchObject({ ref: 'wk000001', health: true });
     expect(q(`worker-${id}`).contains(card(id))).toBe(true);
-    expect(q(`worker-adv-${id}`)).not.toBeNull(); // the card keeps its own actions next to the warning
+    expect(q(`worker-pay-${id}`)).not.toBeNull(); // the card keeps its own actions next to the warning
   });
 
   it('crewHealth: live file wins; a deleted file falls back to the snapshot; no ref, no warning', () => {
@@ -403,6 +409,7 @@ describe('emergency: the health data is READ on site (the person\'s sheet in the
   const FULL = { id: 'wk000009', name: 'Fito Vega', specialties: ['mason'], rating: 2, address: 'Maipú', limiting: 'Vértigo: no trabajar en altura', allergies: 'Penicilina, Látex', emergencyName: 'María Soto', emergencyPhone: '+56 9 8765 4321' };
   const open = async (name) => {
     const id = spy.project.crew.find((w) => w.name === name).id;
+    await unfold(id);
     await click(q(`worker-edit-${id}`));
   };
 
@@ -482,6 +489,7 @@ describe('emergency: the health data is READ on site (the person\'s sheet in the
     });
     await flush();
     await click(q('ws-crew'));
+    await unfold('crew0001');
     await click(q('worker-edit-crew0001'));
     expect(q('crew-emergency')).not.toBeNull();
     expect(q('crew-emergency-gone').textContent).toContain('ya no está en el directorio');
@@ -503,6 +511,7 @@ describe('emergency: the health data is READ on site (the person\'s sheet in the
 describe('emergency panel: the blood group, big and red', () => {
   const FILE = { id: 'wk000009', name: 'Fito Vega', specialties: ['mason'], rating: 2, address: 'Maipú', allergies: 'Penicilina', bloodType: 'O-', emergencyName: 'María', emergencyPhone: '+56 9 1' };
   const openSheet = async (name) => {
+    await unfold(spy.project.crew.find((w) => w.name === name).id);
     await click(q(`worker-edit-${spy.project.crew.find((w) => w.name === name).id}`));
   };
 

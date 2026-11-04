@@ -14,8 +14,8 @@ describe('strict OLED theme', () => {
     for (const f of files) {
       // the documented exceptions (Phase 1 "Zero Stress": text fields / selectors are a subtle neutral-900 fill with a hairline, no heavy outline):
       // the documented exceptions: the 2 px track of the project header's single progress line (HeaderZone) and the dark circle of the
-      // quick-control grid tiles (workspace/Block.jsx), the 1 px bars of the profitability x-ray and the specialty chips of the Squadra rows, all asked for by name
-      const text = fs.readFileSync(f, 'utf8').replaceAll('h-0.5 bg-neutral-800', 'h-0.5').replaceAll('h-1 bg-neutral-800', 'h-1').replaceAll('bg-neutral-800 text-neutral-300', 'text-neutral-300').replaceAll('border-white/5 bg-neutral-900', 'border-white/5').replaceAll('border-white/10 bg-neutral-900', 'border-white/10').replaceAll('bg-neutral-900/50', '').replaceAll('border-none bg-neutral-900', 'border-none').replaceAll('rounded-full bg-neutral-900 p-1', 'rounded-full p-1'); // Phase 10 (client payments): borderless soft fills, asked for by name
+      // quick-control grid tiles (workspace/Block.jsx), the 1 px bars of the profitability x-ray and the specialty chips of the Squadra rows and the initials avatar of a crew contact, all asked for by name
+      const text = fs.readFileSync(f, 'utf8').replaceAll('h-0.5 bg-neutral-800', 'h-0.5').replaceAll('h-1 bg-neutral-800', 'h-1').replaceAll('bg-neutral-800 text-neutral-300', 'text-neutral-300').replaceAll('bg-neutral-800 text-sm font-medium text-neutral-400', 'text-sm font-medium text-neutral-400').replaceAll('border-white/5 bg-neutral-900', 'border-white/5').replaceAll('border-white/10 bg-neutral-900', 'border-white/10').replaceAll('bg-neutral-900/50', '').replaceAll('border-none bg-neutral-900', 'border-none').replaceAll('rounded-full bg-neutral-900 p-1', 'rounded-full p-1'); // Phase 10 (client payments): borderless soft fills, asked for by name
       const m = text.match(/(?:^|[^\w-])(?:[a-z-]+:)*bg-(?:neutral|gray|zinc|slate|stone)-\d+(?:\/\d+)?/g);
       if (m) offenders.push(`${path.relative(root, f)}: ${m.join(', ')}`);
     }
