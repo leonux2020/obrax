@@ -8,11 +8,23 @@ const EARTH_RADIUS_KM = 6371.0088;
 const rad = (deg) => (deg * Math.PI) / 180;
 const round5 = (n) => Math.round(n * 1e5) / 1e5;
 
-/** {lat, lng} with finite numbers inside the valid ranges, rounded to 5 decimals (~1 m), or null. */
+/**
+ * ONE coordinate -> a finite number, or NaN. Nominatim (and any hand-made backup) hands coordinates over as STRINGS ("-33.4489"): they are cast
+ * with parseFloat before any maths ("-33,4489" with a decimal comma too). null / undefined / '' / booleans are NaN, never 0 (Number('') is 0, which
+ * would drop a job on the Gulf of Guinea, 6 000 km from everybody).
+ */
+export function toCoord(v) {
+  if (typeof v === 'number') return v;
+  if (typeof v !== 'string') return NaN;
+  const s = v.trim().replace(',', '.');
+  return s === '' ? NaN : parseFloat(s);
+}
+
+/** {lat, lng} with finite numbers inside the valid ranges, rounded to 5 decimals (~1 m), or null. Accepts strings, and `lon` as a spelling of `lng`. */
 export function normalizeCoords(obj) {
-  if (!obj || typeof obj !== 'object' || obj.lat === null || obj.lng === null || obj.lat === '' || obj.lng === '') return null;
-  const lat = Number(obj.lat);
-  const lng = Number(obj.lng);
+  if (!obj || typeof obj !== 'object') return null;
+  const lat = toCoord(obj.lat);
+  const lng = toCoord(obj.lng ?? obj.lon);
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
   return { lat: round5(lat), lng: round5(lng) };
 }

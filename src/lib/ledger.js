@@ -7,6 +7,7 @@
 //   location  - where the job is (coordinates of the phone when the user taps "ubicación actual")
 
 import { sanitizeText } from './sanitize.js';
+import { toCoord } from './geoDistance.js';
 import { getRegion, taxRateFor } from './regions.js';
 import { FX_SOURCES, baseOf, isoOf, normalizeRate } from './fx.js';
 
@@ -238,8 +239,8 @@ export const normalizeLogbook = (raw) =>
 /** { lat, lng, label } or null. Coordinates only: nothing is sent anywhere to name the place. */
 export function normalizeLocation(obj) {
   if (!obj || typeof obj !== 'object') return null;
-  const lat = Number(obj.lat);
-  const lng = Number(obj.lng);
+  const lat = toCoord(obj.lat); // strings ("-33.45") are cast with parseFloat; null / '' are NOT 0
+  const lng = toCoord(obj.lng ?? obj.lon);
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
   const r = (n) => Math.round(n * 1e5) / 1e5;
   return { lat: r(lat), lng: r(lng), label: sanitizeText(obj.label, 80).trim() };

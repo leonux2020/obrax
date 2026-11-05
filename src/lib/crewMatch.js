@@ -15,7 +15,7 @@
 // so nobody vanishes from the list overnight. A worker with neither, or a job with no place, cannot be placed: they only show in "all".
 
 import { hasHealthNotes, normalizeWorkers } from './workers.js';
-import { haversineKm } from './geoDistance.js';
+import { haversineKm, toCoord } from './geoDistance.js';
 
 export const CREW_RANGES = Object.freeze(['local', 'regional', 'all']);
 export const DEFAULT_RANGE = 'local';
@@ -51,6 +51,15 @@ const placeParts = (v) =>
     .map(norm)
     .filter(Boolean);
 
+const warned = new Set();
+/** An internal warning, once per worker: a bad coordinate is worth knowing about, not worth flooding the console with. */
+function warnOnce(key, message) {
+  if (warned.has(key)) return;
+  warned.add(key);
+  if (warned.size > 200) warned.clear();
+  console.warn(message, key);
+}
+
 /**
  * Straight-line km (Haversine) between the job's saved point and the worker's `lat` / `lon`, or null when either side has no usable coordinates.
  * Reads the project as { location: { lat, lng } } and the worker as { lat, lon } (also tolerates `lng`).
@@ -58,8 +67,15 @@ const placeParts = (v) =>
 export function distanceKm(project, worker) {
   const loc = project?.location;
   if (!loc || !worker) return null;
-  const km = haversineKm({ lat: loc.lat, lng: loc.lng }, { lat: worker.lat, lng: worker.lon ?? worker.lng });
-  return Number.isFinite(km) ? km : null;
+  // every coordinate is cast with parseFloat BEFORE the formula (Nominatim and old backups carry strings); the comparison below is on numbers
+  const from = { lat: toCoord(loc.lat), lng: toCoord(loc.lng ?? loc.lon) };
+  const to = { lat: toCoord(worker.lat), lng: toCoord(worker.lon ?? worker.lng) };
+  const known = (p) => Number.isFinite(p.lat) || Number.isFinite(p.lng);
+  if (!known(from) || !known(to)) return null; // one side simply has no point: not an error
+  const km = haversineKm(from, to);
+  if (Number.isFinite(km)) return km;
+  warnOnce(`${worker.id ?? worker.name}`, 'crewMatch: the distance could not be computed (unusable coordinates); falling back to the city name');
+  return null; // NaN / out-of-range: the worker is NOT dropped, proximity() falls back to the name of the city (legacy behaviour)
 }
 
 /** 0 = local (the city is the job's city), 1 = regional (names another part of the place), 2 = elsewhere, 3 = cannot tell (no city nor address / no job place). */
@@ -110,7 +126,7 @@ const matchesQuery = (worker, query, label) => omniMatch(query, searchFields(wor
  * left out only because they have no city nor address.
  */
 export function rankWorkers(workers, { project, specialty = '', range = DEFAULT_RANGE, query = '', label = null } = {}) {
-  const placed = Boolean(projectPlaces(project).city) || Boolean(project?.location && Number.isFinite(Number(project.location.lat)));
+  const placed = Boolean(projectPlaces(project).city) || Number.isFinite(toCoord(project?.location?.lat));
   let hidden = 0;
   const rows = [];
   for (const worker of normalizeWorkers(workers)) {

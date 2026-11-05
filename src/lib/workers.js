@@ -5,6 +5,7 @@
 import { markDeleted } from './tombstones.js';
 import { WORKER_SPECIALTIES, newEntryId } from './ledger.js';
 import { sanitizePhone, sanitizeText } from './sanitize.js';
+import { toCoord } from './geoDistance.js';
 
 export const WORKERS_KEY = 'cp.workers.v1';
 export const WORKER_LIMIT = 200;
@@ -47,9 +48,8 @@ const when = (v, fallback) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Num
 
 /** A believable coordinate pair -> {lat, lon} (4 decimals, ~10 m: enough for "which town", too coarse to be a home), else null. */
 export function cleanWorkerCoords(lat, lon) {
-  if (lat === null || lon === null || lat === undefined || lon === undefined || lat === '' || lon === '') return null;
-  const a = Number(lat);
-  const b = Number(lon);
+  const a = toCoord(lat); // strings are cast with parseFloat; null / undefined / '' are "no coordinate", never 0
+  const b = toCoord(lon);
   if (!Number.isFinite(a) || !Number.isFinite(b) || Math.abs(a) > 90 || Math.abs(b) > 180) return null;
   return { lat: Math.round(a * 1e4) / 1e4, lon: Math.round(b * 1e4) / 1e4 };
 }
@@ -68,7 +68,8 @@ export function adaptLegacyWorker(raw) {
   o.address = raw.address ?? raw.direccion ?? raw.dirección;
   o.apodo = raw.apodo ?? raw.nickname;
   o.phone = raw.phone ?? raw.telefono ?? raw.teléfono;
-  o.lon = raw.lon ?? raw.lng;
+  o.lon = raw.lon ?? raw.lng ?? raw.longitude;
+  o.lat = raw.lat ?? raw.latitude;
   if (!Array.isArray(raw.specialties)) {
     const one = raw.specialty ?? raw.oficio ?? raw.trade;
     o.specialties = typeof one === 'string' ? [one] : [];

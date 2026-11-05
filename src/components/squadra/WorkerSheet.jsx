@@ -5,6 +5,7 @@ import { sanitizePhone, sanitizeTextInput } from '../../lib/sanitize.js';
 import { REGIONS } from '../../lib/regions.js';
 import { searchPlaces } from '../../lib/forwardGeocode.js';
 import { SEARCH_DEBOUNCE_MS, useCitySearch } from '../../lib/useCitySearch.js';
+import { toCoord } from '../../lib/geoDistance.js';
 import { BLOOD_TYPES, MAX_SPECIALTIES, SEXES } from '../../lib/workers.js';
 import BottomSheet from '../BottomSheet.jsx';
 import { Button, DateInput, TextField } from '../ui.jsx';
@@ -49,7 +50,7 @@ export default function WorkerSheet({ worker, projects = [], onSave, onDelete, o
   const listId = useId();
   const choose = (place) => {
     setError('');
-    setForm((f) => ({ ...f, city: sanitizeTextInput(place.name, 60), lat: place.lat, lon: place.lng }));
+    setForm((f) => ({ ...f, city: sanitizeTextInput(place.name, 60), lat: toCoord(place.lat), lon: toCoord(place.lng ?? place.lon) }));
     setTyped('');
     setActive(-1);
   };
@@ -118,7 +119,7 @@ export default function WorkerSheet({ worker, projects = [], onSave, onDelete, o
             <TextField label={t('squadra.phone')} value={form.phone} onChange={set('phone')} testId="worker-phone" type="tel" inputMode="tel" maxLength={32} sanitize={sanitizePhone} placeholder="+56 9 1234 5678" />
           </div>
           {/* the Radar compares THIS field with the job's city: strongly recommended, never blocking */}
-          <div data-testid="worker-city-box" data-located={Number.isFinite(form.lat) && Number.isFinite(form.lon) ? 'true' : 'false'}>
+          <div data-testid="worker-city-box" data-located={Number.isFinite(toCoord(form.lat)) && Number.isFinite(toCoord(form.lon)) ? 'true' : 'false'}>
             <TextField
               label={t('squadra.city')}
               value={form.city}
