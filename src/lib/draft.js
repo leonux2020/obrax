@@ -101,8 +101,8 @@ export function normalizeCompany(obj) {
 export const proFullName = (c) => [c?.proName, c?.proLastName].map((x) => String(x ?? '').trim()).filter(Boolean).join(' ');
 /** The company entity of the stored profile. */
 export const companyEntity = (c) => ({ name: c?.name || '', taxId: c?.taxId || '', address: c?.address || '', email: c?.email || '', phone: c?.phone || '', city: c?.city || '' });
-/** The professional entity of the stored profile; `signature` is the Base64 PNG data URL (or ''), its size is bounded by SIGNATURE_LIMITS. */
-export const professionalEntity = (c) => ({ name: c?.proName || '', lastName: c?.proLastName || '', title: c?.proTitle || '', license: c?.proLicense || '', taxId: c?.proTaxId || '', signature: c?.signature?.dataUrl || '' });
+/** The professional entity of the stored profile (`id` = the professional's own document / ID, stored as `proTaxId`); `signature` is the Base64 PNG data URL (or ''), its size is bounded by SIGNATURE_LIMITS. */
+export const professionalEntity = (c) => ({ name: c?.proName || '', lastName: c?.proLastName || '', title: c?.proTitle || '', license: c?.proLicense || '', id: c?.proTaxId || '', taxId: c?.proTaxId || '', signature: c?.signature?.dataUrl || '' });
 export const isCompanyEmpty = (c) => !c || Object.values(c).every((v) => !v);
 export const loadCompany = () => normalizeCompany(read(KEYS.company));
 export const saveCompany = (c) => write(KEYS.company, isCompanyEmpty(c) ? null : normalizeCompany(c));

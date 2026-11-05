@@ -88,15 +88,11 @@ describe('Ajustes as a full-screen tab', () => {
   it('opening Ajustes does not lose what is there: language change applies in place and the screen stays', async () => {
     await mount();
     await click(h.tab('Ajustes'));
-    const select = q('settings-lang').querySelector('select');
-    await (async () => {
-      const { act } = await import('react');
-      await act(async () => {
-        select.value = 'it';
-        select.dispatchEvent(new Event('change', { bubbles: true }));
-      });
-    })();
+    await click(q('settings-lang')); // the row opens the picker sheet
+    expect(q('settings-lang-sheet')).not.toBeNull();
+    await click(q('lang-option-it'));
     await flush(60);
+    expect(q('settings-lang-sheet')).toBeNull(); // picking closes the sheet
     expect(q('settings-view')).not.toBeNull();
     expect(q('settings-title').textContent).toBe('Impostazioni');
   });
@@ -132,7 +128,7 @@ describe('Ajustes "Zero Stress": main block, quiet logout, invisible autosave', 
     }
     const sum = q('settings-profile-summary').querySelector('svg[data-outline-icon="true"]');
     expect(sum.getAttribute('class')).toContain('text-neutral-400');
-    expect(q('settings-drive').textContent).toBe('Sincronizar con Google Drive');
+    expect(q('settings-drive').textContent).toContain('Sincronizar con Google Drive');
     // order: profile accordion, operations, then language & country
     expect(idx(q('settings-profile'))).toBeLessThan(idx(q('settings-ops')));
     expect(idx(q('settings-ops'))).toBeLessThan(idx(q('settings-locale')));
@@ -145,7 +141,7 @@ describe('Ajustes "Zero Stress": main block, quiet logout, invisible autosave', 
     for (const l of ['es', 'en', 'pt', 'fr', 'it', 'de']) expect(DICT[l]['settings.driveSync'], l).toBeTruthy();
     await mount('it');
     await click(q('nav-settings'));
-    expect(q('settings-drive').textContent).toBe('Sincronizza con Google Drive');
+    expect(q('settings-drive').textContent).toContain('Sincronizza con Google Drive');
   });
 
   it('there is no autosave switch and no "Guardado" badge anywhere; the profile persists once, on Save', async () => {
@@ -285,15 +281,12 @@ describe('Autodetection of language and country (Zero Stress)', () => {
     await h.mount();
     await click(q('nav-settings'));
     expect(q('settings-title').textContent).toBe('Impostazioni');
-    expect(q('settings-lang').querySelector('select').value).toBe('it');
-    expect(q('settings-region').querySelector('input').value).toMatch(/Ital/); // the detected country, shown in the combobox
+    expect(q('settings-lang-value').textContent).toBe('Italiano');
+    expect(q('settings-lang-value').className).toContain('text-brand/90');
+    expect(q('settings-region-value').textContent).toMatch(/Ital/); // the detected country, shown as the value of its row
     // manual change still works and sticks (locked from now on)
-    const { act } = await import('react');
-    const select = q('settings-lang').querySelector('select');
-    await act(async () => {
-      select.value = 'de';
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    await click(q('settings-lang'));
+    await click(q('lang-option-de'));
     await flush(60);
     expect(q('settings-title').textContent).toBe('Einstellungen');
     expect(JSON.parse(localStorage.getItem('cp.settings.v1')).langLocked).toBe(true);

@@ -1,15 +1,18 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { drawStroke, hasInk } from '../lib/signature.js';
+import { drawStroke, hasInk, smoothPoint, SMOOTHING } from '../lib/signature.js';
 
-const MIN_STEP = 1.2; // px: points closer than this are dropped (keeps strokes light and smooth)
+const MIN_STEP = SMOOTHING.minStep; // px: points closer than this are dropped (keeps strokes light and smooth)
 
 /**
  * Touch / pen / mouse signature canvas. Strokes are kept as points (CSS px) and repainted whenever the
  * canvas is resized, so rotating the phone or opening the keyboard never wipes the signature.
  * On screen the ink is white on pure black (OLED); the exported PNG uses black ink (see lib/signature.js).
+ * `locked`: the pad ignores every touch (and lets the page scroll under the finger) until it is unlocked; only an unlocked pad is `touch-none`.
  * Imperative API: clear(), getStrokes(), hasInk().
  */
-const SignaturePad = forwardRef(function SignaturePad({ label, placeholder, onInkChange, className = '' }, ref) {
+const SignaturePad = forwardRef(function SignaturePad({ label, placeholder, onInkChange, className = '', locked = false }, ref) {
+  const lockedRef = useRef(locked);
+  lockedRef.current = locked;
   const canvasRef = useRef(null);
   const strokes = useRef([]);
   const current = useRef(null);
@@ -52,7 +55,7 @@ const SignaturePad = forwardRef(function SignaturePad({ label, placeholder, onIn
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return undefined;
-    const stop = (e) => e.cancelable && e.preventDefault();
+    const stop = (e) => !lockedRef.current && e.cancelable && e.preventDefault();
     canvas.addEventListener('touchstart', stop, { passive: false });
     canvas.addEventListener('touchmove', stop, { passive: false });
     return () => {
@@ -88,6 +91,7 @@ const SignaturePad = forwardRef(function SignaturePad({ label, placeholder, onIn
   };
 
   const onDown = (e) => {
+    if (lockedRef.current) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     try {
@@ -108,8 +112,8 @@ const SignaturePad = forwardRef(function SignaturePad({ label, placeholder, onIn
     // coalesced events give a smoother line on fast finger / pen movement
     const events = e.nativeEvent?.getCoalescedEvents?.() || [];
     for (const ev of events.length ? events : [e]) {
-      const p = point(ev);
       const last = stroke[stroke.length - 1];
+      const p = smoothPoint(last, point(ev)); // damped: hand tremor never becomes a corner of the line
       if (Math.hypot(p.x - last.x, p.y - last.y) >= MIN_STEP) stroke.push(p);
     }
     paint();
@@ -122,6 +126,11 @@ const SignaturePad = forwardRef(function SignaturePad({ label, placeholder, onIn
     } catch {
       /* nothing captured */
     }
+    // the filter lags a little behind the finger: close the stroke exactly where it was lifted
+    const stroke = current.current;
+    const end = point(e);
+    const last = stroke[stroke.length - 1];
+    if (Number.isFinite(end.x) && Number.isFinite(end.y) && Math.hypot(end.x - last.x, end.y - last.y) >= 0.5 && stroke.length > 1) stroke.push(end);
     current.current = null;
     paint();
   };
@@ -133,7 +142,8 @@ const SignaturePad = forwardRef(function SignaturePad({ label, placeholder, onIn
         role="img"
         aria-label={label}
         data-testid="signature-canvas"
-        className="absolute inset-0 h-full w-full cursor-crosshair touch-none select-none"
+        className={`absolute inset-0 h-full w-full select-none ${locked ? 'pointer-events-none' : 'cursor-crosshair touch-none'}`}
+        data-locked={locked ? 'true' : undefined}
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}

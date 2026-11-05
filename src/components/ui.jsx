@@ -345,7 +345,7 @@ export function Slider({ label, description, value, min, max, step = 1, suffix =
  * Toggle switch on a pure-black card with an ultra-thin border. The whole row is the touch target
  * (one-hand friendly) and it is exposed as role="switch" with its label and description.
  */
-export function Switch({ checked, onChange, label, description, className = '', ...rest }) {
+export function Switch({ checked, onChange, label, description, className = '', labelClassName = 'font-semibold', ...rest }) {
   const id = useId();
   return (
     <button
@@ -359,7 +359,7 @@ export function Switch({ checked, onChange, label, description, className = '', 
       {...rest}
     >
       <span className="min-w-0 flex-1">
-        <span id={`${id}-l`} className="block font-semibold">
+        <span id={`${id}-l`} className={`block ${labelClassName}`}>
           {label}
         </span>
         {description && (

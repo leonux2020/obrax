@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { I18nProvider } from '../src/lib/i18n.jsx';
 import ProfileCard from '../src/components/ProfileCard.jsx';
 import { EMPTY_COMPANY, companyEntity, normalizeCompany, professionalEntity, proFullName } from '../src/lib/draft.js';
-import { SIGNATURE_LIMITS, exportSignature, normalizeInk } from '../src/lib/signature.js';
+import { SIGNATURE_LIMITS, SMOOTHING, drawStroke, exportSignature, normalizeInk, smoothPoint } from '../src/lib/signature.js';
 import { companyInfo } from '../src/lib/reports.js';
 import { DICT } from '../src/lib/dict.js';
 import { makeI18n } from '../src/lib/i18n.jsx';
@@ -18,7 +18,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 const NEW_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 const SIG = { dataUrl: PNG, w: 120, h: 40 };
-const COMPANY = { name: 'Aurora SpA', taxId: '76.123.456-7', address: 'Av. Providencia 123', city: 'Santiago', email: 'obra@aurora.cl', phone: '', proName: 'Ana', proLastName: 'Ruiz', proTitle: 'Ingeniera civil', proLicense: 'CIP 4521', signature: SIG };
+const COMPANY = { name: 'Aurora SpA', taxId: '76.123.456-7', address: 'Av. Providencia 123', city: 'Santiago', email: 'obra@aurora.cl', phone: '', proName: 'Ana', proLastName: 'Ruiz', proTitle: 'Ingeniera civil', proLicense: 'CIP 4521', proTaxId: '12.345.678-5', signature: SIG };
 
 const q = (id) => document.querySelector(`[data-testid="${id}"]`);
 const click = (el) => act(async () => { el.dispatchEvent(new MouseEvent('click', { bubbles: true })); await new Promise((r) => setTimeout(r, 5)); });
@@ -40,6 +40,7 @@ const fakeCanvas = (onDataUrl = () => NEW_PNG) => {
     return onDataUrl(this);
   });
 };
+const unlock = () => click(q('pro-signature-lock'));
 const draw = (canvas, points = [[10, 10], [60, 40], [120, 20]]) => {
   canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 150 });
   const ev = (type, x, y) => {
@@ -125,14 +126,19 @@ describe('read mode: two blocks, no lines, the signature in white at the end', (
     expect(q('settings-profile-pro').textContent).toBe('Ana Ruiz');
     expect(q('settings-profile-title').textContent).toBe('Ingeniera civil');
     expect(q('settings-profile-license').textContent).toBe('CIP 4521');
+    expect(q('settings-profile-proid').textContent).toBe('RUT 12.345.678-5'); // the professional's own document
     const img = q('settings-profile-signature');
     expect(img.getAttribute('src')).toBe(PNG);
     expect(img.className).toContain('invert'); // black ink on transparent -> pure white on black
     expect(pro.lastElementChild.contains(img)).toBe(true); // the last thing of the card
     expect(card.contains(company) && card.contains(pro)).toBe(true);
-    // no lines: no rules, no borders, no dividers inside the card (separation = margins and type hierarchy only)
-    expect(card.querySelector('hr')).toBeNull();
-    for (const el of [card, ...card.querySelectorAll('*')]) expect(String(el.getAttribute('class') || ''), el.tagName).not.toMatch(/\bborder|divide-|\bring\b/);
+    // ONE hairline, strictly between the two blocks, almost invisible; nothing else draws a line (separation = margins and type hierarchy)
+    const rules = card.querySelectorAll('hr');
+    expect(rules).toHaveLength(1);
+    expect(rules[0].className).toContain('border-neutral-800/50');
+    expect(company.compareDocumentPosition(rules[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(rules[0].compareDocumentPosition(pro) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    for (const el of [card, ...card.querySelectorAll('*')].filter((x) => x.tagName !== 'HR')) expect(String(el.getAttribute('class') || ''), el.tagName).not.toMatch(/\bborder|divide-|\bring\b/);
     expect(card.querySelector('input, textarea, select, canvas')).toBeNull();
   });
 
@@ -140,6 +146,7 @@ describe('read mode: two blocks, no lines, the signature in white at the end', (
     mount({ name: 'Aurora' });
     expect(q('settings-profile-professional')).toBeNull();
     expect(q('settings-profile-signature')).toBeNull();
+    expect(q('settings-profile-divider')).toBeNull(); // no professional block, no hairline
     expect(q('settings-profile-tax')).toBeNull();
   });
 
@@ -153,17 +160,42 @@ describe('read mode: two blocks, no lines, the signature in white at the end', (
     expect(host.querySelectorAll('form')).toHaveLength(1);
     expect(q('settings-form-company')).not.toBeNull();
     expect(q('settings-form-professional')).not.toBeNull();
-    for (const id of ['settings-company-name', 'settings-company-tax', 'settings-company-address', 'settings-company-email', 'settings-pro-name', 'settings-pro-lastname', 'settings-pro-title', 'settings-pro-license'])
+    for (const id of ['settings-company-name', 'settings-company-tax', 'settings-company-address', 'settings-company-email', 'settings-pro-name', 'settings-pro-lastname', 'settings-pro-title', 'settings-pro-license', 'settings-pro-id'])
       expect(q(id), id).not.toBeNull();
     expect(q('settings-pro-lastname').value).toBe('Ruiz');
   });
 });
 
-describe('HARD AUDIT 1: the touch canvas never scrolls the page while drawing', () => {
-  it('the canvas is touch-action:none and cancels touchstart / touchmove / pointer events', async () => {
+describe('HARD AUDIT 1: the touch canvas never scrolls the page while drawing, and cannot be touched by accident', () => {
+  it('LOCKED by default: a padlock overlay covers the pad, the page scrolls over it and nothing is drawn', async () => {
+    fakeCanvas();
     mount();
     await click(q('settings-profile-edit'));
     const canvas = q('signature-canvas');
+    const lock = q('pro-signature-lock');
+    expect(lock).not.toBeNull();
+    expect(lock.className).toMatch(/bg-black\/60/); // translucent
+    expect(lock.querySelector('svg[data-outline-icon="true"]')).not.toBeNull(); // the padlock
+    expect(lock.textContent).toBe('Toca para desbloquear y firmar');
+    expect(canvas.dataset.locked).toBe('true');
+    expect(canvas.className).not.toContain('touch-none'); // vertical scroll is free over a locked pad
+    expect(canvas.className).toContain('pointer-events-none');
+    const move = new Event('touchmove', { bubbles: true, cancelable: true });
+    act(() => canvas.dispatchEvent(move));
+    expect(move.defaultPrevented).toBe(false);
+    const [down] = draw(canvas); // even a synthetic stroke leaves no ink
+    expect(down.defaultPrevented).toBe(false);
+    await click(q('settings-profile-save'));
+    expect(saved[0].signature).toEqual(SIG); // untouched: the stored signature is kept
+  });
+
+  it('one tap on the overlay unlocks it: touch-action:none, touch events cancelled, drawing works', async () => {
+    mount();
+    await click(q('settings-profile-edit'));
+    await unlock();
+    expect(q('pro-signature-lock')).toBeNull();
+    const canvas = q('signature-canvas');
+    expect(canvas.dataset.locked).toBeUndefined();
     expect(canvas.className).toContain('touch-none');
     for (const type of ['touchstart', 'touchmove']) {
       const e = new Event(type, { bubbles: true, cancelable: true });
@@ -173,6 +205,53 @@ describe('HARD AUDIT 1: the touch canvas never scrolls the page while drawing', 
     const events = draw(canvas);
     expect(events[0].defaultPrevented).toBe(true); // pointerdown
     expect(events[1].defaultPrevented).toBe(true); // pointermove while the finger is down
+  });
+
+  it('every edit session starts locked again', async () => {
+    mount();
+    await click(q('settings-profile-edit'));
+    await unlock();
+    await click(q('settings-profile-cancel'));
+    await click(q('settings-profile-edit'));
+    expect(q('pro-signature-lock')).not.toBeNull();
+  });
+});
+
+describe('Bézier smoothing: the ink is a smooth curve, tremor is damped', () => {
+  const calls = (fn) => {
+    const log = [];
+    const ctx = new Proxy({}, { get: (_, k) => (k === 'canvas' ? {} : (...a) => log.push([k, ...a])), set: () => true });
+    fn(ctx);
+    return log;
+  };
+  it('drawStroke joins the midpoints with quadraticCurveTo (the only lineTo is the very last half-segment)', () => {
+    const pts = Array.from({ length: 12 }, (_, i) => ({ x: i * 10, y: (i % 2) * 6 }));
+    const log = calls((ctx) => drawStroke(ctx, pts));
+    expect(log.filter(([k]) => k === 'quadraticCurveTo')).toHaveLength(pts.length - 2);
+    expect(log.filter(([k]) => k === 'lineTo')).toHaveLength(1);
+    const last = log.filter(([k]) => k === 'lineTo')[0];
+    expect(last.slice(1)).toEqual([pts[pts.length - 1].x, pts[pts.length - 1].y]);
+    const first = log.find(([k]) => k === 'quadraticCurveTo');
+    expect(first.slice(1)).toEqual([pts[1].x, pts[1].y, (pts[1].x + pts[2].x) / 2, (pts[1].y + pts[2].y) / 2]); // control = the point, end = the midpoint
+  });
+
+  it('the low-pass filter damps a shaky hand: the kept points wobble far less than the raw ones', () => {
+    const raw = Array.from({ length: 60 }, (_, i) => ({ x: i * 4, y: 50 + (i % 2 ? 4 : -4) })); // a straight line with +-4 px tremor
+    const kept = [raw[0]];
+    for (const p of raw.slice(1)) {
+      const s = smoothPoint(kept[kept.length - 1], p);
+      if (Math.hypot(s.x - kept.at(-1).x, s.y - kept.at(-1).y) >= SMOOTHING.minStep) kept.push(s);
+    }
+    const wobble = (pts) => Math.max(...pts.slice(5).map((p) => Math.abs(p.y - 50)));
+    expect(wobble(raw)).toBe(4);
+    expect(wobble(kept)).toBeLessThan(2.5);
+    expect(smoothPoint(null, { x: 3, y: 4 })).toEqual({ x: 3, y: 4 }); // the first point is exact
+  });
+
+  it('the pad feeds every pointer sample through that filter', () => {
+    const pad = readFileSync('src/components/SignaturePad.jsx', 'utf8');
+    expect(pad).toMatch(/smoothPoint\(last, point\(ev\)\)/);
+    expect(pad).not.toMatch(/ctx\.lineTo|\.lineTo\(/); // no straight segments in the live drawing either
   });
 });
 
@@ -239,6 +318,7 @@ describe('HARD AUDIT 3: Cancel restores the previous signature; nothing is lost 
     fakeCanvas();
     mount();
     await click(q('settings-profile-edit'));
+    await unlock();
     draw(q('signature-canvas'));
     expect(q('pro-signature-current')).toBeNull(); // the new ink replaces the preview on screen only
     await click(q('settings-profile-cancel'));
@@ -268,6 +348,7 @@ describe('HARD AUDIT 3: Cancel restores the previous signature; nothing is lost 
     fakeCanvas();
     await click(q('settings-profile-edit'));
     expect(q('pro-signature-current')).toBeNull();
+    await unlock();
     draw(q('signature-canvas'));
     await click(q('settings-profile-save'));
     expect(saved[1].signature).toMatchObject({ dataUrl: NEW_PNG });
@@ -278,6 +359,7 @@ describe('HARD AUDIT 3: Cancel restores the previous signature; nothing is lost 
   it('a signature that cannot be exported keeps the form open with an error and the old signature intact', async () => {
     mount(); // happy-dom has no 2D context: exportSignature throws signature:store
     await click(q('settings-profile-edit'));
+    await unlock();
     const ctx = new Proxy({}, { get: (_, k) => (k === 'canvas' ? {} : () => {}), set: () => true });
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => ctx);
     draw(q('signature-canvas'));

@@ -37,7 +37,8 @@ describe('Ajustes: three cards', () => {
     expect(q('settings-profile')).not.toBeNull();
     expect(q('settings-locale').textContent).toContain('Idioma y País');
     expect(q('settings-cloud')).not.toBeNull();
-    expect(q('settings-lang').querySelector('[data-testid="lang-select"]')).not.toBeNull();
+    expect(q('settings-lang').tagName).toBe('BUTTON'); // a flat row, not a select box
+    expect(q('settings-lang-value').textContent).toBe('Español');
     expect(q('settings-region')).not.toBeNull();
     expect(q('settings-logo')).toBeNull(); // read-only card until the pencil
     expect(q('settings-company-email')).toBeNull();

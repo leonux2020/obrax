@@ -2,6 +2,9 @@
 
 export const P8 = {
   es: {
+    'profile.sign.unlock': 'Toca para desbloquear y firmar',
+    'settings.country': 'País',
+    'settings.driveSync.sub': 'Copia automática de tus proyectos',
     'profile.address': 'Dirección',
     'profile.address.ph': 'Calle y número',
     'profile.pro.firstName': 'Nombre',
@@ -485,6 +488,9 @@ export const P8 = {
     'fx.edit': "Modificar tipo de cambio",
   },
   en: {
+    'profile.sign.unlock': 'Tap to unlock and sign',
+    'settings.country': 'Country',
+    'settings.driveSync.sub': 'Automatic backup of your projects',
     'profile.address': 'Address',
     'profile.address.ph': 'Street and number',
     'profile.pro.firstName': 'First name',
@@ -968,6 +974,9 @@ export const P8 = {
     'fx.edit': "Edit exchange rate",
   },
   pt: {
+    'profile.sign.unlock': 'Toque para desbloquear e assinar',
+    'settings.country': 'País ou região',
+    'settings.driveSync.sub': 'Cópia automática dos seus projetos',
     'profile.address': 'Endereço',
     'profile.address.ph': 'Rua e número',
     'profile.pro.firstName': 'Nome',
@@ -1451,6 +1460,9 @@ export const P8 = {
     'fx.edit': "Alterar taxa de câmbio",
   },
   fr: {
+    'profile.sign.unlock': 'Touchez pour déverrouiller et signer',
+    'settings.country': 'Pays',
+    'settings.driveSync.sub': 'Sauvegarde automatique de vos projets',
     'profile.address': 'Adresse',
     'profile.address.ph': 'Rue et numéro',
     'profile.pro.firstName': 'Prénom',
@@ -1934,6 +1946,9 @@ export const P8 = {
     'fx.edit': "Modifier le taux de change",
   },
   it: {
+    'profile.sign.unlock': 'Tocca per sbloccare e firmare',
+    'settings.country': 'Paese',
+    'settings.driveSync.sub': 'Copia automatica dei tuoi progetti',
     'profile.address': 'Indirizzo',
     'profile.address.ph': 'Via e numero',
     'profile.pro.firstName': 'Nome',
@@ -2417,6 +2432,9 @@ export const P8 = {
     'fx.edit': "Modifica tasso",
   },
   de: {
+    'profile.sign.unlock': 'Zum Entsperren und Unterschreiben tippen',
+    'settings.country': 'Land',
+    'settings.driveSync.sub': 'Automatische Sicherung deiner Projekte',
     'profile.address': 'Adresse',
     'profile.address.ph': 'Straße und Hausnummer',
     'profile.pro.firstName': 'Vorname',

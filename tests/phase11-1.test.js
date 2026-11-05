@@ -71,7 +71,7 @@ describe('3. Ajustes: naming, icon padding and light type', () => {
   });
   it('titles of the options: light, softly tracked, neutral-300 (Ajustes accordions + Squadra + Contabilidad cards)', () => {
     const light = /font-light tracking-\[0\.02em\] text-neutral-300/;
-    expect(view.match(new RegExp(light.source, 'g'))).toHaveLength(2);
+    expect(view.match(new RegExp(light.source, 'g'))).toHaveLength(3); // accordions, Squadra, the Drive switch
     expect(read('src/components/GlobalAccounting.jsx')).toMatch(light);
     expect(view).not.toMatch(/text-lg font-semibold/);
   });

@@ -48,6 +48,17 @@ export function strokeBounds(strokes) {
 }
 
 /**
+ * Anti-tremor low-pass filter for the live pen: each new sample moves only `alpha` of the way from the previous KEPT point to the raw
+ * finger position, so a hand tremor (a few px of jitter around the intended line) is damped before it ever becomes a point. The ink is then
+ * drawn through the midpoints of the kept points with quadratic Béziers (see drawStroke), never joined with straight `lineTo` segments.
+ */
+export const SMOOTHING = Object.freeze({ alpha: 0.5, minStep: 1.2 });
+export function smoothPoint(prev, raw, alpha = SMOOTHING.alpha) {
+  if (!prev) return { x: raw.x, y: raw.y };
+  return { x: prev.x + (raw.x - prev.x) * alpha, y: prev.y + (raw.y - prev.y) * alpha };
+}
+
+/**
  * Draw one stroke smoothly: quadratic curves through the midpoints of consecutive points (the classic
  * "smooth finger drawing" technique). A single tap becomes a dot. Caller sets the stroke style.
  */

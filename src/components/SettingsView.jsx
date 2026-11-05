@@ -2,14 +2,12 @@ import { useState } from 'react';
 import BackupBadge from './BackupBadge.jsx';
 import { useI18n } from '../lib/i18n.jsx';
 import { googleConfigured } from '../lib/auth.js';
-import { detectCurrentRegion } from '../lib/geo.js';
 import { BACKUP_FOLDER } from '../lib/drive.js';
 import { useBackLayer } from '../lib/backStack.js';
 import { CloudUploadIcon, GlobeIcon, SmartphoneIcon, UserIcon, UsersIcon } from './workspace/icons.jsx';
 import { Button, Switch } from './ui.jsx';
 import GoogleButton from './GoogleButton.jsx';
-import LangSelect from './LangSelect.jsx';
-import RegionCombobox from './RegionCombobox.jsx';
+import { LocaleRows } from './SettingsRows.jsx';
 import InstallButton from './InstallButton.jsx';
 import ProfileCard from './ProfileCard.jsx';
 import SquadraSheet from './squadra/SquadraSheet.jsx';
@@ -148,19 +146,27 @@ export default function SettingsView({
         {/* ---- 2. Operaciones y Sincronización: solo Drive y respaldo (la firma vive en la tarjeta del profesional) ---------------------------------------- */}
         <Accordion testId="settings-ops" titleId="settings-ops-title" icon={SmartphoneIcon} title={t('settings.ops')} open={openAcc.ops} onToggle={toggleAcc('ops')} bodyClassName="px-4 sm:px-5">
         {/* ---- Google Drive y Respaldo ---------------------------------------------------------------------------- */}
-        <div className="space-y-3 py-4" data-testid="settings-cloud">
+        <div className="space-y-3 py-2" data-testid="settings-cloud">
           <h2 id="settings-drive-title" className="sr-only">
             {t('settings.cloud')}
           </h2>
           <div className="flex items-center gap-3">
             <CloudUploadIcon size={22} className="text-neutral-400" />
-            <Switch checked={drive} onChange={toggleDrive} label={t('settings.driveSync')} className="min-w-0 flex-1 !border-0 !bg-transparent !p-0" data-testid="settings-drive" />
+            <Switch
+              checked={drive}
+              onChange={toggleDrive}
+              label={t('settings.driveSync')}
+              description={t('settings.driveSync.sub')}
+              labelClassName="text-base font-light tracking-[0.02em] text-neutral-300"
+              className="min-w-0 flex-1 !border-0 !bg-transparent !p-0"
+              data-testid="settings-drive"
+            />
           </div>
 
-          {drive && googleUser && <div className="border-t border-white/10 pt-3">{accountRow}</div>}
+          {drive && googleUser && <div className="pt-1">{accountRow}</div>}
 
           {backup && (drive || !backup.configured) && (
-            <div className="space-y-3 border-t border-white/10 pt-3" data-testid="settings-backup" data-state={!backup.configured ? 'unconfigured' : !backup.enabled ? 'off' : backup.linked ? 'connected' : 'disconnected'}>
+            <div className="space-y-3 pt-1" data-testid="settings-backup" data-state={!backup.configured ? 'unconfigured' : !backup.enabled ? 'off' : backup.linked ? 'connected' : 'disconnected'}>
               {!backup.configured ? (
                 <p className="text-xs leading-snug text-[#e8c35f]" role="status" data-testid="backup-config-diagnostic" data-config={backup.configStatus || 'missing'}>
                   {t(backup.configStatus === 'invalid' ? 'backup.cfg.invalid' : 'backup.cfg.missing')}
@@ -198,7 +204,7 @@ export default function SettingsView({
                     </p>
                   )}
                   {googleUser && <span className="sr-only" data-testid="backup-account">{[user.name, user.email].filter(Boolean).join(' · ')}</span>}
-                  <p className="truncate text-xs text-neutral-500" data-testid="backup-folder">
+                  <p className="truncate text-sm text-neutral-500" data-testid="backup-folder">
                     {t('backup.folder', { name: BACKUP_FOLDER })}
                   </p>
                   {/* ZERO STRESS: no "save now" / "restore" buttons. The daemon syncs by itself (app comes back, signal returns, every change, debounced);
@@ -209,7 +215,7 @@ export default function SettingsView({
                         {t(`backup.status.pending.${waitReason}`)}
                       </p>
                     )}
-                    <p className="text-xs leading-snug text-neutral-500" data-testid="backup-auto">
+                    <p className="text-sm leading-snug text-neutral-500" data-testid="backup-auto">
                       {t('backup.auto')}
                       {st?.at ? (
                         <>
@@ -251,21 +257,8 @@ export default function SettingsView({
         </Accordion>
 
         {/* ---- 3. Preferencias del sistema: Idioma y País -------------------------------------------------------------------------------------- */}
-        <Accordion testId="settings-locale" titleId="settings-locale-title" icon={GlobeIcon} title={t('settings.locale')} open={openAcc.locale} onToggle={toggleAcc('locale')} bodyClassName="px-4 py-4 sm:px-5">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="min-w-0" data-testid="settings-lang">
-              <LangSelect onChange={onChangeLang} hideLabel={false} className="w-full !min-h-[52px] text-base" />
-            </div>
-            <div className="min-w-0" data-testid="settings-region">
-              {onConfirmRegion ? (
-                <RegionCombobox value={regionCode || detectCurrentRegion()} onChange={onConfirmRegion} />
-              ) : (
-                <button type="button" onClick={onChangeRegion} className="flex min-h-[52px] w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-neutral-900 px-4 text-left font-medium hover:bg-white/10">
-                  <span className="truncate">{t('settings.region.change')}</span>
-                </button>
-              )}
-            </div>
-          </div>
+        <Accordion testId="settings-locale" titleId="settings-locale-title" icon={GlobeIcon} title={t('settings.locale')} open={openAcc.locale} onToggle={toggleAcc('locale')} bodyClassName="px-4 sm:px-5">
+          <LocaleRows regionCode={regionCode} onChangeLang={onChangeLang} onConfirmRegion={onConfirmRegion} onChangeRegion={onChangeRegion} />
         </Accordion>
 
         <InstallButton pwa={pwa} quiet />

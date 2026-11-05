@@ -188,11 +188,8 @@ describe('App: the interface and the new projects follow the device', () => {
     h = createHost(App);
     await h.mount();
     await click(h.tab('Impostazioni'));
-    const select = q('settings-lang').querySelector('select');
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, 'de');
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    await click(q('settings-lang'));
+    await click(q('lang-option-de'));
     await flush(50);
     expect(JSON.parse(localStorage.getItem('cp.settings.v1'))).toMatchObject({ lang: 'de', langLocked: true });
     h.unmount();

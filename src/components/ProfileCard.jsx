@@ -14,7 +14,7 @@ import ProSignature from './ProSignature.jsx';
 const initialOf = (c) => ((c.name || c.proName || '?').trim().slice(0, 1).toUpperCase() || '?');
 
 /**
- * READ-ONLY identity card ("Zero Stress"): two blocks told apart only by margins and type size, never by lines.
+ * READ-ONLY identity card ("Zero Stress"): two blocks told apart by margins, type size and ONE hairline between them.
  *   Empresa      -> name (large), tax ID, place, email, phone
  *   Profesional  -> name, title, register number, and the digital signature floating at the end of the card
  * The stored signature is black ink on transparent, so on the OLED ground it is inverted to pure white.
@@ -25,9 +25,9 @@ function ProfileRead({ company, logo, regionCode }) {
   const pro = professionalEntity(company);
   const proName = [pro.name, pro.lastName].filter(Boolean).join(' ');
   const place = [co.address, co.city].filter(Boolean).join(', ');
-  const hasPro = Boolean(proName || pro.title || pro.license || pro.signature);
+  const hasPro = Boolean(proName || pro.title || pro.license || pro.id || pro.signature);
   return (
-    <div className="space-y-10 px-4 py-5 pr-14 sm:px-5 sm:pr-16" data-testid="settings-profile-card">
+    <div className="px-4 py-5 pr-14 sm:px-5 sm:pr-16" data-testid="settings-profile-card">
       <section className="space-y-3" data-testid="settings-profile-company">
         <div className="flex items-center gap-4">
           <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl p-1" data-testid="settings-profile-logo">
@@ -53,6 +53,8 @@ function ProfileRead({ company, logo, regionCode }) {
         </Line>
       </section>
 
+      {/* the ONLY line of the card: an almost invisible hairline, strictly between the company and the professional */}
+      {hasPro && <hr data-testid="settings-profile-divider" className="my-6 border-neutral-800/50" />}
       {hasPro && (
         <section className="space-y-1" data-testid="settings-profile-professional">
           <p className="pb-1 text-sm font-medium text-neutral-500">{t('setup.pro')}</p>
@@ -69,6 +71,11 @@ function ProfileRead({ company, logo, regionCode }) {
           {pro.license && (
             <p className="text-sm text-neutral-400" data-testid="settings-profile-license">
               {pro.license}
+            </p>
+          )}
+          {pro.id && (
+            <p className="text-sm tabular-nums text-neutral-400" data-testid="settings-profile-proid">
+              {t(`company.taxId.${regionCode}`)} {pro.id}
             </p>
           )}
           {pro.signature && (
@@ -239,6 +246,16 @@ export default function ProfileCard({ company, logo, onSave, open = true }) {
           {text('proLastName', t('profile.pro.lastName'), { testId: 'settings-pro-lastname' })}
         </div>
         {text('proTitle', t('profile.pro.title'), { testId: 'settings-pro-title', optional: t('common.optional'), placeholder: t('profile.pro.titlePh') })}
+        <TextField
+          label={t('setup.pro.taxId', { label: t(`company.taxId.${regionCode}`) })}
+          value={form.proTaxId}
+          onChange={set('proTaxId')}
+          testId="settings-pro-id"
+          maxLength={20}
+          optional={t('common.optional')}
+          sanitize={sanitizeTaxId}
+          placeholder={t(`company.taxId.ph.${regionCode}`)}
+        />
         {text('proLicense', t('profile.pro.license'), { maxLength: 40, testId: 'settings-pro-license', optional: t('common.optional'), placeholder: t('profile.pro.licensePh') })}
         <ProSignature ref={sigRef} value={current.company.signature} />
       </section>
