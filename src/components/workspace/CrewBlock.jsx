@@ -9,7 +9,8 @@ import { EditToggle, RowDelete } from '../EditControls.jsx';
 import BirthdayMark from '../squadra/BirthdayMark.jsx';
 import { TextField } from '../ui.jsx';
 import Block from './Block.jsx';
-import { CREW_RANGES, DEFAULT_RANGE, LOCAL_KM, crewHealth, findByName, norm, rankWorkers } from '../../lib/crewMatch.js';
+import { CREW_RANGES, DEFAULT_RANGE, LOCAL_KM, crewHealth, norm, omniMatch, rankWorkers } from '../../lib/crewMatch.js';
+import { useKeyboardFit } from '../../lib/keyboardFit.js';
 import CrewSuggest, { initialsOf } from './CrewSuggest.jsx';
 import NumberPad from './NumberPad.jsx';
 import { CoinsIcon, Outline, UsersIcon } from './icons.jsx';
@@ -132,9 +133,7 @@ function WorkerSheet({ worker, file = null, health = false, onSave, onDelete, on
   );
 }
 
-/** Lower case, no accents: "Électricien" and "electricien" are the same search. */
-const fold = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-/** ONE look for every chip of the crew (distance and trade): matte, quiet, the active one a little lighter. */
+/** ONE look for the chips of the crew (the distance ones): matte, quiet, the active one a little lighter. */
 const chipClass = (active) => `min-h-[36px] shrink-0 whitespace-nowrap rounded-full px-3.5 text-xs font-medium transition ${active ? 'bg-white/10 text-neutral-100' : 'bg-white/5 text-neutral-400'}`;
 const specOf = (w) => (WORKER_SPECIALTIES.includes(w.specialty) ? w.specialty : 'multi');
 
@@ -244,42 +243,38 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
   const [advFor, setAdvFor] = useState(null); // worker id whose advance is being typed on the pad
   const [unfolded, setUnfolded] = useState(null); // accordion: the id of the ONE unfolded row (null = all folded)
   const [query, setQuery] = useState(''); // the search field of the agenda
-  const [spec, setSpec] = useState(''); // the trade chip: '' or one of WORKER_SPECIALTIES (filters the crew AND the suggestions)
+  const [searching, setSearching] = useState(false); // the omnibox has the focus: the keyboard is up and the results take the room that is left
   const [range, setRange] = useState(DEFAULT_RANGE); // the distance chip: it only reaches the suggestions of the company's directory
   const amount = useRef(0);
+  const results = useRef(null); // the results block (suggestions + crew): flex-1, its own scroll
+  const searchBox = useRef(null);
+  useKeyboardFit(results, searching);
   const crew = project.crew ?? [];
   const { rows, loose, looseTotal } = advancesByWorker(crew, project.advances);
   const pool = laborPool(result.valid ? result.quote.labor : 0, project.advances);
   const editing = sheet ? crew.find((w) => w.id === sheet) : null;
-  // the directory is read again whenever a sheet or the dropdown opens or closes (its file may have just been edited)
-  const directory = useMemo(() => loadWorkers(), [sheet, open]); // eslint-disable-line react-hooks/exhaustive-deps
-  // THE MASTER SEARCH: what is typed (name or trade) and the trade chip filter the crew on the job AND suggest people of the company's directory
+  // the directory is read again whenever a sheet opens or closes and whenever a search starts (its files may have just been edited in Settings)
+  const directory = useMemo(() => loadWorkers(), [sheet, open, query.trim() !== '']); // eslint-disable-line react-hooks/exhaustive-deps
+  // THE OMNIBOX: ONE field. Every typed word is looked for at once in the first name, the surname and the trade, both among the crew on the job
+  // and among the company's directory ("ele" finds Elena and Juan the electrician). Read only governance: a project never creates people.
   const typed = query.trim();
-  const needle = fold(typed);
-  const visible = rows.filter((r) => (!spec || specOf(r.worker) === spec) && (!needle || fold(r.worker.name).includes(needle) || fold(t(`ws.spec.${specOf(r.worker)}`)).includes(needle)));
+  const visible = rows.filter((r) => !typed || omniMatch(typed, [r.worker.name, t(`ws.spec.${specOf(r.worker)}`)]));
   const crewFull = crew.length >= CREW_LIMIT;
-  const suggesting = !crewFull && (typed !== '' || spec !== '');
+  const suggesting = !crewFull && typed !== '';
   const inProject = (w) => crew.some((c) => c.ref === w.id || norm(c.name) === norm(w.name));
+  const rankFor = (reach) => rankWorkers(directory, { project, range: reach, query: typed, label: (id) => t(`ws.spec.${id}`) });
   const ranked = useMemo(
-    () => (suggesting ? rankWorkers(directory, { project, specialty: spec, range, query: typed, label: (id) => t(`ws.spec.${id}`) }) : { rows: [], placed: true, hidden: 0 }),
-    [suggesting, directory, project, spec, range, typed, t],
+    () => (suggesting ? rankFor(range) : { rows: [], placed: true, hidden: 0 }),
+    [suggesting, directory, project, range, typed, t], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const suggestions = ranked.rows.filter(({ worker }) => !inProject(worker));
-  const suggestHint = !directory.length ? t('crew.pick.noDir') : suggestions.length === 0 ? (typed ? t('crew.pick.noMatch') : t('crew.pick.noRange')) : '';
+  // nobody in this reach but somebody in a wider one: say so; nobody at all: the passive "no results, new people are created in Settings"
+  const widerHas = suggesting && suggestions.length === 0 && directory.length > 0 && range !== 'all' && rankFor('all').rows.some(({ worker }) => !inProject(worker));
+  const suggestHint = !directory.length ? t('crew.pick.noDir') : suggestions.length === 0 ? (widerHas ? t('crew.pick.noRange') : t('crew.pick.noMatch')) : '';
   const addPerson = (w) => {
     if (inProject(w) || crewFull) return;
-    setProject((p) => withWorker(p, { name: w.name, specialty: spec || w.specialties[0] || 'multi', ref: w.id, health: hasHealthNotes(w) }));
+    setProject((p) => withWorker(p, { name: w.name, specialty: w.specialties[0] || 'multi', ref: w.id, health: hasHealthNotes(w) }));
     setQuery('');
-  };
-  const addTyped = (e) => {
-    e?.preventDefault?.();
-    if (!typed || crewFull) return;
-    const match = findByName(directory, typed); // the exact name of someone in the directory links their file
-    if (match && !inProject(match)) addPerson(match);
-    else if (!match) {
-      setProject((p) => withWorker(p, { name: typed, specialty: spec || 'multi' })); // plain text, like always: no medical file is asked for
-      setQuery('');
-    }
   };
   const healthOf = (w) => crewHealth(w, directory);
   const birthdayOf = (w) => isBirthdayToday(directory.find((f) => f.id === w.ref)?.birthDate); // local date of the device, plain-text people have no file
@@ -298,7 +293,7 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
       setEditMode(false);
       setUnfolded(null);
       setQuery('');
-      setSpec('');
+      setSearching(false);
       setRange(DEFAULT_RANGE);
     }
   }, [open]);
@@ -321,24 +316,43 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
   );
 
   return (
-    <Block icon={<UsersIcon size={32} />} label={t('ws.menu.crew')} id="crew" title={t('ws.crew.title')} meta={t(crew.length === 1 ? 'ws.crew.count1' : 'ws.crew.countN', { n: crew.length })} open={open} onToggle={onToggle} testId="ws-crew" tall headerAction={editToggle}>
-      <div className="space-y-3">
-        {/* the labour balance is read BEFORE handing out an advance; under it ONE column, like the phone's contacts: the master search, one line of
-            chips (distance + trade), the live suggestions of the company's directory and the crew on the job. No stacked sheets. */}
-        <div className="space-y-2">
+    <Block icon={<UsersIcon size={32} />} label={t('ws.menu.crew')} id="crew" title={t('ws.crew.title')} meta={t(crew.length === 1 ? 'ws.crew.count1' : 'ws.crew.countN', { n: crew.length })} open={open} onToggle={onToggle} testId="ws-crew" tall fill headerAction={editToggle}>
+      <div className="flex min-h-0 flex-1 flex-col gap-2">
+        {/* the labour balance is read BEFORE handing out an advance; then, the OMNIBOX: the distance chips right ABOVE the search field, and the results
+            block BORN under it (flex-1, its own scroll, kept above the keyboard while the field has the focus). No trade chips, no "+ create" here. */}
+        <div className="shrink-0 space-y-2">
           <div className="flex items-center gap-3" data-testid="crew-bar">
             <p data-testid="labor-pool" data-available={pool.available} data-spent={pool.advanced} className="min-w-0 flex-1 text-right text-sm text-neutral-300">
               {t('ws.crew.labor')}: <b className="tabular-nums text-neutral-200">{money(pool.available)}</b>
               <span className="whitespace-nowrap tabular-nums text-[#e8c35f]"> ({t('ws.crew.spent')}: {money(pool.advanced)})</span>
             </p>
           </div>
-          <form onSubmit={addTyped} data-testid="crew-master" className="sticky top-0 z-10 -mx-1 space-y-2 bg-black px-1 pb-1">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              searchBox.current?.blur(); // "done": the keyboard goes down, the results stay
+            }}
+            data-testid="crew-master"
+            className="space-y-2"
+          >
+            {directory.length > 0 && (
+              <div role="radiogroup" aria-label={t('crew.pick.range')} data-testid="crew-range" className="hide-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 py-0.5">
+                {CREW_RANGES.map((r) => (
+                  <button key={r} type="button" role="radio" aria-checked={range === r} onClick={() => setRange(r)} data-testid={`crew-range-${r}`} className={chipClass(range === r)}>
+                    {t(`crew.range.${r}`, { km: LOCAL_KM })}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="relative" data-testid="crew-search-box">
               <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
               <input
+                ref={searchBox}
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(sanitizeText(e.target.value, 60))}
+                onFocus={() => setSearching(true)}
+                onBlur={() => setSearching(false)}
                 onKeyDown={(e) => {
                   if (e.key !== 'Escape' || !query) return;
                   e.preventDefault();
@@ -354,25 +368,10 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
                 className="min-h-[44px] w-full rounded-xl border-0 bg-neutral-900/50 pl-10 pr-4 text-base text-neutral-100 outline-none placeholder:text-neutral-500 focus:bg-white/5"
               />
             </div>
-            <div role="group" aria-label={t('ws.crew.filter')} data-testid="crew-filters" className="hide-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 py-0.5">
-              {directory.length > 0 && (
-                <div role="radiogroup" aria-label={t('crew.pick.range')} data-testid="crew-range" className="flex shrink-0 items-center gap-2">
-                  {CREW_RANGES.map((r) => (
-                    <button key={r} type="button" role="radio" aria-checked={range === r} onClick={() => setRange(r)} data-testid={`crew-range-${r}`} className={chipClass(range === r)}>
-                      {t(`crew.range.${r}`, { km: LOCAL_KM })}
-                    </button>
-                  ))}
-                  <span aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-white/10" />
-                </div>
-              )}
-              {WORKER_SPECIALTIES.map((s) => (
-                <button key={s} type="button" onClick={() => setSpec(spec === s ? '' : s)} aria-pressed={spec === s} data-testid={`crew-filter-${s}`} className={chipClass(spec === s)}>
-                  {t(`ws.spec.${s}`)}
-                </button>
-              ))}
-            </div>
           </form>
-          {suggesting && <CrewSuggest rows={suggestions} typed={typed} hint={suggestHint} placed={ranked.placed || directory.length === 0} hidden={ranked.hidden} range={range} allowText={typed !== ''} onPick={addPerson} onText={addTyped} />}
+        </div>
+        <div ref={results} data-testid="crew-results" data-searching={searching ? 'true' : undefined} className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain">
+          {suggesting && <CrewSuggest rows={suggestions} hint={suggestHint} placed={ranked.placed || directory.length === 0} hidden={ranked.hidden} range={range} onPick={addPerson} />}
           {crew.length === 0 && !typed && (
             <p className="text-sm text-neutral-400" data-testid="crew-empty">
               {t('ws.crew.empty')}
@@ -406,9 +405,7 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
               ))}
             </ul>
           )}
-        </div>
-
-        {loose.length > 0 && (
+          {loose.length > 0 && (
           <div className="space-y-1" data-testid="advances-loose" data-total={looseTotal}>
             <p className="flex justify-between text-xs font-semibold text-neutral-400">
               <span>{t('ws.crew.loose')}</span>
@@ -428,7 +425,8 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
               ))}
             </ul>
           </div>
-        )}
+          )}
+        </div>
       </div>
 
       {editing && (

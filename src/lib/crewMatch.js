@@ -64,12 +64,18 @@ export function proximity(project, worker) {
   return regionHit(address) ? 1 : 2;
 }
 
-/** Every typed word is found in the name OR in the label of one of the worker's trades ("electri" finds the electricians). `label` maps a trade id to its words. */
-const matchesQuery = (worker, query, label) => {
+/**
+ * OMNIBOX: ONE field, every typed word must be found (accents / case ignored, anywhere inside the word) in AT LEAST ONE of the `fields`
+ * (first name, surname, trade...). "ele" finds "Elena" and "Juan" the Electricista; "juan ele" finds only that Juan. Nothing typed matches all.
+ */
+export const omniMatch = (query, fields) => {
   const words = norm(query).split(' ').filter(Boolean);
-  const hay = [worker.name, ...(label ? worker.specialties.map((id) => label(id)) : [])].map(norm);
+  const hay = fields.map(norm).filter(Boolean);
   return words.every((w) => hay.some((h) => h.includes(w)));
 };
+
+/** The directory worker against the omnibox: their name (first name + surname) and the label of EVERY trade they have. `label` maps a trade id to its words. */
+const matchesQuery = (worker, query, label) => omniMatch(query, [worker.name, ...(label ? worker.specialties.map((id) => label(id)) : [])]);
 
 /**
  * The directory for this job: [{ worker, near }] filtered by the typed text (name, or trade when `label` is given), the trade chip (`specialty` id or '') and the range, and ordered

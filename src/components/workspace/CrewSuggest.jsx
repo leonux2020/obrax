@@ -10,17 +10,19 @@ export const initialsOf = (name) => {
 };
 
 /**
- * The live suggestions of the MASTER SEARCH of the crew: a quiet strip of contact rows (no boxes, hairlines) right under the chips, NOT a sheet.
- * Tapping a person of the company's global directory adds them to the job at once. Whatever is typed can also go in as plain text with the last
- * row ("urgency": no medical file is asked for). `rows` already come ranked (nearest, best rated) and without the people already on the job.
+ * The live suggestions of the OMNIBOX of the crew: a quiet strip of contact rows (no boxes, hairlines) that is born right under the search
+ * field. It has no scroll of its own: it lives inside the results block of the sheet (`flex-1 overflow-y-auto`), which takes the visible space
+ * that is left above the keyboard. Tapping a person of the company's global directory adds them to the job at once. READ ONLY governance: a project
+ * can only pick from the directory, there is no "+ create" here (new people are created in Settings). `rows` already come ranked (nearest, best
+ * rated) and without the people already on the job.
  */
-export default function CrewSuggest({ rows, typed, hint, placed, hidden, range, allowText, onPick, onText }) {
+export default function CrewSuggest({ rows, hint, placed, hidden, range, onPick }) {
   const { t } = useI18n();
   return (
     <section aria-label={t('ws.crew.fromDirectory')} data-testid="crew-suggest" className="row-fade">
       <p className="px-1 text-xs font-medium text-neutral-500">{t('ws.crew.fromDirectory')}</p>
       {rows.length > 0 && (
-        <ul className="max-h-64 overflow-y-auto overscroll-contain" data-testid="crew-directory">
+        <ul data-testid="crew-directory">
           {rows.map(({ worker: w, near }) => (
             <li key={w.id} className="border-b border-white/5">
               <button type="button" onClick={() => onPick(w)} data-testid={`crew-pick-${w.id}`} data-near={near} className="flex min-h-[56px] w-full items-center gap-3 py-2 text-left transition active:bg-white/5">
@@ -50,13 +52,8 @@ export default function CrewSuggest({ rows, typed, hint, placed, hidden, range, 
           ))}
         </ul>
       )}
-      {allowText && typed && (
-        <button type="button" data-testid="crew-add-text" onClick={onText} className="flex min-h-[48px] w-full items-center px-1 text-left text-sm font-medium text-emerald-400 transition active:text-emerald-300">
-          + {t('crew.pick.add', { name: typed })}
-        </button>
-      )}
       {hint && (
-        <p className="px-1 py-1 text-xs text-neutral-500" data-testid="crew-pick-hint">
+        <p className="px-1 py-3 text-center text-sm text-neutral-400" data-testid="crew-pick-hint">
           {hint}
         </p>
       )}

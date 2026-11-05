@@ -9,9 +9,10 @@ const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([di
  * `prefers-reduced-motion` and the battery `eco-mode` switch every animation off in index.css. There is NO close x: the header is the title on the
  * left and, optionally, ONE control on the right (`headerAction`: a pencil, a total, a filter). Every sheet closes the native way: swipe down
  * (on by default, `swipeToClose={false}` is the explicit opt-out nobody uses), the device Back (back stack), the backdrop and Escape. Anchored to the bottom of the screen, pure #000 with an ultra
- * thin border (`tall`: an expanded sheet, 85 % of the screen, for dense lists). Focus is trapped inside and returns to the opener.
+ * thin border (`tall`: an expanded sheet, 85 % of the screen, for dense lists; `fill`: the sheet does not scroll as a whole, it is a flex column whose body
+ * (a `min-h-0 flex-1` block) owns the scroll, so a search field stays put and its results take the room that is left above the keyboard). Focus is trapped inside and returns to the opener.
  */
-export default function BottomSheet({ title, subtitle, onClose, fullscreen = false, tall = false, swipeToClose = true, autoFocus = true, headerAction = null, children }) {
+export default function BottomSheet({ title, subtitle, onClose, fullscreen = false, tall = false, fill = false, swipeToClose = true, autoFocus = true, headerAction = null, children }) {
   const titleId = useId();
   const ref = useRef(null);
   // Back-stack layer: opening pushes one history entry; the device's Back closes only this sheet (or the topmost layer above it);
@@ -69,12 +70,12 @@ export default function BottomSheet({ title, subtitle, onClose, fullscreen = fal
         tabIndex={-1}
         data-swipe-close={swipeToClose ? 'true' : undefined}
         {...swipe}
-        className={`sheet-slide relative w-full outline-none overflow-y-auto overscroll-contain border border-white/10 bg-black p-5 [padding-bottom:max(1.25rem,env(safe-area-inset-bottom))] ${
+        className={`sheet-slide relative w-full outline-none ${fill ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'} overscroll-contain border border-white/10 bg-black p-5 [padding-bottom:max(1.25rem,env(safe-area-inset-bottom))] ${
           fullscreen ? 'h-[100dvh] max-w-none border-0 sm:mx-auto sm:max-w-3xl sm:border' : tall ? 'h-[85vh] max-h-[92vh] max-w-lg rounded-t-3xl border-b-0' : 'max-h-[92vh] max-w-lg rounded-t-3xl border-b-0'
         }`}
       >
-        {swipeToClose && <div aria-hidden="true" data-testid="sheet-handle" className="mx-auto -mt-2 mb-2 h-1 w-10 rounded-full bg-white/20" />}
-        <div className="mb-1 flex min-h-[44px] items-start justify-between gap-3">
+        {swipeToClose && <div aria-hidden="true" data-testid="sheet-handle" className="mx-auto -mt-2 mb-2 h-1 w-10 shrink-0 rounded-full bg-white/20" />}
+        <div className="mb-1 flex min-h-[44px] shrink-0 items-start justify-between gap-3">
           <h2 id={titleId} className="min-w-0 text-2xl font-medium tracking-tight">
             {title}
           </h2>
