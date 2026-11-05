@@ -49,41 +49,60 @@ export function healTargets({ project, directory, query }) {
  */
 export function useGeoHealing({ enabled, geocode, project, directory, query, lang = '', pauseMs = HEAL_PAUSE_MS }) {
   const [points, setPoints] = useState({}); // key -> { lat, lng }
+  const [tick, setTick] = useState(0);
   const tried = useRef(new Set());
+  const running = useRef(false);
+  const alive = useRef(true);
+  const ctl = useRef(null);
   const targets = useMemo(() => (enabled && geocode ? healTargets({ project, directory, query }) : []), [enabled, geocode, project, directory, query]);
-  const todo = targets.filter((t) => !tried.current.has(t.key));
-  const signature = todo.map((t) => t.key).join('|');
+  const latest = useRef({ targets, project, lang, geocode });
+  latest.current = { targets, project, lang, geocode };
+  const pending = targets.filter((t) => !tried.current.has(t.key)).map((t) => t.key).join('|');
 
   useEffect(() => {
-    if (!signature || !geocode) return undefined;
-    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
-    let dead = false;
+    alive.current = true;
+    ctl.current = typeof AbortController === 'function' ? new AbortController() : null;
+    return () => {
+      alive.current = false;
+      ctl.current?.abort();
+    };
+  }, []);
+
+  // ONE runner, one request at a time. It re-reads the wanted list before every request (typing more narrows it), so a keystroke never cancels or
+  // repeats a request and never starts a second runner.
+  useEffect(() => {
+    if (!pending || !geocode || running.current) return;
+    running.current = true;
     (async () => {
       let jobPoint = hasPoint(project?.location) ? project.location : null;
-      for (let i = 0; i < todo.length && !dead; i += 1) {
-        const target = todo[i];
-        let places = [];
-        try {
-          places = (await geocode(target.text, { lang, signal: ctl?.signal })) || [];
-        } catch {
-          places = [];
+      try {
+        for (;;) {
+          const cur = latest.current;
+          const target = cur.targets.find((t) => !tried.current.has(t.key));
+          if (!target || !alive.current || !cur.geocode) break;
+          let places = [];
+          try {
+            places = (await cur.geocode(target.text, { lang: cur.lang, signal: ctl.current?.signal })) || [];
+          } catch {
+            places = [];
+          }
+          if (!alive.current) return;
+          tried.current.add(target.key);
+          const best = pickPlace(places, { near: target.kind === 'worker' ? jobPoint : null, countryCode: cur.project?.draft?.regionCode || '' });
+          if (best) {
+            const point = { lat: best.lat, lng: best.lng };
+            if (target.kind === 'project') jobPoint = point;
+            setPoints((p) => ({ ...p, [target.key]: point }));
+          }
+          if (pauseMs > 0 && latest.current.targets.some((t) => !tried.current.has(t.key))) await new Promise((r) => setTimeout(r, pauseMs));
+          if (!alive.current) return;
         }
-        if (dead) return;
-        tried.current.add(target.key);
-        const best = pickPlace(places, { near: target.kind === 'worker' ? jobPoint : null, countryCode: project?.draft?.regionCode || '' });
-        if (best) {
-          const point = { lat: best.lat, lng: best.lng };
-          if (target.kind === 'project') jobPoint = point;
-          setPoints((cur) => ({ ...cur, [target.key]: point }));
-        }
-        if (pauseMs > 0 && i < todo.length - 1) await new Promise((r) => setTimeout(r, pauseMs));
+      } finally {
+        running.current = false;
+        if (alive.current && latest.current.targets.some((t) => !tried.current.has(t.key))) setTick((n) => n + 1); // something new arrived while we were finishing
       }
     })();
-    return () => {
-      dead = true;
-      ctl?.abort();
-    };
-  }, [signature]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pending, tick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const healedProject = useMemo(() => {
     const text = jobText(project);

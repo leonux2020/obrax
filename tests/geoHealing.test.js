@@ -215,7 +215,7 @@ describe('2) silent healing on the screen', () => {
     expect(asked).toEqual(expect.arrayContaining(['Maipú', 'Concepción', 'Villa Imaginaria']));
     expect(asked.filter((a) => a === 'Maipú')).toHaveLength(1); // once
     expect(ids()).toContain('wk000001');
-    expect(note('wk000001')).toMatch(/Local · 1[01] km/); // Santiago - Maipú ~11 km
+    expect(note('wk000001')).toMatch(/Local \(1[01] km\)/); // Santiago - Maipú ~11 km
     expect(q('crew-pick-wk000001').getAttribute('data-unknown')).toBeNull();
     expect(ids()).not.toContain('wk000002'); // Concepción: 420 km, measured, out of Locale
     expect(ids()).toContain('wk000003'); // unknown, still offered
@@ -233,7 +233,7 @@ describe('2) silent healing on the screen', () => {
     await flush(1400);
     await flush(1400);
     expect(geocode.mock.calls.map((c) => c[0])).not.toContain('Santiago');
-    expect(note('wk000001')).toMatch(/Local · 1[01] km/);
+    expect(note('wk000001')).toMatch(/Local \(1[01] km\)/);
   });
   it('nothing is asked until the user searches', async () => {
     const geocode = vi.fn(async () => []);

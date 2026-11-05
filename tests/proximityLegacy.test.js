@@ -230,7 +230,7 @@ describe('the drop-up materializes with ONE letter', () => {
     await mount();
     await click(q('crew-range-all'));
     await typeInto(q('crew-search'), 'ana');
-    expect(q('crew-pick-wk000001').querySelector('[data-testid="crew-pick-note"]').textContent).toMatch(/Local · \d+ km/);
+    expect(q('crew-pick-wk000001').querySelector('[data-testid="crew-pick-note"]').textContent).toMatch(/Local \(\d+ km\)/);
     await typeInto(q('crew-search'), 'eva');
     expect(q('crew-pick-wk000005').querySelector('[data-testid="crew-pick-note"]').textContent).not.toMatch(/km/);
   });

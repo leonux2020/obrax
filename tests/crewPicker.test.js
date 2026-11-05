@@ -446,15 +446,15 @@ describe('crew master search: ONE bar to find and add people (no modal, no boxes
     ]);
     await mount();
     await type('flaco');
-    expect(listed()).toEqual(['Juan Pérez']); // found by the nickname alone
+    expect(listed()).toEqual(['Juan “El Flaco” Pérez']); // found by the nickname alone; it sits between the first name and the surname
     const nick = q('crew-pick-apodo');
     expect(nick.textContent.trim()).toBe('“El Flaco”');
     expect(nick.className).toContain('text-neutral-400');
     expect(nick.closest('[data-testid="crew-pick-wk000021"]')).not.toBeNull();
     await type('f'); // one letter of the nickname is enough
-    expect(listed()).toEqual(['Juan Pérez']);
+    expect(listed()).toEqual(['Juan “El Flaco” Pérez']);
     await type('el fl');
-    expect(listed()).toEqual(['Juan Pérez']);
+    expect(listed()).toEqual(['Juan “El Flaco” Pérez']);
     await click(q('crew-pick-wk000021'));
     const id = spy.project.crew[0].id;
     expect(q(`worker-apodo-${id}`).textContent.trim()).toBe('“El Flaco”'); // on the crew card, read live from the file

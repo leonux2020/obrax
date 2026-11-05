@@ -479,7 +479,7 @@ export default function CrewBlock({ project, result, setProject, open, onToggle,
         <div ref={dock} className="relative z-50 shrink-0" data-testid="crew-dock">
           {suggesting && (
             <div ref={dropup} data-testid="crew-dropup" className="absolute bottom-full left-0 right-0 z-50 mb-2 flex max-h-[40vh] w-full flex-col-reverse overflow-y-auto overscroll-contain rounded-2xl border border-white/20 bg-black px-3 py-1 text-neutral-100 shadow-[0_-8px_24px_rgba(0,0,0,0.9)]">
-              <CrewSuggest rows={suggestions} hint={suggestHint} placed={ranked.placed || directory.length === 0} hidden={ranked.hidden} range={range} onPick={addPerson} />
+              <CrewSuggest rows={suggestions} hint={suggestHint} placed={ranked.placed || directory.length === 0} hidden={ranked.hidden} range={range} onPick={addPerson} query={typed} />
             </div>
           )}
           <form
