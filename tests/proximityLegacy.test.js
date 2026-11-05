@@ -60,8 +60,9 @@ describe('Haversine: the distance chips are real maths', () => {
   });
   it('"Locale" only suggests workers within 70 km; "Regionale" widens to 250 km; "all" is everybody', () => {
     const names = (range) => rankWorkers(DIR, { project: JOB, range }).rows.map((r) => r.worker.name);
-    expect(names('local')).toEqual(['Ana Ruiz', 'Fabio Vega']); // Maipú (12 km) and, with no coordinates, the same town by name
-    expect(names('regional')).toEqual(['Ana Ruiz', 'Fabio Vega', 'Beto Soto', 'Carla Díaz']);
+    // measured distances decide (Beto 81 km, Carla 100 km, Dante 420 km are out of "local"); the two without coordinates can not be measured: kept
+    expect(names('local')).toEqual(['Ana Ruiz', 'Fabio Vega', 'Eva Lara']); // Maipú (12 km), the same town by name, and Eva (unknown, flagged)
+    expect(names('regional')).toEqual(['Ana Ruiz', 'Fabio Vega', 'Beto Soto', 'Carla Díaz', 'Eva Lara']); // Dante (420 km) is out
     expect(names('all')).toHaveLength(6);
     expect(names('all')).toContain('Eva Lara'); // no coordinates, no city: still found in the global search
   });
@@ -73,11 +74,14 @@ describe('Haversine: the distance chips are real maths', () => {
     const regional = res.rows.filter((r) => r.near === 1).map((r) => r.worker.name);
     expect(regional).toEqual(['Beto Soto', 'Carla Díaz']); // 81 km before 100 km
   });
-  it('a job without a saved point falls back to the place names; a worker without coordinates is hidden only from the narrow ranges (and counted)', () => {
+  it('a job without a saved point falls back to the place names; nobody unmeasurable is hidden, he is flagged "unknown"', () => {
     const named = { cityOrRegion: 'Maipú' };
-    expect(rankWorkers(DIR, { project: named, range: 'local' }).rows.map((r) => r.worker.name)).toEqual(['Ana Ruiz']);
-    const res = rankWorkers(DIR, { project: JOB, range: 'local' });
-    expect(res.hidden).toBe(1); // Eva
+    const res = rankWorkers(DIR, { project: named, range: 'local' });
+    expect(res.rows).toHaveLength(6); // no point in the job: nobody can be measured, nobody is hidden
+    expect(res.rows[0].worker.name).toBe('Ana Ruiz'); // ...but the town of the job is still first
+    expect(res.rows.find((r) => r.worker.name === 'Dante Mora').unknown).toBe(true);
+    expect(res.rows.find((r) => r.worker.name === 'Ana Ruiz').unknown).toBe(false);
+    expect(rankWorkers(DIR, { project: JOB, range: 'local' }).hidden).toBe(0);
   });
   it('a located job with no city text is still "placed"', () => {
     expect(rankWorkers(DIR, { project: { location: { lat: -33.4489, lng: -70.6693, label: '' } }, range: 'local' }).placed).toBe(true);

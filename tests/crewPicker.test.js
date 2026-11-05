@@ -46,22 +46,26 @@ describe('crewMatch: the emulated distance and the ranking', () => {
   });
   it('ranking: nearest first, then best rated, then name', () => {
     const r = (range, extra = {}) => rankWorkers(DIRECTORY, { project: place, range, ...extra }).rows.map((x) => x.worker.name);
-    expect(r('local')).toEqual(['Beto Soto', 'Ana Ruiz']); // both local: 5 stars before 3
-    expect(r('regional')).toEqual(['Beto Soto', 'Ana Ruiz', 'Carla Díaz']);
-    expect(r('all')).toEqual(['Beto Soto', 'Ana Ruiz', 'Carla Díaz', 'Dante Mora', 'Eva Lara']);
-    expect(rankWorkers(DIRECTORY, { project: place }).rows).toHaveLength(2); // default = local
+    // nobody here has coordinates, so no distance can be MEASURED: nobody is hidden by a range (inclusive); the order is still nearest-by-name first
+    const everybody = ['Beto Soto', 'Ana Ruiz', 'Carla Díaz', 'Dante Mora', 'Eva Lara']; // Beto / Ana local (5 stars before 3), Carla regional, Dante elsewhere, Eva unplaced
+    expect(r('local')).toEqual(everybody);
+    expect(r('regional')).toEqual(everybody);
+    expect(r('all')).toEqual(everybody);
+    expect(rankWorkers(DIRECTORY, { project: place }).rows).toHaveLength(5); // default = local
+    // ...and the ones the names cannot place are flagged "distance unknown" for the human to decide
+    expect(rankWorkers(DIRECTORY, { project: place }).rows.map((x) => x.unknown)).toEqual([false, false, false, true, true]);
   });
   it('filters: trade, typed text (accents ignored), and the count hidden for lack of address', () => {
     const names = (o) => rankWorkers(DIRECTORY, { project: place, range: 'all', ...o }).rows.map((x) => x.worker.name);
     expect(names({ specialty: 'electrician' })).toEqual(['Beto Soto', 'Ana Ruiz', 'Dante Mora']);
-    expect(names({ specialty: 'plumber', range: 'local' })).toEqual(['Beto Soto']);
+    expect(names({ specialty: 'plumber', range: 'local' })).toEqual(['Beto Soto', 'Carla Díaz']); // Carla cannot be measured: kept, not hidden
     expect(names({ query: 'DIAZ' })).toEqual(['Carla Díaz']);
     expect(names({ query: 'ana ru' })).toEqual(['Ana Ruiz']); // every typed word is looked for in the name
     const label = (id) => ({ electrician: 'Electricista', plumber: 'Fontanero', mason: 'Albañil' })[id] ?? id;
     expect(names({ query: 'ELECTRI', label })).toEqual(['Beto Soto', 'Ana Ruiz', 'Dante Mora']); // ...or in the label of one of their trades
     expect(names({ query: 'electri' })).toEqual([]); // without labels only the name counts
     expect(names({ query: 'ana electri', label })).toEqual(['Ana Ruiz']); // name + trade together
-    expect(rankWorkers(DIRECTORY, { project: place, range: 'local' }).hidden).toBe(1); // Eva has no address
+    expect(rankWorkers(DIRECTORY, { project: place, range: 'local' }).hidden).toBe(0); // nobody is hidden any more: Eva has no address and is listed as unknown
     expect(rankWorkers(DIRECTORY, { project: place, range: 'all' }).hidden).toBe(0);
   });
   it('a job with no place cannot be filtered by reach: everybody is offered (and `placed` says so)', () => {
@@ -249,7 +253,8 @@ describe('crew master search: ONE bar to find and add people (no modal, no boxes
   it('typing a TRADE ("electri") suggests the people of that trade (nearest first); accents and case do not matter', async () => {
     await mount();
     await type('ELÉCTRI');
-    expect(listed()).toEqual(['Beto Soto', 'Ana Ruiz']); // local by default
+    expect(listed()).toEqual(['Beto Soto', 'Ana Ruiz', 'Dante Mora']); // local by default: Dante cannot be measured, so he is kept (flagged)
+    expect(q('crew-pick-wk000004').querySelector('[data-testid="crew-pick-unknown"]')).not.toBeNull();
     await reach('all');
     expect(listed()).toEqual(['Beto Soto', 'Ana Ruiz', 'Dante Mora']);
     await type('albanil');
@@ -269,23 +274,25 @@ describe('crew master search: ONE bar to find and add people (no modal, no boxes
     expect(q('crew-pick-wk000002').querySelector('[data-testid="crew-pick-health"]')).toBeNull();
   });
 
-  it('REACH: Local (< 70 km) is the default; Regional adds the region, Todos the whole directory; the count without address is told quietly', async () => {
+  it('REACH: with no measurable distance nobody is hidden by Local / Regional; whoever cannot be placed says "Distancia desconocida"', async () => {
     await mount();
     await type('plomer');
-    expect(listed()).toEqual(['Beto Soto']);
+    expect(listed()).toEqual(['Beto Soto', 'Carla Díaz']); // Local by default
+    expect(q('crew-range-local').getAttribute('aria-checked')).toBe('true');
+    expect(q('crew-pick-wk000002').querySelector('[data-testid="crew-pick-unknown"]')).toBeNull(); // placed by the name of its town
     await reach('regional');
     expect(listed()).toEqual(['Beto Soto', 'Carla Díaz']);
     expect(q('crew-range-regional').getAttribute('aria-checked')).toBe('true');
-    expect(q('crew-range-local').getAttribute('aria-checked')).toBe('false');
     expect(q('crew-pick-wk000003').querySelector('[data-testid="crew-pick-note"]').textContent).toBe('Plomero · Regional');
     await type('albanil');
-    expect(listed()).toEqual([]);
+    expect(listed()).toEqual(['Eva Lara']); // no address, no coordinates: still offered in Regional...
     await reach('local');
-    expect(q('crew-pick-hint').textContent).toBe('Nadie en este alcance: amplía el radio.');
-    expect(q('crew-hidden').textContent).toBe('1 sin dirección: solo aparecen en «Todos».');
+    expect(listed()).toEqual(['Eva Lara']); // ...and in Local
+    expect(q('crew-pick-wk000005').querySelector('[data-testid="crew-pick-unknown"]').textContent).toBe(DICT.es['crew.near.unknown']);
+    expect(q('crew-pick-wk000005').getAttribute('data-unknown')).toBe('true');
+    expect(q('crew-hidden')).toBeNull();
     await reach('all');
     expect(listed()).toEqual(['Eva Lara']);
-    expect(q('crew-hidden')).toBeNull();
   });
 
   it('the omnibox filters BOTH the crew on the job and the suggestions', async () => {

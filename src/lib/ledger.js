@@ -241,7 +241,7 @@ export function normalizeLocation(obj) {
   if (!obj || typeof obj !== 'object') return null;
   const lat = toCoord(obj.lat); // strings ("-33.45") are cast with parseFloat; null / '' are NOT 0
   const lng = toCoord(obj.lng ?? obj.lon);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180 || (lat === 0 && lng === 0)) return null; // 0,0 = an empty record, not a place
   const r = (n) => Math.round(n * 1e5) / 1e5;
   return { lat: r(lat), lng: r(lng), label: sanitizeText(obj.label, 80).trim() };
 }

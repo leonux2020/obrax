@@ -126,8 +126,10 @@ describe('a) null / undefined / "" / garbage never crash and never become 0', ()
       const calls = warn.mock.calls.length;
       rows([worker], badJob, 'local');
       expect(warn.mock.calls.length).toBe(calls); // once per worker, no flood
-      // a different city is (correctly) not rescued by the fallback
-      expect(rows([{ ...worker, id: 'wk000006', city: 'Rancagua' }], badJob, 'local')).toEqual([]);
+      // a different city cannot be measured either: it is kept too, but flagged "unknown" (inclusive)
+      const other = rankWorkers([{ ...worker, id: 'wk000006', city: 'Rancagua' }], { project: badJob, range: 'local' }).rows;
+      expect(other).toHaveLength(1);
+      expect(other[0].unknown).toBe(true);
     } finally {
       warn.mockRestore();
     }

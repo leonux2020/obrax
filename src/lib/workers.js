@@ -50,7 +50,7 @@ const when = (v, fallback) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Num
 export function cleanWorkerCoords(lat, lon) {
   const a = toCoord(lat); // strings are cast with parseFloat; null / undefined / '' are "no coordinate", never 0
   const b = toCoord(lon);
-  if (!Number.isFinite(a) || !Number.isFinite(b) || Math.abs(a) > 90 || Math.abs(b) > 180) return null;
+  if (!Number.isFinite(a) || !Number.isFinite(b) || Math.abs(a) > 90 || Math.abs(b) > 180 || (a === 0 && b === 0)) return null; // 0,0 = an empty record, not a place
   return { lat: Math.round(a * 1e4) / 1e4, lon: Math.round(b * 1e4) / 1e4 };
 }
 

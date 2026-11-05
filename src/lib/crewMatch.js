@@ -4,7 +4,8 @@
 // REAL DISTANCE (Haversine, computed on the device): when the job has a saved point (`project.location`, from the city autocomplete / GPS target) AND
 // the worker has `lat` / `lon` (saved quietly when their town was picked in Ajustes), the range is decided by kilometres:
 //   local <= 70 km, regional <= 250 km, beyond = elsewhere. A worker without coordinates is never made invisible: they fall back to the
-//   place-name emulation below and, whatever it says, always show in "all".
+//   place-name emulation below and, whatever it says, always show in "all". Nobody whose distance CANNOT be measured is hidden by "local" /
+//   "regional": he is listed with `unknown: true` ("Distancia desconocida") and the human decides.
 // FALLBACK (either side has no coordinates): the distance is EMULATED by place names: the job's "Ciudad o Región"
 // ("Valparaíso, Región Metropolitana": first part = city, the rest = region / province) against the worker's own "Ciudad / Localidad" field
 // (`city`), separate from the street address. Accents and case never matter ("Milán" = "milan").
@@ -51,6 +52,13 @@ const placeParts = (v) =>
     .map(norm)
     .filter(Boolean);
 
+/** Does this point ({lat, lng|lon}) hold a usable place? Strings are cast; null / '' / garbage / 0,0 (an empty record read as numbers) are not a place. */
+export function hasPoint(p) {
+  const lat = toCoord(p?.lat);
+  const lng = toCoord(p?.lng ?? p?.lon);
+  return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0);
+}
+
 const warned = new Set();
 /** An internal warning, once per worker: a bad coordinate is worth knowing about, not worth flooding the console with. */
 function warnOnce(key, message) {
@@ -70,7 +78,8 @@ export function distanceKm(project, worker) {
   // every coordinate is cast with parseFloat BEFORE the formula (Nominatim and old backups carry strings); the comparison below is on numbers
   const from = { lat: toCoord(loc.lat), lng: toCoord(loc.lng ?? loc.lon) };
   const to = { lat: toCoord(worker.lat), lng: toCoord(worker.lon ?? worker.lng) };
-  const known = (p) => Number.isFinite(p.lat) || Number.isFinite(p.lng);
+  const nullIsland = (p) => p.lat === 0 && p.lng === 0; // an empty record read as 0,0: not a place
+  const known = (p) => (Number.isFinite(p.lat) || Number.isFinite(p.lng)) && !nullIsland(p);
   if (!known(from) || !known(to)) return null; // one side simply has no point: not an error
   const km = haversineKm(from, to);
   if (Number.isFinite(km)) return km;
@@ -126,22 +135,22 @@ const matchesQuery = (worker, query, label) => omniMatch(query, searchFields(wor
  * left out only because they have no city nor address.
  */
 export function rankWorkers(workers, { project, specialty = '', range = DEFAULT_RANGE, query = '', label = null } = {}) {
-  const placed = Boolean(projectPlaces(project).city) || Number.isFinite(toCoord(project?.location?.lat));
-  let hidden = 0;
+  const placed = Boolean(projectPlaces(project).city) || hasPoint(project?.location);
+  const hidden = 0; // kept for the callers: nobody is hidden any more (see `unknown`)
   const rows = [];
   for (const worker of normalizeWorkers(workers)) {
     if (specialty && !worker.specialties.includes(specialty)) continue;
     if (query && !matchesQuery(worker, query, label)) continue;
-    const near = proximity(project, worker);
     const km = distanceKm(project, worker);
+    const near = proximity(project, worker);
+    const measured = km !== null;
     if (placed && range !== 'all') {
       const ok = range === 'local' ? near === 0 : near <= 1;
-      if (!ok) {
-        if (near === 3) hidden += 1;
-        continue;
-      }
+      // a MEASURED distance decides. A worker whose distance cannot be known (no coordinates, offline, bad data) is NEVER hidden: he stays in the
+      // list, flagged `unknown`, and the human decides whether to call him (inclusive, not exclusive)
+      if (!ok && measured) continue;
     }
-    rows.push({ worker, near, km, starts: query ? omniStarts(query, searchFields(worker, label)) : true });
+    rows.push({ worker, near, km, unknown: placed && !measured && near >= 2, starts: query ? omniStarts(query, searchFields(worker, label)) : true });
   }
   // nearest first; at the same distance the ones whose words BEGIN with what is typed (one letter finds a lot: "e" puts Elena before Michele), then best rated
   const gap = (a, b) => (a.km === null || b.km === null ? 0 : a.km - b.km); // two measured workers: the closer one first

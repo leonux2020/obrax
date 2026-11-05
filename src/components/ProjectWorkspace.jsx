@@ -69,7 +69,7 @@ export default function ProjectWorkspace({ fromAccounting = false, rendition = n
   return <TacticalWorkspace {...props} />;
 }
 
-function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, company, receipts, enqueueReceipt, onEdit, onPro, onSyncDossier = null, dossierBusy = false }) {
+function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, company, receipts, enqueueReceipt, onEdit, onPro, onSyncDossier = null, dossierBusy = false, geocode }) {
   const i18n = useI18n();
   const { t, region } = i18n;
   const draft = project.draft;
@@ -214,7 +214,7 @@ function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, c
         <PartidaList draft={draft} groups={groups} open={ui.open} locked={Boolean(locked)} onBlocked={blocked} showErrors onToggle={toggle} onUpdate={updatePartida} onTask={changeTask} onAdd={addPartida} onRemove={removePartida} onPrice={openPrice} result={result} setDraft={setDraft} projectLocation={location} />
         {/* the quick-control grid (Android settings style): each circle opens its content in a bottom sheet */}
         <div className="grid grid-cols-3 gap-4 p-4" data-testid="ws-menu">
-        <CrewBlock project={project} result={result} setProject={setProject} open={ui.open.crew} onToggle={toggle} />
+        <CrewBlock project={project} result={result} setProject={setProject} open={ui.open.crew} onToggle={toggle} geocode={geocode} />
         <FinanceBlock draft={draft} locked={Boolean(locked)} onBlocked={blocked} setDraft={edit} open={ui.open.finance} onToggle={toggle} />
         <CashBlock projectId={project.id} total={total} payments={project.payments} onChange={setList('payments')} open={ui.open.cash} onToggle={toggle} />
         <LogBlock entries={project.logbook} onChange={setList('logbook')} open={ui.open.log} onToggle={toggle} projectId={project.id} />

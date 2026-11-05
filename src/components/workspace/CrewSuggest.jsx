@@ -23,9 +23,9 @@ export default function CrewSuggest({ rows, hint, placed, hidden, range, onPick 
     <section aria-label={t('ws.crew.fromDirectory')} data-testid="crew-suggest" className="row-fade flex flex-col-reverse">
       {rows.length > 0 && (
         <ul data-testid="crew-directory" className="flex flex-col-reverse">
-          {rows.map(({ worker: w, near, km }) => (
+          {rows.map(({ worker: w, near, km, unknown }) => (
             <li key={w.id} className="border-b border-white/5">
-              <button type="button" onClick={() => onPick(w)} data-testid={`crew-pick-${w.id}`} data-near={near} className="flex min-h-[56px] w-full items-center gap-3 py-2 text-left transition active:bg-white/5">
+              <button type="button" onClick={() => onPick(w)} data-testid={`crew-pick-${w.id}`} data-near={near} data-unknown={unknown ? 'true' : undefined} className="flex min-h-[56px] w-full items-center gap-3 py-2 text-left transition active:bg-white/5">
                 <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-xs font-medium text-neutral-400">
                   {initialsOf(w.name)}
                 </span>
@@ -45,6 +45,11 @@ export default function CrewSuggest({ rows, hint, placed, hidden, range, onPick 
                     <span className="min-w-0 truncate text-xs text-neutral-400" data-testid="crew-pick-note">
                       {[w.specialties[0] ? t(`ws.spec.${w.specialties[0]}`) : '', near === 0 ? t('crew.near.local') : near === 1 ? t('crew.near.regional') : '', Number.isFinite(km) ? `${Math.max(1, Math.round(km))} km` : ''].filter(Boolean).join(' · ')}
                     </span>
+                    {unknown && (
+                      <span className="shrink-0 text-xs italic text-neutral-500" data-testid="crew-pick-unknown">
+                        {t('crew.near.unknown')}
+                      </span>
+                    )}
                     <Stars value={w.rating} />
                   </span>
                 </span>

@@ -2,6 +2,8 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 're
 import { useI18n } from '../../lib/i18n.jsx';
 import { CREW_LIMIT, LEDGER_LIMITS, WORKER_SPECIALTIES, advancesByWorker, laborPool } from '../../lib/ledger.js';
 import { sanitizeText } from '../../lib/sanitize.js';
+import { searchPlaces } from '../../lib/forwardGeocode.js';
+import { useGeoHealing } from '../../lib/useGeoHealing.js';
 import { hasHealthNotes, isBirthdayToday, loadWorkers } from '../../lib/workers.js';
 import { withAdvance, withDiscount, withWorker, withWorkerEdited, withoutAdvance, withoutDiscount, withoutWorker } from '../../lib/workspaceModel.js';
 import BottomSheet from '../BottomSheet.jsx';
@@ -267,8 +269,8 @@ function WorkerCard({ row, apodo = '', health = false, birthday = false, editing
  * button, which opens the app's numpad); every advance is still one entry of `project.advances`, so the labour pool and the project's
  * cash (ledger.js) keep adding all of them. Nothing here is a theoretical estimate any more (no man-hours, no dead days, no bars).
  */
-export default function CrewBlock({ project, result, setProject, open, onToggle }) {
-  const { t, money, region } = useI18n();
+export default function CrewBlock({ project, result, setProject, open, onToggle, geocode }) {
+  const { t, money, region, lang } = useI18n();
   const [sheet, setSheet] = useState(null); // null | worker id (the sheet that edits one person)
   const [editMode, setEditMode] = useState(false); // the pencil of the header: the delete icons only exist while it is on
   const [advFor, setAdvFor] = useState(null); // worker id whose advance is being typed on the pad
@@ -301,10 +303,14 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
   const crewFull = crew.length >= CREW_LIMIT;
   const suggesting = !crewFull && typed !== '';
   const inProject = (w) => crew.some((c) => c && ((typeof c.ref === 'string' && c.ref === w.id) || norm(typeof c === 'string' ? c : c.name) === norm(w.name))); // by id OR by name: a legacy person already on the job is never offered twice
-  const rankFor = (reach) => rankWorkers(directory, { project, range: reach, query: typed, label: (id) => t(`ws.spec.${id}`) });
+  // SILENT HEALING: a job or a worker typed by hand (a city name, no point) is geocoded in the background while the search is open and the point
+  // is merged in memory; offline it simply stays "distance unknown" in the list (never hidden). Off in the test build unless one is injected.
+  const finder = geocode === undefined ? (import.meta.env.MODE === 'test' ? null : searchPlaces) : geocode;
+  const healed = useGeoHealing({ enabled: suggesting, geocode: finder, project, directory, query: typed, lang });
+  const rankFor = (reach) => rankWorkers(healed.directory, { project: healed.project, range: reach, query: typed, label: (id) => t(`ws.spec.${id}`) });
   const ranked = useMemo(
     () => (suggesting ? rankFor(range) : { rows: [], placed: true, hidden: 0 }),
-    [suggesting, directory, project, range, typed, t], // eslint-disable-line react-hooks/exhaustive-deps
+    [suggesting, healed.project, healed.directory, range, typed, t], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const suggestions = ranked.rows.filter(({ worker }) => !inProject(worker));
   // The drop-up grows UPWARDS from the dock, so it must fit between the dock and the top of what is really visible (the dialog shrinks when the

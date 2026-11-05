@@ -47,7 +47,7 @@ describe('backwards compatibility', () => {
     expect(proximity(job(''), { city: 'Maipú' })).toBe(3);
   });
 
-  it('rankWorkers: old and new files mix in the Local list; the others only in Regional / Todos', () => {
+  it('rankWorkers: old and new files mix in the Local list; the ones whose distance cannot be known are listed too, flagged as unknown', () => {
     const list = [
       w('wk000001', { name: 'Old', address: 'Calle 5, Maipú' }),
       w('wk000002', { name: 'New', city: 'maipu' }),
@@ -55,9 +55,12 @@ describe('backwards compatibility', () => {
       w('wk000004', { name: 'Blank' }),
     ];
     const names = (range) => rankWorkers(list, { project: job('Maipú'), range }).rows.map((r) => r.worker.name).sort();
-    expect(names('local')).toEqual(['New', 'Old']);
+    expect(names('local')).toEqual(['Blank', 'Far', 'New', 'Old']); // nobody can be MEASURED here (no coordinates): nobody is hidden
     expect(names('all')).toEqual(['Blank', 'Far', 'New', 'Old']);
-    expect(rankWorkers(list, { project: job('Maipú'), range: 'local' }).hidden).toBe(1); // "Blank": no city nor address
+    const rows = rankWorkers(list, { project: job('Maipú'), range: 'local' }).rows;
+    expect(rows.map((r) => r.worker.name)).toEqual(['New', 'Old', 'Far', 'Blank']); // the town of the job first
+    expect(rows.map((r) => r.unknown)).toEqual([false, false, true, true]); // "Far" (another town) and "Blank" (no city nor address) say "distance unknown"
+    expect(rankWorkers(list, { project: job('Maipú'), range: 'local' }).hidden).toBe(0);
   });
 });
 
