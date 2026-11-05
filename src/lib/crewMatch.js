@@ -1,7 +1,11 @@
 // "Selector inteligente" of the project's crew: how the global directory of workers (workers.js) is filtered and ranked when a person is added
 // to a job. Pure functions, no React.
 //
-// There are no coordinates in a worker's file, so the distance is EMULATED by place names: the job's "Ciudad o Región"
+// REAL DISTANCE (Haversine, computed on the device): when the job has a saved point (`project.location`, from the city autocomplete / GPS target) AND
+// the worker has `lat` / `lon` (saved quietly when their town was picked in Ajustes), the range is decided by kilometres:
+//   local <= 70 km, regional <= 250 km, beyond = elsewhere. A worker without coordinates is never made invisible: they fall back to the
+//   place-name emulation below and, whatever it says, always show in "all".
+// FALLBACK (either side has no coordinates): the distance is EMULATED by place names: the job's "Ciudad o Región"
 // ("Valparaíso, Región Metropolitana": first part = city, the rest = region / province) against the worker's own "Ciudad / Localidad" field
 // (`city`), separate from the street address. Accents and case never matter ("Milán" = "milan").
 //   local     the worker's CITY is the job's city (exact match after normalising)   (the default: ~ the 70 km that keep the trip short)
@@ -11,10 +15,12 @@
 // so nobody vanishes from the list overnight. A worker with neither, or a job with no place, cannot be placed: they only show in "all".
 
 import { hasHealthNotes, normalizeWorkers } from './workers.js';
+import { haversineKm } from './geoDistance.js';
 
 export const CREW_RANGES = Object.freeze(['local', 'regional', 'all']);
 export const DEFAULT_RANGE = 'local';
 export const LOCAL_KM = 70; // the radius "local" stands for (shown on the chip)
+export const REGIONAL_KM = 250; // the radius "regional" stands for
 
 /** Lower case, no accents, only letters / digits separated by single spaces. */
 export const norm = (v) =>
@@ -45,8 +51,21 @@ const placeParts = (v) =>
     .map(norm)
     .filter(Boolean);
 
+/**
+ * Straight-line km (Haversine) between the job's saved point and the worker's `lat` / `lon`, or null when either side has no usable coordinates.
+ * Reads the project as { location: { lat, lng } } and the worker as { lat, lon } (also tolerates `lng`).
+ */
+export function distanceKm(project, worker) {
+  const loc = project?.location;
+  if (!loc || !worker) return null;
+  const km = haversineKm({ lat: loc.lat, lng: loc.lng }, { lat: worker.lat, lng: worker.lon ?? worker.lng });
+  return Number.isFinite(km) ? km : null;
+}
+
 /** 0 = local (the city is the job's city), 1 = regional (names another part of the place), 2 = elsewhere, 3 = cannot tell (no city nor address / no job place). */
 export function proximity(project, worker) {
+  const km = distanceKm(project, worker);
+  if (km !== null) return km <= LOCAL_KM ? 0 : km <= REGIONAL_KM ? 1 : 2; // real maths first
   const { city, others } = projectPlaces(project);
   const own = placeParts(worker?.city ?? worker?.ciudad);
   const address = norm(worker?.address);
@@ -91,13 +110,14 @@ const matchesQuery = (worker, query, label) => omniMatch(query, searchFields(wor
  * left out only because they have no city nor address.
  */
 export function rankWorkers(workers, { project, specialty = '', range = DEFAULT_RANGE, query = '', label = null } = {}) {
-  const placed = Boolean(projectPlaces(project).city);
+  const placed = Boolean(projectPlaces(project).city) || Boolean(project?.location && Number.isFinite(Number(project.location.lat)));
   let hidden = 0;
   const rows = [];
   for (const worker of normalizeWorkers(workers)) {
     if (specialty && !worker.specialties.includes(specialty)) continue;
     if (query && !matchesQuery(worker, query, label)) continue;
     const near = proximity(project, worker);
+    const km = distanceKm(project, worker);
     if (placed && range !== 'all') {
       const ok = range === 'local' ? near === 0 : near <= 1;
       if (!ok) {
@@ -105,10 +125,11 @@ export function rankWorkers(workers, { project, specialty = '', range = DEFAULT_
         continue;
       }
     }
-    rows.push({ worker, near, starts: query ? omniStarts(query, searchFields(worker, label)) : true });
+    rows.push({ worker, near, km, starts: query ? omniStarts(query, searchFields(worker, label)) : true });
   }
   // nearest first; at the same distance the ones whose words BEGIN with what is typed (one letter finds a lot: "e" puts Elena before Michele), then best rated
-  rows.sort((a, b) => a.near - b.near || Number(b.starts) - Number(a.starts) || b.worker.rating - a.worker.rating || a.worker.name.localeCompare(b.worker.name));
+  const gap = (a, b) => (a.km === null || b.km === null ? 0 : a.km - b.km); // two measured workers: the closer one first
+  rows.sort((a, b) => a.near - b.near || Number(b.starts) - Number(a.starts) || gap(a, b) || b.worker.rating - a.worker.rating || a.worker.name.localeCompare(b.worker.name));
   return { rows, placed, hidden };
 }
 

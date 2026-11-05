@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { CREW_LIMIT, LEDGER_LIMITS, WORKER_SPECIALTIES, advancesByWorker, laborPool } from '../../lib/ledger.js';
 import { sanitizeText } from '../../lib/sanitize.js';
@@ -136,7 +136,7 @@ function WorkerSheet({ worker, file = null, health = false, onSave, onDelete, on
 
 /** ONE look for the chips of the crew (the distance ones): matte, quiet, the active one a little lighter. */
 const chipClass = (active) => `min-h-[36px] shrink-0 whitespace-nowrap rounded-full px-3.5 text-xs font-medium transition ${active ? 'bg-white/10 text-neutral-100' : 'bg-white/5 text-neutral-400'}`;
-const specOf = (w) => (WORKER_SPECIALTIES.includes(w.specialty) ? w.specialty : 'multi');
+const specOf = (w) => (WORKER_SPECIALTIES.includes(w?.specialty) ? w.specialty : 'multi');
 
 /** The magnifier of the search field (local, outline: the shared icon set stays frozen). */
 const SearchIcon = (props) => (
@@ -278,6 +278,8 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
   const [range, setRange] = useState(DEFAULT_RANGE); // the distance chip: it only reaches the suggestions of the company's directory
   const amount = useRef(0);
   const searchBox = useRef(null);
+  const dock = useRef(null);
+  const dropup = useRef(null);
   const crew = project.crew ?? [];
   const { rows, loose, looseTotal, looseDiscounts } = advancesByWorker(crew, project.advances, project.discounts);
   const pool = laborPool(result.valid ? result.quote.labor : 0, project.advances, project.discounts);
@@ -287,17 +289,46 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
   // THE OMNIBOX: ONE field. Every typed word is looked for at once in the first name, the surname and the trade, both among the crew on the job
   // and among the company's directory ("ele" finds Elena and Juan the electrician). Read only governance: a project never creates people.
   const typed = query.trim();
-  const fileOf = (w) => directory.find((f) => f.id === w.ref); // the person's file in the directory (plain-text people have none)
-  const visible = rows.filter((r) => !typed || omniMatch(typed, [r.worker.name, fileOf(r.worker)?.apodo, t(`ws.spec.${specOf(r.worker)}`)]));
+  // the person's file in the directory. LEGACY crews (plain names, no `ref`) are matched by name, so their nickname / health still show; a person
+  // with no file at all (typed text) just has none. Nothing here may throw on an old or half-empty record.
+  const fileOf = (w) => {
+    if (!w) return undefined;
+    const byRef = typeof w.ref === 'string' ? directory.find((f) => f.id === w.ref) : undefined;
+    const n = norm(w.name);
+    return byRef ?? (n ? directory.find((f) => norm(f.name) === n) : undefined);
+  };
+  const visible = rows.filter((r) => !typed || omniMatch(typed, [r.worker?.name, fileOf(r.worker)?.apodo, t(`ws.spec.${specOf(r.worker)}`)]));
   const crewFull = crew.length >= CREW_LIMIT;
   const suggesting = !crewFull && typed !== '';
-  const inProject = (w) => crew.some((c) => c.ref === w.id || norm(c.name) === norm(w.name));
+  const inProject = (w) => crew.some((c) => c && ((typeof c.ref === 'string' && c.ref === w.id) || norm(typeof c === 'string' ? c : c.name) === norm(w.name))); // by id OR by name: a legacy person already on the job is never offered twice
   const rankFor = (reach) => rankWorkers(directory, { project, range: reach, query: typed, label: (id) => t(`ws.spec.${id}`) });
   const ranked = useMemo(
     () => (suggesting ? rankFor(range) : { rows: [], placed: true, hidden: 0 }),
     [suggesting, directory, project, range, typed, t], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const suggestions = ranked.rows.filter(({ worker }) => !inProject(worker));
+  // The drop-up grows UPWARDS from the dock, so it must fit between the dock and the top of what is really visible (the dialog shrinks when the
+  // keyboard rises): its height is capped to that room on every render and whenever the visual viewport changes, never cut off by the sheet.
+  useLayoutEffect(() => {
+    if (!suggesting) return undefined;
+    const fit = () => {
+      const box = dock.current;
+      const list = dropup.current;
+      if (!box || !list) return;
+      const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+      const room = box.getBoundingClientRect().top - (vv ? vv.offsetTop : 0) - 20; // 20 = the gap under it + a margin
+      const cap = Math.round((vv?.height || window.innerHeight || 800) * 0.4);
+      list.style.maxHeight = `${Math.max(96, Math.min(cap, Number.isFinite(room) && room > 0 ? room : cap))}px`;
+    };
+    fit();
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', fit);
+    vv?.addEventListener('scroll', fit);
+    return () => {
+      vv?.removeEventListener('resize', fit);
+      vv?.removeEventListener('scroll', fit);
+    };
+  });
   // nobody in this reach but somebody in a wider one: say so; nobody at all: the passive "no results, new people are created in Settings"
   const widerHas = suggesting && suggestions.length === 0 && directory.length > 0 && range !== 'all' && rankFor('all').rows.some(({ worker }) => !inProject(worker));
   const suggestHint = !directory.length ? t('crew.pick.noDir') : suggestions.length === 0 ? (widerHas ? t('crew.pick.noRange') : t('crew.pick.noMatch')) : '';
@@ -307,7 +338,7 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
     setQuery('');
   };
   const healthOf = (w) => crewHealth(w, directory);
-  const birthdayOf = (w) => isBirthdayToday(directory.find((f) => f.id === w.ref)?.birthDate); // local date of the device, plain-text people have no file
+  const birthdayOf = (w) => isBirthdayToday(fileOf(w)?.birthDate); // local date of the device, plain-text people have no file
 
   const closeAdvance = () => {
     const n = amount.current;
@@ -439,9 +470,9 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
             </ul>
           )}
         </div>
-        <div className="relative shrink-0" data-testid="crew-dock">
+        <div ref={dock} className="relative z-50 shrink-0" data-testid="crew-dock">
           {suggesting && (
-            <div data-testid="crew-dropup" className="absolute bottom-full left-0 right-0 z-10 mb-2 flex max-h-[40vh] w-full flex-col-reverse overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-black px-3 py-1">
+            <div ref={dropup} data-testid="crew-dropup" className="absolute bottom-full left-0 right-0 z-50 mb-2 flex max-h-[40vh] w-full flex-col-reverse overflow-y-auto overscroll-contain rounded-2xl border border-white/20 bg-black px-3 py-1 text-neutral-100 shadow-[0_-8px_24px_rgba(0,0,0,0.9)]">
               <CrewSuggest rows={suggestions} hint={suggestHint} placed={ranked.placed || directory.length === 0} hidden={ranked.hidden} range={range} onPick={addPerson} />
             </div>
           )}

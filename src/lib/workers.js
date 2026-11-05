@@ -45,9 +45,41 @@ export function isBirthdayToday(birthDate, now = new Date()) {
 const text = (v, max) => sanitizeText(v, max).trim();
 const when = (v, fallback) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : fallback);
 
+/** A believable coordinate pair -> {lat, lon} (4 decimals, ~10 m: enough for "which town", too coarse to be a home), else null. */
+export function cleanWorkerCoords(lat, lon) {
+  if (lat === null || lon === null || lat === undefined || lon === undefined || lat === '' || lon === '') return null;
+  const a = Number(lat);
+  const b = Number(lon);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || Math.abs(a) > 90 || Math.abs(b) > 180) return null;
+  return { lat: Math.round(a * 1e4) / 1e4, lon: Math.round(b * 1e4) / 1e4 };
+}
+
+/**
+ * LEGACY ADAPTER: what older versions (or hand-made backups) stored -> the current shape. A plain string is a name; `nombre` / `worker_id` /
+ * `ciudad` / `direccion` / `nickname` / `lng` are the old spellings; a single `specialty` becomes the list. Never throws; null = nothing usable.
+ */
+export function adaptLegacyWorker(raw) {
+  if (typeof raw === 'string') return { name: raw };
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const o = { ...raw };
+  o.name = raw.name ?? raw.nombre ?? raw.fullName ?? raw.full_name;
+  o.id = raw.id ?? raw.worker_id ?? raw.workerId;
+  o.city = raw.city ?? raw.ciudad;
+  o.address = raw.address ?? raw.direccion ?? raw.dirección;
+  o.apodo = raw.apodo ?? raw.nickname;
+  o.phone = raw.phone ?? raw.telefono ?? raw.teléfono;
+  o.lon = raw.lon ?? raw.lng;
+  if (!Array.isArray(raw.specialties)) {
+    const one = raw.specialty ?? raw.oficio ?? raw.trade;
+    o.specialties = typeof one === 'string' ? [one] : [];
+  }
+  return o;
+}
+
 /** A clean worker, or null when it has no name. Specialties: a unique list of known ids (max 6); rating 0 = not rated, else 1..5. */
-export function normalizeWorker(raw, now = Date.now()) {
-  if (!raw || typeof raw !== 'object') return null;
+export function normalizeWorker(input, now = Date.now()) {
+  const raw = adaptLegacyWorker(input);
+  if (!raw) return null;
   const name = text(raw.name, 80);
   if (!name) return null;
   const specialties = [...new Set(Array.isArray(raw.specialties) ? raw.specialties : [])].filter((s) => WORKER_SPECIALTIES.includes(s)).slice(0, MAX_SPECIALTIES);
@@ -61,7 +93,8 @@ export function normalizeWorker(raw, now = Date.now()) {
     rating: rating >= 1 && rating <= 5 ? rating : 0,
     phone: sanitizePhone(raw.phone, 32).trim(),
     city: text(raw.city ?? raw.ciudad, 60), // "Ciudad / Localidad": the exact town the Radar compares with the job's city ('' in older files)
-    address: text(raw.address, 120),
+    address: text(raw.address, 120), // street and number ONLY: the town lives in `city`
+    ...(cleanWorkerCoords(raw.lat, raw.lon) || {}), // saved quietly when the town was picked from the autocomplete; feeds the real distance to a job
     document: text(raw.document, 40),
     nationality: text(raw.nationality, 40),
     sex: SEXES.includes(raw.sex) ? raw.sex : '',
@@ -119,7 +152,33 @@ export function loadWorkers() {
   try {
     const raw = window.localStorage.getItem(WORKERS_KEY);
     if (!raw || raw.length > MAX_STORED_CHARS) return [];
-    return normalizeWorkers(JSON.parse(raw));
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    // old rows (plain names, no valid id) get ONE stable id and are written back quietly (no change event: this runs while rendering), so a
+    // `ref` saved in a project keeps pointing at them; an id-less row repeating a name already in the list is the same person, not a new one
+    if (parsed.some((r) => typeof r === 'string' || typeof adaptLegacyWorker(r)?.id !== 'string' || !ID_RE.test(adaptLegacyWorker(r).id))) {
+      const names = new Set();
+      const kept = parsed.filter((r) => {
+        const a = adaptLegacyWorker(r);
+        if (!a) return false;
+        const key = text(a.name, 80).toLowerCase();
+        if (typeof a.id === 'string' && ID_RE.test(a.id)) {
+          names.add(key);
+          return true;
+        }
+        if (names.has(key)) return false;
+        names.add(key);
+        return true;
+      });
+      const healed = normalizeWorkers(kept);
+      try {
+        if (healed.length) window.localStorage.setItem(WORKERS_KEY, JSON.stringify(healed));
+      } catch {
+        /* storage full / blocked: the list still works in memory */
+      }
+      return healed;
+    }
+    return normalizeWorkers(parsed);
   } catch {
     return [];
   }

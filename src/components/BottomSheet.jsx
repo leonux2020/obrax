@@ -72,7 +72,7 @@ export default function BottomSheet({ title, subtitle, onClose, fullscreen = fal
         tabIndex={-1}
         data-swipe-close={swipeToClose ? 'true' : undefined}
         {...swipe}
-        className={`sheet-slide relative w-full outline-none ${fill ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'} overscroll-contain border border-white/10 bg-black p-5 [padding-bottom:max(1.25rem,env(safe-area-inset-bottom))] ${
+        className={`sheet-slide relative w-full outline-none ${fill ? 'flex flex-col' : 'overflow-y-auto'} overscroll-contain border border-white/10 bg-black p-5 [padding-bottom:max(1.25rem,env(safe-area-inset-bottom))] ${
           fullscreen ? 'h-[100dvh] max-w-none border-0 sm:mx-auto sm:max-w-3xl sm:border' : tall ? 'h-[85vh] max-h-[92vh] max-w-lg rounded-t-3xl border-b-0' : 'max-h-[92vh] max-w-lg rounded-t-3xl border-b-0'
         }`}
       >

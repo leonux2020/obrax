@@ -1,14 +1,17 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { WORKER_SPECIALTIES, newEntryId } from '../../lib/ledger.js';
 import { sanitizePhone, sanitizeTextInput } from '../../lib/sanitize.js';
+import { REGIONS } from '../../lib/regions.js';
+import { searchPlaces } from '../../lib/forwardGeocode.js';
+import { SEARCH_DEBOUNCE_MS, useCitySearch } from '../../lib/useCitySearch.js';
 import { BLOOD_TYPES, MAX_SPECIALTIES, SEXES } from '../../lib/workers.js';
 import BottomSheet from '../BottomSheet.jsx';
 import { Button, DateInput, TextField } from '../ui.jsx';
 import { StarPicker } from './Stars.jsx';
 import WorkerLedger from './WorkerLedger.jsx';
 
-const EMPTY = { name: '', apodo: '', specialties: [], rating: 0, phone: '', city: '', address: '', document: '', nationality: '', sex: '', birthDate: '', bloodType: '', limiting: '', allergies: '', emergencyName: '', emergencyPhone: '' };
+const EMPTY = { name: '', apodo: '', specialties: [], rating: 0, phone: '', city: '', lat: null, lon: null, address: '', document: '', nationality: '', sex: '', birthDate: '', bloodType: '', limiting: '', allergies: '', emergencyName: '', emergencyPhone: '' };
 
 const Block = ({ id, title, children, className = '', headingClass = 'text-neutral-200' }) => (
   <section data-testid={`worker-block-${id}`} aria-labelledby={`worker-block-${id}-title`} className={`space-y-4 rounded-2xl border px-4 py-4 ${className || 'border-white/10'}`}>
@@ -23,8 +26,8 @@ const Block = ({ id, title, children, className = '', headingClass = 'text-neutr
  * The worker's file, in three "zero stress" blocks: (a) professional data, (b) personal data, (c) SAFETY AND HEALTH (limiting conditions,
  * allergies, emergency contact), the one that matters most, framed in a soft orange panel. `worker` null = a new one.
  */
-export default function WorkerSheet({ worker, projects = [], onSave, onDelete, onClose }) {
-  const { t } = useI18n();
+export default function WorkerSheet({ worker, projects = [], onSave, onDelete, onClose, search = null, searchDelay = SEARCH_DEBOUNCE_MS }) {
+  const { t, lang } = useI18n();
   const [form, setForm] = useState(() => ({ ...EMPTY, ...(worker || {}) }));
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -35,6 +38,34 @@ export default function WorkerSheet({ worker, projects = [], onSave, onDelete, o
   const toggleSpecialty = (id) =>
     setForm((f) => ({ ...f, specialties: f.specialties.includes(id) ? f.specialties.filter((x) => x !== id) : [...f.specialties, id] }));
   const full = form.specialties.length >= MAX_SPECIALTIES;
+
+  // CITY AUTOCOMPLETE: the same Nominatim search as the job's city field (debounced, silent offline; off in the test build unless one is injected).
+  // Only what is TYPED is searched; picking a match writes the town AND saves its coordinates quietly (lat / lon), which is what the crew picker
+  // measures the real distance to a job with. Typing the town by hand again drops the old point: it would describe another place.
+  const finder = search ?? (import.meta.env.MODE === 'test' ? null : searchPlaces);
+  const [typed, setTyped] = useState('');
+  const [active, setActive] = useState(-1);
+  const places = useCitySearch(typed, { search: finder, lang, delay: searchDelay });
+  const listId = useId();
+  const choose = (place) => {
+    setError('');
+    setForm((f) => ({ ...f, city: sanitizeTextInput(place.name, 60), lat: place.lat, lon: place.lng }));
+    setTyped('');
+    setActive(-1);
+  };
+  const onCityKey = (e) => {
+    if (!places.length) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActive((i) => (e.key === 'ArrowDown' ? (i + 1) % places.length : (i <= 0 ? places.length : i) - 1));
+    } else if (e.key === 'Enter' && active >= 0) {
+      e.preventDefault();
+      choose(places[active]);
+    } else if (e.key === 'Escape') {
+      e.stopPropagation();
+      setTyped('');
+    }
+  };
 
   const submit = (e) => {
     e.preventDefault();
@@ -87,8 +118,48 @@ export default function WorkerSheet({ worker, projects = [], onSave, onDelete, o
             <TextField label={t('squadra.phone')} value={form.phone} onChange={set('phone')} testId="worker-phone" type="tel" inputMode="tel" maxLength={32} sanitize={sanitizePhone} placeholder="+56 9 1234 5678" />
           </div>
           {/* the Radar compares THIS field with the job's city: strongly recommended, never blocking */}
-          <div>
-            <TextField label={t('squadra.city')} value={form.city} onChange={set('city')} testId="worker-city" maxLength={60} sanitize={(v) => sanitizeTextInput(v, 60)} placeholder={t('squadra.city.ph')} />
+          <div data-testid="worker-city-box" data-located={Number.isFinite(form.lat) && Number.isFinite(form.lon) ? 'true' : 'false'}>
+            <TextField
+              label={t('squadra.city')}
+              value={form.city}
+              onChange={(v) => {
+                setError('');
+                setForm((f) => ({ ...f, city: v, lat: null, lon: null }));
+                setTyped(v);
+                setActive(-1);
+              }}
+              testId="worker-city"
+              maxLength={60}
+              sanitize={(v) => sanitizeTextInput(v, 60)}
+              placeholder={t('squadra.city.ph')}
+              inputProps={{
+                role: 'combobox',
+                'aria-autocomplete': 'list',
+                'aria-expanded': places.length > 0,
+                'aria-controls': listId,
+                'aria-activedescendant': active >= 0 ? `${listId}-${active}` : undefined,
+                onKeyDown: onCityKey,
+              }}
+            />
+            {places.length > 0 && (
+              <ul id={listId} role="listbox" aria-label={t('squadra.city')} data-testid="worker-city-results" className="mt-1.5 overflow-hidden rounded-xl bg-white/5 py-1">
+                {places.map((pl, i) => (
+                  <li key={pl.id} id={`${listId}-${i}`} role="option" aria-selected={i === active}>
+                    <button
+                      type="button"
+                      onClick={() => choose(pl)}
+                      data-testid={`worker-city-option-${i}`}
+                      className={`flex min-h-[44px] w-full items-center gap-3 px-4 text-left text-sm text-neutral-200 transition active:bg-white/10 ${i === active ? 'bg-white/10' : ''}`}
+                    >
+                      <span aria-hidden="true" className="w-6 shrink-0 text-base">
+                        {REGIONS[pl.countryCode]?.flag || ''}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate">{pl.label}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
             {!form.city.trim() && (
               <p data-testid="worker-city-hint" className="mt-1.5 text-xs text-orange-400">
                 {t('squadra.city.hint')}

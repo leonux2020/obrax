@@ -115,9 +115,15 @@ export const normalizeDiscounts = (raw) =>
 export const WORKER_SPECIALTIES = Object.freeze(['multi', 'foreman', 'laborer', 'mason', 'carpenter', 'painter', 'tiler', 'drywaller', 'electrician', 'plumber', 'smith', 'welder', 'glazier', 'gardener', 'operator', 'finishing', 'other']);
 export const CREW_LIMIT = 60;
 
+/** Legacy crews: a plain string is a name; `nombre` / `worker_id` are old spellings of `name` / `ref`. Anything else passes through untouched. */
+const legacyCrew = (raw) =>
+  Array.isArray(raw)
+    ? raw.map((w) => (typeof w === 'string' ? { name: w } : w && typeof w === 'object' ? { ...w, name: w.name ?? w.nombre, ref: w.ref ?? w.worker_id ?? w.workerId } : w))
+    : raw;
+
 /** `project.crew`: [{ id, name, specialty, notes, ref?, health? }]. A worker without a name is dropped; an unknown specialty becomes "multi". */
 export const normalizeCrew = (raw) =>
-  listOf(raw, CREW_LIMIT, (w, used) => {
+  listOf(legacyCrew(raw), CREW_LIMIT, (w, used) => {
     const name = sanitizeText(w.name, 60).trim();
     if (!name) return null;
     return { id: idOf(w.id, used), name, specialty: WORKER_SPECIALTIES.includes(w.specialty) ? w.specialty : 'multi', notes: sanitizeText(w.notes, 120).trim(), ...(typeof w.ref === 'string' && ID_RE.test(w.ref) ? { ref: w.ref, ...(w.health === true ? { health: true } : {}) } : {}) }; // `ref`: the file of the global directory (workers.js) it was picked from; `health`: that file carried health notes when the person was added (safety net if the file is later deleted)

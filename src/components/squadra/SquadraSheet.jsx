@@ -58,7 +58,7 @@ function Row({ worker, onOpen, editing, onDelete }) {
  * "Squadra / Maestranze": the global directory of workers (opened from Ajustes, full screen above everything). A list of rows
  * (name, stars, specialty chips); tapping a row, or "Nuevo trabajador", opens the worker's file (WorkerSheet).
  */
-export default function SquadraSheet({ projects = [], onClose }) {
+export default function SquadraSheet({ projects = [], onClose, search = null, searchDelay }) {
   const { t } = useI18n();
   const [workers, setWorkers] = useState(() => loadWorkers());
   useEffect(() => onWorkersChanged(() => setWorkers(loadWorkers())), []); // a pull from Drive (another device) refreshes the open list
@@ -108,7 +108,7 @@ export default function SquadraSheet({ projects = [], onClose }) {
           )}
         </div>
       </BottomSheet>
-      {editing && <WorkerSheet worker={editing.worker} projects={projects} onSave={save} onDelete={remove} onClose={() => setEditing(null)} />}
+      {editing && <WorkerSheet worker={editing.worker} projects={projects} onSave={save} onDelete={remove} onClose={() => setEditing(null)} search={search} {...(searchDelay !== undefined ? { searchDelay } : {})} />}
     </>
   );
 }

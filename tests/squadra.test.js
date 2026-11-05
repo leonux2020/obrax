@@ -152,9 +152,10 @@ describe('the directory travels with the backup (and is not lost on logout)', ()
   it('a hostile backup cannot inject rows: invalid ones are dropped and text is cleaned', () => {
     const raw = { app: 'cubrax', version: 1, createdAt: 1, projects: [], workers: [{ name: '' }, 'x', { name: 'Eva <img onerror=x>', specialties: ['hacker'], allergies: '<script>' }] };
     const w = parseBackup(JSON.stringify(raw)).workers;
-    expect(w).toHaveLength(1);
-    expect(w[0].name).not.toMatch(/[<>]/);
-    expect(w[0].specialties).toEqual([]);
+    expect(w).toHaveLength(2); // the nameless row is dropped; a plain string is an OLD-style worker (legacy adapter) named "x"
+    expect(w.map((x) => x.name)).toContain('x');
+    expect(w.every((x) => !/[<>]/.test(x.name))).toBe(true);
+    expect(w.find((x) => x.name.startsWith('Eva')).specialties).toEqual([]);
   });
   it('logging out wipes the device (health data included): that is why the backup carries it', async () => {
     saveWorkers([{ name: 'Ana' }]);
