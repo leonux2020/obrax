@@ -113,7 +113,7 @@ describe('model: crew, machinery, deadline', () => {
     expect(split.rows.map((r) => [r.worker.name, r.total])).toEqual([['Ana', 1800], ['Beto', 700]]);
     expect(split.loose).toEqual([]);
     // the cash book keeps summing EVERY advance, whoever got it
-    expect(laborPool(5000, p2.advances)).toEqual({ pool: 5000, advanced: 2500, available: 2500 });
+    expect(laborPool(5000, p2.advances)).toEqual({ pool: 5000, advanced: 2500, discounted: 0, available: 2500 });
     expect(liquidity(p2.payments, [], p2.advances)).toBe(7500);
     expect(projectLiquidity(p2)).toBe(7500);
     // removing a person keeps the money in the book, as unassigned

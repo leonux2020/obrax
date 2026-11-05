@@ -10,7 +10,7 @@ import { sanitizeText } from './sanitize.js';
 import { getRegion, taxRateFor } from './regions.js';
 import { FX_SOURCES, baseOf, isoOf, normalizeRate } from './fx.js';
 
-export const LEDGER_LIMITS = Object.freeze({ payments: 200, advances: 200, expenses: 500, logbook: 500, maxAmount: 1e12, noteChars: 80, logChars: 2000 });
+export const LEDGER_LIMITS = Object.freeze({ payments: 200, advances: 200, discounts: 200, expenses: 500, logbook: 500, maxAmount: 1e12, noteChars: 80, logChars: 2000 });
 
 export const EXPENSE_CATEGORIES = Object.freeze(['material', 'tool_rental', 'machinery_rental', 'labor', 'transport', 'food', 'other']);
 // A job site has indirect costs too: `food` = food / per-diem for the crew (supermarket, restaurant), `transport` = fuel, tolls, freight.
@@ -96,6 +96,19 @@ export const normalizeAdvances = (raw) =>
     return a === null || !worker ? null : { id: idOf(p.id, used), worker, amount: a, at: stamp(p.at), ...(typeof p.workerId === 'string' && ID_RE.test(p.workerId) ? { workerId: p.workerId } : {}) };
   });
 
+/**
+ * `project.discounts` (retentions): [{ id, worker, workerId?, amount, note, at }]. A DISCOUNT lowers what is owed to a worker (an absence, a lost
+ * tool) but NO cash moves: it is a separate collection, so nothing that adds up the cash (liquidity, balances, rendición, margin) ever sees it.
+ * The amount is positive and the note (the reason) is REQUIRED: a record without either is dropped.
+ */
+export const normalizeDiscounts = (raw) =>
+  listOf(raw, LEDGER_LIMITS.discounts, (p, used) => {
+    const a = amount(p.amount);
+    const worker = sanitizeText(p.worker, 60).trim();
+    const note = sanitizeText(p.note, LEDGER_LIMITS.noteChars).trim();
+    return a === null || a < 0 || !worker || !note ? null : { id: idOf(p.id, used), worker, amount: a, note, at: stamp(p.at), ...(typeof p.workerId === 'string' && ID_RE.test(p.workerId) ? { workerId: p.workerId } : {}) };
+  });
+
 // ---- the crew: the people physically on the job ---------------------------------------------------------------------------
 // "other" stays last; the order is the one of the select. IT labels: Multifunzione, Capocantiere, Manovale, Muratore, Carpentiere, Pittore,
 // Piastrellista, Cartongessista, Elettricista, Idraulico, Fabbro, Saldatore, Serramentista, Giardiniere, Autista / Macchinista, Finiture, Altro.
@@ -122,15 +135,18 @@ export const normalizePhases = (raw) =>
 /**
  * Splits the advances by person: `rows` = every crew member with the advances given to them and their total; `loose` = the advances
  * that belong to nobody (legacy records, or a person removed later) with their total. Nothing is lost: Σ rows + loose = Σ advances.
+ * The DISCOUNTS (retentions, no cash) are split the same way (`discounts` / `discounted` on each row, `looseDiscounts` / `looseDiscounted`).
  */
-export function advancesByWorker(crew = [], advances = []) {
+export function advancesByWorker(crew = [], advances = [], discounts = []) {
   const ids = new Set(arr(crew).map((w) => w.id));
   const rows = arr(crew).map((w) => {
     const list = arr(advances).filter((a) => a.workerId === w.id);
-    return { worker: w, list, total: cents(sum(list)) };
+    const cuts = arr(discounts).filter((d) => d.workerId === w.id);
+    return { worker: w, list, total: cents(sum(list)), discounts: cuts, discounted: cents(sum(cuts)) };
   });
   const loose = arr(advances).filter((a) => !ids.has(a.workerId));
-  return { rows, loose, looseTotal: cents(sum(loose)) };
+  const looseDiscounts = arr(discounts).filter((d) => !ids.has(d.workerId));
+  return { rows, loose, looseTotal: cents(sum(loose)), looseDiscounts, looseDiscounted: cents(sum(looseDiscounts)) };
 }
 
 const RECEIPT_ID_RE = /^[a-z0-9]{4,24}$/;
@@ -249,11 +265,43 @@ export function cashSummary(total, payments = []) {
   return { total: budget, paid, pending, pct, overpaid: budget > 0 && paid > budget + 0.005 };
 }
 
-/** Labour pool (what the labour line of the quote allows) minus the cash already advanced to workers. */
-export function laborPool(laborAmount, advances = []) {
+/**
+ * Labour pool (what the labour line of the quote allows) minus what is already settled with the workers: the cash advanced (`advanced`, which
+ * DID leave the till) and the discounts (`discounted`, retentions: they lower what is still owed but no money moved, so they never touch the cash).
+ */
+export function laborPool(laborAmount, advances = [], discounts = []) {
   const advanced = cents(sum(advances));
+  const discounted = cents(sum(discounts));
   const pool = toAmount(laborAmount);
-  return { pool, advanced, available: cents(pool - advanced) };
+  return { pool, advanced, discounted, available: cents(pool - advanced - discounted) };
+}
+
+/**
+ * The GLOBAL LEDGER of one person of the company directory ("Historial financiero"): walks EVERY stored project, finds the crew members that were
+ * picked from that file (`ref` = the directory id) and adds up the advances paid to them (and, apart, the discounts applied). Money of different
+ * currencies is never mixed: one group per currency, each with its projects (biggest first) and its grand total.
+ * -> [{ currency, regionCode, projects: [{ project, paid, discounted }], paid, discounted }]
+ */
+export function workerLedger(projects, directoryId) {
+  const groups = new Map();
+  if (typeof directoryId !== 'string' || !directoryId) return [];
+  for (const project of arr(projects)) {
+    const ids = new Set(arr(project.crew).filter((w) => w.ref === directoryId).map((w) => w.id));
+    if (!ids.size) continue;
+    const paid = cents(sum(arr(project.advances).filter((a) => ids.has(a.workerId))));
+    const discounted = cents(sum(arr(project.discounts).filter((d) => ids.has(d.workerId))));
+    if (paid === 0 && discounted === 0) continue;
+    const { currency, regionCode } = projectMarket(project);
+    const key = currency || regionCode;
+    const g = groups.get(key) ?? { currency, regionCode, projects: [], paid: 0, discounted: 0 };
+    g.projects.push({ project, paid, discounted });
+    g.paid = cents(g.paid + paid);
+    g.discounted = cents(g.discounted + discounted);
+    groups.set(key, g);
+  }
+  const nameOf = (x) => String(x.project?.draft?.project?.name ?? '');
+  for (const g of groups.values()) g.projects.sort((x, y) => y.paid - x.paid || nameOf(x).localeCompare(nameOf(y)));
+  return [...groups.values()].sort((a, b) => a.currency.localeCompare(b.currency));
 }
 
 export const expensesTotal = (expenses = []) => cents(sum(expenses));

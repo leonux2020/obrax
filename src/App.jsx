@@ -1101,6 +1101,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
                   onChangeRegion={() => setPickingRegion(true)}
                   backup={{ configured: googleConfigured, configStatus: GOOGLE_CONFIG_STATUS, enabled: backupOn, linked: driveLinked, held: Boolean(backup.held), state: backup }}
                   onLogout={logout}
+                  projects={projects}
                 />
               ) : tab === 'accounting' ? (
                 <GlobalAccounting projects={projects} onOpenProject={openProject} onExportGlobal={submitGlobalRendition} />

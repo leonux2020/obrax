@@ -81,7 +81,7 @@ describe('ledger: cash control, labour pool and rental alerts', () => {
   });
 
   it('laborPool: advances are discounted from the visible pool', () => {
-    expect(laborPool(100000, [{ amount: 30000 }, { amount: 20000 }])).toEqual({ pool: 100000, advanced: 50000, available: 50000 });
+    expect(laborPool(100000, [{ amount: 30000 }, { amount: 20000 }])).toEqual({ pool: 100000, advanced: 50000, discounted: 0, available: 50000 });
     expect(laborPool(10, [{ amount: 30 }]).available).toBe(-20);
     expect(expensesTotal([{ amount: 1.1 }, { amount: 2.2 }])).toBe(3.3);
   });

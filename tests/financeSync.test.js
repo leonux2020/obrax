@@ -69,7 +69,7 @@ describe('type-safe amounts in the derived figures ("Da incassare")', () => {
     const payments = [{ amount: '100' }, { amount: 20 }, { amount: null }, { amount: 'x' }];
     expect(cashSummary(1000, payments)).toMatchObject({ paid: 120, pending: 880 });
     expect(cashSummary('1000', payments)).toMatchObject({ total: 1000, paid: 120, pending: 880 }); // the budget itself may be a string
-    expect(laborPool('500', [{ amount: '100' }, { amount: 20 }])).toEqual({ pool: 500, advanced: 120, available: 380 });
+    expect(laborPool('500', [{ amount: '100' }, { amount: 20 }])).toEqual({ pool: 500, advanced: 120, discounted: 0, available: 380 });
     expect(liquidity(payments, [{ amount: '50' }], [{ amount: '10' }])).toBe(60);
     expect(expensesTotal([{ amount: '1.5' }, { amount: 2 }])).toBe(3.5);
     const p = { payments, advances: [{ amount: '30' }, { amount: 5 }], expenses: [{ amount: '15' }] };

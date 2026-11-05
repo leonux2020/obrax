@@ -3,7 +3,7 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { CREW_LIMIT, LEDGER_LIMITS, WORKER_SPECIALTIES, advancesByWorker, laborPool } from '../../lib/ledger.js';
 import { sanitizeText } from '../../lib/sanitize.js';
 import { hasHealthNotes, isBirthdayToday, loadWorkers } from '../../lib/workers.js';
-import { withAdvance, withWorker, withWorkerEdited, withoutAdvance, withoutWorker } from '../../lib/workspaceModel.js';
+import { withAdvance, withDiscount, withWorker, withWorkerEdited, withoutAdvance, withoutDiscount, withoutWorker } from '../../lib/workspaceModel.js';
 import BottomSheet from '../BottomSheet.jsx';
 import { EditToggle, RowDelete } from '../EditControls.jsx';
 import BirthdayMark from '../squadra/BirthdayMark.jsx';
@@ -12,6 +12,7 @@ import Block from './Block.jsx';
 import { CREW_RANGES, DEFAULT_RANGE, LOCAL_KM, crewHealth, norm, omniMatch, rankWorkers } from '../../lib/crewMatch.js';
 import Nick from '../squadra/Nick.jsx';
 import CrewSuggest, { initialsOf } from './CrewSuggest.jsx';
+import DiscountSheet from './DiscountSheet.jsx';
 import NumberPad from './NumberPad.jsx';
 import { CoinsIcon, Outline, UsersIcon } from './icons.jsx';
 
@@ -152,16 +153,18 @@ const SearchIcon = (props) => (
  * advances and two text actions without a frame, "+ Advance" (the app's numpad) and "Edit" (the worker's sheet). In EDIT MODE (the pencil
  * of the sheet's header) the row also wears its delete icon on the left and each advance of the unfolded detail its own cross.
  */
-function WorkerCard({ row, apodo = '', health = false, birthday = false, editing = false, expanded = false, onToggle, onEdit, onAdvance, onRemove, onRemoveAdvance }) {
+function WorkerCard({ row, apodo = '', health = false, birthday = false, editing = false, expanded = false, onToggle, onEdit, onAdvance, onDiscount, onRemove, onRemoveAdvance, onRemoveDiscount }) {
   const { t, money, locale } = useI18n();
-  const { worker: w, list, total } = row;
+  const { worker: w, list, total, discounts, discounted } = row;
+  // ONE dated history: payments / advances in a neutral tone, discounts (retentions, no cash) in a subtle red with the minus sign and the reason
+  const history = [...list.map((a) => ({ kind: 'advance', ...a })), ...discounts.map((d) => ({ kind: 'discount', ...d }))].sort((x, y) => y.at - x.at);
   const panelId = `worker-panel-${w.id}`;
   const stamp = (ms) => (ms ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(ms)) : '');
   return (
     <li className="border-b border-white/5" data-testid={`worker-${w.id}`} data-specialty={w.specialty}>
       <div className="flex items-center gap-1">
         {editing && <RowDelete name={w.name} testId={`worker-del-${w.id}`} onConfirm={onRemove} />}
-        <button type="button" onClick={onToggle} aria-expanded={expanded} aria-controls={panelId} data-testid={`worker-toggle-${w.id}`} aria-label={`${w.name}${health ? ` · ⚠ ${t('squadra.healthFlag')}` : ''}${total > 0 ? ` · ${t('ws.crew.advanced')}: ${money(total)}` : ''}`} className={`flex min-h-[64px] min-w-0 flex-1 items-center gap-3 py-2 text-left ${editing ? 'pl-1' : ''}`}>
+        <button type="button" onClick={onToggle} aria-expanded={expanded} aria-controls={panelId} data-testid={`worker-toggle-${w.id}`} aria-label={`${w.name}${health ? ` · ⚠ ${t('squadra.healthFlag')}` : ''}${total > 0 ? ` · ${t('ws.crew.advanced')}: ${money(total)}` : ''}${discounted > 0 ? ` · ${t('ws.crew.discounted')}: ${money(discounted)}` : ''}`} className={`flex min-h-[64px] min-w-0 flex-1 items-center gap-3 py-2 text-left ${editing ? 'pl-1' : ''}`}>
           <span aria-hidden="true" data-testid={`worker-avatar-${w.id}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-sm font-medium text-neutral-400">
             {initialsOf(w.name)}
           </span>
@@ -188,6 +191,11 @@ function WorkerCard({ row, apodo = '', health = false, birthday = false, editing
               {money(total)}
             </span>
           )}
+          {discounted > 0 && (
+            <span className="shrink-0 pl-2 text-xs font-medium tabular-nums text-red-400/90" data-testid={`worker-discounted-${w.id}`} data-total={discounted}>
+              − {money(discounted)}
+            </span>
+          )}
         </button>
         {/* the payment: a coin, no frame. It does the same as the row: unfolds the detail of the advances */}
         <button type="button" onClick={onToggle} aria-expanded={expanded} aria-controls={panelId} aria-label={`${t('ws.crew.advanced')}: ${w.name}`} title={t('ws.crew.advanced')} data-testid={`worker-pay-${w.id}`} className={`flex h-11 w-11 shrink-0 items-center justify-center transition ${expanded ? 'text-emerald-400' : 'text-neutral-400'}`}>
@@ -199,25 +207,47 @@ function WorkerCard({ row, apodo = '', health = false, birthday = false, editing
           <div className="min-h-0 overflow-hidden">
             <div className="pb-2 pl-[3.25rem] pr-1">
               <p className="text-xs font-medium text-neutral-500">{t('ws.crew.advanced')}</p>
-              {list.length === 0 && <p className="mt-0.5 text-xs font-medium text-neutral-500">{t('ws.crew.noAdvances')}</p>}
-              {list.length > 0 && (
+              {history.length === 0 && <p className="mt-0.5 text-xs font-medium text-neutral-500">{t('ws.crew.noAdvances')}</p>}
+              {history.length > 0 && (
                 <ul className="mt-0.5 divide-y divide-white/5" data-testid={`worker-advlist-${w.id}`}>
-                  {list.map((a) => (
-                    <li key={a.id} className="flex min-h-[36px] items-center gap-3">
-                      <span className="min-w-0 flex-1 text-xs font-medium text-neutral-500">{stamp(a.at)}</span>
-                      <span className="text-xs font-medium tabular-nums text-neutral-300">{money(a.amount)}</span>
-                      {editing && (
-                        <button type="button" onClick={() => onRemoveAdvance(a.id)} aria-label={`${t('common.delete')}: ${w.name}`} data-testid={`worker-adv-del-${a.id}`} className="row-fade flex h-9 w-9 shrink-0 items-center justify-center text-base text-red-400/80 hover:text-red-400">
-                          ×
-                        </button>
-                      )}
-                    </li>
-                  ))}
+                  {history.map((h) =>
+                    h.kind === 'advance' ? (
+                      <li key={h.id} className="flex min-h-[36px] items-center gap-3" data-kind="advance">
+                        <span className="min-w-0 flex-1 text-xs font-medium text-neutral-500">{stamp(h.at)}</span>
+                        <span className="text-xs font-medium tabular-nums text-neutral-300">{money(h.amount)}</span>
+                        {editing && (
+                          <button type="button" onClick={() => onRemoveAdvance(h.id)} aria-label={`${t('common.delete')}: ${w.name}`} data-testid={`worker-adv-del-${h.id}`} className="row-fade flex h-9 w-9 shrink-0 items-center justify-center text-base text-red-400/80 hover:text-red-400">
+                            ×
+                          </button>
+                        )}
+                      </li>
+                    ) : (
+                      <li key={h.id} className="flex min-h-[36px] items-center gap-3 py-1" data-kind="discount" data-testid={`worker-disc-${h.id}`}>
+                        <span className="min-w-0 flex-1">
+                          <span className="block break-words text-xs font-medium text-red-400/90" data-testid={`worker-disc-note-${h.id}`}>
+                            {h.note}
+                          </span>
+                          <span className="block text-xs text-neutral-500">{stamp(h.at)}</span>
+                        </span>
+                        <span className="text-xs font-medium tabular-nums text-red-400/90" data-testid={`worker-disc-amount-${h.id}`}>
+                          − {money(h.amount)}
+                        </span>
+                        {editing && (
+                          <button type="button" onClick={() => onRemoveDiscount(h.id)} aria-label={`${t('common.delete')}: ${w.name}`} data-testid={`worker-disc-del-${h.id}`} className="row-fade flex h-9 w-9 shrink-0 items-center justify-center text-base text-red-400/80 hover:text-red-400">
+                            ×
+                          </button>
+                        )}
+                      </li>
+                    ),
+                  )}
                 </ul>
               )}
               <div className="mt-1 flex items-center gap-5">
                 <button type="button" onClick={onAdvance} data-testid={`worker-adv-${w.id}`} className="min-h-[44px] text-sm font-medium text-emerald-400 transition active:text-emerald-300">
                   + {t('ws.crew.advance')}
+                </button>
+                <button type="button" onClick={onDiscount} data-testid={`worker-discount-${w.id}`} className="min-h-[44px] text-sm text-neutral-400 transition active:text-neutral-200">
+                  - {t('ws.crew.discount')}
                 </button>
                 <button type="button" onClick={onEdit} data-testid={`worker-edit-${w.id}`} className="min-h-[44px] text-sm text-neutral-400 transition active:text-neutral-200">
                   {t('ws.crew.sheetEdit')}
@@ -242,14 +272,15 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
   const [sheet, setSheet] = useState(null); // null | worker id (the sheet that edits one person)
   const [editMode, setEditMode] = useState(false); // the pencil of the header: the delete icons only exist while it is on
   const [advFor, setAdvFor] = useState(null); // worker id whose advance is being typed on the pad
+  const [discFor, setDiscFor] = useState(null); // worker id whose discount (amount + reason) is being written
   const [unfolded, setUnfolded] = useState(null); // accordion: the id of the ONE unfolded row (null = all folded)
   const [query, setQuery] = useState(''); // the search field of the agenda
   const [range, setRange] = useState(DEFAULT_RANGE); // the distance chip: it only reaches the suggestions of the company's directory
   const amount = useRef(0);
   const searchBox = useRef(null);
   const crew = project.crew ?? [];
-  const { rows, loose, looseTotal } = advancesByWorker(crew, project.advances);
-  const pool = laborPool(result.valid ? result.quote.labor : 0, project.advances);
+  const { rows, loose, looseTotal, looseDiscounts } = advancesByWorker(crew, project.advances, project.discounts);
+  const pool = laborPool(result.valid ? result.quote.labor : 0, project.advances, project.discounts);
   const editing = sheet ? crew.find((w) => w.id === sheet) : null;
   // the directory is read again whenever a sheet opens or closes and whenever a search starts (its files may have just been edited in Settings)
   const directory = useMemo(() => loadWorkers(), [sheet, open, query.trim() !== '']); // eslint-disable-line react-hooks/exhaustive-deps
@@ -285,7 +316,8 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
     setAdvFor(null);
   };
   const advanceFull = (project.advances ?? []).length >= LEDGER_LIMITS.advances;
-  const nothingToEdit = crew.length === 0 && loose.length === 0;
+  const discountFull = (project.discounts ?? []).length >= LEDGER_LIMITS.discounts;
+  const nothingToEdit = crew.length === 0 && loose.length === 0 && looseDiscounts.length === 0;
   // the sheet closed (device Back, swipe, backdrop) or nothing left to edit: back to the quiet, protected state
   useEffect(() => {
     if (!open) {
@@ -320,9 +352,13 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
             the thumb's reach and riding on top of the keyboard, the OMNIBOX dock: the distance chips right ABOVE the search field and the
             suggestions DROPPING UP from it, over the crew (so the keyboard never covers them). No trade chips, no "+ create" here. */}
         <div className="shrink-0" data-testid="crew-bar">
-          <p data-testid="labor-pool" data-available={pool.available} data-spent={pool.advanced} className="min-w-0 text-right text-sm text-neutral-300">
+          <p data-testid="labor-pool" data-available={pool.available} data-spent={pool.advanced} data-discounted={pool.discounted} className="min-w-0 text-right text-sm text-neutral-300">
             {t('ws.crew.labor')}: <b className="tabular-nums text-neutral-200">{money(pool.available)}</b>
-            <span className="whitespace-nowrap tabular-nums text-[#e8c35f]"> ({t('ws.crew.spent')}: {money(pool.advanced)})</span>
+            <span className="whitespace-nowrap tabular-nums text-[#e8c35f]">
+              {' '}
+              ({t('ws.crew.spent')}: {money(pool.advanced)}
+              {pool.discounted > 0 && <span data-testid="labor-discounted"> · {t('ws.crew.discounted')}: − {money(pool.discounted)}</span>})
+            </span>
           </p>
         </div>
         <div data-testid="crew-results" className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain">
@@ -355,7 +391,11 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
                     amount.current = 0;
                     setAdvFor(row.worker.id);
                   }}
+                  onDiscount={() => {
+                    if (!discountFull) setDiscFor(row.worker.id);
+                  }}
                   onRemoveAdvance={(id) => setProject((p) => withoutAdvance(p, id))}
+                  onRemoveDiscount={(id) => setProject((p) => withoutDiscount(p, id))}
                 />
               ))}
             </ul>
@@ -380,6 +420,23 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
               ))}
             </ul>
           </div>
+          )}
+          {looseDiscounts.length > 0 && (
+            <ul className="divide-y divide-white/5" data-testid="discounts-loose">
+              {looseDiscounts.map((d) => (
+                <li key={d.id} className="flex min-h-[36px] items-center gap-3 py-1">
+                  <span className="min-w-0 flex-1 truncate text-xs font-medium text-red-400/90">
+                    {d.worker} · {d.note}
+                  </span>
+                  <span className="text-xs font-medium tabular-nums text-red-400/90">− {money(d.amount)}</span>
+                  {editMode && (
+                    <button type="button" onClick={() => setProject((p) => withoutDiscount(p, d.id))} aria-label={`${t('common.delete')}: ${d.worker}`} data-testid={`worker-disc-del-${d.id}`} className="flex h-9 w-9 shrink-0 items-center justify-center text-base text-red-400/80 hover:text-red-400">
+                      ×
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
           )}
         </div>
         <div className="relative shrink-0" data-testid="crew-dock">
@@ -444,6 +501,16 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
           onDelete={() => {
             setProject((p) => withoutWorker(p, editing.id));
             setSheet(null);
+          }}
+        />
+      )}
+      {discFor && (
+        <DiscountSheet
+          name={crew.find((w) => w.id === discFor)?.name ?? ''}
+          onClose={() => setDiscFor(null)}
+          onSave={(amount, note) => {
+            setProject((p) => withDiscount(p, discFor, amount, note));
+            setDiscFor(null);
           }}
         />
       )}

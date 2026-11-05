@@ -7,7 +7,7 @@ import { getRegion } from './regions.js';
 import { normalizeDraft, normalizeCompany, newDraft, isCompanyEmpty } from './draft.js';
 import { sanitizeText } from './sanitize.js';
 import { normalizeLogo } from './logo.js';
-import { normalizeAdvances, normalizeCrew, normalizeExpenses, normalizeLocation, normalizeLogbook, normalizePayments, normalizePhases } from './ledger.js';
+import { normalizeAdvances, normalizeCrew, normalizeDiscounts, normalizeExpenses, normalizeLocation, normalizeLogbook, normalizePayments, normalizePhases } from './ledger.js';
 import { syncDates } from './phases.js';
 
 export const MAX_PROJECTS = 200;
@@ -155,6 +155,7 @@ export function newProject({ regionCode, mode = 'quick', company = null, logo = 
     crew: [],
     phases: [], // the Cronograma: once a phase has dates, startDate / endDate above follow them (lib/phases.js)
     advances: [],
+    discounts: [], // retentions on a worker's account: they lower what is owed, never the cash
     expenses: [],
     logbook: [],
     draft,
@@ -218,6 +219,7 @@ export function normalizeProject(obj) {
     crew: normalizeCrew(obj.crew), // the people on site (older records have none)
     phases, // the Cronograma (older records have none)
     advances: normalizeAdvances(obj.advances),
+    discounts: normalizeDiscounts(obj.discounts),
     expenses: normalizeExpenses(obj.expenses).map((e) => ({ ...e, projectId: obj.id })), // an expense always knows its project (old records get it here)
     logbook: normalizeLogbook(obj.logbook),
     ...(Object.keys(normalizeTomb(obj.tomb, 200)).length ? { tomb: normalizeTomb(obj.tomb, 200) } : {}), // ids of records deleted here (so a merge with another device does not bring them back)

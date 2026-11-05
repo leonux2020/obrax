@@ -5,7 +5,7 @@ import { LEVEL_COLOR } from '../components/levelStyle.js';
 import { MAX_PRICE } from './pricing.js';
 import { dayDiff, isClosed, parseDay, projectLevel } from './projects.js';
 import { parseISODay, spanDays } from './schedule.js';
-import { CREW_LIMIT, LEDGER_LIMITS, PHASE_LIMIT, newEntryId, normalizeAdvances, normalizeCrew, normalizePhases } from './ledger.js';
+import { CREW_LIMIT, LEDGER_LIMITS, PHASE_LIMIT, newEntryId, normalizeAdvances, normalizeCrew, normalizeDiscounts, normalizePhases } from './ledger.js';
 import { syncDates } from './phases.js';
 import { DEFAULT_MACHINERY, MACHINE_IDS } from './machinery.js';
 import { savedMeta } from './priceBook.js';
@@ -232,6 +232,19 @@ export function withAdvance(project, workerId, amount, now = Date.now()) {
 }
 
 export const withoutAdvance = (project, id) => ({ ...project, advances: (project.advances ?? []).filter((a) => a.id !== id) });
+
+/**
+ * Applies a DISCOUNT (retention) to a person of the crew: it lowers what is owed to them but is NOT cash (it goes to `project.discounts`, which
+ * no cash figure reads). A positive amount AND a note (the reason) are required: otherwise the SAME project comes back.
+ */
+export function withDiscount(project, workerId, amount, note, now = Date.now()) {
+  const w = (project.crew ?? []).find((x) => x.id === workerId);
+  const [d] = w ? normalizeDiscounts([{ id: newEntryId(), worker: w.name, workerId, amount, note, at: now }]) : [];
+  const list = project.discounts ?? [];
+  return d && d.amount > 0 && list.length < LEDGER_LIMITS.discounts ? { ...project, discounts: [d, ...list] } : project;
+}
+
+export const withoutDiscount = (project, id) => ((project.discounts ?? []).some((d) => d.id === id) ? { ...project, discounts: project.discounts.filter((d) => d.id !== id) } : project);
 
 /** One editable daily rate per machine type the quote uses (a scaffold in two partidas is a single rate). */
 export function rentRows(result, regionCode = null) {

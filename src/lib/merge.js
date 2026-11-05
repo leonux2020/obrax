@@ -15,9 +15,9 @@ import { MAX_PHOTOS } from './photos.js';
 import { mergeCapsule } from './capsule.js';
 import { syncDates } from './phases.js';
 
-export const RECORD_COLLECTIONS = Object.freeze(['payments', 'advances', 'expenses', 'crew', 'logbook', 'phases']);
+export const RECORD_COLLECTIONS = Object.freeze(['payments', 'advances', 'discounts', 'expenses', 'crew', 'logbook', 'phases']);
 /** The money vectors: cobros (payments), anticipos (advances) and gastos (expenses). Their `amount` is forced to a real number on every merge. */
-export const FINANCIAL_COLLECTIONS = Object.freeze(['payments', 'advances', 'expenses']);
+export const FINANCIAL_COLLECTIONS = Object.freeze(['payments', 'advances', 'discounts', 'expenses']);
 
 /** A top-level list of records with ids (the known collections, or any future one such as invoices): merged BY ID like the rest. */
 const isRecordList = (key, value) =>

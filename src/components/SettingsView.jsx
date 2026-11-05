@@ -69,6 +69,7 @@ export default function SettingsView({
   onConfirmRegion = null, // preferred: change country in place without leaving Ajustes
   onLogout,
   backup = null,
+  projects = [], // every stored project: the financial history of a worker (Squadra) reads them
 }) {
   const { t, lang, region } = useI18n();
   const [phase, setPhase] = useState('idle'); // idle | confirming | syncing | failed (sign-out)
@@ -595,7 +596,7 @@ export default function SettingsView({
           )}
         </div>
       </main>
-      {squadra && <SquadraSheet onClose={() => setSquadra(false)} />}
+      {squadra && <SquadraSheet projects={projects} onClose={() => setSquadra(false)} />}
     </div>
     </>
   );

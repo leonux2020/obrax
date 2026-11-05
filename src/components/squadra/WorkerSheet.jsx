@@ -6,6 +6,7 @@ import { BLOOD_TYPES, MAX_SPECIALTIES, SEXES } from '../../lib/workers.js';
 import BottomSheet from '../BottomSheet.jsx';
 import { Button, DateInput, TextField } from '../ui.jsx';
 import { StarPicker } from './Stars.jsx';
+import WorkerLedger from './WorkerLedger.jsx';
 
 const EMPTY = { name: '', apodo: '', specialties: [], rating: 0, phone: '', city: '', address: '', document: '', nationality: '', sex: '', birthDate: '', bloodType: '', limiting: '', allergies: '', emergencyName: '', emergencyPhone: '' };
 
@@ -22,7 +23,7 @@ const Block = ({ id, title, children, className = '', headingClass = 'text-neutr
  * The worker's file, in three "zero stress" blocks: (a) professional data, (b) personal data, (c) SAFETY AND HEALTH (limiting conditions,
  * allergies, emergency contact), the one that matters most, framed in a soft orange panel. `worker` null = a new one.
  */
-export default function WorkerSheet({ worker, onSave, onDelete, onClose }) {
+export default function WorkerSheet({ worker, projects = [], onSave, onDelete, onClose }) {
   const { t } = useI18n();
   const [form, setForm] = useState(() => ({ ...EMPTY, ...(worker || {}) }));
   const [error, setError] = useState('');
@@ -177,6 +178,9 @@ export default function WorkerSheet({ worker, onSave, onDelete, onClose }) {
             <TextField label={t('squadra.emPhone')} value={form.emergencyPhone} onChange={set('emergencyPhone')} testId="worker-em-phone" type="tel" inputMode="tel" maxLength={32} sanitize={sanitizePhone} placeholder="+56 9 1234 5678" />
           </div>
         </Block>
+
+        {/* d) the global ledger of an existing person: what they were paid in every project (read only) */}
+        {worker && <WorkerLedger workerId={worker.id} projects={projects} />}
 
         <div className="grid grid-cols-2 gap-3">
           <Button variant="ghost" onClick={onClose} data-testid="worker-cancel">
