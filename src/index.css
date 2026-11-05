@@ -32,6 +32,23 @@
     outline: 3px solid #4ade80;
     outline-offset: 2px;
   }
+  /* "Zero grid effect": touch targets never wear a focus rectangle (closing a sheet hands the focus back to its tile; the green box
+     that appeared there is gone). Their feedback is the passive touch state (active:scale / active:opacity). Text fields and sliders
+     keep their own focus indication. */
+  * {
+    -webkit-tap-highlight-color: transparent !important;
+  }
+  button:focus,
+  a:focus,
+  [role='button']:focus,
+  div[tabindex]:focus,
+  button:focus-visible,
+  a:focus-visible,
+  [role='button']:focus-visible,
+  div[tabindex]:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
   input,
   select,
   button {
