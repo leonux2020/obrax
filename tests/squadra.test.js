@@ -337,6 +337,8 @@ describe('Squadra: the worker file', () => {
     await openAjustes();
     await click(q('settings-squadra'));
     await click(q('worker-wk000001'));
+    expect(q('worker-name')).toBeNull(); // an existing file opens as a read-only card...
+    await click(q('worker-edit')); // ...the pencil reveals the form
     expect(q('worker-name').value).toBe('Ana Ruiz');
     expect(q('worker-spec-plumber').getAttribute('aria-pressed')).toBe('true');
     expect(q('worker-rating').dataset.rating).toBe('3');
@@ -382,6 +384,7 @@ describe('Squadra: the worker file', () => {
     await openAjustes();
     await click(q('settings-squadra'));
     await click(q('worker-wk000001'));
+    await click(q('worker-edit'));
     await click(q('worker-delete'));
     expect(loadWorkers()).toHaveLength(1); // one tap deletes nothing
     expect(q('worker-delete-confirm')).not.toBeNull();
@@ -438,7 +441,9 @@ describe('Grupo sanguíneo (closed list, inside Seguridad y Salud)', () => {
     await click(q('worker-save'));
     expect(loadWorkers()[0].bloodType).toBe('O-');
     await click(q(`worker-${loadWorkers()[0].id}`));
-    expect(q('worker-blood-O-').getAttribute('aria-checked')).toBe('true');
+    expect(q('worker-card-blood').textContent).toBe('O-'); // the card shows it...
+    await click(q('worker-edit'));
+    expect(q('worker-blood-O-').getAttribute('aria-checked')).toBe('true'); // ...and the form has it hydrated
     await click(q('worker-blood-none')); // back to not specified
     await click(q('worker-save'));
     expect(loadWorkers()[0].bloodType).toBe('');

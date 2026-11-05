@@ -284,6 +284,7 @@ describe('Ajustes > worker file: city is separate from the address and saves its
       root.render(React.createElement(I18nProvider, { lang: 'es', regionCode: 'CL' }, React.createElement(WorkerSheet, { worker, onSave: (w) => (saved = w), onClose: () => {}, search, searchDelay: 0 })));
     });
     await flush();
+    if (worker) await click(q('worker-edit')); // an existing file opens as a read-only card; the pencil reveals the form
     return search;
   };
   const submit = () => act(async () => q('worker-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));

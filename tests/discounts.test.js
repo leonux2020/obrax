@@ -309,7 +309,9 @@ describe('Ajustes: "Historial financiero" in the file of a worker', () => {
     expect(ledger).not.toBeNull();
     expect(ledger.querySelector('h3').textContent).toBe(DICT.es['squadra.ledger.title']);
     expect(ledger.querySelector('input, button, select, textarea')).toBeNull(); // read only
-    expect(q('worker-form').contains(ledger)).toBe(true);
+    expect(q('worker-card').contains(ledger)).toBe(true); // at the bottom of the read-only card
+    expect(ledger.className).not.toMatch(/\bborder\b|rounded/); // flat: no box, no lines
+    expect(ledger.querySelector('[class*="divide-"], [class*="border"]')).toBeNull();
     expect([...ledger.querySelectorAll('li')].map((li) => li.dataset.testid)).toEqual([`worker-ledger-project-${b.id}`, `worker-ledger-project-${a.id}`]); // biggest first; Casa C is somebody else's
     expect(q(`worker-ledger-paid-${b.id}`).dataset.amount).toBe('4000');
     expect(q(`worker-ledger-paid-${a.id}`).dataset.amount).toBe('1500');
@@ -325,7 +327,10 @@ describe('Ajustes: "Historial financiero" in the file of a worker', () => {
     await mountSquadra([crewOf('Casa A', 'wk000009', [100])]);
     await click(q('worker-wk000001'));
     expect(q('worker-ledger-empty').textContent).toBe(DICT.es['squadra.ledger.empty']);
-    await click(q('worker-cancel'));
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); // the card has no cancel: it closes the native way
+    });
+    await flush();
     await click(q('squadra-new'));
     expect(q('worker-ledger')).toBeNull();
   });

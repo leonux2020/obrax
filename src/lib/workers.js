@@ -93,6 +93,7 @@ export function normalizeWorker(input, now = Date.now()) {
     specialties,
     rating: rating >= 1 && rating <= 5 ? rating : 0,
     phone: sanitizePhone(raw.phone, 32).trim(),
+    email: text(raw.email ?? raw.correo, 80),
     city: text(raw.city ?? raw.ciudad, 60), // "Ciudad / Localidad": the exact town the Radar compares with the job's city ('' in older files)
     address: text(raw.address, 120), // street and number ONLY: the town lives in `city`
     ...(cleanWorkerCoords(raw.lat, raw.lon) || {}), // saved quietly when the town was picked from the autocomplete; feeds the real distance to a job

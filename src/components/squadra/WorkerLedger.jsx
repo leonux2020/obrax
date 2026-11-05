@@ -8,12 +8,12 @@ import { workerLedger } from '../../lib/ledger.js';
  * Money of different currencies is never added: one block per currency, each with its own total. Discounts (retentions: no cash moved)
  * are not payments, so they are not in the total; they show apart, quietly, when there are any.
  */
-export default function WorkerLedger({ workerId, projects = [] }) {
+export default function WorkerLedger({ workerId, projects = [], flat = false }) {
   const { t, lang } = useI18n();
   const groups = useMemo(() => workerLedger(projects, workerId), [projects, workerId]);
   const many = groups.length > 1;
   return (
-    <section data-testid="worker-ledger" aria-labelledby="worker-ledger-title" className="space-y-3 rounded-2xl border border-white/10 px-4 py-4">
+    <section data-testid="worker-ledger" aria-labelledby="worker-ledger-title" className={flat ? 'space-y-3' : 'space-y-3 rounded-2xl border border-white/10 px-4 py-4'}>
       <h3 id="worker-ledger-title" className="text-base font-medium text-neutral-200">
         {t('squadra.ledger.title')}
       </h3>
@@ -27,7 +27,7 @@ export default function WorkerLedger({ workerId, projects = [] }) {
         return (
           <div key={g.currency || g.regionCode} data-testid={`worker-ledger-${g.currency}`}>
             {many && <p className="mb-0.5 text-xs font-medium tabular-nums text-neutral-400">{g.currency}</p>}
-            <ul className="divide-y divide-white/5">
+            <ul className={flat ? 'space-y-1' : 'divide-y divide-white/5'}>
               {g.projects.map(({ project, paid, discounted }) => (
                 <li key={project.id} className="py-2" data-testid={`worker-ledger-project-${project.id}`}>
                   <div className="flex items-baseline justify-between gap-3">
@@ -44,7 +44,7 @@ export default function WorkerLedger({ workerId, projects = [] }) {
                 </li>
               ))}
             </ul>
-            <div className="mt-1 flex items-baseline justify-between gap-3 border-t border-white/10 pt-2.5">
+            <div className={`mt-1 flex items-baseline justify-between gap-3 ${flat ? 'pt-3' : 'border-t border-white/10 pt-2.5'}`}>
               <span className="text-sm font-semibold text-neutral-200">{t('squadra.ledger.total')}</span>
               <span className="text-lg font-medium tabular-nums text-neutral-200" data-testid={`worker-ledger-total-${g.currency}`} data-amount={g.paid}>
                 {money(g.paid)}

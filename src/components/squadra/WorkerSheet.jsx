@@ -9,10 +9,12 @@ import { toCoord } from '../../lib/geoDistance.js';
 import { BLOOD_TYPES, MAX_SPECIALTIES, SEXES } from '../../lib/workers.js';
 import BottomSheet from '../BottomSheet.jsx';
 import { Button, DateInput, TextField } from '../ui.jsx';
+import { EditToggle } from '../EditControls.jsx';
+import WorkerCard, { IdentityName } from './WorkerCard.jsx';
 import { StarPicker } from './Stars.jsx';
 import WorkerLedger from './WorkerLedger.jsx';
 
-const EMPTY = { name: '', apodo: '', specialties: [], rating: 0, phone: '', city: '', lat: null, lon: null, address: '', document: '', nationality: '', sex: '', birthDate: '', bloodType: '', limiting: '', allergies: '', emergencyName: '', emergencyPhone: '' };
+const EMPTY = { name: '', apodo: '', specialties: [], rating: 0, phone: '', email: '', city: '', lat: null, lon: null, address: '', document: '', nationality: '', sex: '', birthDate: '', bloodType: '', limiting: '', allergies: '', emergencyName: '', emergencyPhone: '' };
 
 const Block = ({ id, title, children, className = '', headingClass = 'text-neutral-200' }) => (
   <section data-testid={`worker-block-${id}`} aria-labelledby={`worker-block-${id}-title`} className={`space-y-4 rounded-2xl border px-4 py-4 ${className || 'border-white/10'}`}>
@@ -24,6 +26,10 @@ const Block = ({ id, title, children, className = '', headingClass = 'text-neutr
 );
 
 /**
+ * READ / EDIT state machine: an existing worker opens as a clean READ-ONLY card (WorkerCard: no inputs, no boxes, no lines) with a discreet pencil
+ * in the header; the pencil reveals the form below. Cancelling goes back to the card with the data exactly as stored. A NEW worker opens straight in
+ * edit mode (there is nothing to read yet).
+ *
  * The worker's file, in three "zero stress" blocks: (a) professional data, (b) personal data, (c) SAFETY AND HEALTH (limiting conditions,
  * allergies, emergency contact), the one that matters most, framed in a soft orange panel. `worker` null = a new one.
  */
@@ -31,6 +37,7 @@ export default function WorkerSheet({ worker, projects = [], onSave, onDelete, o
   const { t, lang } = useI18n();
   const [form, setForm] = useState(() => ({ ...EMPTY, ...(worker || {}) }));
   const [error, setError] = useState('');
+  const [isEditing, setIsEditing] = useState(!worker); // existing -> read; new -> edit
   const [confirmDelete, setConfirmDelete] = useState(false);
   const set = (key) => (value) => {
     setError('');
@@ -68,12 +75,36 @@ export default function WorkerSheet({ worker, projects = [], onSave, onDelete, o
     }
   };
 
+  // cancel an edit of an existing file: everything typed is discarded and the card shows the stored data again
+  const cancelEdit = () => {
+    setForm({ ...EMPTY, ...worker });
+    setError('');
+    setTyped('');
+    setActive(-1);
+    setConfirmDelete(false);
+    setIsEditing(false);
+  };
+
   const submit = (e) => {
     e.preventDefault();
     if (!form.name.trim()) return setError(t('squadra.nameRequired'));
     onSave({ ...form, id: worker?.id || newEntryId() });
     return undefined;
   };
+
+  if (worker && !isEditing) {
+    return (
+      <BottomSheet
+        fullscreen
+        title={<IdentityName worker={worker} />}
+        onClose={onClose}
+        autoFocus={false}
+        headerAction={<EditToggle active={false} onToggle={() => setIsEditing(true)} label={t('squadra.edit')} doneLabel={t('squadra.edit')} testId="worker-edit" />}
+      >
+        <WorkerCard worker={worker} projects={projects} />
+      </BottomSheet>
+    );
+  }
 
   return (
     <BottomSheet fullscreen title={worker ? worker.name : t('squadra.new')} subtitle={t('squadra.fileSubtitle')} onClose={onClose}>
@@ -117,6 +148,7 @@ export default function WorkerSheet({ worker, projects = [], onSave, onDelete, o
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <TextField label={t('squadra.phone')} value={form.phone} onChange={set('phone')} testId="worker-phone" type="tel" inputMode="tel" maxLength={32} sanitize={sanitizePhone} placeholder="+56 9 1234 5678" />
+            <TextField label={t('squadra.email')} optional={t('common.optional')} value={form.email} onChange={set('email')} testId="worker-email" type="email" inputMode="email" maxLength={80} sanitize={(v) => sanitizeTextInput(v, 80)} />
           </div>
           {/* the Radar compares THIS field with the job's city: strongly recommended, never blocking */}
           <div data-testid="worker-city-box" data-located={Number.isFinite(toCoord(form.lat)) && Number.isFinite(toCoord(form.lon)) ? 'true' : 'false'}>
@@ -255,7 +287,7 @@ export default function WorkerSheet({ worker, projects = [], onSave, onDelete, o
         {worker && <WorkerLedger workerId={worker.id} projects={projects} />}
 
         <div className="grid grid-cols-2 gap-3">
-          <Button variant="ghost" onClick={onClose} data-testid="worker-cancel">
+          <Button variant="ghost" onClick={worker ? cancelEdit : onClose} data-testid="worker-cancel">
             {t('common.cancel')}
           </Button>
           <Button type="submit" data-testid="worker-save">
