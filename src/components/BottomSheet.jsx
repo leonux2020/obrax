@@ -87,7 +87,7 @@ export default function BottomSheet({ title, subtitle, onClose, fullscreen = fal
             </div>
           )}
         </div>
-        {subtitle && <p className="mb-4 text-sm text-neutral-300">{subtitle}</p>}
+        {subtitle && <div className="mb-4 shrink-0 text-sm text-neutral-300" data-testid="sheet-subtitle">{subtitle}</div>}
         {children}
       </div>
     </div>

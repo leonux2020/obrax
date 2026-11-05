@@ -1,15 +1,13 @@
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { CREW_LIMIT, LEDGER_LIMITS, WORKER_SPECIALTIES, advancesByWorker, laborPool } from '../../lib/ledger.js';
 import { sanitizeText } from '../../lib/sanitize.js';
 import { searchPlaces } from '../../lib/forwardGeocode.js';
 import { useGeoHealing } from '../../lib/useGeoHealing.js';
 import { hasHealthNotes, isBirthdayToday, loadWorkers } from '../../lib/workers.js';
-import { withAdvance, withDiscount, withWorker, withWorkerEdited, withoutAdvance, withoutDiscount, withoutWorker } from '../../lib/workspaceModel.js';
-import BottomSheet from '../BottomSheet.jsx';
+import { withAdvance, withDiscount, withWorker, withoutAdvance, withoutDiscount, withoutWorker } from '../../lib/workspaceModel.js';
 import { EditToggle, RowDelete } from '../EditControls.jsx';
 import BirthdayMark from '../squadra/BirthdayMark.jsx';
-import { TextField } from '../ui.jsx';
 import Block from './Block.jsx';
 import { CREW_RANGES, DEFAULT_RANGE, LOCAL_KM, crewHealth, norm, omniMatch, rankWorkers } from '../../lib/crewMatch.js';
 import Nick from '../squadra/Nick.jsx';
@@ -87,57 +85,10 @@ function EmergencyPanel({ file }) {
   );
 }
 
-/** EDIT one person of the crew: name, specialty (closed list) and an optional line of tasks or notes. (Adding is the master search of the crew.) */
-function WorkerSheet({ worker, file = null, health = false, onSave, onDelete, onClose }) {
-  const { t } = useI18n();
-  const [name, setName] = useState(worker?.name ?? '');
-  const [specialty, setSpecialty] = useState(worker?.specialty ?? 'multi');
-  const [notes, setNotes] = useState(worker?.notes ?? '');
-  const specId = useId();
-  const ready = name.trim().length > 0;
-  return (
-    <BottomSheet title={worker ? t('ws.crew.sheetEdit') : t('ws.crew.sheetNew')} onClose={onClose}>
-      {health && <EmergencyPanel file={file} />}
-      <form
-        className="mt-3 space-y-4"
-        data-testid="worker-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (ready) onSave({ name, specialty, notes });
-        }}
-      >
-        <TextField label={t('ws.crew.name')} value={name} onChange={setName} sanitize={(v) => sanitizeText(v, 60)} maxLength={60} testId="crew-name" />
-        <div>
-          <label className="label" htmlFor={specId}>
-            {t('ws.crew.specialty')}
-          </label>
-          <select id={specId} value={specialty} onChange={(e) => setSpecialty(e.target.value)} className="field-input min-h-[52px]" data-testid="crew-specialty">
-            {WORKER_SPECIALTIES.map((s) => (
-              <option key={s} value={s}>
-                {t(`ws.spec.${s}`)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <TextField label={t('ws.crew.notes')} optional={t('common.optional')} value={notes} onChange={setNotes} sanitize={(v) => sanitizeText(v, 120)} maxLength={120} testId="crew-notes" />
-        <button type="submit" disabled={!ready} data-testid="crew-save" className="min-h-[56px] w-full rounded-xl px-3 text-base disabled:opacity-40 bg-brand text-black font-semibold hover:bg-brand-light">
-          {t('ws.crew.save')}
-        </button>
-        {worker && (
-          <div className="space-y-1">
-            <button type="button" onClick={onDelete} data-testid="crew-delete" className="min-h-[52px] w-full rounded-xl border border-red-500/40 px-3 text-sm font-medium text-red-400 active:border-red-400">
-              {t('common.delete')}
-            </button>
-            <p className="text-center text-xs text-neutral-400">{t('ws.crew.deleteNote')}</p>
-          </div>
-        )}
-      </form>
-    </BottomSheet>
-  );
-}
-
 /** ONE look for the chips of the crew (the distance ones): matte, quiet, the active one a little lighter. */
 const chipClass = (active) => `min-h-[36px] shrink-0 whitespace-nowrap rounded-full px-3.5 text-xs font-medium transition ${active ? 'bg-white/10 text-neutral-100' : 'bg-white/5 text-neutral-400'}`;
+/** The action pills of an unfolded person: a very light translucent fill, small type, 32 px tall (`before:` extends the hit area to 44 px). */
+const pillClass = 'relative inline-flex min-h-[32px] items-center justify-center rounded-full bg-white/5 px-4 text-sm font-normal transition before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-[""]';
 const specOf = (w) => (WORKER_SPECIALTIES.includes(w?.specialty) ? w.specialty : 'multi');
 
 /** The magnifier of the search field (local, outline: the shared icon set stays frozen). */
@@ -152,10 +103,11 @@ const SearchIcon = (props) => (
  * One person as a CONTACT of the agenda (WhatsApp / Phone style), no box: a continuous row with a hairline under it. Left an avatar with
  * the initials, in the middle the name (birthday cake, orange health triangle) and the trade under it, on the right the total already
  * advanced (quiet) and a discreet coin. Tapping the row, or the coin, UNFOLDS it (accordion, one at a time): the dated list of the
- * advances and two text actions without a frame, "+ Advance" (the app's numpad) and "Edit" (the worker's sheet). In EDIT MODE (the pencil
+ * advances and two compact pills side by side, "+ Advance" (the app's numpad) and "- Discount". There is NO "edit worker" here: the file of a person
+ * (name, nickname, trade) is edited only in Ajustes > Squadra; in the project the person is read, paid and discounted. In EDIT MODE (the pencil
  * of the sheet's header) the row also wears its delete icon on the left and each advance of the unfolded detail its own cross.
  */
-function WorkerCard({ row, apodo = '', health = false, birthday = false, editing = false, expanded = false, onToggle, onEdit, onAdvance, onDiscount, onRemove, onRemoveAdvance, onRemoveDiscount }) {
+function WorkerCard({ row, apodo = '', health = false, emergency = false, file = null, birthday = false, editing = false, expanded = false, onToggle, onAdvance, onDiscount, onRemove, onRemoveAdvance, onRemoveDiscount }) {
   const { t, money, locale } = useI18n();
   const { worker: w, list, total, discounts, discounted } = row;
   // ONE dated history: payments / advances in a neutral tone, discounts (retentions, no cash) in a subtle red with the minus sign and the reason
@@ -208,10 +160,10 @@ function WorkerCard({ row, apodo = '', health = false, birthday = false, editing
         <div className="acc-open" id={panelId} data-testid={`worker-detail-${w.id}`}>
           <div className="min-h-0 overflow-hidden">
             <div className="pb-2 pl-[3.25rem] pr-1">
-              <p className="text-xs font-medium text-neutral-500">{t('ws.crew.advanced')}</p>
-              {history.length === 0 && <p className="mt-0.5 text-xs font-medium text-neutral-500">{t('ws.crew.noAdvances')}</p>}
+              {/* read-only safety data of the person's file (only with a health warning): the in-situ emergency panel, one tap from the row */}
+              {emergency && <EmergencyPanel file={file} />}
               {history.length > 0 && (
-                <ul className="mt-0.5 divide-y divide-white/5" data-testid={`worker-advlist-${w.id}`}>
+                <ul className="divide-y divide-white/5" data-testid={`worker-advlist-${w.id}`}>
                   {history.map((h) =>
                     h.kind === 'advance' ? (
                       <li key={h.id} className="flex min-h-[36px] items-center gap-3" data-kind="advance">
@@ -244,15 +196,13 @@ function WorkerCard({ row, apodo = '', health = false, birthday = false, editing
                   )}
                 </ul>
               )}
-              <div className="mt-1 flex items-center gap-5">
-                <button type="button" onClick={onAdvance} data-testid={`worker-adv-${w.id}`} className="min-h-[44px] text-sm font-medium text-emerald-400 transition active:text-emerald-300">
+              {/* the two actions as ultra-compact pills, side by side: one row of 32 px (the touch area still reaches 44 px through ::before, without taking room) */}
+              <div className="mt-2 flex flex-row gap-4" data-testid={`worker-actions-${w.id}`}>
+                <button type="button" onClick={onAdvance} data-testid={`worker-adv-${w.id}`} className={`${pillClass} text-emerald-400 active:bg-white/10`}>
                   + {t('ws.crew.advance')}
                 </button>
-                <button type="button" onClick={onDiscount} data-testid={`worker-discount-${w.id}`} className="min-h-[44px] text-sm text-neutral-400 transition active:text-neutral-200">
+                <button type="button" onClick={onDiscount} data-testid={`worker-discount-${w.id}`} className={`${pillClass} text-neutral-400 active:bg-white/10 active:text-neutral-200`}>
                   - {t('ws.crew.discount')}
-                </button>
-                <button type="button" onClick={onEdit} data-testid={`worker-edit-${w.id}`} className="min-h-[44px] text-sm text-neutral-400 transition active:text-neutral-200">
-                  {t('ws.crew.sheetEdit')}
                 </button>
               </div>
             </div>
@@ -271,7 +221,6 @@ function WorkerCard({ row, apodo = '', health = false, birthday = false, editing
  */
 export default function CrewBlock({ project, result, setProject, open, onToggle, geocode }) {
   const { t, money, region, lang } = useI18n();
-  const [sheet, setSheet] = useState(null); // null | worker id (the sheet that edits one person)
   const [editMode, setEditMode] = useState(false); // the pencil of the header: the delete icons only exist while it is on
   const [advFor, setAdvFor] = useState(null); // worker id whose advance is being typed on the pad
   const [discFor, setDiscFor] = useState(null); // worker id whose discount (amount + reason) is being written
@@ -285,9 +234,8 @@ export default function CrewBlock({ project, result, setProject, open, onToggle,
   const crew = project.crew ?? [];
   const { rows, loose, looseTotal, looseDiscounts } = advancesByWorker(crew, project.advances, project.discounts);
   const pool = laborPool(result.valid ? result.quote.labor : 0, project.advances, project.discounts);
-  const editing = sheet ? crew.find((w) => w.id === sheet) : null;
   // the directory is read again whenever a sheet opens or closes and whenever a search starts (its files may have just been edited in Settings)
-  const directory = useMemo(() => loadWorkers(), [sheet, open, query.trim() !== '']); // eslint-disable-line react-hooks/exhaustive-deps
+  const directory = useMemo(() => loadWorkers(), [open, query.trim() !== '']); // eslint-disable-line react-hooks/exhaustive-deps
   // THE OMNIBOX: ONE field. Every typed word is looked for at once in the first name, the surname and the trade, both among the crew on the job
   // and among the company's directory ("ele" finds Elena and Juan the electrician). Read only governance: a project never creates people.
   const typed = query.trim();
@@ -382,22 +330,24 @@ export default function CrewBlock({ project, result, setProject, open, onToggle,
     />
   );
 
+  // the labour budget at a glance, right under the title of the sheet (light, quiet): what is left, what was spent, what was discounted
+  const laborLine = (
+    <span data-testid="labor-pool" data-available={pool.available} data-spent={pool.advanced} data-discounted={pool.discounted} className="block min-w-0 text-sm font-light text-neutral-400">
+      {t('ws.crew.labor')}: <span className="font-normal tabular-nums text-neutral-300">{money(pool.available)}</span>
+      <span className="whitespace-nowrap tabular-nums">
+        {' '}
+        ({t('ws.crew.spent')}: {money(pool.advanced)}
+        {pool.discounted > 0 && <span data-testid="labor-discounted"> · {t('ws.crew.discounted')}: − {money(pool.discounted)}</span>})
+      </span>
+    </span>
+  );
+
   return (
-    <Block icon={<UsersIcon size={32} />} label={t('ws.menu.crew')} id="crew" title={t('ws.crew.title')} meta={t(crew.length === 1 ? 'ws.crew.count1' : 'ws.crew.countN', { n: crew.length })} open={open} onToggle={onToggle} testId="ws-crew" tall fill headerAction={editToggle}>
+    <Block icon={<UsersIcon size={32} />} label={t('ws.menu.crew')} id="crew" title={t('ws.crew.title')} meta={t(crew.length === 1 ? 'ws.crew.count1' : 'ws.crew.countN', { n: crew.length })} open={open} onToggle={onToggle} testId="ws-crew" tall fill headerAction={editToggle} subtitle={laborLine}>
       <div className="flex min-h-0 flex-1 flex-col gap-2">
-        {/* the labour balance is read BEFORE handing out an advance; then the crew on the job (the block that scrolls); and at the BOTTOM, within
+        {/* the labour balance now lives in the HEADER of the sheet (under the title); here: the crew on the job (the block that scrolls); and at the BOTTOM, within
             the thumb's reach and riding on top of the keyboard, the OMNIBOX dock: the distance chips right ABOVE the search field and the
             suggestions DROPPING UP from it, over the crew (so the keyboard never covers them). No trade chips, no "+ create" here. */}
-        <div className="shrink-0" data-testid="crew-bar">
-          <p data-testid="labor-pool" data-available={pool.available} data-spent={pool.advanced} data-discounted={pool.discounted} className="min-w-0 text-right text-sm text-neutral-300">
-            {t('ws.crew.labor')}: <b className="tabular-nums text-neutral-200">{money(pool.available)}</b>
-            <span className="whitespace-nowrap tabular-nums text-[#e8c35f]">
-              {' '}
-              ({t('ws.crew.spent')}: {money(pool.advanced)}
-              {pool.discounted > 0 && <span data-testid="labor-discounted"> · {t('ws.crew.discounted')}: − {money(pool.discounted)}</span>})
-            </span>
-          </p>
-        </div>
         <div data-testid="crew-results" className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain">
           {crew.length === 0 && !typed && (
             <p className="text-sm text-neutral-400" data-testid="crew-empty">
@@ -417,11 +367,12 @@ export default function CrewBlock({ project, result, setProject, open, onToggle,
                   row={row}
                   apodo={fileOf(row.worker)?.apodo}
                   health={healthOf(row.worker)}
+                  emergency={healthOf(row.worker) || Boolean(fileOf(row.worker)?.bloodType)} // the blood group is medical data too: it opens the panel on its own
+                  file={fileOf(row.worker) ?? null}
                   birthday={birthdayOf(row.worker)}
                   editing={editMode}
                   expanded={unfolded === row.worker.id}
                   onToggle={() => setUnfolded((id) => (id === row.worker.id ? null : row.worker.id))}
-                  onEdit={() => setSheet(row.worker.id)}
                   onRemove={() => setProject((p) => withoutWorker(p, row.worker.id))}
                   onAdvance={() => {
                     if (advanceFull) return;
@@ -525,22 +476,6 @@ export default function CrewBlock({ project, result, setProject, open, onToggle,
         </div>
       </div>
 
-      {editing && (
-        <WorkerSheet
-          worker={editing}
-          file={directory.find((f) => f.id === editing.ref) ?? null}
-          health={healthOf(editing) || Boolean(directory.find((f) => f.id === editing.ref)?.bloodType)} // the blood group is medical data too: it opens the panel on its own
-          onClose={() => setSheet(null)}
-          onSave={(data) => {
-            setProject((p) => withWorkerEdited(p, editing.id, { ...data, ref: editing.ref, health: editing.health }));
-            setSheet(null);
-          }}
-          onDelete={() => {
-            setProject((p) => withoutWorker(p, editing.id));
-            setSheet(null);
-          }}
-        />
-      )}
       {discFor && (
         <DiscountSheet
           name={crew.find((w) => w.id === discFor)?.name ?? ''}

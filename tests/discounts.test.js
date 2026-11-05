@@ -199,13 +199,15 @@ describe('discounts: the worker accordion', () => {
     await click(q('discount-save'));
   };
 
-  it('a quiet "- Descuento" text button sits next to "+ Anticipo" (neutral text, no border, no fill)', async () => {
+  it('a quiet "- Descuento" pill sits next to "+ Anticipo" (neutral text, no border, no fill)', async () => {
     const id = await setup();
     const btn = q(`worker-discount-${id}`);
     expect(btn.textContent).toBe('- Descuento');
     expect(btn.className).toContain('text-neutral-400');
-    expect(btn.className).not.toMatch(/\bborder\b|\bbg-|\brounded/);
-    expect(btn.className).toMatch(/min-h-\[(4[4-9]|5\d)px\]/);
+    expect(btn.className).not.toMatch(/\bborder\b/);
+    expect(btn.className).toContain('rounded-full'); // Fase 11.3: ultra-compact pill, very light translucent fill
+    expect(btn.className).toContain('bg-white/5');
+    expect(btn.className).toContain('before:-inset-y-1.5'); // 32px pill + 2x6px invisible halo = 44px touch target
     expect(btn.previousElementSibling).toBe(q(`worker-adv-${id}`));
   });
 

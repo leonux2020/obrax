@@ -198,9 +198,11 @@ describe('crew master search: ONE bar to find and add people (no modal, no boxes
     // the distance chips sit EXACTLY above the search bar
     expect(q('crew-range').compareDocumentPosition(q('crew-search')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(q('crew-range').nextElementSibling).toBe(q('crew-search-box'));
-    // order: labour line, then the crew (the block that scrolls), then the dock at the bottom
+    // order: the crew (the block that scrolls), then the dock at the bottom; the labour budget is in the header, above everything
     const results = q('crew-results');
-    expect(q('crew-bar').compareDocumentPosition(results) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(q('crew-bar')).toBeNull();
+    expect(q('sheet-subtitle').contains(q('labor-pool'))).toBe(true);
+    expect(q('labor-pool').compareDocumentPosition(results) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(results.compareDocumentPosition(q('crew-dock')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(q('crew-dock').nextElementSibling).toBeNull(); // the last thing of the sheet's column
     for (const cls of ['flex-1', 'overflow-y-auto', 'min-h-0']) expect(results.className).toContain(cls);
@@ -496,16 +498,16 @@ describe('crew master search: ONE bar to find and add people (no modal, no boxes
     expect(q('ws-crew-sheet')).not.toBeNull();
   });
 
-  it('the person of the project is still edited with the old sheet (name, trade, notes) and keeps the directory link', async () => {
+  it('a person of the project can NOT be edited on the job: no "Modifica lavoratore", no form; the link to the directory is kept', async () => {
     await mount();
     await pick('wk000001');
     const id = spy.project.crew[0].id;
     await unfold(id);
-    await click(q(`worker-edit-${id}`));
-    expect(q('crew-specialty')).not.toBeNull();
-    await typeInto(q('crew-notes'), 'Tablero');
-    await click(q('crew-save'));
-    expect(spy.project.crew[0]).toMatchObject({ id, ref: 'wk000001', notes: 'Tablero' });
+    expect(q(`worker-edit-${id}`)).toBeNull();
+    expect(q('worker-form')).toBeNull();
+    expect(q('crew-specialty')).toBeNull();
+    expect(q(`worker-detail-${id}`).textContent).not.toMatch(/Editar trabajador|Modifica/);
+    expect(spy.project.crew[0]).toMatchObject({ id, ref: 'wk000001' });
   });
 });
 
@@ -564,15 +566,12 @@ describe('safety: the ⚠ of the file follows the worker onto the job', () => {
     expect(card('crew0001')).not.toBeNull();
   });
 
-  it('it survives editing the person on the job, saving the project and loading it again, and the advance flow does not hide it', async () => {
+  it('it survives saving the project and loading it again, and the advance flow does not hide it', async () => {
     await mount();
     await pick('wk000001');
     const id = spy.project.crew[0].id;
     await unfold(id);
-    await click(q(`worker-edit-${id}`));
-    await typeInto(q('crew-notes'), 'Tablero');
-    await click(q('crew-save'));
-    expect(spy.project.crew[0]).toMatchObject({ ref: 'wk000001', health: true, notes: 'Tablero' });
+    expect(spy.project.crew[0]).toMatchObject({ ref: 'wk000001', health: true });
     expect(card(id)).not.toBeNull();
     const reloaded = normalizeProject(JSON.parse(JSON.stringify(spy.project)));
     expect(reloaded.crew[0]).toMatchObject({ ref: 'wk000001', health: true });
@@ -598,12 +597,12 @@ describe('safety: the ⚠ of the file follows the worker onto the job', () => {
   });
 });
 
-describe('emergency: the health data is READ on site (the person\'s sheet in the project)', () => {
+describe('emergency: the health data is READ on site (the unfolded person in the project)', () => {
   const FULL = { id: 'wk000009', name: 'Fito Vega', specialties: ['mason'], rating: 2, address: 'Maipú', limiting: 'Vértigo: no trabajar en altura', allergies: 'Penicilina, Látex', emergencyName: 'María Soto', emergencyPhone: '+56 9 8765 4321' };
+  // the panel is read in the unfolded row (the edit sheet of the job is gone): open the crew sheet if needed and unfold the person
   const open = async (name) => {
-    const id = spy.project.crew.find((w) => w.name === name).id;
-    await unfold(id);
-    await click(q(`worker-edit-${id}`));
+    if (!q('ws-crew-sheet')) await click(q('ws-crew'));
+    await unfold(spy.project.crew.find((w) => w.name === name).id);
   };
 
   it('tapping a person with a health warning shows, at the TOP of the sheet, the conditions, allergies and emergency contact of the file, in an orange panel', async () => {
@@ -623,8 +622,10 @@ describe('emergency: the health data is READ on site (the person\'s sheet in the
     expect(q('crew-emergency-contact-name').textContent).toBe('María Soto');
     expect(q('crew-emergency-phone').textContent).toBe('+56 9 8765 4321');
     expect(q('crew-emergency-phone').getAttribute('href')).toBe('tel:+56987654321'); // one tap to call
-    // it comes BEFORE the editing form: it is the first thing of the sheet
-    expect(panel.compareDocumentPosition(q('worker-form')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // it comes BEFORE the actions of the person: it is the first thing of the unfolded row
+    const id = spy.project.crew.find((w) => w.name === 'Fito Vega').id;
+    expect(panel.compareDocumentPosition(q(`worker-adv-${id}`)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(q(`worker-edit-${id}`)).toBeNull();
     expect(panel.querySelector('input, textarea, select, button')).toBeNull(); // read only
   });
 
@@ -645,7 +646,7 @@ describe('emergency: the health data is READ on site (the person\'s sheet in the
     await pick('wk000009');
     await open('Fito Vega');
     expect(q('crew-emergency-allergies').textContent).toContain('Penicilina');
-    await click(qa('sheet-backdrop').at(-1));
+    await click(qa('sheet-backdrop').at(-1)); // closes the crew sheet
     saveWorkers([{ ...FULL, allergies: 'Abejas' }]); // edited in Ajustes meanwhile
     await open('Fito Vega');
     expect(q('crew-emergency-allergies').textContent).toContain('Abejas');
@@ -659,7 +660,7 @@ describe('emergency: the health data is READ on site (the person\'s sheet in the
     await pick('wk000002'); // Beto: no notes
     for (const name of ['Gaby Paz', 'Pedro Urgente', 'Beto Soto']) {
       await open(name);
-      expect(q('worker-form'), name).not.toBeNull();
+      expect(q(`worker-detail-${spy.project.crew.find((w) => w.name === name).id}`), name).not.toBeNull();
       expect(q('crew-emergency'), name).toBeNull();
       await click(qa('sheet-backdrop').at(-1));
     }
@@ -677,20 +678,18 @@ describe('emergency: the health data is READ on site (the person\'s sheet in the
     await flush();
     await click(q('ws-crew'));
     await unfold('crew0001');
-    await click(q('worker-edit-crew0001'));
     expect(q('crew-emergency')).not.toBeNull();
     expect(q('crew-emergency-gone').textContent).toContain('ya no está en el directorio');
     expect(q('crew-emergency-limiting')).toBeNull();
   });
 
-  it('works in every language and the sheet still edits normally under the panel (name, trade, notes, delete)', async () => {
+  it('works in every language; the person cannot be edited under the panel (read-only, only advances and discounts)', async () => {
     saveWorkers([FULL]);
     await mount();
     await pick('wk000009');
     await open('Fito Vega');
-    await typeInto(q('crew-notes'), 'Tablero');
-    await click(q('crew-save'));
-    expect(spy.project.crew[0]).toMatchObject({ name: 'Fito Vega', notes: 'Tablero', ref: 'wk000009', health: true });
+    expect(q('worker-form')).toBeNull();
+    expect(spy.project.crew[0]).toMatchObject({ name: 'Fito Vega', ref: 'wk000009', health: true });
     for (const l of ['es', 'en', 'pt', 'fr', 'it', 'de']) for (const k of ['crew.emergency.title', 'crew.emergency.noContact', 'crew.emergency.gone']) expect(DICT[l][k], `${l} ${k}`).toBeTruthy();
   });
 });
@@ -699,7 +698,6 @@ describe('emergency panel: the blood group, big and red', () => {
   const FILE = { id: 'wk000009', name: 'Fito Vega', specialties: ['mason'], rating: 2, address: 'Maipú', allergies: 'Penicilina', bloodType: 'O-', emergencyName: 'María', emergencyPhone: '+56 9 1' };
   const openSheet = async (name) => {
     await unfold(spy.project.crew.find((w) => w.name === name).id);
-    await click(q(`worker-edit-${spy.project.crew.find((w) => w.name === name).id}`));
   };
 
   it('shows the group first in the orange panel as a red badge, large and semibold, announced with its label', async () => {

@@ -176,19 +176,11 @@ const keys = async (s) => {
 // A project only PICKS people: they are created in Settings (the company directory). The helper writes the person into the directory,
 // finds them with the omnibox and taps their row, exactly like the user does.
 let dirSeq = 0;
-const addWorker = async (name, specialty = null, notes = '') => {
+const addWorker = async (name, specialty = null) => {
   const id = `dir${String((dirSeq += 1)).padStart(4, '0')}`;
   saveWorkers([...loadWorkers(), { id, name, specialties: specialty ? [specialty] : [] }]);
   await typeInto(q('crew-search'), name);
   await click(q(`crew-pick-${id}`));
-  if (notes) {
-    // adding is fast (name + trade); the optional line of tasks is written from the person's card
-    const id = spy.project.crew.at(-1).id;
-    await unfold(id);
-    await click(q(`worker-edit-${id}`));
-    await typeInto(q('crew-notes'), notes);
-    await click(q('crew-save'));
-  }
 };
 
 function Harness({ initial, spy }) {
@@ -262,7 +254,8 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(DICT.it['ws.crew.title']).toBe('Squadra'); // "Squadra e cronoprogramma" is gone from every language
     for (const l of ['es', 'en', 'pt', 'fr', 'it', 'de']) expect(DICT[l]['ws.crew.title'], l).not.toMatch(/crono|schedule|planning|zeitplan| e | and | und | et /i);
     expect(q('ws-crew').textContent).not.toMatch(/ · \d+ d\b/); // the tile no longer carries the days
-    expect(q('crew-bar').compareDocumentPosition(q('crew-master')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(q('crew-bar')).toBeNull(); // the labour line moved to the header of the sheet
+    expect(q('sheet-subtitle').contains(q('labor-pool'))).toBe(true);
   });
 
   it('the omnibox picks people from the directory (no dialog, NO "+ create"): the bar is always there, typing alone adds nobody, the person shows up as a contact row', async () => {
@@ -279,10 +272,10 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(spy.project.crew).toHaveLength(0); // typing alone adds nobody
     await typeInto(q('crew-search'), '');
     expect(q('crew-suggest')).toBeNull();
-    await addWorker('Luca Rossi', 'electrician', 'Tablero general');
+    await addWorker('Luca Rossi', 'electrician');
     expect(spy.project.crew).toHaveLength(1);
     const w = spy.project.crew[0];
-    expect(w).toMatchObject({ name: 'Luca Rossi', specialty: 'electrician', notes: 'Tablero general' });
+    expect(w).toMatchObject({ name: 'Luca Rossi', specialty: 'electrician' });
     expect(w.ref).toMatch(/^dir/); // linked to its file of the directory
     const card = q(`worker-${w.id}`);
     expect(card.dataset.specialty).toBe('electrician');
@@ -322,8 +315,9 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     const btn = q(`worker-adv-${id}`);
     expect(btn.textContent).toBe('+ Anticipo');
     expect(btn.className).toContain('text-emerald-400');
-    expect(btn.className).not.toMatch(/\bborder\b|\bbg-|\brounded/); // plain text
-    expect(btn.className).toMatch(/min-h-\[(4[4-9]|5\d)px\]/); // still a comfortable touch target
+    expect(btn.className).not.toMatch(/\bborder\b/); // no frame: a light translucent pill
+    expect(btn.className).toContain('rounded-full');
+    expect(btn.className).toContain('before:-inset-y-1.5'); // 32px pill + invisible halo = 44px touch target
     expect(btn.closest('[data-testid="ws-crew-sheet"]')).not.toBeNull();
     expect(DICT.it['ws.crew.advance']).toBe('Anticipo');
   });
@@ -351,8 +345,7 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(q(`worker-toggle-${id}`).getAttribute('aria-expanded')).toBe('true');
     expect(q(`worker-detail-${id}`)).not.toBeNull();
     expect(q(`worker-detail-${id}`).className).toContain('acc-open');
-    expect(q(`worker-advlist-${id}`)).toBeNull(); // no advances yet: it says so
-    expect(q(`worker-detail-${id}`).textContent).toContain(DICT.es['ws.crew.noAdvances']);
+    expect(q(`worker-advlist-${id}`)).toBeNull(); // no advances yet: nothing but the two pills
     await click(q(`worker-adv-${id}`));
     await keys('1000');
     await click(q('pad-done'));
@@ -401,7 +394,7 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(box.className).not.toMatch(/\bborder-white|\bborder\b(?!-0)/);
     expect(box.placeholder).toBe(DICT.es['ws.crew.search']);
     expect(box.getAttribute('aria-label')).toBe(DICT.es['ws.crew.search']);
-    expect(q('crew-bar').compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // under the control line...
+    expect(q('labor-pool').compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // under the labour line of the header...
     expect(q('crew-list').compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // ...and under the list: the bar is docked at the bottom, in reach of the thumb
     await typeInto(box, 'JOSE');
     expect(q(`worker-${jose}`)).not.toBeNull();
@@ -420,20 +413,23 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(q(`worker-${marta}`)).not.toBeNull();
   });
 
-  it('control line: "Mano de obra: X (Gastado: Y)" on the right, ABOVE the master search; no [+], no big bottom button or budget text; the balance moves with each advance', async () => {
+  it('labour line: "Mano de obra: X (Gastado: Y)" in the HEADER of the sheet, under the title, light and quiet; NOT in the body or the list; the balance moves with each advance', async () => {
     await mount(mk());
     await openCrew();
     await addWorker('Juan');
-    const bar = q('crew-bar');
+    const dialog = q('ws-crew-sheet').closest('[role="dialog"]');
+    const head = q('sheet-subtitle');
     const pool = q('labor-pool');
-    expect(bar.contains(pool)).toBe(true);
-    expect(pool.className).toContain('text-right');
+    expect(dialog.contains(head) && head.contains(pool)).toBe(true);
+    expect(q('ws-crew-sheet').contains(pool)).toBe(false); // not in the body of the sheet
+    expect(q('crew-list').contains(pool)).toBe(false); // nor among the people
+    expect(q('crew-bar')).toBeNull();
+    expect(pool.className).toMatch(/text-sm.*font-light.*text-neutral-400|font-light.*text-neutral-400/);
+    expect(dialog.querySelector('h2').compareDocumentPosition(pool) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // right under the title
+    expect(pool.compareDocumentPosition(q('crew-list')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(pool.textContent).toMatch(/^Mano de obra: .*\(Gastado: .*\)$/);
-    expect(bar.querySelector('button')).toBeNull();
     expect(q('crew-add')).toBeNull();
-    expect(bar.compareDocumentPosition(q('crew-search')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // the bar is docked below
-    expect(bar.compareDocumentPosition(q('crew-list')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(q('ws-crew-sheet').textContent).not.toContain('Mano de obra disponible');
+    expect(q('ws-crew-sheet').textContent).not.toContain('Mano de obra');
     const before = Number(pool.dataset.available);
     const id = spy.project.crew[0].id;
     await unfold(id);
@@ -491,7 +487,7 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(q(`worker-del-${ana}`)).not.toBeNull();
     await click(q(`worker-advlist-${ana}`).querySelector('button'));
     expect(spy.project.advances).toHaveLength(0);
-    expect(q(`worker-detail-${ana}`).textContent).toContain(DICT.es['ws.crew.noAdvances']);
+    expect(q(`worker-advlist-${ana}`)).toBeNull(); // no history left: nothing but the two pills
     await typeInto(q('crew-search'), 'electri'); // the omnibox filters the crew; a filtered-out person is not touched
     expect(q(`worker-del-${ana}`)).toBeNull();
     expect(q(`worker-del-${beto}`)).not.toBeNull();
@@ -544,25 +540,21 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(q(`worker-${pia.id}`).dataset.specialty).toBe('painter');
   });
 
-  it('a worker is edited and deleted from their card; their advances stay in the book as unassigned', async () => {
+  it('a worker is deleted from the list (edit mode, two taps) and cannot be edited on the job; their advances stay in the book as unassigned', async () => {
     await mount(mk());
     await openCrew();
     await addWorker('Ana', 'mason');
     const id = spy.project.crew[0].id;
     await unfold(id);
-    await click(q(`worker-edit-${id}`));
-    expect(q('crew-name').value).toBe('Ana');
-    await typeInto(q('crew-name'), 'Ana María');
-    await click(q('crew-save'));
-    expect(spy.project.crew[0]).toMatchObject({ id, name: 'Ana María', specialty: 'mason' });
-    await unfold(id);
+    expect(q(`worker-edit-${id}`)).toBeNull(); // no "Modifica lavoratore": the file is edited only in Ajustes > Squadra
     await click(q(`worker-adv-${id}`));
     await keys('800');
     await click(q('pad-done'));
     expect(spy.project.advances).toHaveLength(1);
-    await unfold(id);
-    await click(q(`worker-edit-${id}`));
-    await click(q('crew-delete'));
+    await click(q('crew-edit-toggle'));
+    await click(q(`worker-del-${id}`));
+    await click(q(`worker-del-${id}-confirm`));
+    await click(q('crew-edit-toggle'));
     expect(spy.project.crew).toHaveLength(0);
     expect(spy.project.advances).toHaveLength(1); // the money already handed over stays
     expect(q('advances-loose').dataset.total).toBe('800');
