@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from 'react';
 import { useBackLayer } from '../lib/backStack.js';
+import { useKeyboardDock } from '../lib/keyboardDock.js';
 import { useSheetSwipe } from '../lib/useSheetSwipe.js';
 
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
@@ -10,15 +11,16 @@ const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([di
  * left and, optionally, ONE control on the right (`headerAction`: a pencil, a total, a filter). Every sheet closes the native way: swipe down
  * (on by default, `swipeToClose={false}` is the explicit opt-out nobody uses), the device Back (back stack), the backdrop and Escape. Anchored to the bottom of the screen, pure #000 with an ultra
  * thin border (`tall`: an expanded sheet, 85 % of the screen, for dense lists; `fill`: the sheet does not scroll as a whole, it is a flex column whose body
- * (a `min-h-0 flex-1` block) owns the scroll, so a search field stays put and its results take the room that is left above the keyboard). Focus is trapped inside and returns to the opener.
+ * (a `min-h-0 flex-1` block) owns the scroll, so a search field stays put; `dock`: while the on-screen keyboard is up the sheet rests on top of it and shrinks to the visible screen). Focus is trapped inside and returns to the opener.
  */
-export default function BottomSheet({ title, subtitle, onClose, fullscreen = false, tall = false, fill = false, swipeToClose = true, autoFocus = true, headerAction = null, children }) {
+export default function BottomSheet({ title, subtitle, onClose, fullscreen = false, tall = false, fill = false, dock = false, swipeToClose = true, autoFocus = true, headerAction = null, children }) {
   const titleId = useId();
   const ref = useRef(null);
   // Back-stack layer: opening pushes one history entry; the device's Back closes only this sheet (or the topmost layer above it);
   // closing by backdrop / swipe / Escape drops the entry again (see lib/backStack.js).
   useBackLayer(onClose);
   const swipe = useSheetSwipe(ref, onClose, swipeToClose);
+  useKeyboardDock(ref, dock); // `dock`: the sheet rides on top of the on-screen keyboard (a field at its bottom stays in sight)
 
   useEffect(() => {
     const previous = document.activeElement;

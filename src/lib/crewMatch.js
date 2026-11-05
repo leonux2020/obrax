@@ -74,8 +74,16 @@ export const omniMatch = (query, fields) => {
   return words.every((w) => hay.some((h) => h.includes(w)));
 };
 
-/** The directory worker against the omnibox: their name (first name + surname) and the label of EVERY trade they have. `label` maps a trade id to its words. */
-const matchesQuery = (worker, query, label) => omniMatch(query, [worker.name, ...(label ? worker.specialties.map((id) => label(id)) : [])]);
+/** True when every typed word BEGINS a word of some field ("el" starts "Elena"; it does not start "Michele"): used to put those first. */
+export const omniStarts = (query, fields) => {
+  const words = norm(query).split(' ').filter(Boolean);
+  const hay = fields.flatMap((f) => norm(f).split(' ')).filter(Boolean);
+  return words.every((w) => hay.some((h) => h.startsWith(w)));
+};
+
+/** What the omnibox reads of a directory worker: first name + surname (`name`), the nickname (`apodo`) and the label of EVERY trade they have. `label` maps a trade id to its words. */
+export const searchFields = (worker, label) => [worker.name, worker.apodo, ...(label ? (worker.specialties ?? []).map((id) => label(id)) : [])];
+const matchesQuery = (worker, query, label) => omniMatch(query, searchFields(worker, label));
 
 /**
  * The directory for this job: [{ worker, near }] filtered by the typed text (name, or trade when `label` is given), the trade chip (`specialty` id or '') and the range, and ordered
@@ -97,9 +105,10 @@ export function rankWorkers(workers, { project, specialty = '', range = DEFAULT_
         continue;
       }
     }
-    rows.push({ worker, near });
+    rows.push({ worker, near, starts: query ? omniStarts(query, searchFields(worker, label)) : true });
   }
-  rows.sort((a, b) => a.near - b.near || b.worker.rating - a.worker.rating || a.worker.name.localeCompare(b.worker.name));
+  // nearest first; at the same distance the ones whose words BEGIN with what is typed (one letter finds a lot: "e" puts Elena before Michele), then best rated
+  rows.sort((a, b) => a.near - b.near || Number(b.starts) - Number(a.starts) || b.worker.rating - a.worker.rating || a.worker.name.localeCompare(b.worker.name));
   return { rows, placed, hidden };
 }
 

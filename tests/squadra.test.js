@@ -9,6 +9,7 @@ import { collectBackup, parseBackup, restoreBackup } from '../src/lib/backup.js'
 import { liquidity, normalizeAdvances, normalizeExpenses, normalizePayments, profitability } from '../src/lib/ledger.js';
 import { BLOOD_TYPES, WORKERS_KEY, WORKER_LIMIT, cleanBirthDate, hasHealthNotes, loadWorkers, mergeWorkers, normalizeWorker, normalizeWorkers, removeWorker, saveWorkers, upsertWorker } from '../src/lib/workers.js';
 import { wipeLocalData } from '../src/lib/session.js';
+import { DICT } from '../src/lib/dict.js';
 
 let App;
 let h;
@@ -224,6 +225,20 @@ describe('Squadra: the directory (list)', () => {
     expect(ana.querySelector('[data-testid="worker-health-flag"]')).not.toBeNull();
     expect(juan.querySelector('[data-testid="worker-health-flag"]')).toBeNull();
   });
+
+  it('NICKNAME: the optional "Apodo" is written after the name in a quiet tone; a row without one shows nothing extra', async () => {
+    saveWorkers([
+      { id: 'wk000001', name: 'Juan Pérez', apodo: 'El Flaco', specialties: ['mason'], rating: 4 },
+      { id: 'wk000002', name: 'Ana Ruiz', specialties: ['painter'], rating: 3 },
+    ]);
+    await openAjustes();
+    await click(q('settings-squadra'));
+    const juan = q('worker-wk000001');
+    expect(juan.querySelector('[data-testid="worker-row-name"]').textContent).toBe('Juan Pérez “El Flaco”');
+    expect(juan.querySelector('[data-testid="worker-row-apodo"]').className).toContain('text-neutral-400');
+    expect(q('worker-wk000002').querySelector('[data-testid="worker-row-apodo"]')).toBeNull();
+    expect(q('worker-wk000002').querySelector('[data-testid="worker-row-name"]').textContent).toBe('Ana Ruiz');
+  });
 });
 
 describe('Squadra: the worker file', () => {
@@ -232,6 +247,23 @@ describe('Squadra: the worker file', () => {
     await click(q('settings-squadra'));
     await click(q('squadra-new'));
   };
+
+  it('the form has an optional "Apodo" field under the name (inside the professional block, OLED like the rest) and it is saved with the file', async () => {
+    await openNew();
+    const field = q('worker-apodo');
+    expect(field).not.toBeNull();
+    expect(q('worker-block-pro').contains(field)).toBe(true);
+    expect(q('worker-name').compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(field.maxLength).toBe(40);
+    expect(field.className).not.toMatch(/bg-neutral-[3-9]00(?!\/)/);
+    expect(q('worker-block-pro').textContent).toContain('Apodo');
+    expect(q('worker-block-pro').textContent).toContain(DICT.es['common.optional']);
+    await typeInto(q('worker-name'), 'Juan Pérez');
+    await typeInto(field, 'El Flaco');
+    await click(q('worker-save'));
+    expect(loadWorkers()[0]).toMatchObject({ name: 'Juan Pérez', apodo: 'El Flaco' });
+    for (const l of ['es', 'en', 'pt', 'fr', 'it', 'de']) expect(DICT[l]['squadra.apodo'], l).toBeTruthy();
+  });
 
   it('three blocks in order: professional, personal and SAFETY AND HEALTH framed in a soft orange panel', async () => {
     await openNew();

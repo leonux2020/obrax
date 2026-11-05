@@ -7,7 +7,7 @@ import BottomSheet from '../BottomSheet.jsx';
 import { Button, DateInput, TextField } from '../ui.jsx';
 import { StarPicker } from './Stars.jsx';
 
-const EMPTY = { name: '', specialties: [], rating: 0, phone: '', city: '', address: '', document: '', nationality: '', sex: '', birthDate: '', bloodType: '', limiting: '', allergies: '', emergencyName: '', emergencyPhone: '' };
+const EMPTY = { name: '', apodo: '', specialties: [], rating: 0, phone: '', city: '', address: '', document: '', nationality: '', sex: '', birthDate: '', bloodType: '', limiting: '', allergies: '', emergencyName: '', emergencyPhone: '' };
 
 const Block = ({ id, title, children, className = '', headingClass = 'text-neutral-200' }) => (
   <section data-testid={`worker-block-${id}`} aria-labelledby={`worker-block-${id}-title`} className={`space-y-4 rounded-2xl border px-4 py-4 ${className || 'border-white/10'}`}>
@@ -48,6 +48,7 @@ export default function WorkerSheet({ worker, onSave, onDelete, onClose }) {
         {/* ---- a) professional data --------------------------------------------------------------------------------------- */}
         <Block id="pro" title={t('squadra.pro')}>
           <TextField label={t('squadra.name')} value={form.name} onChange={set('name')} testId="worker-name" maxLength={80} sanitize={(v) => sanitizeTextInput(v, 80)} />
+          <TextField label={t('squadra.apodo')} optional={t('common.optional')} value={form.apodo} onChange={set('apodo')} testId="worker-apodo" maxLength={40} sanitize={(v) => sanitizeTextInput(v, 40)} />
           {error && (
             <p role="alert" data-testid="worker-error" className="-mt-2 text-sm font-medium text-orange-400">
               {error}

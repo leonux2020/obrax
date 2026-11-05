@@ -402,7 +402,7 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(box.placeholder).toBe(DICT.es['ws.crew.search']);
     expect(box.getAttribute('aria-label')).toBe(DICT.es['ws.crew.search']);
     expect(q('crew-bar').compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // under the control line...
-    expect(box.compareDocumentPosition(q('crew-list')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // ...above the list
+    expect(q('crew-list').compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // ...and under the list: the bar is docked at the bottom, in reach of the thumb
     await typeInto(box, 'JOSE');
     expect(q(`worker-${jose}`)).not.toBeNull();
     expect(q(`worker-${marta}`)).toBeNull();
@@ -431,7 +431,7 @@ describe('Squadra e cronoprogramma (manual dates + nominal crew)', () => {
     expect(pool.textContent).toMatch(/^Mano de obra: .*\(Gastado: .*\)$/);
     expect(bar.querySelector('button')).toBeNull();
     expect(q('crew-add')).toBeNull();
-    expect(bar.compareDocumentPosition(q('crew-search')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(bar.compareDocumentPosition(q('crew-search')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // the bar is docked below
     expect(bar.compareDocumentPosition(q('crew-list')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(q('ws-crew-sheet').textContent).not.toContain('Mano de obra disponible');
     const before = Number(pool.dataset.available);

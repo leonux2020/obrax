@@ -56,6 +56,7 @@ export function normalizeWorker(raw, now = Date.now()) {
   return {
     id: typeof raw.id === 'string' && ID_RE.test(raw.id) ? raw.id : newEntryId(),
     name,
+    apodo: text(raw.apodo, 40), // optional nickname ("El Flaco"): in many crews it is what a person is really called; searched and shown with the name
     specialties,
     rating: rating >= 1 && rating <= 5 ? rating : 0,
     phone: sanitizePhone(raw.phone, 32).trim(),

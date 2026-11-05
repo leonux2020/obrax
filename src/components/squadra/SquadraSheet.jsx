@@ -5,6 +5,7 @@ import BottomSheet from '../BottomSheet.jsx';
 import { EditToggle, RowDelete } from '../EditControls.jsx';
 import { Button } from '../ui.jsx';
 import BirthdayMark from './BirthdayMark.jsx';
+import Nick from './Nick.jsx';
 import { Stars } from './Stars.jsx';
 import WorkerSheet from './WorkerSheet.jsx';
 
@@ -22,6 +23,7 @@ function Row({ worker, onOpen, editing, onDelete }) {
         <span className="flex items-center gap-2">
           <span data-testid="worker-row-name" className="min-w-0 flex-1 truncate text-base font-medium text-neutral-200">
             {worker.name}
+            <Nick apodo={worker.apodo} testId="worker-row-apodo" />
           </span>
           {isBirthdayToday(worker.birthDate) && <BirthdayMark />}
           {hasHealthNotes(worker) && (

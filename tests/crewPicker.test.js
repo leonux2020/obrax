@@ -11,7 +11,7 @@ import { resetRegistry } from '../src/lib/priceRegistry.js';
 import { resetToasts } from '../src/lib/notify.js';
 import { WORKER_SPECIALTIES, normalizeCrew } from '../src/lib/ledger.js';
 import { DEFAULT_RANGE, LOCAL_KM, crewHealth, findByName, norm, omniMatch, projectPlaces, proximity, rankWorkers } from '../src/lib/crewMatch.js';
-import { loadWorkers, saveWorkers } from '../src/lib/workers.js';
+import { loadWorkers, normalizeWorkers, saveWorkers } from '../src/lib/workers.js';
 import { DICT } from '../src/lib/dict.js';
 
 vi.mock('../src/lib/exportActions.js', () => ({ EXPORT_KINDS: ['client', 'tech', 'xlsx'], runExport: vi.fn(async () => 'shared') }));
@@ -80,6 +80,19 @@ describe('crewMatch: the emulated distance and the ranking', () => {
     expect(omniMatch('juan albanil', juan)).toBe(false); // every word must be found somewhere
     expect(omniMatch('  ', juan)).toBe(true);
     expect(omniMatch('x', [])).toBe(false);
+  });
+  it('the nickname is part of the directory file (clean text, max 40) and of the omnibox; one letter finds, words that BEGIN with it come first', () => {
+    const dir = [
+      { id: 'wk000031', name: 'Michele Bruno', specialties: ['mason'], apodo: '', rating: 5 },
+      { id: 'wk000032', name: 'Elena Costa', specialties: ['painter'], rating: 1 },
+      { id: 'wk000033', name: 'Juan Perez', apodo: 'El Flaco <b>', specialties: ['electrician'], rating: 3 },
+    ];
+    const names = (query) => rankWorkers(dir, { project: { cityOrRegion: '' }, range: 'all', query }).rows.map((x) => x.worker.name);
+    expect(names('flaco')).toEqual(['Juan Perez']);
+    expect(rankWorkers(dir, { query: 'flaco' }).rows[0].worker.apodo).not.toMatch(/[<>]/);
+    expect(names('e')).toEqual(['Juan Perez', 'Elena Costa', 'Michele Bruno']); // begins with "e" (Elena, "El" Flaco) before the ones that merely contain it
+    expect(normalizeWorkers([{ name: 'A', apodo: 'x'.repeat(100) }])[0].apodo).toHaveLength(40);
+    expect(normalizeWorkers([{ name: 'A' }])[0].apodo).toBe('');
   });
   it('findByName: exact, accents / case ignored', () => {
     expect(findByName(DIRECTORY, 'beto  SOTO')?.id).toBe('wk000002');
@@ -164,7 +177,7 @@ describe('crew master search: ONE bar to find and add people (no modal, no boxes
   const type = (text) => typeInto(q('crew-search'), text);
   const reach = async (r) => click(q(`crew-range-${r}`));
 
-  it('there is NO add dialog: the [+] and the dropdown are gone; labour line, then the distance chips ABOVE the search, then the results block born under it', async () => {
+  it('there is NO add dialog: the [+] and the dropdown are gone; labour line, the crew, and the DOCK at the bottom: distance chips ABOVE the search field', async () => {
     await mount();
     expect(q('crew-add')).toBeNull();
     expect(q('crew-selector')).toBeNull();
@@ -172,24 +185,27 @@ describe('crew master search: ONE bar to find and add people (no modal, no boxes
     expect(q('crew-search').placeholder).toBe(DICT.es['ws.crew.search']);
     expect(q('ws-crew-sheet').contains(q('crew-search'))).toBe(true); // already there with an empty crew: it is how people are added
     expect(q('crew-suggest')).toBeNull(); // nothing is suggested until you type
+    expect(q('crew-dropup')).toBeNull();
     expect(q('crew-filters')).toBeNull(); // no trade chips
     expect(q('ws-crew-sheet').querySelector('[data-testid^="crew-filter-"]')).toBeNull();
-    expect(q('crew-bar').compareDocumentPosition(q('crew-master')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(q('crew-dock').contains(q('crew-master'))).toBe(true);
     expect(q('crew-master').contains(q('crew-search'))).toBe(true);
     expect(q('crew-master').contains(q('crew-range'))).toBe(true);
     // the distance chips sit EXACTLY above the search bar
     expect(q('crew-range').compareDocumentPosition(q('crew-search')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(q('crew-range').nextElementSibling).toBe(q('crew-search-box'));
-    // the results block is born right under the input and is the one that scrolls
+    // order: labour line, then the crew (the block that scrolls), then the dock at the bottom
     const results = q('crew-results');
-    expect(q('crew-master').parentElement.nextElementSibling).toBe(results); // born immediately under the field's block
-    expect(q('crew-master').compareDocumentPosition(results) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(q('crew-bar').compareDocumentPosition(results) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(results.compareDocumentPosition(q('crew-dock')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(q('crew-dock').nextElementSibling).toBeNull(); // the last thing of the sheet's column
     for (const cls of ['flex-1', 'overflow-y-auto', 'min-h-0']) expect(results.className).toContain(cls);
+    expect(q('crew-dock').className).toContain('relative'); // the anchor of the drop-up
     expect(q('ws-crew-sheet').className).toContain('flex-1');
     expect(q('ws-crew-sheet').closest('[role="dialog"]').className).toContain('flex-col'); // the sheet is a column: it does not scroll as a whole
     await pick('wk000002');
     expect(results.contains(q('crew-list'))).toBe(true);
-    expect(q('crew-master').className).not.toContain('sticky'); // nothing to anchor: the results scroll on their own
+    expect(q('crew-master').className).not.toContain('sticky');
   });
 
   it('the distance capsules are the ONLY chips: matte bg-white/5, quiet text, active bg-white/10; one tap switches the reach', async () => {
@@ -349,30 +365,102 @@ describe('crew master search: ONE bar to find and add people (no modal, no boxes
     expect(listed()).toEqual(['Marta Lopez']);
   });
 
-  it('FOCUS TAKEOVER: while the field has the focus the results block is kept above the keyboard (as tall as the visible room) and lets go on blur', async () => {
+  it('DROP-UP: the suggestions open UPWARDS from the field (absolute, bottom-full), capped at 40vh, with their own scroll and the best match touching the field', async () => {
+    await mount();
+    await click(q('crew-range-all'));
+    await type('e'); // ONE letter is enough
+    const up = q('crew-dropup');
+    expect(up).not.toBeNull();
+    expect(q('crew-dock').contains(up)).toBe(true);
+    for (const cls of ['absolute', 'bottom-full', 'mb-2', 'w-full', 'max-h-[40vh]', 'overflow-y-auto', 'flex', 'flex-col-reverse', 'bg-black']) expect(up.className.split(' ')).toContain(cls);
+    expect(up.contains(q('crew-suggest'))).toBe(true);
+    expect(q('crew-suggest').className).toContain('flex-col-reverse');
+    expect(q('crew-directory').className).toContain('flex-col-reverse'); // first (best) row at the BOTTOM of the stack, next to the field
+    expect(q('crew-results').contains(up)).toBe(false); // it floats over the crew, it does not push it
+    expect(up.compareDocumentPosition(q('crew-search')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // above the field in the page
+    expect(listed()[0]).toBe('Beto Soto'); // the DOM keeps the ranking: best first
+    await click(q('crew-pick-wk000002'));
+    expect(q('crew-dropup')).toBeNull(); // picked: it folds away
+    await type('zzz');
+    expect(q('crew-dropup').querySelector('[data-testid="crew-pick-hint"]')).not.toBeNull(); // the "no results" note lives in the same drop-up
+  });
+
+  it('ONE LETTER fires the search at once: no minimum length anywhere (directory suggestions AND the crew on the job)', async () => {
+    await mount();
+    await click(q('crew-range-all'));
+    await pick('wk000003'); // Carla on the job
+    await type('d');
+    expect(listed().length).toBeGreaterThan(0);
+    expect(qa('crew-list')[0].children).toHaveLength(1); // Carla Díaz has a "d" too
+    await type('e');
+    expect(listed()).toContain('Eva Lara'); // starts with "e"
+    expect(listed()).toHaveLength(4); // everybody but Carla, who is on the job already
+    await type('x');
+    expect(qa('crew-list')).toHaveLength(0); // no "x" in Carla Díaz, nor in Plomero
+  });
+
+  it('FOCUS: the sheet rides ON TOP of the keyboard (padding under the backdrop = keyboard height, height capped to the visible screen) and goes back when it closes', async () => {
     const listeners = {};
-    const vv = { offsetTop: 0, height: 420, addEventListener: (n, f) => (listeners[n] = f), removeEventListener: () => {} };
+    const vv = { offsetTop: 0, height: 800, addEventListener: (n, f) => (listeners[n] = f), removeEventListener: () => {} };
     Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true });
+    window.innerHeight = 800;
     try {
       await mount();
-      const results = q('crew-results');
-      results.getBoundingClientRect = () => ({ top: 200, bottom: 600, left: 0, right: 0, width: 0, height: 400 });
-      expect(results.style.maxHeight).toBe('');
-      await act(async () => q('crew-search').dispatchEvent(new FocusEvent('focusin', { bubbles: true })));
-      expect(results.dataset.searching).toBe('true');
-      expect(results.style.maxHeight).toBe('212px'); // 420 - 200 - 8: from the top of the block to the top of the keyboard
-      vv.height = 300; // a keyboard that leaves less than 120 px: the natural layout stays
+      const dialog = q('ws-crew-sheet').closest('[role="dialog"]');
+      const backdrop = dialog.parentElement;
+      expect(backdrop.style.paddingBottom).toBe(''); // no keyboard: untouched
+      vv.height = 500; // the keyboard opens: 300 px
       await act(async () => listeners.resize());
-      expect(results.style.maxHeight).toBe('');
-      vv.height = 520;
+      expect(backdrop.style.paddingBottom).toBe('300px');
+      expect(dialog.style.maxHeight).toBe('488px'); // 500 - 12
+      expect(dialog.dataset.keyboard).toBe('true');
+      vv.height = 760; // not a keyboard (browser bars moving): left alone
       await act(async () => listeners.resize());
-      expect(results.style.maxHeight).toBe('312px');
-      await act(async () => q('crew-search').dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
-      expect(results.dataset.searching).toBeUndefined();
-      expect(results.style.maxHeight).toBe('');
+      expect(backdrop.style.paddingBottom).toBe('');
+      expect(dialog.style.maxHeight).toBe('');
+      vv.height = 450;
+      vv.offsetTop = 20; // iOS: the visual viewport is panned
+      await act(async () => listeners.scroll());
+      expect(backdrop.style.paddingBottom).toBe('330px');
+      vv.height = 800;
+      vv.offsetTop = 0;
+      await act(async () => listeners.resize());
+      expect(backdrop.style.paddingBottom).toBe('');
+      expect(dialog.dataset.keyboard).toBeUndefined();
     } finally {
       delete window.visualViewport;
     }
+  });
+
+  it('NICKNAME (apodo): searched by the omnibox, written quietly after the name in the suggestions and on the crew card', async () => {
+    saveWorkers([
+      { id: 'wk000021', name: 'Juan Pérez', apodo: 'El Flaco', specialties: ['mason'], rating: 4, address: 'Maipú' },
+      { id: 'wk000022', name: 'Marta Lopez', specialties: ['painter'], rating: 5, address: 'Maipú' },
+    ]);
+    await mount();
+    await type('flaco');
+    expect(listed()).toEqual(['Juan Pérez']); // found by the nickname alone
+    const nick = q('crew-pick-apodo');
+    expect(nick.textContent.trim()).toBe('“El Flaco”');
+    expect(nick.className).toContain('text-neutral-400');
+    expect(nick.closest('[data-testid="crew-pick-wk000021"]')).not.toBeNull();
+    await type('f'); // one letter of the nickname is enough
+    expect(listed()).toEqual(['Juan Pérez']);
+    await type('el fl');
+    expect(listed()).toEqual(['Juan Pérez']);
+    await click(q('crew-pick-wk000021'));
+    const id = spy.project.crew[0].id;
+    expect(q(`worker-apodo-${id}`).textContent.trim()).toBe('“El Flaco”'); // on the crew card, read live from the file
+    expect(q(`worker-apodo-${id}`).className).toContain('text-neutral-400');
+    await type('flaco'); // and the crew on the job is searched by it too
+    expect(q(`worker-${id}`)).not.toBeNull();
+    await type('lopez');
+    expect(q(`worker-${id}`)).toBeNull();
+    await type('');
+    expect(q('crew-pick-apodo')).toBeNull();
+    // someone without a nickname shows nothing extra
+    await type('marta');
+    expect(q('crew-pick-apodo')).toBeNull();
   });
 
   it('a job with no city cannot filter by reach: says so and offers everybody', async () => {

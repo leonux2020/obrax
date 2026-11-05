@@ -10,7 +10,7 @@ import BirthdayMark from '../squadra/BirthdayMark.jsx';
 import { TextField } from '../ui.jsx';
 import Block from './Block.jsx';
 import { CREW_RANGES, DEFAULT_RANGE, LOCAL_KM, crewHealth, norm, omniMatch, rankWorkers } from '../../lib/crewMatch.js';
-import { useKeyboardFit } from '../../lib/keyboardFit.js';
+import Nick from '../squadra/Nick.jsx';
 import CrewSuggest, { initialsOf } from './CrewSuggest.jsx';
 import NumberPad from './NumberPad.jsx';
 import { CoinsIcon, Outline, UsersIcon } from './icons.jsx';
@@ -152,7 +152,7 @@ const SearchIcon = (props) => (
  * advances and two text actions without a frame, "+ Advance" (the app's numpad) and "Edit" (the worker's sheet). In EDIT MODE (the pencil
  * of the sheet's header) the row also wears its delete icon on the left and each advance of the unfolded detail its own cross.
  */
-function WorkerCard({ row, health = false, birthday = false, editing = false, expanded = false, onToggle, onEdit, onAdvance, onRemove, onRemoveAdvance }) {
+function WorkerCard({ row, apodo = '', health = false, birthday = false, editing = false, expanded = false, onToggle, onEdit, onAdvance, onRemove, onRemoveAdvance }) {
   const { t, money, locale } = useI18n();
   const { worker: w, list, total } = row;
   const panelId = `worker-panel-${w.id}`;
@@ -169,6 +169,7 @@ function WorkerCard({ row, health = false, birthday = false, editing = false, ex
             <span className="flex items-center gap-2">
               <span className="min-w-0 truncate text-base font-medium text-neutral-200" data-testid={`worker-name-${w.id}`}>
                 {w.name}
+                <Nick apodo={apodo} testId={`worker-apodo-${w.id}`} />
               </span>
               {birthday && <BirthdayMark testId={`worker-birthday-${w.id}`} />}
               {/* safety: the warning of the worker's file (limiting condition / allergy) stays on the row for as long as they are on the job */}
@@ -243,12 +244,9 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
   const [advFor, setAdvFor] = useState(null); // worker id whose advance is being typed on the pad
   const [unfolded, setUnfolded] = useState(null); // accordion: the id of the ONE unfolded row (null = all folded)
   const [query, setQuery] = useState(''); // the search field of the agenda
-  const [searching, setSearching] = useState(false); // the omnibox has the focus: the keyboard is up and the results take the room that is left
   const [range, setRange] = useState(DEFAULT_RANGE); // the distance chip: it only reaches the suggestions of the company's directory
   const amount = useRef(0);
-  const results = useRef(null); // the results block (suggestions + crew): flex-1, its own scroll
   const searchBox = useRef(null);
-  useKeyboardFit(results, searching);
   const crew = project.crew ?? [];
   const { rows, loose, looseTotal } = advancesByWorker(crew, project.advances);
   const pool = laborPool(result.valid ? result.quote.labor : 0, project.advances);
@@ -258,7 +256,8 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
   // THE OMNIBOX: ONE field. Every typed word is looked for at once in the first name, the surname and the trade, both among the crew on the job
   // and among the company's directory ("ele" finds Elena and Juan the electrician). Read only governance: a project never creates people.
   const typed = query.trim();
-  const visible = rows.filter((r) => !typed || omniMatch(typed, [r.worker.name, t(`ws.spec.${specOf(r.worker)}`)]));
+  const fileOf = (w) => directory.find((f) => f.id === w.ref); // the person's file in the directory (plain-text people have none)
+  const visible = rows.filter((r) => !typed || omniMatch(typed, [r.worker.name, fileOf(r.worker)?.apodo, t(`ws.spec.${specOf(r.worker)}`)]));
   const crewFull = crew.length >= CREW_LIMIT;
   const suggesting = !crewFull && typed !== '';
   const inProject = (w) => crew.some((c) => c.ref === w.id || norm(c.name) === norm(w.name));
@@ -293,7 +292,6 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
       setEditMode(false);
       setUnfolded(null);
       setQuery('');
-      setSearching(false);
       setRange(DEFAULT_RANGE);
     }
   }, [open]);
@@ -318,60 +316,16 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
   return (
     <Block icon={<UsersIcon size={32} />} label={t('ws.menu.crew')} id="crew" title={t('ws.crew.title')} meta={t(crew.length === 1 ? 'ws.crew.count1' : 'ws.crew.countN', { n: crew.length })} open={open} onToggle={onToggle} testId="ws-crew" tall fill headerAction={editToggle}>
       <div className="flex min-h-0 flex-1 flex-col gap-2">
-        {/* the labour balance is read BEFORE handing out an advance; then, the OMNIBOX: the distance chips right ABOVE the search field, and the results
-            block BORN under it (flex-1, its own scroll, kept above the keyboard while the field has the focus). No trade chips, no "+ create" here. */}
-        <div className="shrink-0 space-y-2">
-          <div className="flex items-center gap-3" data-testid="crew-bar">
-            <p data-testid="labor-pool" data-available={pool.available} data-spent={pool.advanced} className="min-w-0 flex-1 text-right text-sm text-neutral-300">
-              {t('ws.crew.labor')}: <b className="tabular-nums text-neutral-200">{money(pool.available)}</b>
-              <span className="whitespace-nowrap tabular-nums text-[#e8c35f]"> ({t('ws.crew.spent')}: {money(pool.advanced)})</span>
-            </p>
-          </div>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              searchBox.current?.blur(); // "done": the keyboard goes down, the results stay
-            }}
-            data-testid="crew-master"
-            className="space-y-2"
-          >
-            {directory.length > 0 && (
-              <div role="radiogroup" aria-label={t('crew.pick.range')} data-testid="crew-range" className="hide-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 py-0.5">
-                {CREW_RANGES.map((r) => (
-                  <button key={r} type="button" role="radio" aria-checked={range === r} onClick={() => setRange(r)} data-testid={`crew-range-${r}`} className={chipClass(range === r)}>
-                    {t(`crew.range.${r}`, { km: LOCAL_KM })}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="relative" data-testid="crew-search-box">
-              <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
-              <input
-                ref={searchBox}
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(sanitizeText(e.target.value, 60))}
-                onFocus={() => setSearching(true)}
-                onBlur={() => setSearching(false)}
-                onKeyDown={(e) => {
-                  if (e.key !== 'Escape' || !query) return;
-                  e.preventDefault();
-                  e.stopPropagation(); // clears the search only; the sheet underneath stays open
-                  setQuery('');
-                }}
-                maxLength={60}
-                placeholder={t('ws.crew.search')}
-                aria-label={t('ws.crew.search')}
-                autoComplete="off"
-                enterKeyHint="done"
-                data-testid="crew-search"
-                className="min-h-[44px] w-full rounded-xl border-0 bg-neutral-900/50 pl-10 pr-4 text-base text-neutral-100 outline-none placeholder:text-neutral-500 focus:bg-white/5"
-              />
-            </div>
-          </form>
+        {/* the labour balance is read BEFORE handing out an advance; then the crew on the job (the block that scrolls); and at the BOTTOM, within
+            the thumb's reach and riding on top of the keyboard, the OMNIBOX dock: the distance chips right ABOVE the search field and the
+            suggestions DROPPING UP from it, over the crew (so the keyboard never covers them). No trade chips, no "+ create" here. */}
+        <div className="shrink-0" data-testid="crew-bar">
+          <p data-testid="labor-pool" data-available={pool.available} data-spent={pool.advanced} className="min-w-0 text-right text-sm text-neutral-300">
+            {t('ws.crew.labor')}: <b className="tabular-nums text-neutral-200">{money(pool.available)}</b>
+            <span className="whitespace-nowrap tabular-nums text-[#e8c35f]"> ({t('ws.crew.spent')}: {money(pool.advanced)})</span>
+          </p>
         </div>
-        <div ref={results} data-testid="crew-results" data-searching={searching ? 'true' : undefined} className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain">
-          {suggesting && <CrewSuggest rows={suggestions} hint={suggestHint} placed={ranked.placed || directory.length === 0} hidden={ranked.hidden} range={range} onPick={addPerson} />}
+        <div data-testid="crew-results" className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain">
           {crew.length === 0 && !typed && (
             <p className="text-sm text-neutral-400" data-testid="crew-empty">
               {t('ws.crew.empty')}
@@ -388,6 +342,7 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
                 <WorkerCard
                   key={row.worker.id}
                   row={row}
+                  apodo={fileOf(row.worker)?.apodo}
                   health={healthOf(row.worker)}
                   birthday={birthdayOf(row.worker)}
                   editing={editMode}
@@ -426,6 +381,53 @@ export default function CrewBlock({ project, result, setProject, open, onToggle 
             </ul>
           </div>
           )}
+        </div>
+        <div className="relative shrink-0" data-testid="crew-dock">
+          {suggesting && (
+            <div data-testid="crew-dropup" className="absolute bottom-full left-0 right-0 z-10 mb-2 flex max-h-[40vh] w-full flex-col-reverse overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-black px-3 py-1">
+              <CrewSuggest rows={suggestions} hint={suggestHint} placed={ranked.placed || directory.length === 0} hidden={ranked.hidden} range={range} onPick={addPerson} />
+            </div>
+          )}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              searchBox.current?.blur(); // "done": the keyboard goes down, the suggestions stay
+            }}
+            data-testid="crew-master"
+            className="space-y-2"
+          >
+            {directory.length > 0 && (
+              <div role="radiogroup" aria-label={t('crew.pick.range')} data-testid="crew-range" className="hide-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 py-0.5">
+                {CREW_RANGES.map((r) => (
+                  <button key={r} type="button" role="radio" aria-checked={range === r} onClick={() => setRange(r)} data-testid={`crew-range-${r}`} className={chipClass(range === r)}>
+                    {t(`crew.range.${r}`, { km: LOCAL_KM })}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="relative" data-testid="crew-search-box">
+              <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+              <input
+                ref={searchBox}
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(sanitizeText(e.target.value, 60))}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Escape' || !query) return;
+                  e.preventDefault();
+                  e.stopPropagation(); // clears the search only; the sheet underneath stays open
+                  setQuery('');
+                }}
+                maxLength={60}
+                placeholder={t('ws.crew.search')}
+                aria-label={t('ws.crew.search')}
+                autoComplete="off"
+                enterKeyHint="done"
+                data-testid="crew-search"
+                className="min-h-[44px] w-full rounded-xl border-0 bg-neutral-900/50 pl-10 pr-4 text-base text-neutral-100 outline-none placeholder:text-neutral-500 focus:bg-white/5"
+              />
+            </div>
+          </form>
         </div>
       </div>
 
