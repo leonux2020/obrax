@@ -69,10 +69,15 @@ export default function SquadraSheet({ projects = [], onClose, search = null, se
     if (editMode && workers.length === 0) setEditMode(false);
   }, [editMode, workers.length]);
 
+  // A NEW person: saved and the sheet closes (as always). An EXISTING one: saved and the sheet STAYS open on the refreshed read-only card
+  // (WorkerSheet flips itself back from edit to read); the saved file is handed back so the card shows exactly what was stored.
   const save = (data) => {
+    const isNew = !editing?.worker;
     const r = upsertWorker(data);
     if (r.worker) setWorkers(r.list);
-    setEditing(null);
+    if (isNew) setEditing(null);
+    else setEditing({ worker: r.worker ?? editing.worker });
+    return r.worker;
   };
   const remove = (id) => {
     setWorkers(removeWorker(id));
@@ -108,7 +113,7 @@ export default function SquadraSheet({ projects = [], onClose, search = null, se
           )}
         </div>
       </BottomSheet>
-      {editing && <WorkerSheet worker={editing.worker} projects={projects} onSave={save} onDelete={remove} onClose={() => setEditing(null)} search={search} {...(searchDelay !== undefined ? { searchDelay } : {})} />}
+      {editing && <WorkerSheet key={editing.worker?.id ?? 'new'} worker={editing.worker} projects={projects} onSave={save} onDelete={remove} onClose={() => setEditing(null)} search={search} {...(searchDelay !== undefined ? { searchDelay } : {})} />}
     </>
   );
 }

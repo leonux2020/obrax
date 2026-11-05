@@ -52,6 +52,7 @@ let onClose;
 const open = async (worker, lang = 'es') => {
   onSave = vi.fn();
   onClose = vi.fn();
+  await act(async () => root.render(null)); // a different person is a fresh sheet (SquadraSheet keys it by id)
   await act(async () => {
     root.render(React.createElement(I18nProvider, { lang, regionCode: 'CL' }, React.createElement(WorkerSheet, { worker, projects: [], onSave, onDelete: () => {}, onClose })));
   });
