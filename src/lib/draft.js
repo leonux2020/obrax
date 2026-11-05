@@ -75,21 +75,34 @@ export const loadUser = () => normalizeUser(read(KEYS.user));
 export const saveUser = (u) => write(KEYS.user, u);
 
 // ---- company / professional profile (printed on both reports) -------------
-export const EMPTY_COMPANY = Object.freeze({ name: '', taxId: '', phone: '', email: '', city: '', proName: '', proTaxId: '', signature: null });
+// Flat on disk (one record, 100 % backward compatible), two logical entities on screen:
+//   company      = name, taxId, address, email (+ phone, city)
+//   professional = proName (first name), proLastName, proTitle, proLicense (+ proTaxId) and the signature
+export const EMPTY_COMPANY = Object.freeze({ name: '', taxId: '', address: '', phone: '', email: '', city: '', proName: '', proLastName: '', proTitle: '', proLicense: '', proTaxId: '', signature: null });
 
 export function normalizeCompany(obj) {
   if (!obj || typeof obj !== 'object') return { ...EMPTY_COMPANY };
   return {
     name: sanitizeText(obj.name, 80).trim(),
     taxId: sanitizeTaxId(obj.taxId),
+    address: sanitizeText(obj.address, 100).trim(),
     phone: sanitizePhone(obj.phone).trim(),
     email: sanitizeEmail(obj.email),
     city: sanitizeText(obj.city, 60).trim(),
     proName: sanitizeText(obj.proName, 60).trim(), // the professional who signs: personal name ...
+    proLastName: sanitizeText(obj.proLastName, 60).trim(),
+    proTitle: sanitizeText(obj.proTitle, 60).trim(), // title / role (Ingeniero, Geometra, ...)
+    proLicense: sanitizeText(obj.proLicense, 40).trim(), // register number (Albo, CIP, ...) when it applies
     proTaxId: sanitizeTaxId(obj.proTaxId), // ... and personal ID (RUT / DNI / ...)
     signature: normalizeInk(obj.signature), // contractor's ink (PNG), printed automatically on the final documents
   };
 }
+/** The professional's full name: first name + surname (a legacy profile kept the whole name in `proName`). */
+export const proFullName = (c) => [c?.proName, c?.proLastName].map((x) => String(x ?? '').trim()).filter(Boolean).join(' ');
+/** The company entity of the stored profile. */
+export const companyEntity = (c) => ({ name: c?.name || '', taxId: c?.taxId || '', address: c?.address || '', email: c?.email || '', phone: c?.phone || '', city: c?.city || '' });
+/** The professional entity of the stored profile; `signature` is the Base64 PNG data URL (or ''), its size is bounded by SIGNATURE_LIMITS. */
+export const professionalEntity = (c) => ({ name: c?.proName || '', lastName: c?.proLastName || '', title: c?.proTitle || '', license: c?.proLicense || '', taxId: c?.proTaxId || '', signature: c?.signature?.dataUrl || '' });
 export const isCompanyEmpty = (c) => !c || Object.values(c).every((v) => !v);
 export const loadCompany = () => normalizeCompany(read(KEYS.company));
 export const saveCompany = (c) => write(KEYS.company, isCompanyEmpty(c) ? null : normalizeCompany(c));

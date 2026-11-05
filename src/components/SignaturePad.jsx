@@ -47,6 +47,20 @@ const SignaturePad = forwardRef(function SignaturePad({ label, placeholder, onIn
     return () => ro.disconnect();
   }, [paint]);
 
+  // `touch-none` (touch-action: none) already stops the page from scrolling under the finger; this non-passive listener also covers
+  // browsers that ignore it, so the page never scrolls, bounces or pull-to-refreshes while the signature is being drawn.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    const stop = (e) => e.cancelable && e.preventDefault();
+    canvas.addEventListener('touchstart', stop, { passive: false });
+    canvas.addEventListener('touchmove', stop, { passive: false });
+    return () => {
+      canvas.removeEventListener('touchstart', stop);
+      canvas.removeEventListener('touchmove', stop);
+    };
+  }, []);
+
   const setInk = (value) => {
     setInked(value);
     onInkChange?.(value);
@@ -119,7 +133,7 @@ const SignaturePad = forwardRef(function SignaturePad({ label, placeholder, onIn
         role="img"
         aria-label={label}
         data-testid="signature-canvas"
-        className="absolute inset-0 h-full w-full cursor-crosshair touch-none"
+        className="absolute inset-0 h-full w-full cursor-crosshair touch-none select-none"
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}

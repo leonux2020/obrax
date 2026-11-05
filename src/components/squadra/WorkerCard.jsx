@@ -5,12 +5,12 @@ import Nick from './Nick.jsx';
 import { Stars } from './Stars.jsx';
 import WorkerLedger from './WorkerLedger.jsx';
 
-const PhoneIcon = (props) => (
+export const PhoneIcon = (props) => (
   <Outline icon="phone" {...props}>
     <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z" />
   </Outline>
 );
-const MailIcon = (props) => (
+export const MailIcon = (props) => (
   <Outline icon="mail" {...props}>
     <rect x="3" y="5" width="18" height="14" rx="2" />
     <path d="m3 7 9 6 9-6" />
@@ -30,7 +30,7 @@ export function IdentityName({ worker }) {
 }
 
 /** One line of the contact block: a quiet icon instead of a label (the label stays for screen readers), the text beside it. A missing value renders nothing. */
-function Line({ icon, label, children, testId }) {
+export function Line({ icon, label, children, testId }) {
   if (!children) return null;
   return (
     <p className="flex items-start gap-3 text-base text-neutral-200" data-testid={testId}>

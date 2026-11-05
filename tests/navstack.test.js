@@ -177,15 +177,20 @@ describe('universal back stack: sheets inside the real app', () => {
     expect(q('project-card')).not.toBeNull();
   });
 
-  it('Ajustes -> firma: Back closes ONLY the signature sheet and Ajustes comes back intact (accordion still open)', async () => {
+  it('Ajustes -> editar perfil: the signature canvas lives in the form; Back folds the accordion and drops the draft, then Ajustes, then Proyectos', async () => {
     await click(q('nav-settings'));
-    await click(q('settings-signature'));
-    expect(q('contractor-sign-sheet')).not.toBeNull();
+    await openAcc('settings-profile');
+    await click(q('settings-profile-edit'));
+    expect(q('pro-signature')).not.toBeNull();
+    expect(q('contractor-sign-sheet')).toBeNull(); // no full-screen swap any more
+    expect(layerDepth()).toBe(1);
     await deviceBack();
-    expect(q('contractor-sign-sheet')).toBeNull();
+    expect(q('settings-profile').open).toBe(false);
     expect(q('settings-view')).not.toBeNull();
-    expect(q('settings-signature')).not.toBeNull(); // the accordion kept its state
-    expect(window.history.state).toEqual({ cubraxTab: 'settings' });
+    await openAcc('settings-profile');
+    expect(q('settings-profile-form')).toBeNull(); // folded -> back on the read card
+    expect(q('settings-profile-card')).not.toBeNull();
+    await deviceBack();
     await deviceBack();
     expect(q('project-card')).not.toBeNull();
   });
@@ -232,23 +237,6 @@ describe('universal back stack: sheets inside the real app', () => {
     await deviceBack();
     expect(q('settings-view')).toBeNull();
     expect(q('project-card')).not.toBeNull();
-  });
-
-  it('Ajustes: signature over an open accordion: Back closes the signature, then the accordion, then Ajustes', async () => {
-    await click(q('nav-settings'));
-    await openAcc('settings-ops');
-    await click(q('settings-signature'));
-    expect(q('contractor-sign-sheet')).not.toBeNull();
-    expect(layerDepth()).toBe(2); // the accordion layer was not remounted by the screen swap
-    await deviceBack();
-    expect(q('contractor-sign-sheet')).toBeNull();
-    expect(q('settings-ops').open).toBe(true);
-    await deviceBack();
-    expect(q('settings-ops').open).toBe(false);
-    expect(q('settings-view')).not.toBeNull();
-    await deviceBack();
-    expect(q('project-card')).not.toBeNull();
-    expect(layerDepth()).toBe(0);
   });
 
   it('Ajustes with an accordion open: tapping another tab, then Back, never strands the user', async () => {

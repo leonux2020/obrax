@@ -114,18 +114,18 @@ describe('Ajustes as a full-screen tab', () => {
 });
 
 describe('Ajustes "Zero Stress": main block, quiet logout, invisible autosave', () => {
-  it('Firma Digitale and Google Drive share ONE operations card with grey line icons; the profile is its own accordion above it', async () => {
+  it('Google Drive lives alone in the operations card (NO signature in Google Sync); the profile is its own accordion above it', async () => {
     await mount();
     await click(h.tab('Ajustes'));
     const ops = q('settings-ops');
     expect(ops).not.toBeNull();
-    expect(ops.contains(q('settings-signature'))).toBe(true);
+    expect(q('settings-signature')).toBeNull();
+    expect(ops.querySelector('canvas, [data-testid="pro-signature"], img')).toBeNull(); // not a trace of the signature in the sync card
     expect(ops.contains(q('settings-cloud'))).toBe(true);
     expect(ops.contains(q('settings-profile'))).toBe(false);
     expect(ops.className).toContain('card'); // the card's subtle border + black fill tie both rows together
     expect(ops.tagName).toBe('DETAILS');
-    expect(ops.querySelector(':scope > div').className).toContain('divide-white/10');
-    for (const id of ['settings-signature', 'settings-cloud']) {
+    for (const id of ['settings-cloud']) {
       const svg = q(id).querySelector('svg[data-outline-icon="true"]');
       expect(svg, id).not.toBeNull();
       expect(svg.getAttribute('class')).toContain('text-neutral-400');
@@ -135,7 +135,6 @@ describe('Ajustes "Zero Stress": main block, quiet logout, invisible autosave', 
     expect(q('settings-drive').textContent).toBe('Sincronizar con Google Drive');
     // order: profile accordion, operations, then language & country
     expect(idx(q('settings-profile'))).toBeLessThan(idx(q('settings-ops')));
-    expect(idx(q('settings-signature'))).toBeLessThan(idx(q('settings-cloud')));
     expect(idx(q('settings-ops'))).toBeLessThan(idx(q('settings-locale')));
     expect(q('settings-drive').getAttribute('role')).toBe('switch');
   });
@@ -149,7 +148,7 @@ describe('Ajustes "Zero Stress": main block, quiet logout, invisible autosave', 
     expect(q('settings-drive').textContent).toBe('Sincronizza con Google Drive');
   });
 
-  it('there is no autosave switch and no "Guardado" badge anywhere: saving is implicit (it still persists)', async () => {
+  it('there is no autosave switch and no "Guardado" badge anywhere; the profile persists once, on Save', async () => {
     await mount();
     await click(h.tab('Ajustes'));
     expect(document.querySelectorAll('[role="switch"]')).toHaveLength(1); // only the Drive one
@@ -163,6 +162,8 @@ describe('Ajustes "Zero Stress": main block, quiet logout, invisible autosave', 
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
     await flush(400);
+    expect(JSON.parse(localStorage.getItem('cp.company.v1')).proName).toBe('Ana Ruiz'); // typing alone writes nothing
+    await click(q('settings-profile-save'));
     expect(JSON.parse(localStorage.getItem('cp.company.v1')).proName).toBe('Ana Soto');
   });
 
@@ -225,10 +226,10 @@ describe('Ajustes: shorter screen and nothing to configure by hand', () => {
     expect(acc.contains(q('settings-profile-edit'))).toBe(true); // the pencil lives in the card
     expect(acc.contains(q('settings-profile-name'))).toBe(true);
     await click(q('settings-profile-edit'));
-    for (const id of ['settings-logo', 'settings-company-name', 'settings-pro-name', 'settings-company-email', 'settings-company-phone', 'settings-company-tax', 'settings-company-city'])
+    for (const id of ['settings-logo', 'settings-company-name', 'settings-company-address', 'settings-pro-name', 'settings-pro-lastname', 'settings-pro-title', 'settings-pro-license', 'pro-signature', 'settings-company-email', 'settings-company-phone', 'settings-company-tax', 'settings-company-city'])
       expect(acc.contains(q(id)), id).toBe(true);
-    // the signature, Drive and language are NOT inside the accordion: they stay visible while it is closed
-    for (const id of ['settings-signature', 'settings-drive', 'settings-locale']) expect(acc.contains(q(id)), id).toBe(false);
+    // Drive and language are NOT inside the accordion: they stay visible while it is closed
+    for (const id of ['settings-drive', 'settings-locale']) expect(acc.contains(q(id)), id).toBe(false);
     acc.open = true;
     expect(acc.open).toBe(true);
   });
@@ -339,7 +340,6 @@ describe('Ajustes loads almost empty: three closed accordions', () => {
     // three different icons
     expect(new Set(want.map(([id]) => q(`${id}-summary`).querySelector('svg').innerHTML)).size).toBe(3);
     // ops + locale hold exactly what they should
-    expect(q('settings-ops').contains(q('settings-signature'))).toBe(true);
     expect(q('settings-ops').contains(q('settings-drive'))).toBe(true);
     expect(q('settings-locale').contains(q('settings-lang'))).toBe(true);
     expect(q('settings-locale').contains(q('settings-region'))).toBe(true);
@@ -361,18 +361,15 @@ describe('Ajustes loads almost empty: three closed accordions', () => {
     expect(visible.length).toBeLessThanOrEqual(6); // 3 summaries + Squadra + logout (+ install when the app is not installed)
   });
 
-  it('the open state of an accordion survives the signature canvas (it swaps the screen) and the content is reachable once opened', async () => {
+  it('the open state of an accordion is kept by the parent and the content is reachable once opened', async () => {
     await mount();
     await click(h.tab('Ajustes'));
-    const sum = q('settings-ops-summary');
-    await click(sum);
+    await click(q('settings-ops-summary'));
     expect(q('settings-ops').open).toBe(true);
     expect(q('settings-profile').open).toBe(false);
-    await click(q('settings-signature'));
-    expect(q('contractor-sign-sheet')).not.toBeNull();
-    expect(q('settings-ops')).toBeNull();
-    await deviceBack(); // the signature sheet has no x: the device Back closes it
-    expect(q('settings-ops').open).toBe(true); // still open: not collapsed behind the user's back
+    expect(q('settings-drive')).not.toBeNull();
+    await deviceBack();
+    expect(q('settings-ops').open).toBe(false);
     expect(q('settings-locale').open).toBe(false);
   });
 });
@@ -388,14 +385,13 @@ describe('Ajustes "Zero Stress" fase 5: sin flechas y tarjeta pasiva de empresa'
     await flush(10);
   };
 
-  it('no row of Ajustes carries a chevron / caret (accordions, signature, Squadra)', async () => {
+  it('no row of Ajustes carries a chevron / caret (accordions, Squadra)', async () => {
     await mount();
     await click(h.tab('Ajustes'));
     await open('settings-ops');
     expect(q('settings-view').textContent).not.toContain('›'); // (the ▾ of the country combobox is a form control, not a row indicator)
     for (const id of ['settings-profile', 'settings-ops', 'settings-locale']) expect(q(`${id}-summary`).querySelector('span[aria-hidden="true"]'), id).toBeNull();
     expect(q('settings-squadra').querySelector('span[aria-hidden="true"]')).toBeNull();
-    expect(q('settings-signature').textContent).not.toContain('›');
   });
 
   it('the profile opens as a read-only business card: name, professional and filled data only; no inputs, a floating pencil on the right', async () => {
@@ -410,8 +406,8 @@ describe('Ajustes "Zero Stress" fase 5: sin flechas y tarjeta pasiva de empresa'
     expect(card.querySelector('input, textarea, select')).toBeNull();
     expect(q('settings-profile-name').textContent).toBe('Aurora');
     expect(q('settings-profile-pro').textContent).toBe('Ana Ruiz');
-    expect(q('settings-profile-tax').textContent).toBe('76.123.456-7');
-    expect(q('settings-profile-city').textContent).toBe('Santiago');
+    expect(q('settings-profile-tax').textContent).toBe('RUT 76.123.456-7');
+    expect(q('settings-profile-address').textContent).toBe('Santiago');
     expect(q('settings-profile-email')).toBeNull(); // empty fields are not shown
     expect(q('settings-profile-phone')).toBeNull();
     const pencil = q('settings-profile-edit');
@@ -420,23 +416,31 @@ describe('Ajustes "Zero Stress" fase 5: sin flechas y tarjeta pasiva de empresa'
     expect(pencil.getAttribute('aria-pressed')).toBe('false');
   });
 
-  it('only the pencil turns the card into the form; the check returns to the card with the saved data; folding the accordion re-protects it', async () => {
+  it('only the pencil turns the card into the form; Save returns to the card with the saved data; Cancel and folding restore it', async () => {
     await mount();
     await click(h.tab('Ajustes'));
     await open('settings-profile');
     expect(q('settings-company-name')).toBeNull();
     await click(q('settings-profile-edit'));
     expect(q('settings-profile-card')).toBeNull();
+    expect(q('settings-profile-edit')).toBeNull(); // ONE pencil: gone while editing (Save / Cancel take over)
     expect(q('settings-company-name').value).toBe('Aurora');
-    expect(q('settings-profile-edit').querySelector('svg[data-icon="check"]')).not.toBeNull();
     const { act } = await import('react');
-    await act(async () => {
-      const input = q('settings-pro-name');
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'Ana Soto');
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    await flush(400);
+    const typeInto = async (id, v) =>
+      act(async () => {
+        const input = q(id);
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, v);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    await typeInto('settings-pro-name', 'Ana Soto');
+    await click(q('settings-profile-cancel')); // cancel: nothing changed
+    expect(q('settings-company-name')).toBeNull();
+    expect(q('settings-profile-pro').textContent).toBe('Ana Ruiz');
+    expect(JSON.parse(localStorage.getItem('cp.company.v1')).proName).toBe('Ana Ruiz');
     await click(q('settings-profile-edit'));
+    expect(q('settings-pro-name').value).toBe('Ana Ruiz'); // the draft starts again from the stored data
+    await typeInto('settings-pro-name', 'Ana Soto');
+    await click(q('settings-profile-save'));
     expect(q('settings-company-name')).toBeNull();
     expect(q('settings-profile-pro').textContent).toBe('Ana Soto');
     await click(q('settings-profile-edit')); // edit again, then fold the accordion with the device Back

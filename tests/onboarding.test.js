@@ -182,7 +182,7 @@ describe('after onboarding, the profile lives only in Ajustes', () => {
     expect(read('components/BottomNav.jsx')).not.toContain('onCompany');
   });
 
-  it('Ajustes shows the profile and is the only way to edit it (inline, autosave)', async () => {
+  it('Ajustes shows the profile and is the only way to edit it (inline, pencil, explicit save)', async () => {
     await onboarded();
     await click(tab('Ajustes'));
     expect(q('settings-profile')).not.toBeNull();
@@ -195,11 +195,16 @@ describe('after onboarding, the profile lives only in Ajustes', () => {
     expect(q('settings-pro-name').value).toBe('Ana Ruiz');
     expect(q('settings-company-tax')).not.toBeNull();
     expect(q('settings-company-city')).not.toBeNull();
-    expect(q('settings-signature').textContent).toContain('Configurar Firma Digital');
-    type(q('settings-pro-name'), 'Ana Ruiz Soto');
-    await flush(400); // debounced autosave
-    expect(q('settings-pro-name').value).toBe('Ana Ruiz Soto');
-    expect(loadCompany().proName).toBe('Ana Ruiz Soto');
+    expect(q('settings-signature')).toBeNull(); // the signature is NOT in Google Sync any more: it is the canvas of the professional
+    expect(q('pro-signature')).not.toBeNull();
+    type(q('settings-pro-name'), 'Ana');
+    type(q('settings-pro-lastname'), 'Ruiz Soto');
+    expect(loadCompany().proName).toBe('Ana Ruiz'); // nothing is written while editing
+    await click(q('settings-profile-save'));
+    expect(q('settings-profile-form')).toBeNull(); // back on the refreshed read card
+    expect(q('settings-profile-pro').textContent).toBe('Ana Ruiz Soto');
+    expect(loadCompany().proName).toBe('Ana');
+    expect(loadCompany().proLastName).toBe('Ruiz Soto');
     expect(loadProfileMeta().onboarded).toBe(true);
     expect(q('settings-saved')).toBeNull(); // saved silently
   });
@@ -401,7 +406,7 @@ describe('data model and copy', () => {
     const c = normalizeCompany({ name: 'A', proName: '<b>Ana</b> Ruiz', proTaxId: "1-9'; DROP" });
     expect(c.proName).not.toMatch(/[<>]/);
     expect(c.proTaxId).toMatch(/^[A-Z0-9.\-/]*$/);
-    expect(Object.keys(EMPTY_COMPANY)).toEqual(['name', 'taxId', 'phone', 'email', 'city', 'proName', 'proTaxId', 'signature']);
+    expect(Object.keys(EMPTY_COMPANY)).toEqual(['name', 'taxId', 'address', 'phone', 'email', 'city', 'proName', 'proLastName', 'proTitle', 'proLicense', 'proTaxId', 'signature']);
     expect(isCompanyEmpty(normalizeCompany({ proName: 'Ana' }))).toBe(false);
     expect(normalizeProfileMeta(null)).toEqual({ onboarded: false, drive: true });
     expect(normalizeProfileMeta({ onboarded: 'yes', drive: false })).toEqual({ onboarded: false, drive: false });

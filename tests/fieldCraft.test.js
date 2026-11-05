@@ -35,7 +35,7 @@ describe('1. native keyboards', () => {
     const src = (f) => readFileSync(f, 'utf8');
     expect(src('src/components/squadra/WorkerSheet.jsx')).toContain('testId="worker-phone" type="tel" inputMode="tel"');
     expect(src('src/components/squadra/WorkerSheet.jsx')).toContain('testId="worker-em-phone" type="tel" inputMode="tel"');
-    expect(src('src/components/SettingsView.jsx')).toContain('inputMode="tel"');
+    expect(src('src/components/ProfileCard.jsx')).toContain('inputMode="tel"');
     expect(src('src/components/ProfileFields.jsx')).toContain('type="tel" inputMode="tel"');
     // money / quantities: read-only + inputMode="none" (the app's own pad), which is why no file may ask for decimal / numeric
     expect(src('src/components/ui.jsx')).toContain('inputMode="none"');

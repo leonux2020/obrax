@@ -28,16 +28,18 @@ export function companyInfo(company, region, t) {
   if (c.taxId) lines.push(`${t(`company.taxId.${region.code}`)}: ${c.taxId}`);
   if (c.phone) lines.push(`${t('company.phone')}: ${c.phone}`);
   if (c.email) lines.push(`${t('company.email')}: ${c.email}`);
-  if (c.city) lines.push(c.city);
+  const place = [c.address, c.city].filter(Boolean).join(', ');
+  if (place) lines.push(place);
   // Read-only data of the contractor, always taken from the company profile snapshot of the project.
   return {
     name: c.name || '',
     details: lines,
     taxLine: c.taxId ? `${t(`company.taxId.${region.code}`)}: ${c.taxId}` : '',
     logo: typeof c.logo === 'string' ? c.logo : '',
-    signer: c.proName || '', // the professional who signs (own key names: the confidentiality test greps the model for store names)
-    signerLine: c.proTaxId ? `${t(`company.taxId.${region.code}`)}: ${c.proTaxId}` : '',
-    empty: !c.name && lines.length === 0 && !c.logo && !c.proName,
+    signer: [c.proName, c.proLastName].filter(Boolean).join(' '), // the professional who signs (own key names: the confidentiality test greps the model for store names)
+    // title, register number and personal ID under the signature (each one only when filled in)
+    signerLine: [c.proTitle, c.proLicense, c.proTaxId ? `${t(`company.taxId.${region.code}`)}: ${c.proTaxId}` : ''].filter(Boolean).join(' · '),
+    empty: !c.name && lines.length === 0 && !c.logo && !c.proName && !c.proLastName,
   };
 }
 
