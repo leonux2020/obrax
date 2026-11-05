@@ -169,7 +169,7 @@ describe('Ajustes: the "Squadra / Maestranzas" button', () => {
     await openAjustes();
     const btn = q('settings-squadra');
     expect(btn).not.toBeNull();
-    expect(btn.textContent).toContain('Equipo / Maestranzas');
+    expect(btn.textContent).toContain('Elenco de Trabajadores');
     const all = [...q('settings-view').querySelectorAll('button, [role="switch"], select, input, summary')];
     const logout = q('logout-button');
     expect(all[all.length - 1]).toBe(logout);
@@ -184,7 +184,7 @@ describe('Ajustes: the "Squadra / Maestranzas" button', () => {
     h = createHost(App);
     await h.mount();
     await click(q('nav-settings'));
-    expect(q('settings-squadra').textContent).toContain('Squadra / Maestranze');
+    expect(q('settings-squadra').textContent).toContain('Elenco Lavoratori');
   });
 });
 

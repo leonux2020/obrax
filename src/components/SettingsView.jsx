@@ -31,7 +31,7 @@ function Accordion({ testId, titleId, icon: Icon, title, open, onToggle, childre
     >
       <summary data-testid={`${testId}-summary`} className="flex min-h-[64px] cursor-pointer list-none items-center gap-3 px-4 sm:px-5 [&::-webkit-details-marker]:hidden">
         <Icon size={22} className="text-neutral-400" />
-        <h2 id={titleId} className="min-w-0 flex-1 truncate text-lg font-semibold">
+        <h2 id={titleId} className="min-w-0 flex-1 truncate text-lg font-light tracking-[0.02em] text-neutral-300">
           {title}
         </h2>
       </summary>
@@ -291,11 +291,11 @@ export default function SettingsView({
           type="button"
           onClick={() => setSquadra(true)}
           data-testid="settings-squadra"
-          className="card !p-0 mt-8 flex min-h-[64px] w-full items-center gap-3 px-4 text-left transition active:border-white/40 sm:px-5"
+          className="card !py-0 mt-8 flex min-h-[64px] w-full items-center gap-3 px-4 text-left transition active:border-white/40 sm:px-5"
         >
           <UsersIcon size={22} className="text-neutral-400" />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-lg font-semibold">{t('squadra.title')}</span>
+            <span className="block truncate text-lg font-light tracking-[0.02em] text-neutral-300">{t('squadra.title')}</span>
             <span className="block truncate text-xs text-neutral-400">{t('squadra.subtitle')}</span>
           </span>
         </button>

@@ -34,13 +34,17 @@ const AMBER = 'text-[#e8c35f]';
 /** Font size by length of the amount, so the figure always fits INSIDE the hole of the ring (never wraps or clips, 320 px screens included). */
 const sizeFor = (text) => (text.length <= 8 ? 'text-3xl' : text.length <= 10 ? 'text-2xl' : text.length <= 13 ? 'text-xl' : 'text-lg');
 
-/** Solid, sober segment colours (greens, greys, a dark orange); the folded "others" take the darkest grey. */
-const SEGMENT_COLORS = ['#22c55e', '#9ca3af', '#c2410c', '#166534'];
-const OTHERS_COLOR = '#52525b';
+/**
+ * Segment colours of the expenses ring: muted reds and greys, NEVER green. The money in the hole is bright green (emerald-400), so a green
+ * ring would blend into the figure; the segments stay in a quiet, different hue (red-900 / red-700 / neutral at about half opacity) and are
+ * still told apart from one another. The folded "others" take the darkest grey.
+ */
+const SEGMENT_COLORS = ['rgba(185, 28, 28, 0.6)', 'rgba(156, 163, 175, 0.5)', 'rgba(127, 29, 29, 0.5)', 'rgba(251, 146, 60, 0.4)'];
+const OTHERS_COLOR = 'rgba(82, 82, 91, 0.7)';
 
 /**
  * ONE metric per currency: the DONUT. Its ring splits the global expenses by supplier; in its hollow centre sits DISPONIBILE (real liquid cash:
- * collected - expenses - advances), large, green when positive. Under the ring an ultra-minimal legend names the main suppliers with their %.
+ * collected - expenses - advances), large, bright green (emerald-400) when positive. Under the ring an ultra-minimal legend names the main suppliers with their %.
  * Currencies are never mixed: each one gets its own ring.
  */
 function DonutBlock({ currency, liquid, shares, many, fmt, label }) {
@@ -54,7 +58,7 @@ function DonutBlock({ currency, liquid, shares, many, fmt, label }) {
         <span className="block whitespace-nowrap text-xs font-medium uppercase text-neutral-400">{label}</span>
         <span
           data-testid={`acc-liquid-${currency}`}
-          className={`mt-0.5 block whitespace-nowrap font-medium tracking-tight tabular-nums ${sizeFor(text)} ${liquid < 0 ? AMBER : liquid > 0 ? 'text-brand' : 'text-neutral-200'}`}
+          className={`mt-0.5 block whitespace-nowrap font-medium tracking-tight tabular-nums ${sizeFor(text)} ${liquid < 0 ? AMBER : liquid > 0 ? 'text-emerald-400' : 'text-neutral-200'}`}
         >
           {text}
         </span>
@@ -220,7 +224,7 @@ export default function GlobalAccounting({ projects, onOpenProject = null, onExp
                       className="flex min-w-0 flex-1 items-center gap-3 rounded-r-2xl py-3 pr-4 text-left active:opacity-80"
                     >
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate font-semibold">{projectTitle(p) || t('proj.untitled')}</span>
+                        <span className="block truncate font-light tracking-[0.02em] text-neutral-300">{projectTitle(p) || t('proj.untitled')}</span>
                         <span className="block truncate text-xs text-neutral-400">{projectClient(p) || t('proj.noClient')}</span>
                         <span data-testid={`acc-timeline-${p.id}`} className="mt-0.5 block truncate text-xs text-neutral-500">
                           {[datesOf(p), pulseOf(p)].filter(Boolean).join(' · ')}

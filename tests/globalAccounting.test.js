@@ -295,7 +295,7 @@ describe('Vista Contabilidad Global', () => {
     expect(q('acc-liquid-CLP').className).toContain('#e8c35f');
     const pos = mk('CL', { payments: [pay(5000, back(1))] });
     await render([pos]);
-    expect(q('acc-liquid-CLP').className).toContain('text-brand');
+    expect(q('acc-liquid-CLP').className).toContain('text-emerald-400');
     expect(q('acc-liquid-CLP').className).not.toContain('#e8c35f');
   });
 
@@ -598,14 +598,14 @@ describe('Donut OLED: gastos globales por proveedor y DISPONIBILE en el centro h
     // hollow: every circle is a stroke only (fill none) and nothing paints the middle
     for (const c of donut.querySelectorAll('circle')) expect(c.getAttribute('fill')).toBe('none');
     expect(donut.innerHTML).not.toMatch(/<rect|<path|bg-neutral|bg-gray/);
-    // solid, sober colours (no gradients, no opacity tricks) and no chart library
-    expect(segs[0].getAttribute('stroke')).toBe('#22c55e');
+    // muted colours that never compete with the green figure in the hole (see phase11-1), no gradients and no chart library
+    expect(segs[0].getAttribute('stroke')).toBe('rgba(185, 28, 28, 0.6)');
     expect(new Set(segs.map((c) => c.getAttribute('stroke'))).size).toBe(2);
     // the main metric is INSIDE the ring's box: label + big green figure
     expect(donut.contains(q('acc-liquid-CLP'))).toBe(true);
     expect(donut.textContent.toUpperCase()).toContain('DISPONIBLE');
     expect(q('acc-liquid-CLP').textContent).toMatch(/60\.000/); // 100.000 - 40.000
-    expect(q('acc-liquid-CLP').className).toContain('text-brand');
+    expect(q('acc-liquid-CLP').className).toContain('text-emerald-400');
   });
 
   it('leyenda ultraminimalista bajo el anillo: los proveedores principales con su %, el resto como "Otros"', async () => {

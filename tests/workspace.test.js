@@ -345,7 +345,9 @@ describe('frozen quote', () => {
   it('shows 🔒, a tap on a price answers "Precios bloqueados" with a toast and opens no pad', async () => {
     const spy = {};
     await mount({ initial: lockedProject(), spy });
-    expect(q('ws-lock-chip').textContent).toContain('🔒');
+    expect(q('ws-unlock').querySelector('svg')).not.toBeNull(); // the lock icon sits in the one button
+    expect(q('ws-unlock').textContent).toContain('Desbloquear presupuesto');
+    expect(q('ws-lock-chip')).toBeNull();
     expect(q('price-cement_bag').getAttribute('data-locked')).toBe('true');
     await click(q('price-cement_bag'));
     expect(q('price-numpad')).toBeNull();
@@ -361,7 +363,7 @@ describe('frozen quote', () => {
     expect(spy.project.draft.frozen).not.toBeNull(); // nothing changed yet
     await click(q('unlock-confirm'));
     expect(spy.project.draft.frozen).toBeNull();
-    expect(q('ws-lock-chip')).toBeNull();
+    expect(q('ws-unlock')).toBeNull();
     await click(q('price-cement_bag'));
     expect(q('price-numpad')).not.toBeNull();
   });

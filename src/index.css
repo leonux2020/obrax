@@ -271,6 +271,32 @@ body.eco-mode *::after {
   }
 }
 
+/* PRO logo: a diagonal, translucent silver glint crosses the tag now and then. `shimmer` rests for most of the cycle (the sweep itself is
+   ~3 s of a 48 s loop, the first one after ~45 s), so it is occasional and never a constant distraction. Pseudo-element only: it paints
+   no layout; reduced-motion and eco-mode remove it (rules below, `animation: none`). */
+@keyframes shimmer {
+  0%,
+  93.75% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+.pro-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.pro-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 35%, rgba(226, 232, 240, 0.4) 50%, transparent 65%);
+  transform: translateX(-100%);
+  animation: shimmer 48s infinite linear;
+}
+
 /* A control that appears with a quiet fade (the delete crosses of an edit mode); removed, not slowed, under reduced-motion / eco-mode */
 @keyframes row-fade {
   from {

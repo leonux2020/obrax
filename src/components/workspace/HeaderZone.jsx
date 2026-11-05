@@ -1,6 +1,7 @@
 import { useI18n } from '../../lib/i18n.jsx';
 import BackupBadge from '../BackupBadge.jsx';
 import WeatherChip from './WeatherChip.jsx';
+import { LockIcon } from './icons.jsx';
 
 const Check = () => (
   <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" data-testid="ws-settled-check">
@@ -110,17 +111,31 @@ export default function HeaderZone({ project, model, title, client, region, offl
               )}
             </span>
           )}
-          {model.locked && (
-            <span data-testid="ws-lock-chip" className="mt-1 block text-xs font-medium text-[#e8c35f]">
+          {model.locked && audit && (
+            <span data-testid="ws-lock-chip" className="mt-1 block text-xs font-medium text-neutral-400">
               🔒 {t(model.locked === 'signed' ? 'ws.lock.signed' : 'ws.lock.frozen')}
             </span>
           )}
         </Total>
       </div>
 
+      {/* ONE element says the state AND gives the action: the lock, "Sblocca preventivo", and (quiet, underneath) why it is locked. No loose yellow text. */}
       {model.locked && !audit && (
-        <button type="button" onClick={onUnlock} data-testid="ws-unlock" className="mt-2 min-h-[40px] w-full rounded-lg border border-[#d4af37]/60 px-3 text-xs font-semibold text-[#e8c35f] active:border-[#d4af37]">
-          {t('ws.unlock')}
+        <button
+          type="button"
+          onClick={onUnlock}
+          data-testid="ws-unlock"
+          data-lock={model.locked}
+          aria-label={`${t('ws.unlock')} - ${t(model.locked === 'signed' ? 'ws.lock.signed' : 'ws.lock.frozen')}`}
+          className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-2.5 rounded-lg border border-[#d4af37]/40 bg-transparent px-3 py-1.5 text-[#e8c35f] transition active:border-[#d4af37]"
+        >
+          <LockIcon size={18} />
+          <span className="min-w-0 text-left">
+            <span className="block truncate text-sm font-medium leading-tight">{t('ws.unlock')}</span>
+            <span data-testid="ws-lock-why" className="block truncate text-xs font-normal leading-tight text-neutral-400">
+              {t(model.locked === 'signed' ? 'ws.lock.signed' : 'ws.lock.frozen')}
+            </span>
+          </span>
         </button>
       )}
       {offline && (

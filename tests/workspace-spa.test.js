@@ -847,7 +847,8 @@ describe('PDF Cliente + client signature', () => {
     const sig = spy.project.draft.signature;
     expect(sig).toMatchObject({ name: 'Cliente' });
     expect(sig.timeline).toEqual({ startDate: day(-5), endDate: day(20) }); // stamped like the wizard did
-    expect(q('ws-lock-chip').textContent).toContain('Firmada');
+    expect(q('ws-unlock').textContent).toContain('Firmada'); // the state lives INSIDE the unlock button
+    expect(q('ws-lock-chip')).toBeNull(); // no loose yellow text
     expect(q('project-workspace').dataset.locked).toBe('signed');
     expect(runExport).toHaveBeenCalledTimes(1);
     const [kind, ctx] = runExport.mock.calls[0];

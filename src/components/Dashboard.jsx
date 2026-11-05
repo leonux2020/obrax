@@ -111,7 +111,7 @@ export default function Dashboard({ projects, tab, onTab, onNew, onOpen, onPro, 
         >
           <span
             data-testid="pro-pill"
-            className={`flex items-center rounded-md border px-1.5 py-0.5 transition-colors ${
+            className={`pro-shimmer flex items-center rounded-md border px-1.5 py-0.5 transition-colors ${
               pro ? 'border-slate-500/50 text-slate-300' : 'border-white/15 text-neutral-400 group-hover:border-slate-400/70 group-hover:text-slate-300'
             }`}
           >
