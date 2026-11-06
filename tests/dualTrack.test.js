@@ -102,14 +102,14 @@ describe('HeaderZone: the dual track', () => {
     expect(readFileSync('src/index.css', 'utf8')).toMatch(/@keyframes lane-grow[\s\S]*scaleX\(0\)/);
   });
 
-  it('NO stage dots: each lane is ONE plain continuous line from start to end, and the ghost track is barely there (white/5, not a grey)', async () => {
+  it('NO stage dots: each lane is ONE plain continuous line from start to end, and the ghost track is barely there (white/[0.02], not a grey)', async () => {
     await render(withPhases([phase('a', '2026-03-02', '2026-03-04', true), phase('b', '2026-03-05', '2026-03-10')]));
     expect(host.querySelectorAll('[data-testid="ws-node"]')).toHaveLength(0);
     expect(q('ws-physical').children).toHaveLength(1); // only the fill
     expect(q('ws-progress').children).toHaveLength(1);
     for (const id of ['ws-progress', 'ws-physical']) {
-      expect(q(id).className).toContain('bg-white/5');
-      expect(q(id).className).not.toMatch(/bg-white\/10|bg-neutral|bg-gray/);
+      expect(q(id).className).toContain('bg-white/[0.02]');
+      expect(q(id).className).not.toMatch(/bg-white\/(5|10)\b|bg-neutral|bg-gray/);
       expect(q(id).className).toContain('h-0.5'); // the lane is as thin as the line it carries
     }
     for (const id of ['ws-progress-fill', 'ws-physical-fill']) expect(q(id).className).toContain('h-full'); // the active lines keep the full 2 px

@@ -192,11 +192,11 @@ export default function HeaderZone({ project, model, title, client, region, offl
       </ul>
       <div data-testid="ws-lanes" className="absolute inset-x-0 bottom-0 flex flex-col gap-px">
         {cash.pct !== null && cash.pct !== undefined && (
-          <div data-testid="ws-progress" data-pct={Math.round(cash.pct)} className="relative h-0.5 w-full bg-white/5" role="progressbar" aria-label={t('ws.collected')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(cash.pct)}>
+          <div data-testid="ws-progress" data-pct={Math.round(cash.pct)} className="relative h-0.5 w-full bg-white/[0.02]" role="progressbar" aria-label={t('ws.collected')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(cash.pct)}>
             <div data-testid="ws-progress-fill" className="lane-grow h-full bg-brand transition-all duration-500" style={{ width: `${clamp(cash.pct)}%` }} />
           </div>
         )}
-        <div data-testid="ws-physical" data-pct={physicalPct} className="relative h-0.5 w-full bg-white/5" role="progressbar" aria-label={t('ws.lane.physical')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={physicalPct}>
+        <div data-testid="ws-physical" data-pct={physicalPct} className="relative h-0.5 w-full bg-white/[0.02]" role="progressbar" aria-label={t('ws.lane.physical')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={physicalPct}>
           <div data-testid="ws-physical-fill" className="lane-grow h-full bg-cyan-500 transition-all duration-500" style={{ width: `${clamp(physical.pct)}%` }} />
         </div>
       </div>

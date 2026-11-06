@@ -145,11 +145,11 @@ describe('Zone A: DA INCASSARE is the one big number', () => {
     expect(q('ws-zone-a').innerHTML).not.toMatch(/#ff2b2b|text-red/);
   });
 
-  it('the upper lane at the base of the block (2 px, a ghost white/5 track, green fill) holds the share collected; the two old meters are gone', async () => {
+  it('the upper lane at the base of the block (2 px, a ghost white/[0.02] track, green fill) holds the share collected; the two old meters are gone', async () => {
     await open(job());
     const line = q('ws-progress');
     expect(line.className).toContain('h-0.5');
-    expect(line.className).toContain('bg-white/5');
+    expect(line.className).toContain('bg-white/[0.02]');
     expect(q('ws-lanes').className).toContain('bottom-0');
     expect(q('ws-lanes').contains(line)).toBe(true);
     expect(q('ws-progress-fill').className).toContain('bg-brand');
