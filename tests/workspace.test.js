@@ -224,7 +224,7 @@ describe('ProjectWorkspace: three zones', () => {
     expect(q('ws-due').className).not.toMatch(/font-(extrabold|bold|black|semibold)/);
   });
 
-  it('hierarchy: DA INCASSARE is the only big number; quote and collected are small grey text under it; ONE 2 px line replaces the two bars', async () => {
+  it('hierarchy: DA INCASSARE is the only big number; quote and collected are small grey text under it; the dual 2 px track replaces the two bars', async () => {
     await mount({ initial: mk({}, -5, 5) });
     expect(q('ws-due').className).toContain('text-3xl');
     expect(q('ws-due').className).toMatch(/text-(orange-400|amber-500)/); // debt: soft orange, never red
@@ -235,7 +235,7 @@ describe('ProjectWorkspace: three zones', () => {
     expect(q('ws-meters')).toBeNull();
     expect(q('bar-time')).toBeNull();
     expect(q('bar-cash')).toBeNull();
-    expect(q('ws-zone-a').querySelectorAll('[role="progressbar"]')).toHaveLength(1);
+    expect(q('ws-zone-a').querySelectorAll('[role="progressbar"]')).toHaveLength(2); // the dual track: money + physical progress
     expect(q('ws-progress').className).toContain('h-0.5');
   });
 

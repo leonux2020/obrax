@@ -145,16 +145,17 @@ describe('Zone A: DA INCASSARE is the one big number', () => {
     expect(q('ws-zone-a').innerHTML).not.toMatch(/#ff2b2b|text-red/);
   });
 
-  it('ONE 2 px line at the base of the block (neutral-800 track, green fill) with the share collected; the two old meters are gone', async () => {
+  it('the upper lane at the base of the block (2 px, a white/10 track, green fill) holds the share collected; the two old meters are gone', async () => {
     await open(job());
     const line = q('ws-progress');
     expect(line.className).toContain('h-0.5');
-    expect(line.className).toContain('bg-neutral-800');
-    expect(line.className).toContain('bottom-0');
+    expect(line.className).toContain('bg-white/10');
+    expect(q('ws-lanes').className).toContain('bottom-0');
+    expect(q('ws-lanes').contains(line)).toBe(true);
     expect(q('ws-progress-fill').className).toContain('bg-brand');
     expect(q('ws-progress-fill').style.width).toBe(`${line.dataset.pct}%`);
     expect(Number(line.dataset.pct)).toBeGreaterThan(0);
-    expect(q('ws-zone-a').querySelectorAll('[role="progressbar"]')).toHaveLength(1);
+    expect(q('ws-zone-a').querySelectorAll('[role="progressbar"]')).toHaveLength(2); // money + physical progress
     expect(q('ws-meters')).toBeNull();
     expect(q('bar-time')).toBeNull();
     expect(q('bar-cash')).toBeNull();

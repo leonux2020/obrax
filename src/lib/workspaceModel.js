@@ -6,7 +6,7 @@ import { MAX_PRICE } from './pricing.js';
 import { dayDiff, isClosed, parseDay, projectLevel } from './projects.js';
 import { parseISODay, spanDays } from './schedule.js';
 import { CREW_LIMIT, LEDGER_LIMITS, PHASE_LIMIT, newEntryId, normalizeAdvances, normalizeCrew, normalizeDiscounts, normalizePhases } from './ledger.js';
-import { syncDates } from './phases.js';
+import { sortPhases, syncDates } from './phases.js';
 import { DEFAULT_MACHINERY, MACHINE_IDS } from './machinery.js';
 import { savedMeta } from './priceBook.js';
 import { aiRetailer } from './suppliers.js';
@@ -33,6 +33,30 @@ export function timeProgress(project, now = Date.now()) {
   const total = Math.max(1, dayDiff(start, end));
   const elapsed = Math.min(total, Math.max(0, dayDiff(start, today)));
   return { pct: (elapsed / total) * 100, elapsed, total };
+}
+
+/**
+ * Physical progress of the job for the lower lane of the header: the share of the Cronograma that is REALLY finished (the phases the user marked
+ * as done), each phase weighing its calendar days (a phase without both dates weighs 1 day). Nothing is estimated from the calendar: with no
+ * phases, or none done, it is 0. `nodes` = the end of every stage along the lane ({ id, at: 0-100, done }), in chronological order, so the lane is
+ * never cut: the stages are dots over it.
+ */
+export function physicalProgress(project) {
+  const phases = sortPhases(project?.phases);
+  if (!phases.length) return { pct: 0, count: 0, done: 0, nodes: [] };
+  const weights = phases.map((p) => {
+    const days = spanDays(p.startDate, p.endDate);
+    return days === null ? 1 : days + 1;
+  });
+  const whole = weights.reduce((a, b) => a + b, 0) || 1;
+  let run = 0;
+  let finished = 0;
+  const nodes = phases.map((p, i) => {
+    run += weights[i];
+    if (p.done) finished += weights[i];
+    return { id: p.id, at: Math.min(100, (run / whole) * 100), done: p.done === true };
+  });
+  return { pct: Math.min(100, Math.max(0, (finished / whole) * 100)), count: phases.length, done: phases.filter((p) => p.done).length, nodes };
 }
 
 // ---- the lock: a quote that has been sent or signed keeps its prices -------------------------------------------------
@@ -315,6 +339,7 @@ export function partidaGroups(result, draft) {
  * Everything the sticky header shows. `cash` comes from cashSummary(); `total` from the live quote; `liquid` is the real cash
  * on hand (ledger.liquidity: payments - expenses - worker advances) and rides on the Caja bar.
  * Bars: Plazo (time elapsed of the schedule) and Caja (paid of the budget). A bar with `pct: null` is not drawn.
+ * `physical` = the real progress of the Cronograma (see physicalProgress): the second lane of the header, always a number (0 when there is no data).
  */
 export function headerModel({ project, total, valid, cash, liquid = 0, now = Date.now() }) {
   const st = workspaceState(project, now);
@@ -330,6 +355,7 @@ export function headerModel({ project, total, valid, cash, liquid = 0, now = Dat
       { id: 'time', pct: time.pct, tone: st.tone, elapsed: time.elapsed, of: time.total },
       { id: 'cash', pct: valid && cash ? cash.pct : null, tone: cash?.overpaid ? '#e8c35f' : '#22c55e', paid: cash?.paid ?? 0, pending: cash?.pending ?? 0, liquid: Number.isFinite(liquid) ? liquid : 0 },
     ],
+    physical: physicalProgress(project),
   };
 }
 

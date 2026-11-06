@@ -310,6 +310,20 @@ body.eco-mode *::after {
   animation: row-fade 0.18s ease-out;
 }
 
+/* The two lanes of the header grow from the left when the screen opens (a later change of the width is a CSS transition); removed, not slowed, under reduced-motion / eco-mode */
+@keyframes lane-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.lane-grow {
+  transform-origin: left center;
+  animation: lane-grow 0.5s ease-out;
+}
+
 /* The weather badge of a project card fades in when its reading lands (the card never waited for it) */
 @keyframes wx-in {
   from {
