@@ -15,6 +15,7 @@ import { DB_VERSION } from '../src/lib/db.js';
 import { resetRegistry } from '../src/lib/priceRegistry.js';
 import { resetToasts } from '../src/lib/notify.js';
 import { DICT } from '../src/lib/dict.js';
+import { createProjectViaDraft } from './helpers/appHarness.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const at = (y, m, d, h = 12) => new Date(y, m - 1, d, h).getTime();
@@ -179,9 +180,7 @@ describe('device back button inside the real App', () => {
     await mountApp();
     await pop(); // Dashboard: nothing to leave
     expect(q('fab-new')).not.toBeNull();
-    await click(q('fab-new'));
-    await typeInto(document.querySelector('[role="dialog"] input'), 'Casa Soto');
-    await click(q('project-save'));
+    await createProjectViaDraft('Casa Soto');
     expect(q('project-workspace')).not.toBeNull();
     expect(window.history.state?.cubraxProject).toBeTruthy(); // one entry for the open project
     await pop();
@@ -200,15 +199,13 @@ describe('device back button inside the real App', () => {
   it('back with a sheet open over the project closes ONLY the sheet (LIFO); a second back lands on the Dashboard', async () => {
     await seed();
     await mountApp();
-    await click(q('fab-new'));
-    await typeInto(document.querySelector('[role="dialog"] input'), 'Casa Soto');
-    await click(q('project-save'));
+    await createProjectViaDraft('Casa Soto');
     await click(q('ws-edit'));
     expect(q('edit-form')).not.toBeNull();
-    await pop();
+    await deviceBack(); // a real history pop (the draft's entry became the project's: it must still be exactly one)
     expect(q('edit-form')).toBeNull();
     expect(q('ws-title')).not.toBeNull(); // the project is still open under the closed sheet
-    await pop();
+    await deviceBack(); // a real history pop (the draft's entry became the project's: it must still be exactly one)
     expect(q('project-workspace')).toBeNull();
     expect(q('project-card')).not.toBeNull();
   });

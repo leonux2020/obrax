@@ -15,7 +15,7 @@ import App, { resetBoot } from '../src/App.jsx';
 import { newProject } from '../src/lib/projects.js';
 import { withMarket } from '../src/lib/workspaceModel.js';
 import { projectStore } from '../src/lib/projectStore.js';
-import { q, flush, click, typeInto, createHost } from './helpers/appHarness.js';
+import { q, flush, click, typeInto, createHost, createProjectViaDraft, saveDraftAs } from './helpers/appHarness.js';
 import { resetDevice, setDevice } from './helpers/device.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -141,9 +141,7 @@ describe('App: Italy end to end (flag, currency and money agree) and a stale Chi
     setDevice({ timeZone: 'Europe/Rome', languages: ['it-IT', 'it'] });
     h = createHost(App);
     await h.mount();
-    await click(q('fab-new'));
-    await typeInto(document.querySelector('[role="dialog"] input'), 'Casa Rossi');
-    await click(q('project-save'));
+    await createProjectViaDraft('Casa Rossi');
     await flush(400);
     const [project] = await projectStore.load();
     expect(project.draft.regionCode).toBe('IT');
@@ -158,8 +156,7 @@ describe('App: Italy end to end (flag, currency and money agree) and a stale Chi
     setDevice({ timeZone: 'Etc/UTC', languages: ['en'] });
     h = createHost(App);
     await h.mount();
-    await click(q('fab-new'));
-    await click(q('project-save'));
+    await createProjectViaDraft('Obra');
     await flush(400);
     expect((await projectStore.load())[0].draft.regionCode).toBe('PE');
   });
@@ -258,6 +255,7 @@ describe('Sensor vs state: a job\'s market is its own; the device sensor decides
     await h.mount();
     // job 1: the user picks Chile by hand
     await click(q('fab-new'));
+    await click(q('ws-edit')); // the draft's details sheet holds the market
     await typeInto(document.querySelector('[role="dialog"] input'), 'Obra Santiago');
     const market = () => document.querySelector('[data-testid="project-market"] input[role="combobox"]');
     expect(marketValue()).toContain('Italia');
@@ -265,6 +263,7 @@ describe('Sensor vs state: a job\'s market is its own; the device sensor decides
     await click(document.querySelector('[role="option"][id$="-opt-CL"]'));
     expect(marketValue()).toContain('Cile');
     await click(q('project-save'));
+    await saveDraftAs('Obra Santiago');
     await flush(400);
     expect((await projectStore.load()).find((p) => p.draft.project.name === 'Obra Santiago').draft.regionCode).toBe('CL');
     expect(settingsNow()).toEqual({ region: 'IT', lang: 'it' }); // nothing global moved
@@ -273,6 +272,7 @@ describe('Sensor vs state: a job\'s market is its own; the device sensor decides
     await flush(100);
     if (!q('fab-new')) await click(q('nav-projects'));
     await click(q('fab-new'));
+    await click(q('ws-edit'));
     expect(marketValue()).toContain('Italia');
     expect(q('project-market-hint').textContent).toContain('EUR');
     expect(document.documentElement.lang).toBe('it'); // the interface never left Italian
@@ -284,6 +284,7 @@ describe('Sensor vs state: a job\'s market is its own; the device sensor decides
     h = createHost(App);
     await h.mount();
     await click(q('fab-new'));
+    await click(q('ws-edit'));
     expect(marketValue()).toContain('Italia');
     h.unmount();
     seed({ region: 'PE', lang: 'es' });
@@ -291,6 +292,7 @@ describe('Sensor vs state: a job\'s market is its own; the device sensor decides
     h = createHost(App);
     await h.mount();
     await click(q('fab-new'));
+    await click(q('ws-edit'));
     expect(marketValue()).toMatch(/Per[uú]/);
   });
 

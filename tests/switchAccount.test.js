@@ -5,7 +5,7 @@ import React, { act } from 'react';
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createFakeDrive } from './helpers/fakeDrive.js';
-import { CLIENT, backToDashboard, q, flush, click, typeInto, installFakeGoogle, createHost } from './helpers/appHarness.js';
+import { CLIENT, backToDashboard, q, flush, click, typeInto, installFakeGoogle, createHost, createProjectViaDraft } from './helpers/appHarness.js';
 import { parseBackup } from '../src/lib/backup.js';
 import { DRIVE_INTERACTION_KEY, DRIVE_LINKED_KEY, DRIVE_TOKEN_KEY, clearDriveToken, getDriveToken, isDriveLinked, markDriveNeedsInteraction, setDriveToken, unlinkDriveAccount } from '../src/lib/driveToken.js';
 import { DICT } from '../src/lib/dict.js';
@@ -38,9 +38,7 @@ const openOps = async () => {
   await flush(10);
 };
 const createProject = async (name) => {
-  await click(q('fab-new'));
-  typeInto(document.querySelector('[role="dialog"] input'), name);
-  await click(q('project-save'));
+  await createProjectViaDraft(name);
   await flush(60);
   await backToDashboard();
 };

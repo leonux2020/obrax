@@ -5,7 +5,7 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { createFakeDrive } from './helpers/fakeDrive.js';
-import { CLIENT, backToDashboard, q, flush, click, typeInto, installFakeGoogle, createHost } from './helpers/appHarness.js';
+import { CLIENT, backToDashboard, q, flush, click, typeInto, installFakeGoogle, createHost, saveDraftAs } from './helpers/appHarness.js';
 import { I18nProvider } from '../src/lib/i18n.jsx';
 import ProjectSheet from '../src/components/ProjectSheet.jsx';
 import { BUDGET_MODELS, WORK_TYPES, cleanBudgetModel, cleanWorkType, modeForBudget, newProject, normalizeProject, normalizeProjects } from '../src/lib/projects.js';
@@ -199,11 +199,12 @@ describe('App: create and edit end to end (checked in the Drive backup)', () => 
     h = createHost(App);
     await h.mount();
     await click(q('fab-new'));
+    await click(q('ws-edit')); // the draft's details: model + type are chosen here, before saving for good
     typeInto(document.querySelector('[role="dialog"] input'), 'Casa Norte');
     await click(q('budget-detailed'));
     await click(q('worktype-remodel'));
     await click(q('project-save'));
-    await flush(60);
+    await saveDraftAs('Casa Norte');
     expect(q('project-workspace')).not.toBeNull();
     await flush(5600);
     const first = parseBackup(drive.backupFiles()[0].body).projects[0];

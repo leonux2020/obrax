@@ -12,7 +12,7 @@ import InstallButton from '../src/components/InstallButton.jsx';
 import Logbook from '../src/components/Logbook.jsx';
 import { __resetInstallForTests, startInstallCapture, getInstallState, promptInstall } from '../src/pwa/installPrompt.js';
 import { createFakeDrive } from './helpers/fakeDrive.js';
-import { CLIENT, backToDashboard, q, flush, click, typeInto, installFakeGoogle, createHost } from './helpers/appHarness.js';
+import { CLIENT, backToDashboard, q, flush, click, typeInto, installFakeGoogle, createHost, saveDraftAs } from './helpers/appHarness.js';
 import { createDictation, getSpeechRecognition, joinSpeech, speechLocale, mergeFinals, closeSentence } from '../src/lib/speech.js';
 import { devAiBypass, aiAccess } from '../src/lib/pro.js';
 import { computeAll } from '../src/lib/engine.js';
@@ -149,11 +149,14 @@ describe('3. a new project goes to the kind of work + measures, not to the finan
   });
 
   const create = async (name, mode) => {
-    await click(q('fab-new'));
-    typeInto(document.querySelector('[role="dialog"] input'), name);
-    if (mode) await click(q(`budget-${{ quick: 'turnkey', project: 'detailed' }[mode]}`)); // the budget model sets the mode: turnkey = one global line, detailed = partida by partida
-    await click(q('project-save'));
-    await flush(60);
+    await click(q('fab-new')); // the project screen opens at once, as a draft
+    if (mode) {
+      await click(q('ws-edit')); // the budget model sets the mode: turnkey = one global line, detailed = partida by partida
+      typeInto(document.querySelector('[role="dialog"] input'), name);
+      await click(q(`budget-${{ quick: 'turnkey', project: 'detailed' }[mode]}`));
+      await click(q('project-save'));
+    }
+    await saveDraftAs(name);
   };
 
   it('a new project lands in the workspace: the first partida is open with the work-type picker (Radier, Pintura...) and the measures', async () => {

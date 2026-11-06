@@ -15,6 +15,7 @@ import NumberPad from '../src/components/workspace/NumberPad.jsx';
 import { I18nProvider } from '../src/lib/i18n.jsx';
 import { resetRegistry } from '../src/lib/priceRegistry.js';
 import { resetToasts } from '../src/lib/notify.js';
+import { saveDraftAs } from './helpers/appHarness.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let host;
@@ -264,27 +265,32 @@ describe('universal back stack: sheets inside the real app', () => {
 
   it('closing a real sheet with the backdrop or a swipe leaves no entry behind (no "Back twice"); there is no x', async () => {
     const back = vi.spyOn(window.history, 'back');
-    await click(q('fab-new'));
+    await click(q('fab-new')); // the draft project screen (it owns ONE history entry)
+    const entry = window.history.state;
+    expect(entry?.cubraxProject).toBeTruthy();
+    await click(q('draft-save')); // no name yet: the soft naming sheet (a layer) opens
+    expect(q('draft-name-sheet')).not.toBeNull();
     expect(document.querySelector('[data-sheet-close]')).toBeNull();
     await click(q('sheet-backdrop'));
     await flush(30);
     expect(back).toHaveBeenCalledTimes(1);
-    expect(window.history.state).toBeNull();
-    await click(q('fab-new'));
+    expect(q('draft-name-sheet')).toBeNull();
+    expect(window.history.state?.cubraxProject).toBeTruthy(); // the draft's own entry is still there, nothing extra
+    await click(q('draft-save'));
     await swipeDown();
     await flush(30);
     expect(back).toHaveBeenCalledTimes(2);
-    expect(window.history.state).toBeNull();
+    expect(q('draft-name-sheet')).toBeNull();
+    expect(window.history.state?.cubraxProject).toBeTruthy();
   });
 
-  it('create flow: the new-project sheet (a layer) saves and the project opens; Back from it lands on the Dashboard in order', async () => {
+  it('create flow: "New project" opens the project screen as a draft; saving it keeps it open; Back from it lands on the Dashboard in order', async () => {
     await click(q('fab-new'));
-    expect(q('new-form')).not.toBeNull();
-    await act(async () => {
-      q('new-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    });
-    await flush(60);
-    expect(q('ws-title')).not.toBeNull(); // the project opened, the sheet cleanup did not undo it
+    expect(q('draft-bar')).not.toBeNull();
+    expect(q('new-form')).toBeNull(); // no isolated form any more
+    await saveDraftAs('Casa Nueva');
+    expect(q('ws-title')).not.toBeNull(); // the project is saved and open, the draft cleanup did not undo it
+    expect(q('draft-bar')).toBeNull();
     expect(window.history.state?.cubraxProject).toBeTruthy();
     await deviceBack();
     await flush(60);

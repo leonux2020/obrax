@@ -57,8 +57,9 @@ const ModeIcon = ({ mode }) => (
 /**
  * New job: the agile form (name, client, Partida Única / Proyecto Completo, dates, city with its GPS target), no money.
  * Edit job (the pencil inside the project): the same fields + finished / frozen switches + delete.
+ * `draftMode`: the pencil of a DRAFT (a job not stored yet): the edit layout, but the budget model is still choosable and there is nothing to close or delete.
  */
-export default function ProjectSheet({ project, onSave, onDelete, onClose, locate = currentPosition, detectRegion = detectCurrentRegion, defaultRegion = null, reverse = reverseCity, search = null, searchDelay = SEARCH_DEBOUNCE_MS }) {
+export default function ProjectSheet({ project, draftMode = false, onSave, onDelete, onClose, locate = currentPosition, detectRegion = detectCurrentRegion, defaultRegion = null, reverse = reverseCity, search = null, searchDelay = SEARCH_DEBOUNCE_MS }) {
   const { t, lang } = useI18n();
   const [ask, confirmNode] = useConfirm();
   const editing = Boolean(project);
@@ -66,7 +67,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
     name: project?.draft.project.name ?? '',
     client: project?.draft.project.client ?? '',
     mode: project?.draft.mode ?? 'quick',
-    budgetModel: '', // chosen first; a new job may also be created without choosing (it then behaves as it always did)
+    budgetModel: project?.budgetModel ?? '', // chosen first; a new job may also be created without choosing (it then behaves as it always did)
     workType: cleanWorkType(project?.workType),
     startDate: project ? project.startDate : toDayString(new Date()),
     endDate: project?.endDate ?? '',
@@ -175,7 +176,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
         <TextField label={t('project.client')} placeholder={t('project.clientPh')} value={form.client} sanitize={(v) => sanitizeText(v, 60)} onChange={set('client')} />
 
         {/* 1. the budget model comes FIRST: how the job is sold decides everything below (turnkey = one global value, detailed = partida by partida) */}
-        {!editing && (
+        {(!editing || draftMode) && (
           <div data-testid="budget-model-block">
             <p className="label">{t('newp.budget')}</p>
             <div role="radiogroup" aria-label={t('newp.budget')} className="grid grid-cols-2 gap-3" data-testid="budget-model">
@@ -200,7 +201,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
             </div>
           </div>
         )}
-        {editing && project.budgetModel && (
+        {editing && !draftMode && project.budgetModel && (
           <p className="text-sm font-light text-neutral-400" data-testid="budget-model-readonly">
             {t('newp.budget')}: {t(`newp.budget.${project.budgetModel}`)}
           </p>
@@ -340,7 +341,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
           )}
         </div>
 
-        {editing && (
+        {editing && !draftMode && (
           <>
             <SectionTitle>{t('edit.sectionState')}</SectionTitle>
             <Switch checked={form.closed} onChange={set('closed')} label={t('proj.closeSwitch')} description={t('proj.closeSwitch.desc')} data-testid="project-closed" />
@@ -376,7 +377,7 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
             </Button>
           </div>
         )}
-        {editing && (
+        {editing && !draftMode && (
           <Button
             variant="danger"
             className="w-full !min-h-[44px] text-sm"

@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { act } from 'react';
 import { createFakeDrive } from './helpers/fakeDrive.js';
-import { CLIENT, q, flush, click, typeInto, installFakeGoogle, createHost, backToDashboard } from './helpers/appHarness.js';
+import { CLIENT, q, flush, click, typeInto, installFakeGoogle, createHost, backToDashboard, createProjectViaDraft } from './helpers/appHarness.js';
 import { collectBackup, serializeBackup, hasNoProjects } from '../src/lib/backup.js';
 import { newProject } from '../src/lib/projects.js';
 import { createDriveClient, BACKUP_FILE } from '../src/lib/drive.js';
@@ -202,9 +202,7 @@ describe('the one-click restore sheet', () => {
     await cloudBackup('Otra');
     h = createHost(App);
     await h.mount();
-    await click(q('fab-new'));
-    typeInto(document.querySelector('[role="dialog"] input'), 'Mi obra local');
-    await click(q('project-save'));
+    await createProjectViaDraft('Mi obra local');
     await flush(60);
     await backToDashboard();
     await connect();

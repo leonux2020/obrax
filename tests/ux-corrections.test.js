@@ -19,6 +19,7 @@ import { resetRegistry } from '../src/lib/priceRegistry.js';
 import { resetToasts } from '../src/lib/notify.js';
 import { freezeQuote } from '../src/lib/signature.js';
 import { DICT } from '../src/lib/dict.js';
+import { createProjectViaDraft, saveDraftAs } from './helpers/appHarness.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const read = (f) => fs.readFileSync(path.resolve(__dirname, '..', f), 'utf8');
@@ -224,37 +225,29 @@ const seed = async () => {
   for (const r of await receiptQueue.list()) await receiptQueue.remove(r.id);
 };
 
-describe('3. new project: the closing button', () => {
-  it('the form ends with a big OLED button (green border + lettering, black inside) "Crear proyecto"; tapping it confirms and lands in the living list', async () => {
+describe('3. new project: the closing button (draft bar)', () => {
+  it('"New project" opens the project screen as a draft that ends with a big solid OLED button "Guardar proyecto"; tapping it (named) lands in the living project', async () => {
     await seed();
     await mountApp();
     await click(q('fab-new'));
-    const dialog = document.querySelector('[role="dialog"]');
-    const form = q('new-form');
-    const button = q('project-save');
-    expect(button.textContent).toContain('Crear proyecto');
+    expect(q('new-form')).toBeNull(); // no isolated form
+    const button = q('draft-save');
+    expect(button.textContent).toBe('Guardar proyecto');
     expect(button.className).toContain('bg-brand'); // solid, inverted CTA: green fill, black lettering, no outline
     expect(button.className).toContain('text-black');
-    expect(button.className).not.toContain('border-2');
-    expect(button.className).toContain('min-h-[64px]');
-    expect(button.type).toBe('submit');
-    // it is the LAST thing of the form: nothing but the cancel link comes after it
-    const after = [...form.querySelectorAll('button')].slice([...form.querySelectorAll('button')].indexOf(button) + 1);
-    expect(after).toHaveLength(1);
-    expect(dialog.contains(button)).toBe(true);
-    await typeInto(dialog.querySelector('input'), 'Casa Soto');
-    await click(button);
+    expect(button.className).not.toMatch(/\bborder/);
+    expect(button.className).toContain('min-h-[56px]');
+    expect(q('draft-bar').contains(button)).toBe(true);
+    await saveDraftAs('Casa Soto');
     expect(q('project-workspace')).not.toBeNull();
     expect(q('ws-title').textContent).toBe('Casa Soto');
-    expect(q('new-form')).toBeNull();
+    expect(q('draft-bar')).toBeNull();
   });
 
   it('the project (and a payment registered in it) is really persisted; the back arrow returns to the dashboard with the card', async () => {
     await seed();
     await mountApp();
-    await click(q('fab-new'));
-    await typeInto(document.querySelector('[role="dialog"] input'), 'Casa Soto');
-    await click(q('project-save'));
+    await createProjectViaDraft('Casa Soto');
     await click(q('ws-cash'));
     await click(q('cash-amount'));
     await keys('7500');
@@ -281,9 +274,7 @@ describe('3. new project: the closing button', () => {
   it('editing an existing project keeps the normal Cancel / Save pair (the big button is only for creating)', async () => {
     await seed();
     await mountApp();
-    await click(q('fab-new'));
-    await typeInto(document.querySelector('[role="dialog"] input'), 'Casa Soto');
-    await click(q('project-save'));
+    await createProjectViaDraft('Casa Soto');
     await click(q('ws-edit'));
     const save = q('project-save');
     expect(save.textContent).toBe('Guardar cambios');

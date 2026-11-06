@@ -37,15 +37,17 @@ function Total({ audit, onCash, label, settled, children }) {
  * ZONE A: the header that never scrolls away. Flag + name, client, place, the lock and ONE number: what is still to be collected (DA INCASSARE,
  * soft orange while there is debt, never red). The quote and what is already collected go under it, small and grey; when nothing is left
  * it says "Saldato" with a green check instead. ONE 2 px line at the base of the block shows the share collected of the budget.
+ * DRAFT (`sandbox` = { name, onName, stale }): the job is not in the database yet. The name is an invisible input ("Toca para añadir nombre"), and the big figure is
+ * tagged "(Simulación)" in amber: it is not definitive. 
  * No deadline / countdown of any kind (no "on time", no days left, no late alert: the debt already says it), no back arrow (the device's back gesture leaves the project), no globe, no coordinates.
  */
-export default function HeaderZone({ project, model, title, client, region, offline, onEdit, onCash, onUnlock, audit = false }) {
+export default function HeaderZone({ project, model, title, client, region, offline, onEdit, onCash, onUnlock, audit = false, sandbox = null }) {
   const { t, money } = useI18n();
   // the place is shown only when it has a NAME; raw coordinates are data, not interface
   const where = project.location?.label || '';
   const cash = model.bars[1];
   const known = model.total !== null; // a valid quote: the budget and what is left can be told
-  const settled = known && model.total > 0 && cash.pending <= 0.005;
+  const settled = !sandbox && known && model.total > 0 && cash.pending <= 0.005;
   return (
     <header data-testid="ws-zone-a" data-region={region.code} className="sticky top-0 z-20 border-b border-white/10 bg-black px-3 pb-3 pt-2">
       <div className="flex items-center gap-2">
@@ -55,9 +57,25 @@ export default function HeaderZone({ project, model, title, client, region, offl
             <span aria-hidden="true" data-testid="ws-flag" className="shrink-0 text-xl leading-tight">
               {region.flag}
             </span>
-            <h1 data-testid="ws-title" className="min-w-0 truncate text-xl font-semibold leading-tight">
-              {title}
-            </h1>
+            {sandbox ? (
+              <h1 className="min-w-0 flex-1 text-xl font-semibold leading-tight">
+                <input
+                  type="text"
+                  value={sandbox.name}
+                  onChange={(e) => sandbox.onName(e.target.value)}
+                  placeholder={t('ws.draft.namePh')}
+                  maxLength={60}
+                  autoComplete="off"
+                  aria-label={t('project.name')}
+                  data-testid="ws-draft-name"
+                  className="min-h-[44px] w-full truncate bg-transparent text-xl font-semibold leading-tight text-neutral-100 placeholder:font-light placeholder:text-neutral-400"
+                />
+              </h1>
+            ) : (
+              <h1 data-testid="ws-title" className="min-w-0 truncate text-xl font-semibold leading-tight">
+                {title}
+              </h1>
+            )}
           </div>
           <p className="truncate text-sm text-neutral-300" data-testid="ws-client">
             {client || t('proj.noClient')}
@@ -90,11 +108,21 @@ export default function HeaderZone({ project, model, title, client, region, offl
             <>
               <span data-testid="ws-due-label" className="block text-xs font-medium uppercase text-neutral-400">
                 {t('ws.due')}
+                {sandbox && (
+                  <span data-testid="ws-sim-label" className="ml-1.5 normal-case text-[#e8c35f]/90">
+                    {t('ws.sim.label')}
+                  </span>
+                )}
               </span>
-              <span data-testid="ws-due" className={`mt-1 block text-3xl font-medium leading-none tracking-tight tabular-nums ${known && cash.pending > 0 ? 'text-orange-400' : 'text-neutral-400'}`}>
+              <span data-testid="ws-due" className={`mt-1 block text-3xl font-medium leading-none tracking-tight tabular-nums ${sandbox ? 'text-[#e8c35f]/90' : known && cash.pending > 0 ? 'text-orange-400' : 'text-neutral-400'}`}>
                 {known ? money(cash.pending) : '—'}
               </span>
             </>
+          )}
+          {sandbox?.stale && (
+            <span data-testid="ws-sim-stale" className="mt-1.5 block text-xs font-light text-neutral-400">
+              {t('ws.sim.stale')}
+            </span>
           )}
           {(known || cash.paid > 0) && (
             <span data-testid="ws-summary" className="mt-1.5 block text-xs tabular-nums text-neutral-400">

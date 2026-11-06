@@ -10,7 +10,7 @@ import { hasIndexedDb } from './lib/db.js';
 import { I18nProvider, makeI18n } from './lib/i18n.jsx';
 import { getRegion, LANGS, REGIONS } from './lib/regions.js';
 import { wipeLocalData } from './lib/session.js';
-import { adoptCompany, cleanCityOrRegion, cleanWorkType, documentCompany, isClosed, newExtension, newProject, projectTitle, toDayString } from './lib/projects.js';
+import { adoptCompany, cleanBudgetModel, cleanCityOrRegion, cleanWorkType, documentCompany, isClosed, modeForBudget, newExtension, newProject, projectTitle, toDayString } from './lib/projects.js';
 import { normalizeLocation } from './lib/ledger.js';
 import { detectCurrentRegion, languageFor } from './lib/geo.js';
 import { sanitizeText } from './lib/sanitize.js';
@@ -23,6 +23,7 @@ import {
   clearDraft,
   hasStoredDraft,
   newDraft,
+  newPartida,
   loadCompany,
   saveCompany,
   normalizeCompany,
@@ -472,13 +473,117 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     setPhotos(emptySlots());
   }, []);
 
-  // The device's BACK button (Android / browser) does exactly what the "←" arrow does: back to the Dashboard.
-  const leaveByBack = useCallback(() => {
+  // ---- DRAFT / SIMULATION: "Nuevo proyecto" opens the project screen itself, on a job that is NOT in the database yet ------------------------------
+  // It lives only in this state (never in `projects`, IndexedDB, the Drive backup or the merge) until "Guardar proyecto" hands it to `commit`; a draft that
+  // is closed or discarded leaves nothing behind. Existing projects never pass through here.
+  const [draftProject, setDraftProject] = useState(null);
+  const draftRef = useRef(null);
+  draftRef.current = draftProject;
+  const draftPhotos = useMemo(() => emptySlots(), []); // a draft has no photo dock: nothing to load or keep
+  const draftBase = useRef(''); // the draft as it was born: equal to it = nothing typed yet = nothing to ask when leaving
+  const [leaveAsk, setLeaveAsk] = useState(false);
+  const [draftEpoch, setDraftEpoch] = useState(0); // bumping it re-arms the history entry that the device's Back just consumed
+  const askAfterEpoch = useRef(false);
+  const startDraft = useCallback(() => {
+    // the market of the new job: where the device is NOW, then the stored country (it never writes back to the settings)
+    const regionCode = [detectCurrentRegion(), settings.region].find((c) => REGIONS[c]);
+    const created = newProject({ company, logo, mode: 'project', regionCode, startDate: toDayString(new Date()) });
+    const project = { ...created, draft: { ...created.draft, step: 1 } };
+    draftBase.current = JSON.stringify(project);
     setSheet(null);
+    setLeaveAsk(false);
+    setTab('projects');
+    setDraftProject(project);
+    window.scrollTo({ top: 0 });
+  }, [company, logo, settings.region]);
+  const setDraftProjectFn = useCallback((update) => setDraftProject((p) => (p ? (typeof update === 'function' ? update(p) : update) : p)), []);
+  const setDraftQuote = useCallback(
+    (update) =>
+      setDraftProject((p) => {
+        if (!p) return p;
+        const draft = typeof update === 'function' ? update(p.draft) : update;
+        return draft === p.draft ? p : { ...p, draft };
+      }),
+    []
+  );
+  const discardDraft = useCallback(() => {
+    const d = draftRef.current;
+    setLeaveAsk(false);
+    setSheet(null);
+    setDraftProject(null);
+    if (!d) return;
+    photoStoreFor(d.id).clear().catch(() => {}); // whatever the simulation stored under its provisional id goes away with it
+    notePhotosFor(d.id).clear().catch(() => {});
+    receiptPhotosFor(d.id).clear().catch(() => {});
+    paymentPhotosFor(d.id).clear().catch(() => {});
+  }, []);
+  /** GUARDAR PROYECTO: the draft becomes a real project (same id, so everything it stored stays attached) and the normal screen takes over. */
+  const saveDraft = useCallback(
+    (name) => {
+      const d = draftRef.current;
+      if (!d) return;
+      const clean = sanitizeText(name || d.draft.project.name, 60).trim();
+      if (!clean) return;
+      const project = { ...d, updatedAt: Date.now(), draft: { ...d.draft, project: { ...d.draft.project, name: clean } } };
+      commit(project);
+      setLeaveAsk(false);
+      setSheet(null);
+      setDraftProject(null);
+      pushToast({ key: 'ws.draft.saved', tone: 'ok' });
+      openProject(project.id);
+    },
+    [commit, openProject]
+  );
+  // the pencil of a draft: the same fields as the edit sheet, applied to the draft (the budget model may still be changed while nothing is stored)
+  const applyDraftFields = (f) => {
+    setDraftProject((p) => {
+      if (!p) return p;
+      const model = cleanBudgetModel(f.budgetModel);
+      let draft = REGIONS[f.regionCode] && f.regionCode !== p.draft.regionCode ? withMarket(p.draft, f.regionCode) : p.draft;
+      const mode = model ? modeForBudget(model, draft.mode) : draft.mode;
+      // turnkey is ONE global line: it only takes over when that drops nothing the user already typed
+      if (mode !== draft.mode && (mode === 'project' || draft.partidas.length <= 1)) {
+        draft = { ...draft, mode, partidas: mode === 'quick' ? (draft.partidas.length ? draft.partidas.slice(0, 1) : [newPartida('slab')]) : draft.partidas, step: mode === 'project' ? 1 : 0 };
+      }
+      draft = { ...draft, project: { name: sanitizeText(f.name, 60).trim(), client: sanitizeText(f.client, 60).trim() } };
+      const { workType: _w, budgetModel: _b, ...rest } = p;
+      const workType = cleanWorkType(f.workType);
+      return syncDates({
+        ...rest,
+        ...(model ? { budgetModel: model } : {}),
+        ...(workType ? { workType } : {}),
+        startDate: f.startDate,
+        endDate: f.endDate,
+        location: normalizeLocation(f.location),
+        cityOrRegion: cleanCityOrRegion(f.cityOrRegion),
+        draft,
+      });
+    });
+    setSheet(null);
+  };
+
+  // The device's BACK button (Android / browser) does exactly what the "←" arrow does: back to the Dashboard. On a draft that already has data it asks first.
+  const leaveByBack = useCallback(() => {
     setPaywall(null);
+    if (draftRef.current && !activeRef.current) {
+      if (JSON.stringify(draftRef.current) === draftBase.current) {
+        discardDraft();
+      } else {
+        askAfterEpoch.current = true;
+        setDraftEpoch((e) => e + 1); // first the history entry comes back, THEN the sheet opens above it
+      }
+      return;
+    }
+    setSheet(null);
     closeProject();
-  }, [closeProject]);
-  useHistoryBack(activeId, leaveByBack);
+  }, [closeProject, discardDraft]);
+  useHistoryBack(activeId || (draftProject ? `${draftProject.id}#${draftEpoch}` : null), leaveByBack);
+  useEffect(() => {
+    if (askAfterEpoch.current) {
+      askAfterEpoch.current = false;
+      setLeaveAsk(true);
+    }
+  }, [draftEpoch]);
   // Bottom navigation: Contabilidad and Ajustes are ONE history entry on top of Proyectos (switching between them replaces it), so the
   // device's Back goes ordered to the previous screen (Proyectos) instead of leaving the app; tapping "Proyectos" drops that entry.
   useHistoryBack(tab !== 'projects' ? tab : null, () => setTab('projects'), 'cubraxTab');
@@ -510,23 +615,6 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
       ),
     [activeId]
   );
-
-  // A NEW project lands in the workspace (the SPA): its first partida is already open to type the measures, and
-  // "Proyecto completo" starts with "+ Agregar partida".
-  const createProject = (fields) => {
-    // The company profile is COPIED into the new project: later profile changes never rewrite it.
-    // the market of a new job is the one picked in the form (it starts with where the device is NOW), never blindly the stored one
-    // Market of THIS job, in this order: the one picked in the form (it starts at the country the device is in NOW) -> the device's sensor read
-    // again here -> the profile's country. It is the job's own state: it never writes back to the settings (a Chilean job created from Italy
-    // must not make the next job Chilean) and it never moves the interface language.
-    const regionCode = [fields.regionCode, detectCurrentRegion(), settings.region].find((c) => REGIONS[c]);
-    const created = newProject({ company, logo, ...fields, regionCode });
-    const project = { ...created, draft: { ...created.draft, step: created.draft.mode === 'project' ? 1 : 0 } };
-    commit(project);
-    setSheet(null);
-    setTab('projects');
-    openProject(project.id);
-  };
 
   // "Crear extensión": a NEW phase of a finished job (same client, place and market, no items), linked by parentId.
   const createExtension = (parent) => {
@@ -625,8 +713,8 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
       setPaywall('projects');
       return;
     }
-    setSheet({ type: 'new' });
-  }, [projects, pro]);
+    startDraft(); // no isolated form: the project screen opens at once, as a draft / simulation
+  }, [projects, pro, startDraft]);
 
   const openPaywall = useCallback((feature = 'promo') => {
     setSheet(null);
@@ -1101,6 +1189,22 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
                 onPro={openPaywall}
               />
             )
+          ) : draftProject ? (
+            // "Nuevo proyecto": the project screen itself, on a draft that is not stored anywhere yet (see startDraft)
+            <ProjectWorkspace
+              key={draftProject.id}
+              project={draftProject}
+              setProject={setDraftProjectFn}
+              setDraft={setDraftQuote}
+              photos={draftPhotos}
+              setPhotos={() => {}}
+              company={projectCompany(draftProject, company)}
+              receipts={receipts}
+              enqueueReceipt={async () => null}
+              onEdit={() => setSheet({ type: 'editDraft' })}
+              onPro={openPaywall}
+              sandbox={{ onSave: saveDraft, onDiscard: discardDraft, onKeep: () => setLeaveAsk(false), leaveAsk }}
+            />
           ) : (
             <>
               {tab === 'settings' ? (
@@ -1139,7 +1243,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
             </>
           )}
 
-          {sheet?.type === 'new' && <ProjectSheet defaultRegion={settings.region} onSave={createProject} onClose={() => setSheet(null)} />}
+          {sheet?.type === 'editDraft' && draftProject && <ProjectSheet project={draftProject} draftMode onSave={applyDraftFields} onClose={() => setSheet(null)} />}
           {editing && (
             <ProjectSheet project={editing} onSave={(f) => editProject(editing, f)} onDelete={() => deleteProject(editing.id)} onClose={() => setSheet(null)} />
           )}

@@ -4,7 +4,7 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from '../src/App.jsx';
 import { FREE_PROJECT_LIMIT, SIM_PRO_KEY, isPro } from '../src/lib/pro.js';
-import { backToDashboard } from './helpers/appHarness.js';
+import { backToDashboard, createProjectViaDraft } from './helpers/appHarness.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -61,14 +61,10 @@ describe('PRO test switch inside the real App', () => {
     expect(q('pro-active-note')).not.toBeNull();
   });
 
-  it('PRO lifts the free-project limit at once (no reload): the 4th project opens the form, not the paywall', async () => {
+  it('PRO lifts the free-project limit at once (no reload): the 4th project opens the draft, not the paywall', async () => {
     await mount();
     const create = async (name) => {
-      await click(q('fab-new'));
-      if (q('pro-paywall')) return false;
-      typeInto(document.querySelector('[role="dialog"] input'), name);
-      await click(q('project-save'));
-      await flush(60);
+      if (!(await createProjectViaDraft(name))) return false; // at the free limit the paywall opens instead of the draft
       await backToDashboard();
       return true;
     };

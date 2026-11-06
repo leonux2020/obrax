@@ -12,7 +12,7 @@ import { normalizeSettings } from '../src/lib/draft.js';
 import { newProject } from '../src/lib/projects.js';
 import { projectStore } from '../src/lib/projectStore.js';
 import { REGIONS } from '../src/lib/regions.js';
-import { q, flush, click, typeInto, createHost } from './helpers/appHarness.js';
+import { q, flush, click, typeInto, createHost, saveDraftAs } from './helpers/appHarness.js';
 import { resetDevice, setDevice } from './helpers/device.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -165,9 +165,10 @@ describe('App: the interface and the new projects follow the device', () => {
     expect(document.documentElement.lang).toBe('it');
     expect(JSON.parse(localStorage.getItem('cp.settings.v1'))).toEqual({ region: 'CL', lang: 'it' }); // not locked: it keeps following the device
     await click(q('fab-new'));
+    await click(q('ws-edit')); // the draft's details (the same sheet as editing): the market already starts where the phone is
     expect(document.querySelector('[data-testid="project-market"] input').value).toBe('🇮🇹 Italia');
-    await typeInto(document.querySelector('[role="dialog"] input'), 'Casa Rossi');
     await click(q('project-save'));
+    await saveDraftAs('Casa Rossi');
     await flush(400);
     const [project] = await projectStore.load();
     expect(project.draft.regionCode).toBe('IT');

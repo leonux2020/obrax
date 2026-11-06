@@ -8,6 +8,7 @@ import App from '../src/App.jsx';
 import { projectStore } from '../src/lib/projectStore.js';
 import { receiptQueue } from '../src/lib/receiptQueue.js';
 import { resetToasts } from '../src/lib/notify.js';
+import { createProjectViaDraft } from './helpers/appHarness.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const JPEG = `data:image/jpeg;base64,${Buffer.from(Array.from({ length: 300 }, (_, i) => i % 200)).toString('base64')}`;
@@ -39,9 +40,8 @@ async function mount() {
   });
 }
 async function newProjectIntoWorkspace() {
-  await click(q('fab-new'));
-  typeInto(document.querySelector('[role="dialog"] input'), 'Casa Soto');
-  await click(q('project-save'));
+  await createProjectViaDraft('Casa Soto');
+  resetToasts(); // the "Proyecto guardado" toast is not what these tests look at
   for (let i = 0; i < 8 && !q('project-workspace'); i += 1) {
     if (q('wizard-back')) await click(q('wizard-back'));
     else break;
@@ -87,7 +87,7 @@ describe('App with the workspace (the only project screen)', () => {
     expect(q('wizard-back')).toBeNull();
     expect(q('project-view')).toBeNull();
     expect(q('ws-title').textContent).toBe('Casa Soto');
-    expect(q('partida-0').open).toBe(true); // the measures are right there
+    expect(q('partida-add')).not.toBeNull(); // a detailed job starts with an empty list and the door to add the first partida
     expect(q('ws-advanced')).toBeNull(); // and there is no door to the old editor
     await deviceBack();
     expect(q('dash-empty') || q('project-card')).not.toBeNull();

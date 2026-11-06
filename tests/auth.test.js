@@ -7,7 +7,7 @@ import { createRoot } from 'react-dom/client';
 import { DICT } from '../src/lib/dict.js';
 import { LANGS } from '../src/lib/regions.js';
 import { FREE_PROJECT_LIMIT, isPro, projectLimitReached } from '../src/lib/pro.js';
-import { backToDashboard } from './helpers/appHarness.js';
+import { backToDashboard, createProjectViaDraft } from './helpers/appHarness.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -236,10 +236,7 @@ describe('Google login on the main access screen (VITE_GOOGLE_CLIENT_ID)', () =>
 
 describe('PRO paywall opens when a locked function is used', () => {
   const createViaNav = async (name) => {
-    await click(q('fab-new'));
-    if (q('pro-paywall')) return;
-    typeInto(document.querySelector('[role="dialog"] input'), name);
-    await click(q('project-save'));
+    await createProjectViaDraft(name);
     await flush(60);
     await backToDashboard();
   };

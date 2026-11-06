@@ -3,7 +3,7 @@
 // amber toast (never a crash) and uploads by itself when the signal returns.
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { createFakeDrive } from './helpers/fakeDrive.js';
-import { CLIENT, backToDashboard, q, flush, click, typeInto, installFakeGoogle, createHost } from './helpers/appHarness.js';
+import { CLIENT, backToDashboard, q, flush, click, typeInto, installFakeGoogle, createHost, createProjectViaDraft } from './helpers/appHarness.js';
 import { parseBackup } from '../src/lib/backup.js';
 import { clearDriveToken } from '../src/lib/driveToken.js';
 import { resetToasts } from '../src/lib/notify.js';
@@ -30,9 +30,7 @@ const names = () => {
   return f ? parseBackup(f.body).projects.map((p) => p.draft.project.name) : [];
 };
 const createProject = async (name) => {
-  await click(q('fab-new'));
-  typeInto(document.querySelector('[role="dialog"] input'), name);
-  await click(q('project-save'));
+  await createProjectViaDraft(name);
   await flush(60);
   await backToDashboard();
 };

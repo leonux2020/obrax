@@ -90,3 +90,24 @@ export function createHost(App, props = {}) {
     tab: (name) => [...host.querySelectorAll('nav button')].find((b) => b.textContent.includes(name)),
   };
 }
+
+/**
+ * "Nuevo proyecto" opens the project screen on a DRAFT (nothing stored). This is what a thumb does to make it real: tap "Nuevo", type the name in the
+ * header, tap "Guardar proyecto". A name is optional: without one the soft naming sheet appears and `name` is typed there. The paywall (free limit)
+ * leaves the draft unopened and the function returns false.
+ */
+export async function createProjectViaDraft(name = 'Obra') {
+  await click(q('fab-new'));
+  if (!q('draft-bar')) return false;
+  await setNative(q('ws-draft-name'), name);
+  await click(q('draft-save'));
+  await flush(60);
+  return true;
+}
+
+// The draft that is already open (fab-new clicked): name it in the header and save it for good.
+export async function saveDraftAs(name = 'Obra') {
+  await setNative(q('ws-draft-name'), name);
+  await click(q('draft-save'));
+  await flush(60);
+}

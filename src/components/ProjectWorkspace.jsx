@@ -7,6 +7,7 @@ import { LEDGER_LIMITS, cashSummary, liquidity, newEntryId, projectMarket, withP
 import { MAX_PARTIDAS, newPartida } from '../lib/draft.js';
 import { TASKS, defaultDims } from '../lib/tasks.js';
 import { projectClient, projectTitle } from '../lib/projects.js';
+import { sanitizeText } from '../lib/sanitize.js';
 import { flushUserPrices } from '../lib/priceFeed.js';
 import { savedMeta } from '../lib/priceBook.js';
 import { lookupPrice } from '../lib/baseCatalog.js';
@@ -31,6 +32,7 @@ import CashBlock from './workspace/CashBlock.jsx';
 import CrewBlock from './workspace/CrewBlock.jsx';
 import TimelineBlock from './workspace/TimelineBlock.jsx';
 import Dock from './workspace/Dock.jsx';
+import DraftBar, { DraftLeaveSheet, DraftNameSheet } from './workspace/DraftBar.jsx';
 import ExpensesBlock from './workspace/ExpensesBlock.jsx';
 import ExportSheet from './workspace/ExportSheet.jsx';
 import FinanceBlock from './workspace/FinanceBlock.jsx';
@@ -63,13 +65,18 @@ const MENU_BLOCKS = ['crew', 'finance', 'cash', 'log', 'expenses', 'timeline']; 
  *   TACTICAL  (default, from "Proyectos")           the operational workspace below;
  *   AUDIT     (`fromAccounting`, from "Contabilidad") a pure financial ledger: cockpit + receipt stack, nothing operational (ProjectAudit).
  * `rendition` ({ onClose, onRetry, onReconnect, needsReconnect, queue }) feeds the audit mode's "Cerrar Rendición" bar.
+ *
+ * DRAFT / SIMULATION (`sandbox` = { onSave(name), onDiscard(), onKeep(), leaveAsk }): the same screen for a job that is NOT in the database yet ("Nuevo proyecto"
+ * lands here). The name is typed in the header, the big figures start at 0 and say "(Simulación)", the six tiles work on a virtual project, and the dock
+ * (Bitácora, Cámara...) is replaced by SIMULAR / CALCULAR (refresh the figures, save nothing) and GUARDAR PROYECTO (ask for a name if there is none, then
+ * hand the project to the app, which stores it and shows this very screen in its normal state).
  */
 export default function ProjectWorkspace({ fromAccounting = false, rendition = null, ...props }) {
   if (fromAccounting) return <ProjectAudit project={props.project} rendition={rendition} />;
   return <TacticalWorkspace {...props} />;
 }
 
-function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, company, receipts, enqueueReceipt, onEdit, onPro, onSyncDossier = null, dossierBusy = false, geocode }) {
+function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, company, receipts, enqueueReceipt, onEdit, onPro, onSyncDossier = null, dossierBusy = false, geocode, sandbox = null }) {
   const i18n = useI18n();
   const { t, region } = i18n;
   const draft = project.draft;
@@ -90,7 +97,13 @@ function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, c
   );
   const total = result.valid ? result.quote.total : 0;
   const cash = cashSummary(total, project.payments);
-  const model = headerModel({ project, total, valid: result.valid, cash, liquid: liquidity(project.payments, project.expenses, project.advances), now: Date.now() });
+  // DRAFT: the big figures are a SNAPSHOT taken by "Simular / Calcular" (0 until then); they never follow the typing by themselves
+  const [sim, setSim] = useState(null);
+  const simulate = () => setSim({ total, valid: result.valid, cash });
+  const stale = Boolean(sandbox && sim && (sim.total !== total || sim.cash.paid !== cash.paid));
+  const model = sandbox
+    ? headerModel({ project, total: sim ? sim.total : 0, valid: sim ? sim.valid : true, cash: sim ? sim.cash : cashSummary(0, []), liquid: 0, now: Date.now() })
+    : headerModel({ project, total, valid: result.valid, cash, liquid: liquidity(project.payments, project.expenses, project.advances), now: Date.now() });
   const locked = quoteLock(draft);
   const groups = useMemo(() => partidaGroups(result, draft), [result, draft]);
   const queued = receipts?.rows.filter((r) => r.projectId === project.id) ?? [];
@@ -101,6 +114,13 @@ function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, c
     return { ...initialWorkspaceState(), open: first ? { [first.id]: true } : {} };
   });
   const toggle = (id, open) => dispatch({ type: 'toggle', id, open });
+  // DRAFT: the details sheet can turn the job into a single global line (turnkey) AFTER this screen mounted: that first line opens too
+  const hadPartidas = useRef(groups.length > 0);
+  useEffect(() => {
+    const first = groups.find((g) => g.incomplete);
+    if (sandbox && !hadPartidas.current && groups.length > 0 && first) dispatch({ type: 'toggle', id: first.id, open: true });
+    hadPartidas.current = groups.length > 0;
+  }, [groups, sandbox]);
   // the device's Back closes the last opened partida accordion instead of leaving the project (the grid menus are bottom sheets: they are
   // back-stack layers by themselves, see Block.jsx)
   const partidaOpen = useMemo(() => Object.fromEntries(Object.entries(ui.open).filter(([id]) => !MENU_BLOCKS.includes(id))), [ui.open]);
@@ -205,10 +225,29 @@ function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, c
   };
   const park = (image) => enqueueReceipt({ projectId: project.id, image, regionCode, currency: region.currency, lang: i18n.lang });
   const title = projectTitle(project) || t('proj.untitled');
+  // DRAFT: the name lives in the header; GUARDAR without one asks for it in a soft sheet
+  const [namingFor, setNamingFor] = useState(null); // null | 'save'
+  const setName = (value) => setDraft((d) => ({ ...d, project: { ...d.project, name: sanitizeText(value, 60) } }));
+  const requestSave = () => {
+    const name = sanitizeText(projectTitle(project), 60).trim();
+    if (name) sandbox.onSave(name);
+    else setNamingFor('save');
+  };
 
   return (
     <main className="mx-auto min-h-[100dvh] w-full max-w-3xl bg-black pb-40 text-neutral-200" data-testid="project-workspace" data-locked={locked || undefined}>
-      <HeaderZone project={project} model={model} title={title} client={projectClient(project)} region={region} offline={!online} onEdit={onEdit} onCash={openCash} onUnlock={() => dispatch({ type: 'sheet', name: 'unlock' })} />
+      <HeaderZone
+        project={project}
+        model={model}
+        title={title}
+        client={projectClient(project)}
+        region={region}
+        offline={!online}
+        onEdit={onEdit}
+        onCash={openCash}
+        onUnlock={() => dispatch({ type: 'sheet', name: 'unlock' })}
+        sandbox={sandbox ? { name: projectTitle(project), onName: setName, stale } : null}
+      />
 
       <div className="space-y-3 px-3 pt-3">
         <PartidaList draft={draft} groups={groups} open={ui.open} locked={Boolean(locked)} onBlocked={blocked} showErrors onToggle={toggle} onUpdate={updatePartida} onTask={changeTask} onAdd={addPartida} onRemove={removePartida} onPrice={openPrice} result={result} setDraft={setDraft} projectLocation={location} />
@@ -225,7 +264,7 @@ function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, c
         <AlertTray alerts={projectAlerts(project, t, { now: Date.now(), budget: result.valid ? total : null, queue: queued, money: (n) => i18n.moneyIn(n, projectMarket(project).currency) }).filter((a) => a.kind !== 'deadline')} />
       </div>
 
-      <Dock onOpen={openDock} queued={queued.filter((r) => r.status === 'pending' || r.status === 'sending').length} />
+      {sandbox ? <DraftBar onSimulate={simulate} onSave={requestSave} /> : <Dock onOpen={openDock} queued={queued.filter((r) => r.status === 'pending' || r.status === 'sending').length} />}
 
       {padId && padLookup && (
         <SupplierPad
@@ -271,6 +310,18 @@ function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, c
       )}
       {ui.sheet === 'camera' && <PhotoSheet photos={photos} setPhotos={setPhotos} projectId={project.id} onClose={closeSheet} />}
       {ui.sheet === 'scan' && <ReceiptSheet onSave={saveExpenses} existing={project.expenses} onQueue={park} onClose={closeSheet} />}
+      {sandbox && namingFor && (
+        <DraftNameSheet
+          initial=""
+          onClose={() => setNamingFor(null)}
+          onConfirm={(name) => {
+            setNamingFor(null);
+            setName(name);
+            sandbox.onSave(name);
+          }}
+        />
+      )}
+      {sandbox?.leaveAsk && <DraftLeaveSheet onKeep={sandbox.onKeep} onSave={() => { sandbox.onKeep(); requestSave(); }} onDiscard={sandbox.onDiscard} />}
       {confirmNode}
     </main>
   );
