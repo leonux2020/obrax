@@ -6,12 +6,31 @@ import { LEVEL_COLOR } from '../levelStyle.js';
 import { WASTE_LIMITS } from '../../lib/tasks.js';
 import { priceCaption } from '../../lib/workspaceModel.js';
 import { TextField } from '../ui.jsx';
-import PercentSlider from '../PercentSlider.jsx';
 import LockedZone from './LockedZone.jsx';
 import PartidaMachinery from './PartidaMachinery.jsx';
 import TaskPicker, { TaskIcon } from '../TaskPicker.jsx';
 import DimsForm from '../DimsForm.jsx';
 import HseButton from '../HseSheet.jsx';
+
+/** The three waste presets: Minimum and Critical are the limits of the model, Normal sits halfway (snapped to the step, never outside the limits). */
+const WASTE_PRESETS = (() => {
+  const { min, max, step } = WASTE_LIMITS;
+  const mid = Math.min(max, Math.max(min, Math.round((min + max) / 2 / step) * step));
+  return [
+    { id: 'min', value: min },
+    { id: 'normal', value: mid },
+    { id: 'critical', value: max },
+  ];
+})();
+
+/** Pill of the waste group: a quiet translucent fill; the active one turns brand-tinted (the colour is the only signal, no box shadow). */
+const wastePill = (active) => `relative flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-full px-3 text-sm transition active:scale-95 active:opacity-70 before:absolute before:-inset-y-0.5 before:inset-x-0 before:content-[""] ${active ? 'bg-brand/20 font-normal text-brand' : 'bg-white/5 font-light text-neutral-400'}`;
+
+/** The preset a stored waste belongs to: the exact one, or the nearest for legacy / per-task defaults (read only: nothing is rewritten until the user taps). */
+const activePreset = (waste) => {
+  if (!Number.isFinite(waste)) return null;
+  return WASTE_PRESETS.reduce((best, x) => (Math.abs(x.value - waste) < Math.abs(best.value - waste) ? x : best)).id;
+};
 
 /**
  * ZONE B, the living list: one native <details>/<summary> per partida. Open it and the measures, the materials and
@@ -72,7 +91,24 @@ export default function PartidaList({ draft, groups, open, locked, onBlocked, on
                   <p className="label">{t('ws.measures')}</p>
                   <DimsForm partida={p} validation={g.validation} showErrors={showErrors} onChange={(patch) => onUpdate(p.id, (x) => ({ ...x, dims: { ...x.dims, ...patch } }))} />
                 </div>
-                <PercentSlider label={t('fin.waste')} testId={`waste-${i}`} value={p.waste} min={WASTE_LIMITS.min} max={WASTE_LIMITS.max} step={WASTE_LIMITS.step} onChange={(waste) => onUpdate(p.id, (x) => ({ ...x, waste }))} />
+                <div data-testid={`waste-${i}`}>
+                  <p className="label">
+                    {t('fin.waste')}
+                    <span data-testid={`waste-${i}-value`} className="ml-2 font-light tabular-nums text-neutral-400">
+                      {Number.isFinite(p.waste) ? p.waste : WASTE_LIMITS.min}%
+                    </span>
+                  </p>
+                  <div role="radiogroup" aria-label={t('fin.waste')} className="flex flex-row gap-2">
+                    {WASTE_PRESETS.map(({ id, value }) => {
+                      const active = activePreset(p.waste) === id;
+                      return (
+                        <button key={id} type="button" role="radio" aria-checked={active} onClick={() => onUpdate(p.id, (x) => ({ ...x, waste: value }))} data-testid={`waste-${i}-${id}`} className={wastePill(active)}>
+                          {t(`fin.waste_${id}`)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
                 {project && (
                   <button type="button" onClick={() => onRemove(p.id)} data-testid={`partida-remove-${i}`} className="min-h-[44px] text-xs font-semibold text-red-400">
                     ✕ {t('part.delete')}
@@ -80,54 +116,58 @@ export default function PartidaList({ draft, groups, open, locked, onBlocked, on
                 )}
               </LockedZone>
 
-              {g.rows.length > 0 && (
-                <div>
-                  <p className="label">{t('ws.materials')}</p>
-                  <ul className="divide-y divide-white/10 rounded-xl border border-white/10" data-testid={`materials-${i}`}>
-                    {g.rows.map((r) => (
-                      <li key={r.id} className="flex items-center gap-3 px-3 py-2">
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold">{t(`mat.${r.id}`)}</span>
-                          <span className="block text-xs text-neutral-400 tabular-nums">
-                            {num(r.packs)} {unit(r.saleUnit)} · {money(r.total)}
+              {/* progressive disclosure: the definition above (measures + waste) is one block; the logistics (materials, safety guide, machinery) is another, in its own container */}
+              <div className="space-y-4 pt-2" data-testid={`logistics-${i}`}>
+                {g.rows.length > 0 && (
+                  <>
+                  <p className="text-xs font-light tracking-[0.02em] text-neutral-400">{t('ws.logistics')}</p>
+                  <div>
+                    <p className="label">{t('ws.materials')}</p>
+                    <ul className="divide-y divide-white/10 rounded-xl border border-white/10" data-testid={`materials-${i}`}>
+                      {g.rows.map((r) => (
+                        <li key={r.id} className="flex items-center gap-3 px-3 py-2">
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold">{t(`mat.${r.id}`)}</span>
+                            <span className="block text-xs text-neutral-400 tabular-nums">
+                              {num(r.packs)} {unit(r.saleUnit)} · {money(r.total)}
+                            </span>
                           </span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => onPrice(r.id)}
-                          data-testid={`price-${r.id}`}
-                          data-origin={r.origin}
-                          data-locked={locked ? 'true' : undefined}
-                          aria-label={`${t(`mat.${r.id}`)}: ${money(r.unitPrice)}${locked ? ` (${t('ws.locked')})` : ''}`}
-                          title={r.shared ? t('ws.shared') : undefined}
-                          className="min-h-[48px] min-w-[104px] rounded-lg border border-white/15 px-3 text-right active:border-white/50"
-                        >
-                          <span className="block text-sm font-medium tabular-nums">
-                            {locked && <span aria-hidden="true">🔒 </span>}
-                            {money(r.unitPrice)}
-                          </span>
-                          <span className="block text-xs font-semibold" style={{ color: r.origin === 'user' ? '#e8c35f' : '#a3a3a3' }}>
-                            {r.shared && <span aria-hidden="true">↔ </span>}
-                            {t(`ws.origin.${r.origin}`)}
-                          </span>
-                          <span data-testid={`supplier-${r.id}`} className="block max-w-[11rem] truncate text-xs text-neutral-500">
-                            {priceCaption(t, { origin: r.origin, meta: r.supplier, regionCode: draft.regionCode })}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* the machinery this task uses (it used to be a module of its own) */}
-              {/* the HSE guide (PPE, ergonomics, waste) of this task: read-only, so it stays available while the quote is frozen */}
-              <div className="flex items-center gap-3" data-testid={`hse-row-${i}`}>
-                <HseButton task={p.task} />
-                <span className="text-xs text-neutral-400">{t('hse.open')}</span>
+                          <button
+                            type="button"
+                            onClick={() => onPrice(r.id)}
+                            data-testid={`price-${r.id}`}
+                            data-origin={r.origin}
+                            data-locked={locked ? 'true' : undefined}
+                            aria-label={`${t(`mat.${r.id}`)}: ${money(r.unitPrice)}${locked ? ` (${t('ws.locked')})` : ''}`}
+                            title={r.shared ? t('ws.shared') : undefined}
+                            className="min-h-[48px] min-w-[104px] rounded-lg border border-white/15 px-3 text-right active:border-white/50"
+                          >
+                            <span className="block text-sm font-medium tabular-nums">
+                              {locked && <span aria-hidden="true">🔒 </span>}
+                              {money(r.unitPrice)}
+                            </span>
+                            <span className="block text-xs font-semibold" style={{ color: r.origin === 'user' ? '#e8c35f' : '#a3a3a3' }}>
+                              {r.shared && <span aria-hidden="true">↔ </span>}
+                              {t(`ws.origin.${r.origin}`)}
+                            </span>
+                            <span data-testid={`supplier-${r.id}`} className="block max-w-[11rem] truncate text-xs text-neutral-500">
+                              {priceCaption(t, { origin: r.origin, meta: r.supplier, regionCode: draft.regionCode })}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  </>
+                )}
+                  {/* the HSE guide (PPE, ergonomics, waste) of this task: read-only, so it stays available while the quote is frozen */}
+                  <div className="flex items-center gap-3" data-testid={`hse-row-${i}`}>
+                    <HseButton task={p.task} />
+                    <span className="text-xs text-neutral-400">{t('hse.open')}</span>
+                  </div>
+                  {/* the machinery this task uses (it used to be a module of its own) */}
+                  {result && setDraft && <PartidaMachinery draft={draft} result={result} index={i} regionCode={draft.regionCode} projectLocation={projectLocation} locked={locked} onBlocked={onBlocked} setDraft={setDraft} />}
               </div>
-
-              {result && setDraft && <PartidaMachinery draft={draft} result={result} index={i} regionCode={draft.regionCode} projectLocation={projectLocation} locked={locked} onBlocked={onBlocked} setDraft={setDraft} />}
             </div>
           </details>
         );
