@@ -85,22 +85,57 @@ describe('unlinkDriveAccount (driveToken.js)', () => {
 });
 
 describe('Ajustes: switch Google account', () => {
-  it('a quiet icon button sits at the right of the account row (44px, no border, tooltip), only for a Google user', async () => {
+  it('the row only offers a quiet pencil (44px, no border): the real action is hidden until the pencil is tapped', async () => {
     seed();
     h = createHost(App);
     await h.mount();
     await openOps();
     const row = q('settings-account');
-    const btn = q('switch-account');
-    expect(row.contains(btn)).toBe(true);
-    expect(row.lastElementChild).toBe(btn);
-    expect(btn.getAttribute('aria-label')).toBe(DICT.es['settings.account.switch']);
-    expect(btn.title).toBe(DICT.es['settings.account.switch']);
-    expect(btn.className).toContain('h-11');
-    expect(btn.className).toContain('active:scale-95');
-    expect(btn.className).not.toMatch(/\bborder\b|bg-neutral|bg-gray/);
-    expect(btn.querySelector('svg[data-outline-icon="true"]')).not.toBeNull();
+    const pencil = q('edit-account');
+    expect(row.contains(pencil)).toBe(true);
+    expect(row.lastElementChild).toBe(pencil);
+    expect(pencil.getAttribute('aria-label')).toBe(DICT.es['settings.account.edit']);
+    expect(pencil.getAttribute('aria-expanded')).toBe('false');
+    expect(pencil.className).toContain('h-11');
+    expect(pencil.className).toContain('w-11');
+    expect(pencil.className).toContain('active:scale-95');
+    expect(pencil.className).not.toMatch(/\bborder\b|bg-neutral|bg-gray/);
+    expect(pencil.querySelector('svg[data-outline-icon="true"][data-icon="pencil"]')).not.toBeNull();
+    expect(q('switch-account')).toBeNull(); // no accidental disconnect: nothing to tap by mistake
+    expect(q('account-edit-panel')).toBeNull();
+    expect(q('account-unlink-desc')).toBeNull();
     expect(q('google-login')).toBeNull(); // a Google user does not see the sign-in button
+  });
+
+  it('tapping the pencil expands the row: dim micro-text + a clear text button (48px, rounded-full, translucent), well apart from the pencil; a second tap folds it', async () => {
+    seed();
+    h = createHost(App);
+    await h.mount();
+    await openOps();
+    await click(q('edit-account'));
+    expect(q('edit-account').getAttribute('aria-expanded')).toBe('true');
+    const panel = q('account-edit-panel');
+    const desc = q('account-unlink-desc');
+    const btn = q('switch-account');
+    expect(panel.contains(desc) && panel.contains(btn)).toBe(true);
+    expect(desc.textContent).toBe(DICT.es['settings.account.unlink_desc']);
+    expect(desc.className).toContain('text-white/50');
+    expect(desc.className).toContain('text-xs');
+    expect(btn.textContent).toBe('Cambiar cuenta de Google'); // explicit words, not just an icon
+    expect(btn.querySelector('svg')).toBeNull();
+    expect(btn.className).toContain('min-h-[48px]');
+    expect(btn.className).toContain('w-full');
+    expect(btn.className).toContain('rounded-full');
+    expect(btn.className).toContain('bg-white/5');
+    expect(btn.className).not.toMatch(/\bborder\b|bg-neutral|bg-gray/);
+    expect(panel.className).toMatch(/\bmt-5\b/); // generous margins: the button is NOT where the thumb just tapped
+    expect(panel.className).toMatch(/space-y-5/);
+    expect(q('settings-account').compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(drive.backupFiles()).toHaveLength(0); // opening the panel changes nothing
+    expect(getDriveToken()).not.toBeNull();
+    await click(q('edit-account'));
+    expect(q('account-edit-panel')).toBeNull();
+    expect(getDriveToken()).not.toBeNull(); // folding it does not disconnect either
   });
 
   it('one tap: token + flags gone, the Google button is back, the user is the local profile; local data and IndexedDB are NOT touched', async () => {
@@ -112,6 +147,7 @@ describe('Ajustes: switch Google account', () => {
     expect(drive.backupFiles()).toHaveLength(1);
     const clearLocal = vi.spyOn(Storage.prototype, 'clear');
     await openOps();
+    await click(q('edit-account'));
     await click(q('switch-account'));
     await flush(30);
     // the connection is gone...
@@ -122,6 +158,7 @@ describe('Ajustes: switch Google account', () => {
     // ...and the sign-in button of Google is offered again
     expect(q('google-login')).not.toBeNull();
     expect(q('switch-account')).toBeNull();
+    expect(q('edit-account')).toBeNull();
     expect(q('settings-backup').dataset.state).toBe('disconnected');
     expect(JSON.parse(localStorage.getItem('cp.user.v1'))).toMatchObject({ provider: 'local', name: 'Ana', email: '' });
     // ...but nothing local was erased
@@ -141,6 +178,7 @@ describe('Ajustes: switch Google account', () => {
     await createProject('Casa Norte');
     await flush(5600);
     await openOps();
+    await click(q('edit-account'));
     await click(q('switch-account'));
     await flush(30);
     const fresh = createFakeDrive(); // the new account's Drive: empty
@@ -169,8 +207,10 @@ describe('the switch can never wipe the device', () => {
 });
 
 describe('the new words', () => {
-  it('settings.account.switch exists in the six languages and only the Spanish one is Spanish', () => {
-    for (const l of ['es', 'en', 'pt', 'fr', 'it', 'de']) expect(DICT[l]['settings.account.switch']?.length, l).toBeGreaterThan(5);
-    expect(new Set(['es', 'en', 'pt', 'fr', 'it', 'de'].map((l) => DICT[l]['settings.account.switch'])).size).toBe(6);
+  it('switch / edit / unlink_desc exist in the six languages, each one different from the others', () => {
+    for (const k of ['settings.account.switch', 'settings.account.edit', 'settings.account.unlink_desc']) {
+      for (const l of ['es', 'en', 'pt', 'fr', 'it', 'de']) expect(DICT[l][k]?.length, `${l} ${k}`).toBeGreaterThan(5);
+      expect(new Set(['es', 'en', 'pt', 'fr', 'it', 'de'].map((l) => DICT[l][k])).size, k).toBe(6);
+    }
   });
 });

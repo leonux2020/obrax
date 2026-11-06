@@ -71,6 +71,7 @@ export default function SettingsView({
   const [note, setNote] = useState('');
   const [openAcc, setOpenAcc] = useState({ profile: false, ops: false, locale: false }); // everything starts closed: a nearly empty screen
   const toggleAcc = (key) => (isOpen) => setOpenAcc((o) => ({ ...o, [key]: isOpen }));
+  const [editingAccount, setEditingAccount] = useState(false); // the account row is read-only until its pencil is tapped
   const [squadra, setSquadra] = useState(false); // the global directory of workers (full-screen sheet over Ajustes)
   const cloud = Boolean(backup?.enabled);
   const busy = phase === 'syncing';
@@ -107,37 +108,57 @@ export default function SettingsView({
     if (on && r && r.ok === false && r.reason !== 'redirect') setNote(connectError(r.reason));
   };
   const googleUser = user?.provider === 'google';
+  const canSwitch = googleUser && Boolean(onSwitchAccount);
   const accountRow = (
-    <div className="flex items-center gap-3" data-testid="settings-account">
-      {user?.picture ? (
-        <img src={user.picture} alt="" className="h-10 w-10 shrink-0 rounded-full border border-white/10 object-cover" />
-      ) : (
-        <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm font-medium text-neutral-400">
-          {(user?.name || user?.email || '?').slice(0, 1).toUpperCase()}
+    <div>
+      <div className="flex items-center gap-3" data-testid="settings-account">
+        {user?.picture ? (
+          <img src={user.picture} alt="" className="h-10 w-10 shrink-0 rounded-full border border-white/10 object-cover" />
+        ) : (
+          <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm font-medium text-neutral-400">
+            {(user?.name || user?.email || '?').slice(0, 1).toUpperCase()}
+          </span>
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-medium">{user?.name}</span>
+          {user?.email && <span className="block truncate text-sm text-neutral-400">{user.email}</span>}
         </span>
-      )}
-      <span className="min-w-0 flex-1">
-        <span className="block truncate font-medium">{user?.name}</span>
-        {user?.email && <span className="block truncate text-sm text-neutral-400">{user.email}</span>}
-      </span>
-      {googleUser && onSwitchAccount && (
-        <button
-          type="button"
-          onClick={() => onSwitchAccount()}
-          data-testid="switch-account"
-          aria-label={t('settings.account.switch')}
-          title={t('settings.account.switch')}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-neutral-400 transition active:scale-95 active:bg-white/10 active:opacity-70"
-        >
-          <Outline size={20}>
-            <path d="m18.84 12.25 1.72-1.71a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-            <path d="m5.17 11.75-1.71 1.71a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-            <line x1="8" y1="2" x2="8" y2="5" />
-            <line x1="2" y1="8" x2="5" y2="8" />
-            <line x1="16" y1="19" x2="16" y2="22" />
-            <line x1="19" y1="16" x2="22" y2="16" />
-          </Outline>
-        </button>
+        {/* progressive disclosure: the row only offers a quiet pencil; the real action lives one tap deeper, away from the thumb's first reach */}
+        {canSwitch && (
+          <button
+            type="button"
+            onClick={() => setEditingAccount((v) => !v)}
+            data-testid="edit-account"
+            aria-expanded={editingAccount}
+            aria-controls="account-edit-panel"
+            aria-label={t('settings.account.edit')}
+            title={t('settings.account.edit')}
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition active:scale-95 active:opacity-70 ${editingAccount ? 'bg-white/10 text-neutral-200' : 'text-neutral-400'}`}
+          >
+            <Outline size={20} icon="pencil">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            </Outline>
+          </button>
+        )}
+      </div>
+      {canSwitch && editingAccount && (
+        <div id="account-edit-panel" data-testid="account-edit-panel" className="mt-5 space-y-5 pb-2 pl-[52px]">
+          <p className="text-xs font-light leading-relaxed text-white/50" data-testid="account-unlink-desc">
+            {t('settings.account.unlink_desc')}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingAccount(false);
+              onSwitchAccount();
+            }}
+            data-testid="switch-account"
+            className="flex min-h-[48px] w-full items-center justify-center rounded-full bg-white/5 px-6 text-sm font-normal text-neutral-200 transition active:scale-95 active:bg-white/10 active:opacity-70"
+          >
+            {t('settings.account.switch')}
+          </button>
+        </div>
       )}
     </div>
   );
