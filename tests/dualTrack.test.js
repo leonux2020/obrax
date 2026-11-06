@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // "Pista de Liquidez Dual": under the big figure two 2 px lanes 1 px apart, the money collected (green) over the real physical progress of the
-// Cronograma (ice-blue) with a dot at the end of each stage, and a two-item legend.
+// Cronograma (ice-blue), both plain continuous lines over a barely visible ghost track, and a two-item legend.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -19,9 +19,9 @@ const phase = (id, startDate, endDate, done = false, name = id) => ({ id, name, 
 const withPhases = (phases, extra = {}) => ({ ...newProject({ regionCode: 'CL', name: 'Casa' }), phases, ...extra });
 
 describe('physicalProgress: only what is really finished, weighted by days; 0 without data', () => {
-  it('no phases (or junk) = 0 %, no nodes, never NaN', () => {
+  it('no phases (or junk) = 0 %, never NaN', () => {
     for (const p of [newProject({ regionCode: 'CL' }), { phases: null }, { phases: 'x' }, {}, null, undefined]) {
-      expect(physicalProgress(p)).toEqual({ pct: 0, count: 0, done: 0, nodes: [] });
+      expect(physicalProgress(p)).toEqual({ pct: 0, count: 0, done: 0 });
     }
   });
 
@@ -31,16 +31,12 @@ describe('physicalProgress: only what is really finished, weighted by days; 0 wi
     expect(r.pct).toBeCloseTo(30);
     expect(r.count).toBe(3);
     expect(r.done).toBe(1);
-    expect(r.nodes.map((n) => Math.round(n.at))).toEqual([30, 90, 100]);
-    expect(r.nodes.map((n) => n.done)).toEqual([true, false, false]);
+    expect(r).not.toHaveProperty('nodes'); // the lane is a plain line: only the percentage
   });
 
-  it('the stages go in chronological order (not the typed one) and all done = 100 %', () => {
-    const p = withPhases([phase('late', '2026-04-01', '2026-04-02', true), phase('early', '2026-03-01', '2026-03-02', true)]);
-    const r = physicalProgress(p);
-    expect(r.nodes.map((n) => n.id)).toEqual(['early', 'late']);
-    expect(r.pct).toBe(100);
-    expect(r.nodes.at(-1).at).toBe(100);
+  it('all phases done = 100 %, whatever the order they were typed in; a done flag that is not exactly true counts for nothing', () => {
+    expect(physicalProgress(withPhases([phase('late', '2026-04-01', '2026-04-02', true), phase('early', '2026-03-01', '2026-03-02', true)])).pct).toBe(100);
+    expect(physicalProgress(withPhases([{ id: 'a', name: 'a', startDate: '', endDate: '', done: 'yes' }])).pct).toBe(0);
   });
 
   it('headerModel carries it next to the two bars (which stay time + cash)', () => {
@@ -106,32 +102,24 @@ describe('HeaderZone: the dual track', () => {
     expect(readFileSync('src/index.css', 'utf8')).toMatch(/@keyframes lane-grow[\s\S]*scaleX\(0\)/);
   });
 
-  it('stage nodes: a 3 px dot over the lane at the end of each stage (the line is one piece), bright when done, dim when pending', async () => {
+  it('NO stage dots: each lane is ONE plain continuous line from start to end, and the ghost track is barely there (white/5, not a grey)', async () => {
     await render(withPhases([phase('a', '2026-03-02', '2026-03-04', true), phase('b', '2026-03-05', '2026-03-10')]));
-    const nodes = [...host.querySelectorAll('[data-testid="ws-node"]')];
-    expect(nodes).toHaveLength(2);
-    expect(q('ws-physical').querySelectorAll('[data-testid="ws-physical-fill"]')).toHaveLength(1); // never cut into pieces
-    for (const n of nodes) {
-      expect(n.className).toContain('h-[3px]');
-      expect(n.className).toContain('w-[3px]');
-      expect(n.className).toContain('rounded-full');
-      expect(n.className).toContain('absolute');
-      expect(n.getAttribute('aria-hidden')).toBe('true');
+    expect(host.querySelectorAll('[data-testid="ws-node"]')).toHaveLength(0);
+    expect(q('ws-physical').children).toHaveLength(1); // only the fill
+    expect(q('ws-progress').children).toHaveLength(1);
+    for (const id of ['ws-progress', 'ws-physical']) {
+      expect(q(id).className).toContain('bg-white/5');
+      expect(q(id).className).not.toMatch(/bg-white\/10|bg-neutral|bg-gray/);
+      expect(q(id).className).toContain('h-0.5'); // the lane is as thin as the line it carries
     }
-    expect(nodes[0].dataset.done).toBe('true');
-    expect(nodes[0].className).toContain('bg-cyan-200');
-    expect(nodes[1].dataset.done).toBeUndefined();
-    expect(nodes[1].className).toContain('bg-cyan-500/50');
-    expect(nodes[0].style.left).toBe('33.33333333333333%');
-    expect(nodes[1].style.left).toBe('100%'); // its right edge rests on the end of the lane: never outside the screen
-    expect(nodes[1].className).toContain('-translate-x-full');
+    for (const id of ['ws-progress-fill', 'ws-physical-fill']) expect(q(id).className).toContain('h-full'); // the active lines keep the full 2 px
+    expect(host.innerHTML).not.toMatch(/shadow-\[|rounded-full bg-cyan-200/);
   });
 
-  it('no data: both lanes at 0 %, no nodes; the legend names both lines with their share', async () => {
+  it('no data: both lanes at 0 %; the legend names both lines with their share', async () => {
     await render(newProject({ regionCode: 'CL', name: 'Nueva' }));
     expect(q('ws-progress-fill').style.width).toBe('0%');
     expect(q('ws-physical-fill').style.width).toBe('0%');
-    expect(host.querySelectorAll('[data-testid="ws-node"]')).toHaveLength(0);
     expect(q('ws-legend-cash').textContent).toBe('Cobrado 0%');
     expect(q('ws-legend-physical').textContent).toBe('Avance físico 0%');
   });
@@ -154,14 +142,13 @@ describe('HeaderZone: the dual track', () => {
     expect(q('ws-legend-physical').textContent).toBe('Avance físico 100%');
   });
 
-  it('junk in the model never breaks the lane (NaN / out of range widths clamp to 0-100)', async () => {
+  it('junk in the model never breaks the lane (a NaN width is 0 %, and the legend never says NaN)', async () => {
     const project = withPhases([]);
-    const model = { ...headerModel({ project, total: 1000, valid: true, cash: cashSummary(1000, []) }), physical: { pct: NaN, count: 1, done: 0, nodes: [{ id: 'x', at: 250, done: false }, { id: 'y', at: -5, done: true }] } };
+    const model = { ...headerModel({ project, total: 1000, valid: true, cash: cashSummary(1000, []) }), physical: { pct: NaN, count: 1, done: 0 } };
     await act(async () => {
       root.render(React.createElement(I18nProvider, { lang: 'es', regionCode: 'CL' }, React.createElement(HeaderZone, { project, model, title: 'Casa', client: '', region: getRegion('CL'), offline: false, onEdit() {}, onCash() {}, onUnlock() {} })));
     });
     expect(q('ws-physical-fill').style.width).toBe('0%');
-    expect([...host.querySelectorAll('[data-testid="ws-node"]')].map((n) => n.style.left)).toEqual(['100%', '0%']);
     expect(host.textContent).not.toMatch(/NaN/);
   });
 });

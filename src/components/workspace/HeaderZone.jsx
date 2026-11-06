@@ -40,7 +40,7 @@ const clamp = (n) => (Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0);
  * ZONE A: the header that never scrolls away. Flag + name, client, place, the lock and ONE number: what is still to be collected (DA INCASSARE,
  * soft orange while there is debt, never red). The quote and what is already collected go under it, small and grey; when nothing is left
  * it says "Saldato" with a green check instead. At the base of the block runs the DUAL LIQUIDITY TRACK: two 2 px lanes 1 px apart, the money collected
- * of the budget (green) over the real physical progress of the Cronograma (ice-blue, with a dot at the end of each stage), plus a two-item legend.
+ * of the budget (green) over the real physical progress of the Cronograma (ice-blue), both plain continuous lines over a barely-there ghost track, plus a two-item legend.
  * DRAFT (`sandbox` = { name, onName, stale }): the job is not in the database yet. The name is an invisible input ("Toca para añadir nombre"), and the big figure is
  * tagged "(Simulación)" in amber: it is not definitive. 
  * No deadline / countdown of any kind (no "on time", no days left, no late alert: the debt already says it), no back arrow (the device's back gesture leaves the project), no globe, no coordinates.
@@ -50,7 +50,7 @@ export default function HeaderZone({ project, model, title, client, region, offl
   // the place is shown only when it has a NAME; raw coordinates are data, not interface
   const where = project.location?.label || '';
   const cash = model.bars[1];
-  const physical = model.physical ?? { pct: 0, nodes: [] }; // the real progress of the Cronograma; 0 while there is no data
+  const physical = model.physical ?? { pct: 0 }; // the real progress of the Cronograma; 0 while there is no data
   const physicalPct = Math.round(clamp(physical.pct));
   const known = model.total !== null; // a valid quote: the budget and what is left can be told
   const settled = !sandbox && known && model.total > 0 && cash.pending <= 0.005;
@@ -192,23 +192,12 @@ export default function HeaderZone({ project, model, title, client, region, offl
       </ul>
       <div data-testid="ws-lanes" className="absolute inset-x-0 bottom-0 flex flex-col gap-px">
         {cash.pct !== null && cash.pct !== undefined && (
-          <div data-testid="ws-progress" data-pct={Math.round(cash.pct)} className="relative h-0.5 w-full bg-white/10" role="progressbar" aria-label={t('ws.collected')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(cash.pct)}>
+          <div data-testid="ws-progress" data-pct={Math.round(cash.pct)} className="relative h-0.5 w-full bg-white/5" role="progressbar" aria-label={t('ws.collected')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(cash.pct)}>
             <div data-testid="ws-progress-fill" className="lane-grow h-full bg-brand transition-all duration-500" style={{ width: `${clamp(cash.pct)}%` }} />
           </div>
         )}
-        <div data-testid="ws-physical" data-pct={physicalPct} className="relative h-0.5 w-full bg-white/10" role="progressbar" aria-label={t('ws.lane.physical')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={physicalPct}>
+        <div data-testid="ws-physical" data-pct={physicalPct} className="relative h-0.5 w-full bg-white/5" role="progressbar" aria-label={t('ws.lane.physical')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={physicalPct}>
           <div data-testid="ws-physical-fill" className="lane-grow h-full bg-cyan-500 transition-all duration-500" style={{ width: `${clamp(physical.pct)}%` }} />
-          {/* the end of every stage: a dot OVER the line (its right edge sits on the stage's end), the line itself is never cut */}
-          {physical.nodes.map((n) => (
-            <span
-              key={n.id}
-              data-testid="ws-node"
-              data-done={n.done || undefined}
-              aria-hidden="true"
-              className={`absolute top-1/2 h-[3px] w-[3px] -translate-x-full -translate-y-1/2 rounded-full transition-all duration-500 ${n.done ? 'bg-cyan-200 shadow-[0_0_4px_1px_rgba(103,232,249,0.8)]' : 'bg-cyan-500/50'}`}
-              style={{ left: `${clamp(n.at)}%` }}
-            />
-          ))}
         </div>
       </div>
     </header>

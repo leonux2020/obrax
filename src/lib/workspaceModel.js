@@ -38,25 +38,24 @@ export function timeProgress(project, now = Date.now()) {
 /**
  * Physical progress of the job for the lower lane of the header: the share of the Cronograma that is REALLY finished (the phases the user marked
  * as done), each phase weighing its calendar days (a phase without both dates weighs 1 day). Nothing is estimated from the calendar: with no
- * phases, or none done, it is 0. `nodes` = the end of every stage along the lane ({ id, at: 0-100, done }), in chronological order, so the lane is
- * never cut: the stages are dots over it.
+ * phases, or none done, it is 0. The lane is a plain continuous line: it carries the percentage and nothing else.
  */
 export function physicalProgress(project) {
   const phases = sortPhases(project?.phases);
-  if (!phases.length) return { pct: 0, count: 0, done: 0, nodes: [] };
-  const weights = phases.map((p) => {
-    const days = spanDays(p.startDate, p.endDate);
-    return days === null ? 1 : days + 1;
-  });
-  const whole = weights.reduce((a, b) => a + b, 0) || 1;
-  let run = 0;
+  if (!phases.length) return { pct: 0, count: 0, done: 0 };
+  let whole = 0;
   let finished = 0;
-  const nodes = phases.map((p, i) => {
-    run += weights[i];
-    if (p.done) finished += weights[i];
-    return { id: p.id, at: Math.min(100, (run / whole) * 100), done: p.done === true };
-  });
-  return { pct: Math.min(100, Math.max(0, (finished / whole) * 100)), count: phases.length, done: phases.filter((p) => p.done).length, nodes };
+  let done = 0;
+  for (const p of phases) {
+    const days = spanDays(p.startDate, p.endDate);
+    const weight = days === null ? 1 : days + 1;
+    whole += weight;
+    if (p.done === true) {
+      finished += weight;
+      done += 1;
+    }
+  }
+  return { pct: Math.min(100, Math.max(0, (finished / (whole || 1)) * 100)), count: phases.length, done };
 }
 
 // ---- the lock: a quote that has been sent or signed keeps its prices -------------------------------------------------
