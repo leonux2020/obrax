@@ -339,7 +339,7 @@ describe('Ajustes: "Historial financiero" in the file of a worker', () => {
 
   it('Ajustes hands every stored project to the directory (App -> SettingsView -> SquadraSheet -> WorkerSheet)', () => {
     const read = (f) => readFileSync(path.resolve(__dirname, '..', 'src', f), 'utf8');
-    expect(read('App.jsx')).toMatch(/onLogout=\{logout\}\s*projects=\{projects\}/);
+    expect(read('App.jsx')).toMatch(/onLogout=\{logout\}\s*onSwitchAccount=\{switchGoogleAccount\}\s*projects=\{projects\}/);
     expect(read('components/SettingsView.jsx')).toContain('<SquadraSheet projects={projects}');
     expect(read('components/squadra/SquadraSheet.jsx')).toContain('projects={projects}');
   });

@@ -231,6 +231,17 @@ export function createDriveSync({
       listeners.add(fn);
       return () => listeners.delete(fn);
     },
+    /**
+     * The Google account changed: forget the "last backup" of the old account and mark EVERYTHING on this device as waiting for the new Drive
+     * (`dirty`), without touching the data. The next connection (a tap) uploads it. Not a wipe: nothing is deleted anywhere.
+     */
+    detach() {
+      if (timer) clearTimer(timer);
+      timer = null;
+      firstChangeAt = 0;
+      setSeenRemote('', storage);
+      emit({ status: 'idle', reason: '', pullError: '', at: 0, dirty: true, held: false, pulling: false });
+    },
     /** Drop the pending timer (signing out / unmounting). */
     cancel() {
       if (timer) clearTimer(timer);

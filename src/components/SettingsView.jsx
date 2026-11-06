@@ -4,7 +4,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { googleConfigured } from '../lib/auth.js';
 import { BACKUP_FOLDER } from '../lib/drive.js';
 import { useBackLayer } from '../lib/backStack.js';
-import { CloudUploadIcon, GlobeIcon, SmartphoneIcon, UserIcon, UsersIcon } from './workspace/icons.jsx';
+import { CloudUploadIcon, GlobeIcon, Outline, SmartphoneIcon, UserIcon, UsersIcon } from './workspace/icons.jsx';
 import { Button, Switch } from './ui.jsx';
 import GoogleButton from './GoogleButton.jsx';
 import { LocaleRows } from './SettingsRows.jsx';
@@ -61,6 +61,7 @@ export default function SettingsView({
   onChangeRegion, // legacy: opens the full-screen picker (kept for callers that still pass it)
   onConfirmRegion = null, // preferred: change country in place without leaving Ajustes
   onLogout,
+  onSwitchAccount = null, // drops ONLY the Drive connection (token + flags); the local data is never touched
   backup = null,
   projects = [], // every stored project: the financial history of a worker (Squadra) reads them
 }) {
@@ -119,6 +120,25 @@ export default function SettingsView({
         <span className="block truncate font-medium">{user?.name}</span>
         {user?.email && <span className="block truncate text-sm text-neutral-400">{user.email}</span>}
       </span>
+      {googleUser && onSwitchAccount && (
+        <button
+          type="button"
+          onClick={() => onSwitchAccount()}
+          data-testid="switch-account"
+          aria-label={t('settings.account.switch')}
+          title={t('settings.account.switch')}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-neutral-400 transition active:scale-95 active:bg-white/10 active:opacity-70"
+        >
+          <Outline size={20}>
+            <path d="m18.84 12.25 1.72-1.71a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+            <path d="m5.17 11.75-1.71 1.71a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+            <line x1="8" y1="2" x2="8" y2="5" />
+            <line x1="2" y1="8" x2="5" y2="8" />
+            <line x1="16" y1="19" x2="16" y2="22" />
+            <line x1="19" y1="16" x2="22" y2="16" />
+          </Outline>
+        </button>
+      )}
     </div>
   );
 

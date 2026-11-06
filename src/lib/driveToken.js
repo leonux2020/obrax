@@ -130,3 +130,19 @@ export function isDriveLinked({ linked = typeof localStorage === 'undefined' ? n
     return false;
   }
 }
+
+/**
+ * "Cambiar de cuenta de Google": forget the Drive connection of THIS device and nothing else. The token (memory, sessionStorage, localStorage),
+ * the "linked" flag and the "needs interaction" flag go away, so no silent request is ever made for the old account. It touches no IndexedDB
+ * (projects, photos, logo stay on the device and are the bridge to the next account) and no other localStorage key.
+ */
+export function unlinkDriveAccount({ storage = session(), persistent = local() } = {}) {
+  clearDriveToken({ storage, persistent });
+  try {
+    persistent?.removeItem?.(DRIVE_LINKED_KEY);
+  } catch {
+    /* ignore */
+  }
+  clearDriveNeedsInteraction({ store: persistent });
+  authListeners.forEach((fn) => fn());
+}

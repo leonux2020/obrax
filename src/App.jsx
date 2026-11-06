@@ -31,7 +31,7 @@ import {
   saveProfileMeta,
 } from './lib/draft.js';
 import { ensureDriveToken, googleConfigured, GOOGLE_CONFIG_STATUS, localUser } from './lib/auth.js';
-import { clearDriveToken, getDriveToken, isDriveLinked, needsDriveInteraction, subscribeDriveAuth } from './lib/driveToken.js';
+import { clearDriveToken, getDriveToken, isDriveLinked, needsDriveInteraction, subscribeDriveAuth, unlinkDriveAccount } from './lib/driveToken.js';
 import { createDriveClient } from './lib/drive.js';
 import { createDriveSync, getSeenRemote, setSeenRemote } from './lib/driveSync.js';
 import { mergeProjectLists, nextStamp, stampProject, stampProjects } from './lib/merge.js';
@@ -650,6 +650,24 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     [sync, onSignedOut]
   );
 
+  // "Cambiar de cuenta de Google": ONLY the Drive connection is dropped (token + linked flags, the old account's "last backup" mark). The user falls back to the
+  // local profile (same name) so the Google button comes back; NOTHING is deleted: projects, photos, logo, company and settings stay on the device (IndexedDB is never
+  // opened here) and are marked as waiting, so the first connection to the new account uploads them.
+  const switchGoogleAccount = useCallback(() => {
+    if (wipingRef.current) return { ok: true };
+    sync.cancel();
+    unlinkDriveAccount();
+    sync.detach();
+    setLinkedNow(false);
+    try {
+      window.google?.accounts?.id?.disableAutoSelect?.(); // Google must not silently re-pick the old account
+    } catch {
+      /* the button simply shows the account chooser */
+    }
+    setUser((u) => (u?.provider === 'google' ? localUser(u.name) : u));
+    return { ok: true };
+  }, [sync]);
+
   // ---- "Sincronizar Expediente a Drive" -----------------------------------------------------------------------
   // Proyectos/<name>/ with the PDF + Excel, "Fotos Obra" and "Comprobantes". Runs in the background (async, never blocks the screen):
   // a toast says "Sincronizando expediente en Drive..." while the user keeps working, then turns into the result.
@@ -1101,6 +1119,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
                   onChangeRegion={() => setPickingRegion(true)}
                   backup={{ configured: googleConfigured, configStatus: GOOGLE_CONFIG_STATUS, enabled: backupOn, linked: driveLinked, held: Boolean(backup.held), state: backup }}
                   onLogout={logout}
+                  onSwitchAccount={switchGoogleAccount}
                   projects={projects}
                 />
               ) : tab === 'accounting' ? (
