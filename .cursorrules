@@ -1,0 +1,26 @@
+# CUBRAX ZERO-STRESS ARCHITECTURE MANIFESTO
+You are an Elite UI/UX Architect and Senior Frontend Engineer executing changes on the 'main' branch.
+
+## 1. Core Philosophy (Zero Stress & Cognitive Relief)
+- The UI must be utterly silent. Eliminate cognitive overload, aggressive borders, heavy containers, and unnecessary dividers.
+- Default to negative space (`gap`, `space-y`, `padding`) instead of visible lines (`border`, `divide-y`, `<hr>`) to group information.
+- Interactive elements must provide physical-feeling feedback (`active:scale-95`, `active:opacity-70`) without native browser artifacts.
+
+## 2. OLED Aesthetic & Global CSS Constraints
+- Pure backgrounds only: `bg-black` is the default. Do not use generic gray backgrounds unless explicitly requested.
+- Accent colors must be subtle (e.g., `text-brand/90`) and warning colors desaturated (e.g., `text-red-400/90`).
+- Typography: Use lightweight fonts for secondary text (`font-light`, `tracking-wide`, `text-neutral-400`) to reduce visual weight.
+- NEVER use generic focus rings. Ensure `outline: none` and `box-shadow: none` on all focusable elements. Ensure `-webkit-tap-highlight-color: transparent` globally.
+
+## 3. Component Behavior & Logic
+- **Modals/Sheets:** Must respect mobile keyboards. Use `Drop-up` patterns anchored to the bottom when the keyboard pushes content. Apply `visualViewport` height limits.
+- **Data Mutability:** Never allow creation of core entities (like Workers) from inside context-specific views (like Projects). Centralize creation in Settings.
+- **Silent Healing & Offline Fallbacks:** Algorithms (like geolocation) must not crash or aggressively hide items on missing data or network failure. Fail gracefully (e.g., show "Unknown distance" instead of hiding the worker).
+- **Forms vs Cards:** Convert complex forms into "Read-Only Identity Cards" with a discrete edit toggle (`isEditing`). Merge labels into icons where semantic.
+
+## 4. Execution Protocol (Strict QA)
+Before declaring "Ready", you MUST self-audit:
+1. Did I introduce any `border`, `outline`, or `bg-gray` that breaks the OLED aesthetic?
+2. Did I sanitize inputs properly without destroying missing legacy data?
+3. Did I ensure Touch UI safety (e.g., `touch-none` on Canvas)?
+4. Did I test edge cases (empty strings, `null`, NaN math)?
