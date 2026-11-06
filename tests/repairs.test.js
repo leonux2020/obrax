@@ -151,7 +151,7 @@ describe('3. a new project goes to the kind of work + measures, not to the finan
   const create = async (name, mode) => {
     await click(q('fab-new'));
     typeInto(document.querySelector('[role="dialog"] input'), name);
-    if (mode) await click(q(`mode-${mode}`));
+    if (mode) await click(q(`budget-${{ quick: 'turnkey', project: 'detailed' }[mode]}`)); // the budget model sets the mode: turnkey = one global line, detailed = partida by partida
     await click(q('project-save'));
     await flush(60);
   };

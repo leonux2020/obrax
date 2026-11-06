@@ -246,17 +246,19 @@ describe('New project sheet: agile form, no money', () => {
     await render(React.createElement(ProjectSheet, { onSave: (p) => saved.push(p), onClose: () => {}, locate, reverse }));
     const dialog = document.querySelector('[role="dialog"]');
     expect(dialog.querySelectorAll('input[type="date"]')).toHaveLength(2);
-    expect(dialog.querySelectorAll('[role="radio"]')).toHaveLength(2);
-    expect(document.body.textContent).toContain('Partida Única');
-    expect(document.body.textContent).toContain('Proyecto Completo');
-    expect(document.body.textContent).not.toMatch(/presupuesto|precio|\$|%/i); // zero financial fields here
+    expect(dialog.querySelectorAll('[role="radio"]')).toHaveLength(2); // the budget model comes first; the type of work only shows once it is chosen
+    expect(document.body.textContent).toContain('Llave en mano');
+    expect(document.body.textContent).toContain('Detallado');
+    expect(dialog.querySelector('[data-testid="work-type-block"]')).toBeNull();
+    expect(dialog.querySelectorAll('input[inputmode="decimal"], input[type="number"]')).toHaveLength(0); // zero financial FIELDS here (the model is a choice, not an amount)
+    expect(document.body.textContent).not.toMatch(/\$|%/);
     const doc = document;
     const text = [...doc.querySelectorAll('[role="dialog"] input[type="text"]')];
     await type(text[0], 'Casa Lo Barnechea');
     await type(text[1], 'María');
     expect(text).toHaveLength(4); // name, client, the country / market combobox, "Ciudad o Región de la Obra"
-    await click(doc.querySelector('[data-testid="mode-project"]'));
-    expect(doc.querySelector('[data-testid="mode-project"]').getAttribute('aria-checked')).toBe('true');
+    await click(doc.querySelector('[data-testid="budget-detailed"]'));
+    expect(doc.querySelector('[data-testid="budget-detailed"]').getAttribute('aria-checked')).toBe('true');
     await click(doc.querySelector('[data-testid="project-city-locate"]'));
     await flush(5);
     expect(locate).toHaveBeenCalled();
@@ -264,7 +266,7 @@ describe('New project sheet: agile form, no money', () => {
     expect(doc.querySelector('[data-testid="project-locate"]')).toBeNull(); // the old big GPS button is gone
     await click(doc.querySelector('[data-testid="project-save"]'));
     expect(saved).toHaveLength(1);
-    expect(saved[0]).toMatchObject({ name: 'Casa Lo Barnechea', client: 'María', mode: 'project', cityOrRegion: 'Valparaíso', location: { lat: -33.4489, lng: -70.6693, label: 'Valparaíso' }, regionCode: 'CL' });
+    expect(saved[0]).toMatchObject({ name: 'Casa Lo Barnechea', client: 'María', mode: 'project', budgetModel: 'detailed', workType: '', cityOrRegion: 'Valparaíso', location: { lat: -33.4489, lng: -70.6693, label: 'Valparaíso' }, regionCode: 'CL' });
   });
 
   it('a refused location is a small message, not a blocker; editing shows the closed / unfreeze switches', async () => {
@@ -294,7 +296,7 @@ describe('Edit modal (the pencil)', () => {
     const dialog = document.querySelector('[role="dialog"]');
     expect(dialog.className).toContain('h-[100dvh]');
     const headings = [...dialog.querySelectorAll('h3')].map((h) => h.textContent);
-    expect(headings).toEqual(['Datos de la obra', 'Fechas', 'Ubicación', 'Estado de la obra']);
+    expect(headings).toEqual(['Datos de la obra', 'Tipo de obra', 'Fechas', 'Ubicación', 'Estado de la obra']);
     expect(dialog.querySelectorAll('input[type="text"]')).toHaveLength(4); // name + client + the market combobox + city/region
     expect(dialog.querySelectorAll('input[type="date"]')).toHaveLength(2);
     expect(document.querySelector('[data-testid="project-locate"]')).toBeNull();

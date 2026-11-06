@@ -10,7 +10,7 @@ import { hasIndexedDb } from './lib/db.js';
 import { I18nProvider, makeI18n } from './lib/i18n.jsx';
 import { getRegion, LANGS, REGIONS } from './lib/regions.js';
 import { wipeLocalData } from './lib/session.js';
-import { adoptCompany, cleanCityOrRegion, documentCompany, isClosed, newExtension, newProject, projectTitle, toDayString } from './lib/projects.js';
+import { adoptCompany, cleanCityOrRegion, cleanWorkType, documentCompany, isClosed, newExtension, newProject, projectTitle, toDayString } from './lib/projects.js';
 import { normalizeLocation } from './lib/ledger.js';
 import { detectCurrentRegion, languageFor } from './lib/geo.js';
 import { sanitizeText } from './lib/sanitize.js';
@@ -542,8 +542,11 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   };
 
   const editProject = (project, fields) => {
+    const { workType: _previousType, ...rest } = project; // the budget model is chosen once (it sets the mode, so it stays); the type of work may be corrected any time
+    const workType = cleanWorkType(fields.workType);
     commit(syncDates({
-      ...project,
+      ...rest,
+      ...(workType ? { workType } : {}),
       startDate: fields.startDate,
       endDate: fields.endDate,
       location: normalizeLocation(fields.location),

@@ -135,8 +135,20 @@ export function adoptCompany(project, company, logo = '') {
 /** "Ciudad o Región de la Obra": free text (max 80), geographic context of the job for the Radar de Mercado. Never money. */
 export const cleanCityOrRegion = (v) => sanitizeText(v, 80).trim();
 
-export function newProject({ regionCode, mode = 'quick', company = null, logo = '', name = '', client = '', startDate = '', endDate = '', location = null, cityOrRegion = '', parentId = '', now = Date.now() }) {
-  const draft = newDraft(regionCode, mode);
+/**
+ * "Modelo de Presupuesto": how the job is sold. `turnkey` = Llave en mano, one global value (fixed price per m²); `detailed` = Bottom-Up, partida by partida.
+ * "Tipo de Obra": the real-world category of the job. Both are OPTIONAL labels of the project (older records and jobs created without choosing have neither,
+ * and behave exactly as before); anything unknown is dropped on read, never guessed.
+ */
+export const BUDGET_MODELS = Object.freeze(['turnkey', 'detailed']);
+export const WORK_TYPES = Object.freeze(['new', 'remodel', 'earthworks', 'structure', 'installations', 'finishes', 'maintenance']);
+export const cleanBudgetModel = (v) => (BUDGET_MODELS.includes(v) ? v : '');
+export const cleanWorkType = (v) => (WORK_TYPES.includes(v) ? v : '');
+/** A turnkey job is ONE global line (the engine's single-partida mode); a detailed one adds partida by partida (full project). No model: whatever the caller asked for. */
+export const modeForBudget = (model, fallback = 'quick') => (model === 'turnkey' ? 'quick' : model === 'detailed' ? 'project' : fallback);
+
+export function newProject({ regionCode, mode = 'quick', budgetModel = '', workType = '', company = null, logo = '', name = '', client = '', startDate = '', endDate = '', location = null, cityOrRegion = '', parentId = '', now = Date.now() }) {
+  const draft = newDraft(regionCode, modeForBudget(cleanBudgetModel(budgetModel), mode));
   draft.project = { name: sanitizeText(name, 60).trim(), client: sanitizeText(client, 60).trim() };
   const start = parseDay(startDate) ? startDate : '';
   const end = parseDay(endDate) && !(start && parseDay(start) > parseDay(endDate)) ? endDate : '';
@@ -150,6 +162,8 @@ export function newProject({ regionCode, mode = 'quick', company = null, logo = 
     location: normalizeLocation(location),
     cityOrRegion: cleanCityOrRegion(cityOrRegion),
     closedAt: 0,
+    ...(cleanBudgetModel(budgetModel) ? { budgetModel: cleanBudgetModel(budgetModel) } : {}),
+    ...(cleanWorkType(workType) ? { workType: cleanWorkType(workType) } : {}),
     ...(parentId && ID_RE.test(parentId) ? { parentId } : {}),
     payments: [],
     crew: [],
@@ -214,6 +228,8 @@ export function normalizeProject(obj) {
     location: normalizeLocation(obj.location),
     cityOrRegion: cleanCityOrRegion(obj.cityOrRegion), // older records have none: ''
     closedAt: Number.isFinite(Number(obj.closedAt)) && Number(obj.closedAt) > 0 ? Number(obj.closedAt) : 0,
+    ...(cleanBudgetModel(obj.budgetModel) ? { budgetModel: cleanBudgetModel(obj.budgetModel) } : {}), // older records have neither: they stay as they were
+    ...(cleanWorkType(obj.workType) ? { workType: cleanWorkType(obj.workType) } : {}),
     ...(typeof obj.parentId === 'string' && ID_RE.test(obj.parentId) ? { parentId: obj.parentId } : {}), // the job this one extends (older records have none)
     payments: normalizePayments(obj.payments),
     crew: normalizeCrew(obj.crew), // the people on site (older records have none)

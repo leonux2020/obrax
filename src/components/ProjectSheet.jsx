@@ -8,7 +8,7 @@ import { REGIONS } from '../lib/regions.js';
 import { marketChangeImpact, quoteLock } from '../lib/workspaceModel.js';
 import { hasPhaseDates } from '../lib/phases.js';
 import { normalizeLocation } from '../lib/ledger.js';
-import { cleanCityOrRegion, isClosed, parseDay, toDayString } from '../lib/projects.js';
+import { BUDGET_MODELS, WORK_TYPES, cleanCityOrRegion, cleanWorkType, isClosed, modeForBudget, parseDay, toDayString } from '../lib/projects.js';
 import { sanitizeText } from '../lib/sanitize.js';
 import { Button, DateInput, Switch, TextField } from './ui.jsx';
 import BottomSheet from './BottomSheet.jsx';
@@ -66,6 +66,8 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
     name: project?.draft.project.name ?? '',
     client: project?.draft.project.client ?? '',
     mode: project?.draft.mode ?? 'quick',
+    budgetModel: '', // chosen first; a new job may also be created without choosing (it then behaves as it always did)
+    workType: cleanWorkType(project?.workType),
     startDate: project ? project.startDate : toDayString(new Date()),
     endDate: project?.endDate ?? '',
     location: project?.location ?? null,
@@ -153,6 +155,8 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
       name: form.name,
       client: form.client,
       mode: form.mode,
+      budgetModel: form.budgetModel,
+      workType: form.workType,
       startDate: start ? form.startDate : '',
       endDate: end ? form.endDate : '',
       location: form.location,
@@ -170,30 +174,60 @@ export default function ProjectSheet({ project, onSave, onDelete, onClose, locat
         <TextField label={t('project.name')} placeholder={t('project.namePh')} value={form.name} sanitize={(v) => sanitizeText(v, 60)} onChange={set('name')} />
         <TextField label={t('project.client')} placeholder={t('project.clientPh')} value={form.client} sanitize={(v) => sanitizeText(v, 60)} onChange={set('client')} />
 
+        {/* 1. the budget model comes FIRST: how the job is sold decides everything below (turnkey = one global value, detailed = partida by partida) */}
         {!editing && (
-          <div role="radiogroup" aria-label={t('newp.type')} className="grid grid-cols-2 gap-3" data-testid="mode-selector">
-            {[
-              ['quick', 'newp.single'],
-              ['project', 'newp.full'],
-            ].map(([m, key]) => {
-              const on = form.mode === m;
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  data-testid={`mode-${m}`}
-                  onClick={() => set('mode')(m)}
-                  className={`flex min-h-[92px] flex-col items-center justify-center gap-2 rounded-2xl border px-2 text-center transition ${
-                    on ? 'border-brand bg-brand/10 text-brand' : 'border-white/10 bg-white/5 text-neutral-300 hover:bg-white/10'
-                  }`}
-                >
-                  <ModeIcon mode={m} />
-                  <span className="text-sm font-medium leading-tight">{t(key)}</span>
-                </button>
-              );
-            })}
+          <div data-testid="budget-model-block">
+            <p className="label">{t('newp.budget')}</p>
+            <div role="radiogroup" aria-label={t('newp.budget')} className="grid grid-cols-2 gap-3" data-testid="budget-model">
+              {BUDGET_MODELS.map((m) => {
+                const on = form.budgetModel === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    data-testid={`budget-${m}`}
+                    onClick={() => setForm((f) => ({ ...f, budgetModel: m, mode: modeForBudget(m, f.mode) }))}
+                    className={`flex min-h-[112px] flex-col items-center justify-center gap-2 rounded-2xl px-3 py-3 text-center transition active:scale-95 active:opacity-70 ${on ? 'bg-brand/15 text-brand' : 'bg-white/5 text-neutral-300'}`}
+                  >
+                    <ModeIcon mode={m === 'turnkey' ? 'quick' : 'project'} />
+                    <span className="text-sm font-medium leading-tight">{t(`newp.budget.${m}`)}</span>
+                    <span className={`text-xs font-light leading-snug ${on ? 'text-brand/80' : 'text-neutral-400'}`}>{t(`newp.budget.${m}.sub`)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {editing && project.budgetModel && (
+          <p className="text-sm font-light text-neutral-400" data-testid="budget-model-readonly">
+            {t('newp.budget')}: {t(`newp.budget.${project.budgetModel}`)}
+          </p>
+        )}
+
+        {/* 2. progressive disclosure: the type of work only appears once the model is chosen (a job being edited always shows it) */}
+        {(editing || form.budgetModel) && (
+          <div data-testid="work-type-block">
+            {editing ? <SectionTitle>{t('newp.worktype')}</SectionTitle> : <p className="label">{t('newp.worktype')}</p>}
+            <div role="radiogroup" aria-label={t('newp.worktype')} className="mt-2 grid grid-cols-2 gap-2" data-testid="work-type">
+              {WORK_TYPES.map((w, i) => {
+                const on = form.workType === w;
+                return (
+                  <button
+                    key={w}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    data-testid={`worktype-${w}`}
+                    onClick={() => setForm((f) => ({ ...f, workType: f.workType === w ? '' : w }))}
+                    className={`flex min-h-[56px] items-center justify-center rounded-2xl px-3 py-2 text-center text-sm leading-tight transition active:scale-95 active:opacity-70 ${i === WORK_TYPES.length - 1 ? 'col-span-2' : ''} ${on ? 'bg-brand/15 font-medium text-brand' : 'bg-white/5 font-light text-neutral-300'}`}
+                  >
+                    {t(`worktype.${w}`)}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
