@@ -9,6 +9,7 @@ import { projectStore } from '../src/lib/projectStore.js';
 import { receiptQueue } from '../src/lib/receiptQueue.js';
 import { resetToasts } from '../src/lib/notify.js';
 import { createProjectViaDraft } from './helpers/appHarness.js';
+import { geminiReply, seedKey } from './helpers/gemini.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const JPEG = `data:image/jpeg;base64,${Buffer.from(Array.from({ length: 300 }, (_, i) => i % 200)).toString('base64')}`;
@@ -50,6 +51,7 @@ async function newProjectIntoWorkspace() {
 
 beforeEach(async () => {
   localStorage.clear();
+  seedKey(); // BYOK: the user's own key is saved on this device
   resetToasts();
   localStorage.setItem('cp.settings.v1', JSON.stringify({ region: 'CL', lang: 'es' }));
   localStorage.setItem('cp.user.v1', JSON.stringify({ provider: 'local', name: 'Ana' }));
@@ -103,7 +105,7 @@ describe('App with the workspace (the only project screen)', () => {
     await act(async () => {
       await receiptQueue.enqueue({ projectId: project.id, image: JPEG, regionCode: 'CL', currency: 'CLP', lang: 'es' });
     });
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => ({ ok: true, json: async () => ({ ok: true, isReceipt: true, currency: 'CLP', supplier: 'Easy', items: [{ description: 'Taladro', amountText: '$25.000', category: 'tool_rental', returnDate: '2099-01-01' }] }) }));
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => geminiReply({ isReceipt: true, currency: 'CLP', supplier: 'Easy', items: [{ description: 'Taladro', amountText: '$25.000', category: 'tool_rental', returnDate: '2099-01-01' }] }));
     await wait(40);
     expect(fetchSpy).not.toHaveBeenCalled(); // offline: nothing is sent
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
@@ -130,7 +132,7 @@ describe('App with the workspace (the only project screen)', () => {
       await receiptQueue.enqueue({ projectId: project.id, image: JPEG, regionCode: 'CL', currency: 'CLP', lang: 'es' });
     });
     const doc = (supplier, description, amountText) => ({ supplier, currency: 'CLP', items: [{ description, amountText, category: 'material' }] });
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => ({ ok: true, json: async () => ({ ok: true, isReceipt: true, receipts: [doc('Easy', 'Taladro', '$25.000'), doc('Sodimac', 'Cemento', '$9.980'), doc('Copec', 'Diésel', '$30.000')] }) }));
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => geminiReply({ isReceipt: true, receipts: [doc('Easy', 'Taladro', '$25.000'), doc('Sodimac', 'Cemento', '$9.980'), doc('Copec', 'Diésel', '$30.000')] }));
     await act(async () => {
       window.dispatchEvent(new Event('online'));
       await new Promise((r) => setTimeout(r, 150));

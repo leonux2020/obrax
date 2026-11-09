@@ -4,13 +4,14 @@ import { useI18n } from '../lib/i18n.jsx';
 import { googleConfigured } from '../lib/auth.js';
 import { BACKUP_FOLDER } from '../lib/drive.js';
 import { useBackLayer } from '../lib/backStack.js';
-import { CloudUploadIcon, GlobeIcon, Outline, SmartphoneIcon, UserIcon, UsersIcon } from './workspace/icons.jsx';
+import { CloudUploadIcon, GlobeIcon, Outline, ReceiptIcon, SmartphoneIcon, UserIcon, UsersIcon } from './workspace/icons.jsx';
 import { Button, Switch } from './ui.jsx';
 import GoogleButton from './GoogleButton.jsx';
 import { LocaleRows } from './SettingsRows.jsx';
 import InstallButton from './InstallButton.jsx';
 import ProfileCard from './ProfileCard.jsx';
 import SquadraSheet from './squadra/SquadraSheet.jsx';
+import { GeminiKeyField } from './GeminiKey.jsx';
 
 /** An open accordion is a back-stack layer: the device's Back folds it (one per press, the last opened first) and Ajustes stays on screen. */
 function OpenLayer({ onClose }) {
@@ -294,6 +295,17 @@ export default function SettingsView({
               )}
             </div>
           )}
+        </div>
+
+        {/* ---- IA de lectura (Scontrino IA): la clave propia de Google AI Studio (BYOK), guardada solo en este dispositivo ---- */}
+        <div className="space-y-3 pb-4 pt-5" data-testid="settings-ai">
+          <div className="flex items-center gap-3">
+            <ReceiptIcon size={22} className="text-neutral-400" />
+            <h2 id="settings-ai-title" className="min-w-0 flex-1 truncate text-base font-light tracking-[0.02em] text-neutral-300">
+              {t('settings.ai')}
+            </h2>
+          </div>
+          <GeminiKeyField testId="settings-gemini-key" />
         </div>
         </Accordion>
 

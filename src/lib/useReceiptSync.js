@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
+import { subscribeGeminiKey } from './geminiKey.js';
 import { receiptQueue } from './receiptQueue.js';
 import { SYNC_MESSAGE, acceptReviewed, drainReceiptQueue, isOnline } from './receiptSync.js';
 
@@ -47,11 +48,14 @@ export function useReceiptSync({ apply, notify, enabled = true, queue = receiptQ
     queue.recover().then(() => queue.list()).then(go);
     const onVisible = () => document.visibilityState === 'visible' && go();
     const onMessage = (e) => e?.data?.type === SYNC_MESSAGE && go();
+    // a key saved in Ajustes (or a new one replacing a rejected key) wakes the photos that were waiting for it, whatever their retry time
+    const offKey = subscribeGeminiKey(() => alive && isOnline() && run({ force: true }));
     window.addEventListener('online', go);
     document.addEventListener('visibilitychange', onVisible);
     navigator.serviceWorker?.addEventListener?.('message', onMessage);
     return () => {
       alive = false;
+      offKey();
       window.removeEventListener('online', go);
       document.removeEventListener('visibilitychange', onVisible);
       navigator.serviceWorker?.removeEventListener?.('message', onMessage);

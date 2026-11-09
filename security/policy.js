@@ -10,11 +10,12 @@ export const CSP_DIRECTIVES = {
   'style-src': ["'self'", "'unsafe-inline'", 'https://accounts.google.com/gsi/style'],
   'img-src': ["'self'", 'data:', 'blob:', 'https://*.googleusercontent.com'],
   'font-src': ["'self'"],
-  // Drive backup: ONLY the Drive v3 REST paths (metadata + upload); the browser still never talks to Google AI.
+  // Scontrino IA / invoices / price list (BYOK): the browser talks to Gemini DIRECTLY with the user's own key (src/lib/gemini.js); no server of ours is involved.
+  // Drive backup: ONLY the Drive v3 REST paths (metadata + upload).
   // Weather chip of the project header: ONLY open-meteo's forecast + geocoding paths (free, no key, no cookies).
   // Reverse geocoding of the city field (target button of the project form): ONLY Nominatim's reverse path (free, no key).
   // FX snapshot of a receipt in a foreign currency: ONLY the latest-rates path of open.er-api.com (free, no key, no cookies).
-  'connect-src': ["'self'", 'https://accounts.google.com/gsi/', 'https://www.googleapis.com/drive/', 'https://www.googleapis.com/upload/drive/', 'https://api.open-meteo.com/v1/forecast', 'https://geocoding-api.open-meteo.com/v1/search', 'https://open.er-api.com/v6/latest/', 'https://nominatim.openstreetmap.org/reverse', 'https://nominatim.openstreetmap.org/search'],
+  'connect-src': ["'self'", 'https://generativelanguage.googleapis.com', 'https://accounts.google.com/gsi/', 'https://www.googleapis.com/drive/', 'https://www.googleapis.com/upload/drive/', 'https://api.open-meteo.com/v1/forecast', 'https://geocoding-api.open-meteo.com/v1/search', 'https://open.er-api.com/v6/latest/', 'https://nominatim.openstreetmap.org/reverse', 'https://nominatim.openstreetmap.org/search'],
   'frame-src': ['https://accounts.google.com/gsi/'],
   'manifest-src': ["'self'"],
   'worker-src': ["'self'"],

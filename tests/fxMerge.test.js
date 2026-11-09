@@ -19,6 +19,7 @@ import { freezeExpense } from '../src/lib/fx.js';
 import { expensesFromRows } from '../src/lib/receipt.js';
 import { recalculateProjectTotals } from '../src/lib/projectTotals.js';
 import { AUTO_SYNC } from '../src/lib/driveSync.js';
+import { geminiReply, isGemini, seedKey } from './helpers/gemini.js';
 
 const company = normalizeCompany({ name: 'Aurora' });
 const device = (projects) => ({ settings: { region: 'CL', lang: 'es' }, company, meta: { onboarded: true, drive: true }, logo: '', projects });
@@ -128,13 +129,15 @@ describe('the Auto-Sync daemon uploads a scanned foreign expense by itself', () 
     resetBoot();
     for (const p of await projectStore.load()) await projectStore.remove(p.id);
     for (const r of await receiptQueue.list()) await receiptQueue.remove(r.id);
+    seedKey(); // BYOK: the user's own key is saved on this device
     drive = createFakeDrive();
     const json = (body) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
     vi.stubGlobal('fetch', async (url, init) => {
       const u = String(url);
       if (u.includes('open.er-api.com')) return json({ result: 'success', rates: { CLP: 1000 } });
+      if (isGemini(u)) return geminiReply({ isReceipt: true, receipts: [{ isReceipt: true, vendorName: 'Conad', receiptDate: '2026-11-02', currency: 'EUR', purchaseType: 'food', totalText: '10,00', items: [{ description: 'PANE', amountText: '10,00', category: 'food' }] }] });
       if (u.includes('googleapis.com') || u.includes('google')) return drive.fetchImpl(url, init);
-      return json({ ok: true, isReceipt: true, receipts: [{ isReceipt: true, vendorName: 'Conad', receiptDate: '2026-11-02', currency: 'EUR', purchaseType: 'food', totalText: '10,00', items: [{ description: 'PANE', amountText: '10,00', category: 'food' }] }] });
+      return json({});
     });
     installFakeGoogle(drive);
     localStorage.setItem('cp.settings.v1', JSON.stringify({ region: 'CL', lang: 'es' }));

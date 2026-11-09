@@ -19,7 +19,9 @@ export const SYNC_TAG = 'cubrax-receipts';
 export const SYNC_MESSAGE = 'SYNC_RECEIPTS';
 
 /** Errors that a later attempt can fix. */
-export const RETRYABLE = Object.freeze(['network', 'timeout', 'upstream', 'rate_limited', 'not_configured', 'cancelled']);
+export const RETRYABLE = Object.freeze(['network', 'timeout', 'upstream', 'rate_limited', 'not_configured', 'cancelled', 'no_key', 'bad_key']);
+/** Waiting for the USER (no key yet / a key Google rejected): the photo stays queued, the attempts are not spent and saving a key wakes the queue. */
+export const WAITING_FOR_USER = Object.freeze(['no_key', 'bad_key']);
 /** Errors that mean this picture will never be read. */
 export const PERMANENT = Object.freeze(['bad_image', 'too_large', 'not_invoice', 'unreadable', 'forbidden']);
 
@@ -91,15 +93,16 @@ export function drainReceiptQueue({ queue = receiptQueue, apply, request = reque
           result.failed.push(row);
           continue;
         }
-        const attempts = row.attempts + 1;
+        const waiting = WAITING_FOR_USER.includes(code);
+        const attempts = waiting ? row.attempts : row.attempts + 1; // a missing / rejected key is not the photo's fault: never burn its attempts
         const exhausted = attempts >= QUEUE_LIMITS.maxAttempts;
-        await queue.update(row.id, exhausted ? { status: 'failed', lastError: code, attempts } : { status: 'pending', lastError: code, attempts, nextAt: now() + backoffMs(attempts) });
+        await queue.update(row.id, exhausted ? { status: 'failed', lastError: code, attempts } : { status: 'pending', lastError: code, attempts, nextAt: now() + (waiting ? BACKOFF.maxMs : backoffMs(attempts)) });
         if (exhausted) result.failed.push(row);
         else result.deferred += 1;
         if (RETRYABLE.includes(code)) {
           // connectivity / service trouble: the rest would fail the same way, so they wait for the same retry time
           const rest = rows.slice(rows.indexOf(row) + 1);
-          for (const r of rest) await queue.update(r.id, { nextAt: now() + backoffMs(attempts) });
+          for (const r of rest) await queue.update(r.id, { nextAt: now() + (waiting ? BACKOFF.maxMs : backoffMs(attempts)) });
           result.deferred += rest.length;
           break;
         }

@@ -8,8 +8,8 @@ import BottomSheet from './BottomSheet.jsx';
 /**
  * PRO flow "Leer factura con IA" (full-height sheet, actions in the thumb zone):
  *   pick (camera / upload)  ->  reading (cancellable)  ->  review (tick what to apply)  ->  onApply(overrides)
- * The photo is compressed on the device and sent ONLY to our own proxy (/api/extract-invoice); the Gemini key
- * never reaches this code. `prepareImage` / `fetchImpl` are injectable for tests.
+ * The photo is compressed on the device and sent straight to Google with the user's own key (BYOK, lib/gemini.js);
+ * without a key the reading ends with the 'no_key' message (Ajustes). `prepareImage` / `fetchImpl` are injectable for tests.
  */
 export default function InvoiceSheet({ quoteItems, taxRate = 0, onApply, onClose, prepareImage = compressInvoiceImage, fetchImpl }) {
   const { t, region, lang, money, unit } = useI18n();

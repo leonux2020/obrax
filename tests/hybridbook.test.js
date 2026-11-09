@@ -17,9 +17,13 @@ import { refreshPrices, saveUserPrice, flushUserPrices, setPriceFeedEnabled } fr
 import { currentBook, publish, resetRegistry } from '../src/lib/priceRegistry.js';
 import { createPriceStore, memoryPriceBackend, priceStore } from '../src/lib/priceStore.js';
 import { freezeQuote } from '../src/lib/signature.js';
-import { buildPricesPrompt, PRICES_QUOTER_RULE } from '../server/geminiProxy.js';
+import { buildPricesPrompt, PRICES_QUOTER_RULE } from '../src/lib/geminiRequests.js';
+import { clearGeminiKey } from '../src/lib/geminiKey.js';
+import { geminiReply, seedKey } from './helpers/gemini.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+beforeEach(() => seedKey()); // BYOK: the user's own key is saved on this device (the price feed asks Gemini directly)
+afterEach(() => clearGeminiKey());
 const NOW = new Date(2026, 9, 22, 9, 0, 0).getTime();
 const region = getRegion('CL');
 const ref = (id) => CATALOG[id].usd * region.fx * region.priceFactor;
@@ -29,7 +33,7 @@ const draftOf = () => {
   d.partidas[0].dims = { ...d.partidas[0].dims, length: 6, width: 4 };
   return d;
 };
-const okFetch = (book) => async () => ({ ok: true, status: 200, json: async () => ({ ok: true, book }) });
+const okFetch = (book) => async () => geminiReply(book); // what Gemini answers (the model's JSON), not a proxy body
 const failFetch = async () => {
   throw new TypeError('offline');
 };
@@ -148,7 +152,7 @@ describe('1b. feed + IndexedDB: the user value is saved at once, persisted, and 
     const store = createPriceStore(memoryPriceBackend());
     await saveUserPrice('CL', 'materials', 'sand', 2222, { store, debounceMs: 0 });
     let release;
-    const slow = () => new Promise((r) => { release = () => r({ ok: true, status: 200, json: async () => ({ ok: true, book: aiBook(2) }) }); });
+    const slow = () => new Promise((r) => { release = () => r(geminiReply(aiBook(2))); });
     const job = refreshPrices('CL', { fetchImpl: slow, store, now: NOW, force: true });
     await new Promise((r) => setTimeout(r, 5));
     await saveUserPrice('CL', 'materials', 'gravel', 6666, { store, debounceMs: 0 }); // typed during the request

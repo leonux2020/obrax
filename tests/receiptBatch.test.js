@@ -12,6 +12,8 @@ import { newProject, normalizeProject } from '../src/lib/projects.js';
 import { normalizeExpenses, withProjectContext } from '../src/lib/ledger.js';
 import { getToasts, resetToasts } from '../src/lib/notify.js';
 import { makeI18n } from '../src/lib/i18n.jsx';
+import { clearGeminiKey } from '../src/lib/geminiKey.js';
+import { geminiReply, seedKey } from './helpers/gemini.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -23,7 +25,10 @@ const photo = {
     { vendorName: 'Jumbo', receiptDate: '2026-10-28', currency: 'CLP', purchaseType: 'food', items: [{ description: 'Pan', amountText: '5.000', category: 'food' }, { description: 'Bebidas', amountText: '3.500', category: 'food' }] },
   ],
 };
-const ok = (body) => vi.fn(async () => new Response(JSON.stringify({ ok: true, ...body }), { status: 200, headers: { 'content-type': 'application/json' } }));
+const ok = (body) => vi.fn(async () => geminiReply(body)); // what the model answers (Gemini's own envelope), not a proxy body
+
+beforeEach(() => seedKey()); // BYOK: the user has saved their own key on this device
+afterEach(() => clearGeminiKey());
 
 describe('parser: normalizeReceipts / requestReceipt', () => {
   it('a photo with three receipts becomes three independent receipts, each with its own fiscal data and lines', () => {
@@ -47,7 +52,7 @@ describe('parser: normalizeReceipts / requestReceipt', () => {
     expect(asReceipts(null)).toEqual([]);
   });
 
-  it('requestReceipt returns the batch from the proxy and maps empty answers to the fixed error codes', async () => {
+  it('requestReceipt returns the batch read by Gemini and maps empty answers to the fixed error codes', async () => {
     const batch = await requestReceipt('data:image/jpeg;base64,/9j/AAAA', { fetchImpl: ok({ receipts: normalizeReceipts(photo).receipts }) });
     expect(batch.receipts).toHaveLength(3);
     await expect(requestReceipt('data:image/jpeg;base64,/9j/AAAA', { fetchImpl: ok({ receipts: [] }) })).rejects.toMatchObject({ code: 'unreadable' });

@@ -1,14 +1,12 @@
 // Dev helper (not part of the app bundle).
 //   node scripts/sample-invoice.mjs          -> writes scripts/sample-invoice.jpg (a synthetic CLP invoice to upload in the app)
-//   node scripts/sample-invoice.mjs --send   -> also POSTs it to the running dev proxy and prints the extraction
-// It never reads .env.local: only the server process holds the Gemini key.
+// (There is no proxy any more: upload the picture in the app with your own Google AI Studio key saved in Ajustes.)
 import sharp from 'sharp';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const PORT = process.env.PORT || 3000;
 const rows = [
   ['Cemento Polpaico 25 kg saco', '10', '4.990', '49.900'],
   ['Arena big bag 0.5 m3', '2', '14.500', '29.000'],
@@ -33,9 +31,3 @@ const buf = await sharp(Buffer.from(svg)).jpeg({ quality: 85 }).toBuffer();
 const out = path.join(here, 'sample-invoice.jpg');
 fs.writeFileSync(out, buf);
 console.log('wrote', out);
-if (!process.argv.includes('--send')) process.exit(0);
-const image = 'data:image/jpeg;base64,' + buf.toString('base64');
-const t0 = Date.now();
-const r = await fetch(`http://localhost:${PORT}/api/extract-invoice`, { method: 'POST', headers: { 'content-type': 'application/json', origin: `http://localhost:${PORT}`, host: `localhost:${PORT}` }, body: JSON.stringify({ image, currency: 'CLP', lang: 'es' }) });
-console.log(r.status, Date.now() - t0, 'ms', buf.length, 'bytes');
-console.log(JSON.stringify(await r.json(), null, 1));

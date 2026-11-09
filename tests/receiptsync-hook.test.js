@@ -1,15 +1,17 @@
 // @vitest-environment happy-dom
 // The global sync hook: starts with the app, reacts to the network coming back, tells the user.
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createReceiptQueue } from '../src/lib/receiptQueue.js';
 import { useReceiptSync } from '../src/lib/useReceiptSync.js';
 import { systemNotify, askNotifyPermission } from '../src/lib/notify.js';
+import { clearGeminiKey } from '../src/lib/geminiKey.js';
+import { geminiReply, seedKey } from './helpers/gemini.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const JPEG = `data:image/jpeg;base64,${Buffer.from(Array.from({ length: 300 }, (_, i) => i % 200)).toString('base64')}`;
-const proxyOk = () => ({ ok: true, json: async () => ({ ok: true, isReceipt: true, currency: 'CLP', supplier: 'Sodimac', items: [{ description: 'Pintura', amountText: '$12.990', category: 'material' }] }) });
+const proxyOk = () => geminiReply({ isReceipt: true, currency: 'CLP', supplier: 'Sodimac', items: [{ description: 'Pintura', amountText: '$12.990', category: 'material' }] });
 
 function Probe({ queue, apply, notify, fetchImpl }) {
   useReceiptSync({ queue, apply, notify, fetchImpl });
@@ -17,6 +19,9 @@ function Probe({ queue, apply, notify, fetchImpl }) {
 }
 
 describe('useReceiptSync', () => {
+  beforeEach(() => seedKey()); // BYOK: the key of the user is on this device
+  afterEach(() => clearGeminiKey());
+
   it('drains on start when online, and again when the `online` event fires after being offline', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
     const queue = createReceiptQueue(null);
@@ -40,7 +45,8 @@ describe('useReceiptSync', () => {
       await new Promise((r) => setTimeout(r, 80)); // the whole drain (queue updates included) happens inside act
     });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toMatchObject({ kind: 'receipt', currency: 'CLP' });
+    expect(fetchImpl.mock.calls[0][0]).toMatch(/^https:\/\/generativelanguage\.googleapis\.com\/v1beta\/models\/gemini-flash-lite-latest:generateContent\?key=/);
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body).systemInstruction.parts[0].text).toContain('CLP'); // the receipt prompt, built in the browser
     expect(apply).toHaveBeenCalledTimes(1);
     expect(apply.mock.calls[0][0]).toBe('proyecto01ab');
     expect(apply.mock.calls[0][1][0]).toMatchObject({ description: 'Pintura', amount: 12990, supplier: 'Sodimac' });

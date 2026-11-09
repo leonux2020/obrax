@@ -300,11 +300,15 @@ describe('PRO paywall opens when a locked function is used', () => {
   });
 });
 
-describe('frontend only: no Gemini key in the client', () => {
-  it('no source file reads GEMINI_API_KEY and the only env var used by the client is VITE_GOOGLE_CLIENT_ID', () => {
+describe('BYOK: the app ships no Gemini key; each user brings their own', () => {
+  it('no source file reads GEMINI_API_KEY, hard-codes a key or uses a key header; Google\'s endpoint lives only in geminiRequests.js; the only env var used by the client is VITE_GOOGLE_CLIENT_ID', () => {
     const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]));
     const files = walk(path.join(process.cwd(), 'src')).filter((f) => /\.(js|jsx)$/.test(f));
-    for (const f of files) expect(fs.readFileSync(f, 'utf8'), f).not.toMatch(/GEMINI_|x-goog-api-key|generativelanguage/i) // the product name may appear in UI copy; the key, its env name and Google's endpoint may not;
+    for (const f of files) {
+      const code = fs.readFileSync(f, 'utf8');
+      expect(code, f).not.toMatch(/GEMINI_API_KEY|GEMINI_MODEL|x-goog-api-key|AIza[0-9A-Za-z_-]{20,}/); // no env name, no header, no literal key
+      if (!f.endsWith(path.join('lib', 'geminiRequests.js'))) expect(code, f).not.toMatch(/generativelanguage/i);
+    }
     const envUses = files.flatMap((f) => [...fs.readFileSync(f, 'utf8').matchAll(/import\.meta\.env\??\.(\w+)/g)].map((m) => m[1]));
     expect(new Set(envUses.filter((n) => n.startsWith('VITE_')))).toEqual(new Set(['VITE_GOOGLE_CLIENT_ID']));
   });

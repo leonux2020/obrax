@@ -215,7 +215,7 @@ const toRows = (receipt, prefix = 'r') => receipt.items.map((it, i) => ({ ...it,
 /** Every receipt of a batch -> expense records: one independent group (own docId, own fiscal data and net / tax split) per receipt. */
 export const batchExpenses = (receipts, { now = Date.now() } = {}) => receipts.flatMap((r) => expensesFromRows(toRows(r), { ...receiptMeta(r), now }));
 
-/** Send ONE compressed photo to the proxy ({kind:'receipt'}) and return its clean receipts: `{ isReceipt: true, receipts: [..] }` (1 or more). */
+/** Read ONE compressed photo with Gemini ({kind:'receipt'}, straight from the browser) and return its clean receipts: `{ isReceipt: true, receipts: [..] }` (1 or more). */
 export async function requestReceipt(dataUrl, opts = {}) {
   const body = await postImage(dataUrl, { ...opts, kind: 'receipt' });
   const batch = normalizeReceipts(body);

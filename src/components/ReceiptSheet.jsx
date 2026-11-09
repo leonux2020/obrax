@@ -16,7 +16,8 @@ import Hourglass from './Hourglass.jsx';
  * "Escanear Boleta con IA" (PRO): photo -> the AI tabulates the lines at once -> the user glances at them -> they are
  * stored in the project as expenses for the rendición. Rented tools / machinery come with the day they go back, which
  * is what lights the hourglass on the project card.
- * The photo is compressed on the device and sent ONLY to our own proxy; the Gemini key never reaches this code.
+ * The photo is compressed on the device and sent straight to Google with the user's own key (BYOK, lib/gemini.js); no server of ours sees it.
+ * Without a key the sheet is not even opened: the soft key request (GeminiKey.jsx, KeyGate) comes first.
  */
 export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], prepareImage = compressInvoiceImage, fetchImpl, today = Date.now, resolveFx = resolveRate }) {
   const { t, region, lang, money, moneyIn } = useI18n();

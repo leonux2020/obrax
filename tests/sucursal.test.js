@@ -5,7 +5,7 @@ import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { buildReceiptPrompt, RECEIPT_DOC_SCHEMA, RECEIPT_SCHEMA } from '../server/geminiProxy.js';
+import { buildReceiptPrompt, RECEIPT_DOC_SCHEMA, RECEIPT_SCHEMA } from '../src/lib/geminiRequests.js';
 import { normalizeReceipt, normalizeReceipts, receiptMeta, expensesFromRows, batchExpenses } from '../src/lib/receipt.js';
 import { normalizeExpenses } from '../src/lib/ledger.js';
 import { projectStore } from '../src/lib/projectStore.js';

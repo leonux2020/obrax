@@ -12,9 +12,13 @@ import { parseSignedAmount } from '../src/lib/invoice.js';
 import { batchExpenses, expensesFromRows, isDiscountLine, normalizeReceipt, normalizeReceipts, receiptSumCheck } from '../src/lib/receipt.js';
 import { expensesByCategory, globalSupplierShares, normalizeExpenses, profitability, supplierTotals } from '../src/lib/ledger.js';
 import { newProject } from '../src/lib/projects.js';
-import { buildReceiptPrompt, RECEIPT_DOC_SCHEMA } from '../server/geminiProxy.js';
+import { buildReceiptPrompt, RECEIPT_DOC_SCHEMA } from '../src/lib/geminiRequests.js';
+import { clearGeminiKey } from '../src/lib/geminiKey.js';
+import { geminiReply, seedKey } from './helpers/gemini.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+beforeEach(() => seedKey()); // BYOK: the user's own key is saved on this device
+afterEach(() => clearGeminiKey());
 const supermarket = (extra = {}) => ({
   isReceipt: true,
   vendorName: 'Conad',
@@ -161,7 +165,7 @@ describe('the screens show a discount as a deduction', () => {
   });
   const scan = async (receipts) => {
     const saved = [];
-    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ ok: true, receipts: normalizeReceipts({ receipts }).receipts }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    const fetchImpl = vi.fn(async () => geminiReply({ receipts })); // the model's own JSON, read straight from Google
     await act(async () => {
       root.render(React.createElement(I18nProvider, { lang: 'es', regionCode: 'IT' }, React.createElement(ReceiptSheet, { onSave: (list, extra) => saved.push({ list, extra }), onClose: () => {}, prepareImage: async () => ({ dataUrl: 'data:image/jpeg;base64,/9j/AAAA' }), fetchImpl })));
     });

@@ -1,15 +1,14 @@
-// AI invoice reading (PRO). Pure logic shared by the browser UI and the server proxy:
-//  - normalizeExtraction(): turns ANY untrusted JSON (a model answer, a proxy response) into a clean, bounded
+// AI invoice reading (PRO). Pure logic of the browser UI (there is no server: see gemini.js):
+//  - normalizeExtraction(): turns ANY untrusted JSON (a model answer) into a clean, bounded
 //    structure. Nothing the model prints can add a material that is not in the catalog or an absurd number.
 //  - planInvoicePrices(): maps the extracted lines to the materials of the CURRENT quote (price per SALE unit,
 //    without tax) and flags what looks wrong.
-//  - requestExtraction(): the only network call; it talks to OUR proxy (/api/extract-invoice), never to Google.
-// The Gemini API key does not exist in this file nor anywhere in src/: it lives on the server side only.
+//  - requestExtraction(): the only network call; it talks to Google directly with the user's own key (gemini.js, BYOK).
+// No Gemini key is shipped with the app: each user brings their own (geminiKey.js), kept only on their device.
 
 import { CATALOG } from './catalog.js';
+import { InvoiceError, callGemini } from './gemini.js';
 import { MAX_PRICE, roundMoney } from './pricing.js';
-
-export const INVOICE_ENDPOINT = '/api/extract-invoice';
 
 export const INVOICE_LIMITS = Object.freeze({
   maxItems: 60,
@@ -187,57 +186,19 @@ export function overridesFromRows(rows, selectedIds) {
   return out;
 }
 
-// ---- network (our own proxy) ----------------------------------------------------------------------------
-export class InvoiceError extends Error {
-  constructor(code) {
-    super(`invoice:${code}`);
-    this.code = code; // see ERROR_CODES
-  }
-}
-
-export const ERROR_CODES = Object.freeze(['not_configured', 'rate_limited', 'bad_image', 'too_large', 'not_invoice', 'unreadable', 'upstream', 'timeout', 'network', 'cancelled', 'forbidden']);
-const SERVER_CODES = new Set(ERROR_CODES);
+// ---- network (direct to Google, with the user's own key: see gemini.js) -------------------------------------------------
+export { ERROR_CODES, InvoiceError } from './gemini.js';
 
 /**
- * POST one compressed photo to OUR proxy and return the parsed JSON body (`ok: true`). Shared by invoice and
- * receipt reading. `kind` is only a request for one of the server's fixed prompts: the browser can never send its own.
- * @throws {InvoiceError} with a stable `code` the UI translates.
+ * Read ONE compressed photo with Gemini, straight from the browser (BYOK), and return the model's parsed JSON (untrusted: the callers
+ * normalize it). Shared by invoice and receipt reading. `kind` only selects one of the fixed prompts of geminiRequests.js.
+ * @throws {InvoiceError} with a stable `code` the UI translates ('no_key' when this device has no key yet; nothing is sent then).
  */
-export async function postImage(dataUrl, { kind = 'invoice', currency = '', lang = '', fetchImpl = globalThis.fetch, signal, endpoint = INVOICE_ENDPOINT } = {}) {
-  let res;
-  const timeout = new AbortController();
-  const timer = setTimeout(() => timeout.abort(), INVOICE_LIMITS.requestTimeoutMs);
-  const onAbort = () => timeout.abort();
-  signal?.addEventListener?.('abort', onAbort);
-  try {
-    res = await fetchImpl(endpoint, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ image: dataUrl, currency, lang, ...(kind === 'invoice' ? {} : { kind }) }),
-      credentials: 'same-origin',
-      cache: 'no-store',
-      signal: timeout.signal,
-    });
-  } catch {
-    throw new InvoiceError(signal?.aborted ? 'cancelled' : timeout.signal.aborted ? 'timeout' : 'network');
-  } finally {
-    clearTimeout(timer);
-    signal?.removeEventListener?.('abort', onAbort);
-  }
-  let body = null;
-  try {
-    body = await res.json();
-  } catch {
-    /* handled below */
-  }
-  if (!res.ok || !body || body.ok !== true) {
-    const code = body && typeof body.error === 'string' && SERVER_CODES.has(body.error) ? body.error : res.status === 404 || res.status === 405 ? 'not_configured' : 'upstream';
-    throw new InvoiceError(code);
-  }
-  return body;
+export async function postImage(dataUrl, { kind = 'invoice', currency = '', fetchImpl = globalThis.fetch, signal, apiKey } = {}) {
+  return callGemini({ kind, dataUrl, currency, fetchImpl, signal, ...(apiKey !== undefined ? { apiKey } : {}) });
 }
 
-/** Send ONE compressed invoice photo to the proxy and return the clean extraction. */
+/** Read ONE compressed invoice photo and return the clean extraction. */
 export async function requestExtraction(dataUrl, opts = {}) {
   const body = await postImage(dataUrl, { ...opts, kind: 'invoice' });
   const extraction = normalizeExtraction(body);

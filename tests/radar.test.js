@@ -24,9 +24,14 @@ import { withMarket, priceCaption, partidaGroups, rentRows } from '../src/lib/wo
 import { freezeQuote } from '../src/lib/signature.js';
 import { resetToasts } from '../src/lib/notify.js';
 import { DICT } from '../src/lib/dict.js';
-import { buildPricesPrompt, buildPricesRequest, cleanSkip, createInvoiceHandler } from '../server/geminiProxy.js';
+import { buildPricesPrompt, buildPricesRequest, cleanSkip } from '../src/lib/geminiRequests.js';
+import { requestPriceBook } from '../src/lib/priceFeed.js';
+import { clearGeminiKey } from '../src/lib/geminiKey.js';
+import { geminiReply, seedKey } from './helpers/gemini.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+beforeEach(() => seedKey()); // BYOK: the user's own key is saved on this device (the price feed asks Gemini directly)
+afterEach(() => clearGeminiKey());
 const NOW = new Date(2026, 9, 22, 9, 0, 0).getTime();
 const SANTIAGO = { lat: -33.4489, lng: -70.6693 };
 const MAIPU = { lat: -33.511, lng: -70.758 }; // ~12 km from Santiago
@@ -278,15 +283,18 @@ describe('priceFeed: supplier saves and the request to the proxy', () => {
     const bodies = [];
     const fetchImpl = vi.fn(async (_u, init) => {
       bodies.push(JSON.parse(init.body));
-      return { ok: true, status: 200, json: async () => ({ ok: true, book: aiBook(1.3) }) };
+      return geminiReply(aiBook(1.3));
     });
     expect(await loadSuppliers('CL', { store: suppliers })).toHaveLength(1);
     await refreshPrices('CL', { fetchImpl, store, suppliers, now: NOW, force: true, locations: [SANTIAGO] });
-    expect(bodies[0]).toMatchObject({ kind: 'prices', region: 'CL', countryCode: 'CL', skip: { materials: ['cement_bag'], rent: [] } });
+    const asked = (i) => bodies[i].systemInstruction.parts[0].text;
+    expect(asked(0)).toBe(buildPricesPrompt('CL', { grounded: true, skip: { materials: ['cement_bag'], rent: [] } })); // the market + WITHOUT what the nearby supplier covers
+    expect(asked(0)).not.toContain('- cement_bag:');
     // a project 81 km away is in the same market: nothing is skipped
     resetRegistry();
     await refreshPrices('CL', { fetchImpl, store, suppliers, now: NOW, force: true, locations: [SANTIAGO, RANCAGUA] });
-    expect(bodies[1].skip).toBeUndefined();
+    expect(asked(1)).toBe(buildPricesPrompt('CL', { grounded: true }));
+    expect(asked(1)).toContain('- cement_bag:');
     // and the stored AI value of the skipped item was kept (last known)
     expect(currentBook('CL').materials.cement_bag).toBeGreaterThan(0);
   });
@@ -324,24 +332,21 @@ describe('project market: withMarket + proxy', () => {
     expect(cleanSkip(null)).toEqual({ materials: [], rent: [] });
   });
 
-  it('the handler uses countryCode (falls back to region) and Gemini receives that market', async () => {
+  it('the price request names the PROJECT\'s market (country code) and Gemini receives that market; an unknown code sends nothing', async () => {
     const good = JSON.stringify({ materials: [{ id: 'cement_bag', price: ref('cement_bag') * 1.1 }], rent: [] });
     const f = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: good }] } }] }) }));
-    const headers = { 'content-type': 'application/json', host: 'localhost:3000', origin: 'http://localhost:3000' };
-    const send = (body) => createInvoiceHandler({ apiKey: 'K', fetchImpl: f, clock: () => 1000 })({ method: 'POST', headers, ip: '2.2.2.2', bodyText: JSON.stringify(body) });
-    await send({ kind: 'prices', region: 'CL', countryCode: 'BR', skip: { materials: ['sand'], rent: [] } });
+    const send = (regionCode, extra = {}) => requestPriceBook(regionCode, { fetchImpl: f, apiKey: 'AIzaSyTEST_key_0123456789_abcdefghijk', ...extra });
+    await send('BR', { skip: { materials: ['sand'], rent: [] } }).catch(() => null); // (a Chilean price is out of Brazil's band: only the REQUEST matters here)
     const sent = JSON.parse(f.mock.calls[0][1].body).systemInstruction.parts[0].text;
     expect(sent).toContain('Brazil');
     expect(sent).toContain('Leroy Merlin');
     expect(sent).not.toContain('- sand:');
     f.mockClear();
-    await send({ kind: 'prices', region: 'CL' });
+    await send('CL');
     expect(JSON.parse(f.mock.calls[0][1].body).systemInstruction.parts[0].text).toContain('(CL)');
     f.mockClear();
-    await send({ kind: 'prices', region: 'ZZ', countryCode: 'ZZ' }).then((r) => expect(r.status).toBe(400));
+    await expect(send('ZZ')).rejects.toBeTruthy();
     expect(f).not.toHaveBeenCalled();
-    // an unknown countryCode with a valid region still works (region is the older field of the same meaning)
-    expect((await send({ kind: 'prices', region: 'CL', countryCode: 'ZZ' })).status).toBe(200);
   });
 });
 

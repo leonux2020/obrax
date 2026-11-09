@@ -66,8 +66,8 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
  * tried without simulating a subscription. It needs ALL of: the Vite dev server (`MODE === 'development'`, which also
  * means `DEV`) and a loopback host. Production builds, preview
  * servers on another host and the test runner (MODE 'test') never get it; `import.meta.env.DEV` is a build-time
- * constant, so the branch is dead code in production bundles. It unlocks the client gate only: the server proxy keeps
- * its own origin check and rate limit.
+ * constant, so the branch is dead code in production bundles. It unlocks the client gate only: reading still needs the
+ * user's own Google AI Studio key (BYOK, lib/geminiKey.js).
  */
 export function devAiBypass({ dev = import.meta.env.DEV, mode = import.meta.env.MODE, host = typeof location === 'undefined' ? '' : location.hostname } = {}) {
   return Boolean(dev) && mode === 'development' && LOCAL_HOSTS.has(String(host).toLowerCase());

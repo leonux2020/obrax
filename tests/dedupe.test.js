@@ -11,10 +11,12 @@ import { normalizeExpenses } from '../src/lib/ledger.js';
 import { getToasts, resetToasts } from '../src/lib/notify.js';
 import { newProject } from '../src/lib/projects.js';
 import { buildRenditionSheets } from '../src/lib/rendition.js';
+import { clearGeminiKey } from '../src/lib/geminiKey.js';
+import { geminiReply, seedKey } from './helpers/gemini.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const doc = (extra = {}) => ({ isReceipt: true, vendorName: 'Sodimac', receiptDate: '2026-10-02', currency: 'CLP', purchaseType: 'material', items: [{ description: 'Cemento', amountText: '20.000', category: 'material' }, { description: 'Clavos', amountText: '10.000', category: 'material' }], ...extra });
-const ok = (body) => vi.fn(async () => new Response(JSON.stringify({ ok: true, ...body }), { status: 200, headers: { 'content-type': 'application/json' } }));
+const ok = (body) => vi.fn(async () => geminiReply(body)); // the model's JSON in Gemini's envelope
 const stored = (receipt) => normalizeExpenses(batchExpenses(normalizeReceipts({ receipts: [receipt] }).receipts, { now: 1 })); // what the project holds after saving it
 
 describe('fingerprint', () => {
@@ -67,12 +69,14 @@ describe('ReceiptSheet', () => {
     await flush();
   };
   beforeEach(() => {
+    seedKey(); // BYOK: the user's own key is saved on this device
     resetToasts();
     host = document.createElement('div');
     document.body.appendChild(host);
     root = createRoot(host);
   });
   afterEach(() => {
+    clearGeminiKey();
     act(() => root.unmount());
     host.remove();
   });

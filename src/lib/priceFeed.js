@@ -4,14 +4,14 @@
 //                saveUserPrice below). It is never overwritten by the service and needs no network at all;
 //      Prices saved WITH a supplier keep its place too (suppliers.js, the "Radar de Mercado"): for a project located at P the
 //      nearest-in-time supplier price within 50 km of P outranks everything below (and the AI is not asked for it);
-//   2. LIVE AI   our proxy (/api/extract-invoice, kind 'prices') searches current retail prices of the region.
+//   2. LIVE AI   Gemini, called straight from the browser with the user's own key (gemini.js, kind 'prices'), searches current retail prices of the region.
 //                It is asked for every product, but its answer is only used where the user has no price of their own;
 //                whatever it LACKS (product not found / out of band) keeps its last known value;
-//   3. SIMULATION  if the service cannot be reached at all (offline, no key, rate limit, timeout...) and nothing is
+//   3. SIMULATION  if the service cannot be reached at all (offline, no AI key of the user, rate limit, timeout...) and nothing is
 //                stored, the quote falls back to the built-in simulated reference prices.
 // The quote engine reads the result from priceRegistry.js; a signed / frozen quote keeps its own copy (priceBook.js).
 
-import { INVOICE_ENDPOINT } from './invoice.js';
+import { callGemini } from './gemini.js';
 import { BOOK_TTL_MS, hasAiPrices, mergeBooks, normalizeBook, withUserPrice } from './priceBook.js';
 import { currentBook, currentStatus, currentSuppliers, publish, publishSuppliers } from './priceRegistry.js';
 import { priceStore } from './priceStore.js';
@@ -28,35 +28,28 @@ export const setPriceFeedEnabled = (on) => {
 };
 export const priceFeedEnabled = () => enabled;
 
-/** One request to the proxy. Resolves to a validated book or throws (the caller decides the fallback). */
-export async function requestPriceBook(regionCode, { fetchImpl = globalThis.fetch, endpoint = INVOICE_ENDPOINT, timeoutMs = PRICES_TIMEOUT_MS, now = Date.now(), skip = null } = {}) {
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), timeoutMs);
-  try {
-    const res = await fetchImpl(endpoint, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      // `countryCode` = the PROJECT's market (not the UI language): the proxy searches that country's retailers.
-      // `skip` = ids the user's nearby suppliers already cover: the AI is not asked for them.
-      body: JSON.stringify({ kind: 'prices', region: regionCode, countryCode: regionCode, ...(skip && (skip.materials.length || skip.rent.length) ? { skip } : {}) }),
-      credentials: 'same-origin',
-      cache: 'no-store',
-      signal: ctl.signal,
-    });
-    const body = await res.json().catch(() => null);
-    if (!res.ok || !body || body.ok !== true) throw new Error(`prices:${body?.error || res.status}`);
-    const book = normalizeBook({ ...body.book, region: regionCode, at: now }, regionCode);
-    if (!book) throw new Error('prices:empty');
-    return book;
-  } finally {
-    clearTimeout(timer);
-  }
+/** One request to Gemini (the user's own key). Resolves to a validated book or throws (the caller decides the fallback). */
+export async function requestPriceBook(regionCode, { fetchImpl = globalThis.fetch, timeoutMs = PRICES_TIMEOUT_MS, now = Date.now(), skip = null, apiKey } = {}) {
+  // `regionCode` = the PROJECT's market (not the UI language): the model searches that country's retailers.
+  // `skip` = ids the user's nearby suppliers already cover: the AI is not asked for them.
+  const parsed = await callGemini({
+    kind: 'prices',
+    regionCode,
+    fetchImpl,
+    skip: skip && (skip.materials.length || skip.rent.length) ? skip : null,
+    totalMs: timeoutMs,
+    ...(apiKey !== undefined ? { apiKey } : {}),
+  });
+  const book = normalizeBook({ ...parsed, region: regionCode, at: now }, regionCode);
+  if (!book) throw new Error('prices:empty');
+  return book;
 }
 
-/** Short diagnostic code of a failed request ('not_configured' = the proxy has no AI key, 'timeout', 'upstream', 'network'...). */
+/** Short diagnostic code of a failed request ('no_key' = this device has no AI key yet, 'bad_key', 'timeout', 'upstream', 'network'...). */
 export function failureReason(err) {
   const m = /^prices:(.+)$/.exec(err?.message || '');
   if (m) return /^\d+$/.test(m[1]) ? `http_${m[1]}` : m[1];
+  if (typeof err?.code === 'string' && /^[a-z_]+$/.test(err.code)) return err.code; // InvoiceError: no_key, bad_key, rate_limited, timeout, upstream...
   return err?.name === 'AbortError' ? 'timeout' : 'network';
 }
 

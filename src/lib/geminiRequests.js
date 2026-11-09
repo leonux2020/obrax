@@ -1,37 +1,21 @@
-// Minimal, framework-free proxy to Google AI Studio (Gemini) for invoice reading.
+// The Gemini REQUESTS of the app, built in the browser (BYOK: the user's own key, see gemini.js). Pure: no network, no key, no React.
 //
-// SECURITY MODEL
-//  - This file and `server/env.js` are the ONLY code that knows about GEMINI_API_KEY. Nothing under src/ may
-//    mention it (a test enforces that, and scans the production build for the key's value).
-//  - The key travels in the `x-goog-api-key` header (never in the URL, so it cannot end up in access logs),
-//    is never logged and never appears in a response; upstream error bodies are NOT forwarded either.
-//  - The browser can only send one image (jpeg/png/webp, <= 4 MB of JSON) - or a region code for the price list -
-//    and receives a validated, bounded extraction: it cannot choose the model, the prompt or any other Gemini parameter.
-//  - Abuse limits: same-origin only, POST + JSON only, per-IP and global rate limits, upstream timeout.
-//
-// The handler is a pure function of (request, injected fetch/clock) so it runs identically inside the Vite dev
-// and preview servers (plugins/ai-proxy.js) and as a serverless function (api/extract-invoice.js).
+// Three FIXED prompts, one per `kind` ('invoice' | 'receipt' | 'prices'); nothing a document says can change them (every prompt tells the
+// model to treat the image as data). Whatever Gemini answers is untrusted: callers pass it through normalizeExtraction /
+// normalizeReceipts / normalizeBook before it touches the app.
+// (This module used to live in server/ behind a proxy; the prompts, schemas and builders below are unchanged.)
 
-import { CATALOG } from '../src/lib/catalog.js';
-import { DICT } from '../src/lib/dict.js';
-import { normalizeExtraction } from '../src/lib/invoice.js';
-import { normalizeReceipts } from '../src/lib/receipt.js';
-import { DOCUMENT_TYPES, EXPENSE_CATEGORIES, PAYMENT_METHODS } from '../src/lib/ledger.js';
-import { MACHINE_IDS } from '../src/lib/machines.js';
-import { getRegion } from '../src/lib/regions.js';
-import { normalizeBook } from '../src/lib/priceBook.js';
+import { CATALOG } from './catalog.js';
+import { DICT } from './dict.js';
+import { DOCUMENT_TYPES, EXPENSE_CATEGORIES, PAYMENT_METHODS } from './ledger.js';
+import { MACHINE_IDS } from './machines.js';
+import { getRegion } from './regions.js';
 
-export const MAX_BODY_BYTES = 4 * 1024 * 1024;
-const RETRYABLE = new Set([404, 408, 500, 502, 503, 504]);
 export const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 // Aliases that follow Google's current models (named versions get retired). Lite is fast and plenty for reading a
 // printed invoice (3-5 s); the full Flash alias is the fallback when Lite is unavailable.
 export const DEFAULT_MODEL = 'gemini-flash-lite-latest';
 export const FALLBACK_MODEL = 'gemini-flash-latest';
-
-const IMAGE_RE = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/;
-// first base64 characters of each format's magic bytes: the declared mime type must match the content
-const MAGIC = { 'image/jpeg': '/9j/', 'image/png': 'iVBORw0KGgo', 'image/webp': 'UklGR' };
 
 /** Short description of every catalog material, so the model can map invoice lines to OUR material ids. */
 function catalogForPrompt() {
@@ -312,197 +296,4 @@ export function parseModelJson(response) {
       return null;
     }
   }
-}
-
-/** Fixed-window-ish limiter: `limit` hits per `windowMs` per key (memory only; best effort on serverless). */
-export function createKeyedLimiter(limit, windowMs, clock = Date.now) {
-  const hits = new Map();
-  return (key) => {
-    const now = clock();
-    const list = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
-    if (list.length >= limit) {
-      hits.set(key, list);
-      return false;
-    }
-    list.push(now);
-    hits.set(key, list);
-    if (hits.size > 5000) for (const [k, v] of hits) if (!v.some((t) => now - t < windowMs)) hits.delete(k);
-    return true;
-  };
-}
-
-/** Google's error text (server-side log only; truncated). */
-async function upstreamMessage(res) {
-  try {
-    const j = await res.json();
-    return String(j?.error?.message ?? j?.error?.status ?? '').slice(0, 160);
-  } catch {
-    return '';
-  }
-}
-
-const json = (status, body) => ({ status, body });
-const fail = (status, error) => json(status, { ok: false, error });
-
-/**
- * @param {object} cfg
- *   apiKey      GEMINI_API_KEY (read by server/env.js and handed in, never read here)
- *   model       Gemini model id
- *   fetchImpl   injectable fetch (tests)
- *   perIpLimit/globalLimit/windowMs   abuse limits
- *   timeoutMs   upstream timeout
- * @returns async (req) => { status, body }  with req = { method, headers, ip, bodyText }
- */
-export function createInvoiceHandler({
-  apiKey,
-  model = DEFAULT_MODEL,
-  fallbackModels = [FALLBACK_MODEL],
-  fetchImpl = globalThis.fetch,
-  perIpLimit = 8,
-  globalLimit = 60,
-  windowMs = 60_000,
-  timeoutMs = 25_000,
-  clock = Date.now,
-  log = null, // optional server-side diagnostics: (line) => void. Never receives the key.
-} = {}) {
-  const perIp = createKeyedLimiter(perIpLimit, windowMs, clock);
-  const global = createKeyedLimiter(globalLimit, windowMs, clock);
-  const note = (line) => {
-    try {
-      log?.(String(line).split(apiKey).join('***'));
-    } catch {
-      /* diagnostics must never break a request */
-    }
-  };
-  const okModel = (x) => typeof x === 'string' && /^[a-z0-9][a-z0-9._-]{1,60}$/i.test(x);
-  const models = [...new Set([okModel(model) ? model : DEFAULT_MODEL, ...fallbackModels.filter(okModel)])];
-
-  return async function handle(req) {
-    if (req.method !== 'POST') return fail(405, 'method');
-    const h = req.headers || {};
-
-    // same-origin only: a page on another site must not be able to spend our quota through a visitor's browser
-    const origin = h.origin;
-    if (h['sec-fetch-site'] === 'cross-site') return fail(403, 'forbidden');
-    if (origin) {
-      let originHost = '';
-      try {
-        originHost = new URL(origin).host;
-      } catch {
-        return fail(403, 'forbidden');
-      }
-      if (!h.host || originHost !== h.host) return fail(403, 'forbidden');
-    }
-    if (!String(h['content-type'] || '').toLowerCase().startsWith('application/json')) return fail(415, 'bad_image');
-
-    if (!apiKey) return fail(503, 'not_configured');
-
-    const text = typeof req.bodyText === 'string' ? req.bodyText : '';
-    if (Buffer.byteLength(text) > MAX_BODY_BYTES) return fail(413, 'too_large');
-    let body;
-    try {
-      body = JSON.parse(text);
-    } catch {
-      return fail(400, 'bad_image');
-    }
-    // `kind` only selects one of the fixed server-side prompts (anything unknown is an invoice)
-    const kind = body?.kind === 'receipt' ? 'receipt' : body?.kind === 'prices' ? 'prices' : 'invoice';
-    // `countryCode` = the market chosen for the PROJECT (independent of the UI language); `region` is the older field of the same meaning
-    const priceRegion = kind === 'prices' ? getRegion(typeof body.countryCode === 'string' && getRegion(body.countryCode) ? body.countryCode : body.region) : null;
-    const priceSkip = kind === 'prices' ? cleanSkip(body.skip) : null;
-    if (kind === 'prices' && !priceRegion) return fail(400, 'bad_region');
-    const m = kind === 'prices' ? null : typeof body?.image === 'string' ? IMAGE_RE.exec(body.image) : null;
-    if (kind !== 'prices' && (!m || !m[2].startsWith(MAGIC[m[1]]) || m[2].length < 100)) return fail(400, 'bad_image');
-
-    const ip = String(req.ip || 'unknown');
-    if (!perIp(ip) || !global('all')) return fail(429, 'rate_limited');
-
-    // Google retires and overloads models: try the configured one, then the lighter alias. Only transient or
-    // "model gone" failures move on; the error body of a failed attempt is never forwarded.
-    const nowDate = new Date(clock());
-    const pad = (n) => String(n).padStart(2, '0');
-    const today = `${nowDate.getFullYear()}-${pad(nowDate.getMonth() + 1)}-${pad(nowDate.getDate())}`;
-    const reqBody = { mime: m?.[1], data: m?.[2], currency: typeof body.currency === 'string' ? body.currency : '', kind, today };
-    const callModels = async (bodyFor) => {
-    let payload = null;
-    let last = fail(502, 'upstream');
-    for (const mdl of models) {
-      const ctl = new AbortController();
-      const timer = setTimeout(() => ctl.abort(), timeoutMs);
-      let upstream;
-      try {
-        upstream = await fetchImpl(`${GEMINI_BASE}/${encodeURIComponent(mdl)}:generateContent`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
-          body: JSON.stringify(bodyFor(mdl)),
-          signal: ctl.signal,
-        });
-      } catch (err) {
-        last = err?.name === 'AbortError' ? fail(504, 'timeout') : fail(502, 'upstream');
-        note(`${mdl}: ${err?.name === 'AbortError' ? 'timeout' : `network error (${String(err?.cause?.code || err?.message || err).slice(0, 120)})`}`);
-        continue;
-      } finally {
-        clearTimeout(timer);
-      }
-      if (upstream.status === 429) {
-        last = fail(429, 'rate_limited');
-        note(`${mdl}: 429 rate limited`);
-        continue;
-      }
-      if (!upstream.ok) {
-        last = fail(502, 'upstream');
-        note(`${mdl}: HTTP ${upstream.status} ${await upstreamMessage(upstream)}`);
-        if (RETRYABLE.has(upstream.status)) continue;
-        return { payload: null, last }; // 400/401/403: retrying another model will not help
-      }
-      try {
-        payload = await upstream.json();
-      } catch {
-        last = fail(502, 'upstream');
-        note(`${mdl}: unreadable response body`);
-        continue;
-      }
-      note(`${mdl}: ok`);
-      break;
-    }
-    return { payload, last };
-    };
-    const bodyFor = (grounded) => (mdl) =>
-      kind === 'prices' ? buildPricesRequest({ regionCode: priceRegion.code, model: mdl, grounded, skip: priceSkip }) : buildGeminiRequest({ ...reqBody, model: mdl });
-    // prices: the request is GROUNDED (google_search tool) so the model looks the prices up on the web
-    let { payload, last } = await callModels(bodyFor(true));
-    if (kind === 'prices') {
-      const usable = (p) => {
-        const parsed = p && !p.promptFeedback?.blockReason ? parseModelJson(p) : null;
-        return Boolean(parsed && normalizeBook({ ...parsed, region: priceRegion.code, at: 1 }, priceRegion.code));
-      };
-      if (!usable(payload)) {
-        // only when the grounded request produced nothing usable (tool refused, quota of the tool, unreadable text):
-        // one plain schema-constrained estimate, so the app still gets a price list
-        note('grounded search gave no usable prices: plain estimate');
-        const plain = await callModels(bodyFor(false));
-        payload = plain.payload;
-        last = plain.last;
-      }
-    }
-    if (!payload) return last;
-    if (payload?.promptFeedback?.blockReason) return fail(422, 'unreadable');
-    const parsed = parseModelJson(payload);
-    if (!parsed) return fail(502, 'unreadable');
-    if (kind === 'prices') {
-      const book = normalizeBook({ ...parsed, region: priceRegion.code, at: clock() }, priceRegion.code);
-      if (!book) return fail(422, 'unreadable');
-      return json(200, { ok: true, book });
-    }
-    if (kind === 'receipt') {
-      const batch = normalizeReceipts(parsed); // one photo = one or more independent receipts
-      if (!batch.isReceipt) return fail(422, 'not_invoice');
-      if (!batch.receipts.length) return fail(422, 'unreadable');
-      return json(200, { ok: true, receipts: batch.receipts });
-    }
-    const extraction = normalizeExtraction(parsed);
-    if (!extraction.isInvoice) return fail(422, 'not_invoice');
-    if (!extraction.items.length) return fail(422, 'unreadable');
-    return json(200, { ok: true, ...extraction });
-  };
 }

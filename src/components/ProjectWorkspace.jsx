@@ -25,6 +25,7 @@ import { notePhotosFor } from '../lib/notePhotos.js';
 import { receiptPhotosFor } from '../lib/receiptPhotos.js';
 import { useAccordionBack } from '../lib/useAccordionBack.js';
 import ReceiptSheet from './ReceiptSheet.jsx';
+import { KeyGate } from './GeminiKey.jsx';
 import SignatureSheet from './SignatureSheet.jsx';
 import SnapGrid, { PhotoEditToggle } from './SnapGrid.jsx';
 import { Button } from './ui.jsx';
@@ -309,7 +310,11 @@ function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, c
         </BottomSheet>
       )}
       {ui.sheet === 'camera' && <PhotoSheet photos={photos} setPhotos={setPhotos} projectId={project.id} onClose={closeSheet} />}
-      {ui.sheet === 'scan' && <ReceiptSheet onSave={saveExpenses} existing={project.expenses} onQueue={park} onClose={closeSheet} />}
+      {ui.sheet === 'scan' && (
+        <KeyGate onClose={closeSheet}>
+          <ReceiptSheet onSave={saveExpenses} existing={project.expenses} onQueue={park} onClose={closeSheet} />
+        </KeyGate>
+      )}
       {sandbox && namingFor && (
         <DraftNameSheet
           initial=""

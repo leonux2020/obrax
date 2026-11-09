@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // Usability audit: voice logbook (permissions + visible state), price-source indicator, microphone policy.
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import React, { act, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import fs from 'node:fs';
@@ -14,6 +14,8 @@ import { publish, resetRegistry } from '../src/lib/priceRegistry.js';
 import { createPriceStore, memoryPriceBackend } from '../src/lib/priceStore.js';
 import { SECURITY_HEADERS } from '../security/policy.js';
 import { makeI18n } from '../src/lib/i18n.jsx';
+import { clearGeminiKey } from '../src/lib/geminiKey.js';
+import { seedKey } from './helpers/gemini.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const h = React.createElement;
@@ -148,7 +150,7 @@ describe('price feed diagnostics', () => {
     }
   });
 
-  it('priceFeed publishes WHY it fell back (offline, proxy without key, timeout, network) next to the state', async () => {
+  it('priceFeed publishes WHY it fell back (offline, no AI key of the user, rejected key, timeout, network) next to the state', async () => {
     const store = createPriceStore(memoryPriceBackend());
     const status = async (fetchImpl, online) => {
       resetRegistry();
@@ -156,12 +158,18 @@ describe('price feed diagnostics', () => {
       return state;
     };
     const { currentStatus } = await import('../src/lib/priceRegistry.js');
-    expect(await status(async () => ({ ok: false, status: 503, json: async () => ({ ok: false, error: 'not_configured' }) }))).toBe('sim');
-    expect(currentStatus('CL').reason).toBe('not_configured');
+    const never = vi.fn(async () => { throw new Error('never'); });
+    expect(await status(never)).toBe('sim'); // no key saved on this device: silent fallback, nothing is sent
+    expect(currentStatus('CL').reason).toBe('no_key');
+    expect(never).not.toHaveBeenCalled();
+    seedKey();
+    await status(async () => ({ ok: false, status: 403, json: async () => ({ error: { status: 'PERMISSION_DENIED', message: 'x' } }) }));
+    expect(currentStatus('CL').reason).toBe('bad_key');
     await status(async () => { throw new TypeError('fetch failed'); });
     expect(currentStatus('CL').reason).toBe('network');
     await status(async () => ({ ok: false, status: 502, json: async () => null }));
-    expect(currentStatus('CL').reason).toBe('http_502');
+    expect(currentStatus('CL').reason).toBe('upstream');
+    clearGeminiKey();
     await status(async () => { throw new Error('never'); }, () => false);
     expect(currentStatus('CL')).toMatchObject({ state: 'sim', reason: 'offline' });
     expect(failureReason(Object.assign(new Error('x'), { name: 'AbortError' }))).toBe('timeout');

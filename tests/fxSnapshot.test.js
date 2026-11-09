@@ -14,6 +14,8 @@ import { dropDuplicateReceipts, expenseFingerprints, normalizeReceipts } from '.
 import { mergeProject } from '../src/lib/merge.js';
 import { newProject } from '../src/lib/projects.js';
 import { makeI18n } from '../src/lib/i18n.jsx';
+import { clearGeminiKey } from '../src/lib/geminiKey.js';
+import { geminiReply, seedKey } from './helpers/gemini.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -174,18 +176,20 @@ describe('the screens', () => {
   const q = (id) => host.querySelector(`[data-testid="${id}"]`);
   const flush = (ms = 0) => act(async () => new Promise((r) => setTimeout(r, ms)));
   beforeEach(() => {
+    seedKey(); // BYOK: the user's own key is saved on this device
     host = document.createElement('div');
     document.body.appendChild(host);
     root = createRoot(host);
   });
   afterEach(() => {
+    clearGeminiKey();
     act(() => root.unmount());
     host.remove();
   });
   const eur = { isReceipt: true, vendorName: 'Conad', receiptDate: '2026-11-02', currency: 'EUR', purchaseType: 'food', totalText: '10,00', items: [{ description: 'PANE', amountText: '10,00', category: 'food' }] };
   const scan = async (resolveFx) => {
     const saved = [];
-    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ ok: true, receipts: normalizeReceipts({ receipts: [eur] }).receipts }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    const fetchImpl = vi.fn(async () => geminiReply({ receipts: [eur] }));
     await act(async () => {
       root.render(React.createElement(I18nProvider, { lang: 'es', regionCode: 'CL' }, React.createElement(ReceiptSheet, { onSave: (list, extra) => saved.push({ list, extra }), onClose: () => {}, prepareImage: async () => ({ dataUrl: 'data:image/jpeg;base64,/9j/AAAA' }), fetchImpl, resolveFx })));
     });

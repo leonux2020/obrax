@@ -19,6 +19,7 @@ import { priceStore } from '../src/lib/priceStore.js';
 import { resetToasts } from '../src/lib/notify.js';
 import { freezeQuote } from '../src/lib/signature.js';
 import { InvoiceError } from '../src/lib/invoice.js';
+import { seedKey } from './helpers/gemini.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -164,6 +165,7 @@ const mount = async (props) => {
 
 beforeEach(() => {
   localStorage.clear();
+  seedKey(); // BYOK: the user's own key is saved on this device
   resetRegistry();
   resetToasts();
   host = document.createElement('div');

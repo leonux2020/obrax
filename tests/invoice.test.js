@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   parseAmount,
   normalizeExtraction,
@@ -8,7 +8,6 @@ import {
   requestExtraction,
   InvoiceError,
   ERROR_CODES,
-  INVOICE_ENDPOINT,
   INVOICE_LIMITS,
 } from '../src/lib/invoice.js';
 import { newDraft } from '../src/lib/draft.js';
@@ -18,6 +17,9 @@ import { CATALOG } from '../src/lib/catalog.js';
 import { getRegion } from '../src/lib/regions.js';
 import { compressInvoiceImage, PhotoError } from '../src/lib/photos.js';
 import { DICT } from '../src/lib/dict.js';
+import { GEMINI_BASE, buildGeminiRequest } from '../src/lib/geminiRequests.js';
+import { clearGeminiKey, setGeminiKey } from '../src/lib/geminiKey.js';
+import { TEST_KEY, geminiError, geminiReply } from './helpers/gemini.js';
 import { LANGS } from '../src/lib/regions.js';
 import { isPro, setSimulatedPro, SIM_PRO_KEY, isProFeature } from '../src/lib/pro.js';
 
@@ -165,48 +167,80 @@ describe('planInvoicePrices: map invoice lines onto the CURRENT quote', () => {
   });
 });
 
-describe('requestExtraction: the browser only talks to OUR proxy', () => {
-  const ok = { ok: true, isInvoice: true, currency: 'CLP', items: [{ materialId: 'cement_bag', description: 'c', unitPrice: 4990, priceBasis: 'sale_unit' }] };
-  const res = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
+describe('requestExtraction: the browser talks DIRECTLY to Gemini with the user\'s own key (BYOK)', () => {
+  const model = { isInvoice: true, currency: 'CLP', items: [{ materialId: 'cement_bag', description: 'c', unitPrice: 4990, priceBasis: 'sale_unit' }] };
+  const PHOTO = `data:image/jpeg;base64,/9j/${'A'.repeat(200)}`;
+  const code = async (f, opts = {}) => {
+    try {
+      await requestExtraction(PHOTO, { fetchImpl: f, ...opts });
+    } catch (e) {
+      expect(e).toBeInstanceOf(InvoiceError);
+      return e.code;
+    }
+    return 'no-error';
+  };
+  beforeEach(() => setGeminiKey(TEST_KEY));
+  afterEach(() => clearGeminiKey());
 
-  it('POSTs JSON {image, currency, lang} to /api/extract-invoice (same origin) and returns a clean extraction', async () => {
-    const f = vi.fn(async () => res(200, ok));
-    const ex = await requestExtraction('data:image/jpeg;base64,AAAA', { currency: 'CLP', lang: 'es', fetchImpl: f });
+  it('POSTs the system prompt, the image and the schema to generativelanguage.googleapis.com with the key in the URL, and returns a clean extraction', async () => {
+    const f = vi.fn(async () => geminiReply(model));
+    const ex = await requestExtraction(PHOTO, { currency: 'CLP', lang: 'es', fetchImpl: f });
     expect(ex.items[0]).toMatchObject({ materialId: 'cement_bag', unitPrice: 4990 });
     const [url, init] = f.mock.calls[0];
-    expect(url).toBe(INVOICE_ENDPOINT);
-    expect(url.startsWith('/')).toBe(true); // relative: never an absolute Google URL
+    expect(url).toBe(`${GEMINI_BASE}/gemini-flash-lite-latest:generateContent?key=${TEST_KEY}`);
+    expect(url).toBe(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${TEST_KEY}`);
     expect(init.method).toBe('POST');
-    expect(JSON.parse(init.body)).toEqual({ image: 'data:image/jpeg;base64,AAAA', currency: 'CLP', lang: 'es' });
-    expect(JSON.stringify(init.headers)).not.toMatch(/key|authorization/i);
+    expect(init.credentials).toBe('omit'); // no cookies of ours travel to Google
+    const body = JSON.parse(init.body);
+    expect(Object.keys(body).sort()).toEqual(['contents', 'generationConfig', 'systemInstruction']);
+    expect(body).toEqual(JSON.parse(JSON.stringify(buildGeminiRequest({ mime: 'image/jpeg', data: PHOTO.split(',')[1], currency: 'CLP', model: 'gemini-flash-lite-latest', kind: 'invoice', today: '' }))));
+    expect(body.contents[0].parts[1].inlineData).toEqual({ mimeType: 'image/jpeg', data: PHOTO.split(',')[1] });
+    expect(JSON.stringify(body)).not.toContain(TEST_KEY); // the key is only in the URL, never in the payload
+  });
+
+  it('without a key NOTHING is sent: the call stops with the stable code "no_key" (the queue keeps the photo)', async () => {
+    clearGeminiKey();
+    const f = vi.fn(async () => geminiReply(model));
+    expect(await code(f)).toBe('no_key');
+    expect(f).not.toHaveBeenCalled();
+    expect(await code(f, { apiKey: TEST_KEY })).toBe('no-error'); // an explicit key still works
   });
 
   it('maps every failure to a stable code the UI translates', async () => {
-    const code = async (f, opts = {}) => {
-      try {
-        await requestExtraction('x', { fetchImpl: f, ...opts });
-      } catch (e) {
-        expect(e).toBeInstanceOf(InvoiceError);
-        return e.code;
-      }
-      return 'no-error';
-    };
-    expect(await code(async () => res(503, { ok: false, error: 'not_configured' }))).toBe('not_configured');
-    expect(await code(async () => res(429, { ok: false, error: 'rate_limited' }))).toBe('rate_limited');
-    expect(await code(async () => res(400, { ok: false, error: 'bad_image' }))).toBe('bad_image');
-    expect(await code(async () => res(422, { ok: false, error: 'not_invoice' }))).toBe('not_invoice');
-    expect(await code(async () => res(502, { ok: false, error: '<script>' }))).toBe('upstream'); // unknown codes are not trusted
-    expect(await code(async () => ({ ok: false, status: 404, json: async () => { throw new Error('html'); } }))).toBe('not_configured'); // static hosting: no /api
+    expect(await code(async () => geminiError(400, 'API key not valid. Please pass a valid API key.', 'INVALID_ARGUMENT'))).toBe('bad_key');
+    expect(await code(async () => geminiError(403, 'denied', 'PERMISSION_DENIED'))).toBe('bad_key');
+    expect(await code(async () => geminiError(401))).toBe('bad_key');
+    expect(await code(async () => geminiError(400, 'Request contains an invalid argument.', 'INVALID_ARGUMENT'))).toBe('upstream');
+    expect(await code(async () => geminiError(429, 'quota', 'RESOURCE_EXHAUSTED'))).toBe('rate_limited');
+    expect(await code(async () => geminiError(413))).toBe('too_large');
+    expect(await code(async () => geminiError(503))).toBe('upstream');
+    expect(await code(async () => geminiError(500))).toBe('upstream');
+    expect(await code(async () => ({ ok: true, status: 200, json: async () => { throw new Error('html'); } }))).toBe('upstream');
     expect(await code(async () => { throw new TypeError('offline'); })).toBe('network');
-    expect(await code(async () => res(200, { ok: true, isInvoice: false, items: [] }))).toBe('not_invoice');
-    expect(await code(async () => res(200, { ok: true, items: [] }))).toBe('unreadable');
-    expect(await code(async () => res(200, { ok: true, items: [{ materialId: 'cement_bag' }] }))).toBe('unreadable'); // no usable price
+    expect(await code(async () => geminiReply({ isInvoice: false, items: [] }))).toBe('not_invoice');
+    expect(await code(async () => geminiReply({ items: [] }))).toBe('unreadable');
+    expect(await code(async () => geminiReply({ isInvoice: true, items: [] }))).toBe('unreadable');
+    expect(await code(async () => geminiReply({ isInvoice: true, items: [{ materialId: 'cement_bag' }] }))).toBe('unreadable'); // no usable price
+    expect(await code(async () => geminiReply('sin datos'))).toBe('unreadable');
+    expect(await code(async () => ({ ok: true, status: 200, json: async () => ({ promptFeedback: { blockReason: 'SAFETY' } }) }))).toBe('unreadable');
+    await expect(requestExtraction('x', { fetchImpl: async () => geminiReply(model) })).rejects.toMatchObject({ code: 'bad_image' }); // not a jpeg / png / webp data URL
+  });
+
+  it('a model that is gone or overloaded falls back to the next one; a rejected key does not', async () => {
+    const f = vi.fn(async (url) => (url.includes('gemini-flash-lite-latest') ? geminiError(503) : geminiReply(model)));
+    expect((await requestExtraction(PHOTO, { fetchImpl: f })).items).toHaveLength(1);
+    expect(f.mock.calls.map((c) => c[0].split(':generateContent')[0].split('/').pop())).toEqual(['gemini-flash-lite-latest', 'gemini-flash-latest']);
+    const quota = vi.fn(async (url) => (url.includes('lite') ? geminiError(429) : geminiReply(model)));
+    expect((await requestExtraction(PHOTO, { fetchImpl: quota })).items).toHaveLength(1);
+    const denied = vi.fn(async () => geminiError(403));
+    expect(await code(denied)).toBe('bad_key');
+    expect(denied).toHaveBeenCalledTimes(1);
   });
 
   it('can be cancelled', async () => {
     const ctl = new AbortController();
     const f = vi.fn((_u, { signal }) => new Promise((_, rej) => signal.addEventListener('abort', () => rej(new Error('aborted')))));
-    const p = requestExtraction('x', { fetchImpl: f, signal: ctl.signal }).catch((e) => e.code);
+    const p = requestExtraction(PHOTO, { fetchImpl: f, signal: ctl.signal }).catch((e) => e.code);
     ctl.abort();
     expect(await p).toBe('cancelled');
   });

@@ -1,13 +1,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import pwaBrand from './plugins/pwa-brand.js';
-import aiProxy from './plugins/ai-proxy.js';
 
 export default defineConfig(({ mode }) => ({
   // Relative base => the same build works at a domain root or in a sub-path (GitHub Pages).
   base: './',
-  // aiProxy: serves /api/extract-invoice on the dev/preview server (the Gemini key is read there, server side only).
-  plugins: [react(), pwaBrand(), aiProxy()],
+  plugins: [react(), pwaBrand()],
   esbuild:
     mode === 'production'
       ? { drop: ['console', 'debugger'], legalComments: 'none' }
