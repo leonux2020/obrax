@@ -140,7 +140,7 @@ export function createFakeDrive({ token: initialToken = 'tok-valid-123456' } = {
         .filter((f) => !onlySheets || f.mimeType === SHEET_MIME)
         .filter((f) => (!name || f.name === name) && (!parent || f.parents.includes(parent)) && (isFolder ? f.mimeType.includes('folder') : !f.mimeType.includes('folder')))
         .sort((a, b) => b.modifiedTime - a.modifiedTime)
-        .map(({ id: fid, name: nm, modifiedTime, body, parents, mimeType }) => ({ id: fid, name: nm, mimeType, size: String(String(body ?? '').length), modifiedTime: new Date(modifiedTime).toISOString(), parents: [...parents] }));
+        .map(({ id: fid, name: nm, modifiedTime, body, parents, mimeType, description }) => ({ id: fid, name: nm, mimeType, ...(description ? { description } : {}), size: String(String(body ?? '').length), modifiedTime: new Date(modifiedTime).toISOString(), parents: [...parents] }));
       return res({ files: out });
     }
     if (method === 'POST' && u.pathname === '/drive/v3/files') {
@@ -156,9 +156,9 @@ export function createFakeDrive({ token: initialToken = 'tok-valid-123456' } = {
       const body = parts[1].split('\r\n\r\n').slice(1).join('\r\n\r\n').replace(/\r\n$/, '');
       if (!meta.parents?.every((pid) => files.has(pid))) return res({ error: 'parent not found' }, 404);
       n += 1;
-      const f = { id: `fil${n}xxxxxx`, name: meta.name, mimeType: meta.mimeType, parents: state.misplaceUploads ? ['root'] : meta.parents, body, modifiedTime: (clock += 1) };
+      const f = { id: `fil${n}xxxxxx`, name: meta.name, mimeType: meta.mimeType, parents: state.misplaceUploads ? ['root'] : meta.parents, body, modifiedTime: (clock += 1), ...(meta.description ? { description: meta.description } : {}) };
       files.set(f.id, f);
-      created.push({ id: f.id, name: meta.name, parents: [...(meta.parents || [])] }); // where it was ASKED to be born
+      created.push({ id: f.id, name: meta.name, parents: [...(meta.parents || [])], description: meta.description }); // where it was ASKED to be born
       return res({ id: f.id, parents: [...f.parents] });
     }
     if (method === 'PATCH' && mediaUpload) {
@@ -180,6 +180,10 @@ export function createFakeDrive({ token: initialToken = 'tok-valid-123456' } = {
         patch = init.body ? JSON.parse(init.body) : {};
       } catch {
         patch = {};
+      }
+      if (typeof patch.description === 'string') {
+        f.description = patch.description; // metadata-only update (a caption edited after the upload)
+        return res({ id: f.id });
       }
       if (patch.trashed === true) {
         f.trashed = true; // to the trash: recoverable, still in `files`

@@ -1,0 +1,58 @@
+// Photo captions ("Fotos de Obra" are photo-first: the picture comes first, a short caption gives it context). Six languages, merged into DICT by dict.js.
+
+export const P10 = {
+  es: {
+    "photo.caption.title": "Descripción de la foto",
+    "photo.caption.ph": "Descripción breve del avance (opcional)",
+    "photo.caption.save": "Guardar",
+    "photo.caption.skip": "Guardar sin texto",
+    "photo.caption.edit": "Editar descripción",
+    "photo.caption.add": "Añadir descripción",
+    "photo.caption.clear": "Quitar descripción",
+  },
+  en: {
+    "photo.caption.title": "Photo caption",
+    "photo.caption.ph": "Short description of the progress (optional)",
+    "photo.caption.save": "Save",
+    "photo.caption.skip": "Save without text",
+    "photo.caption.edit": "Edit caption",
+    "photo.caption.add": "Add a caption",
+    "photo.caption.clear": "Remove caption",
+  },
+  pt: {
+    "photo.caption.title": "Legenda da foto",
+    "photo.caption.ph": "Descrição breve do avanço (opcional)",
+    "photo.caption.save": "Salvar",
+    "photo.caption.skip": "Salvar sem texto",
+    "photo.caption.edit": "Editar legenda",
+    "photo.caption.add": "Adicionar legenda",
+    "photo.caption.clear": "Remover legenda",
+  },
+  fr: {
+    "photo.caption.title": "Légende de la photo",
+    "photo.caption.ph": "Courte description de l’avancement (facultatif)",
+    "photo.caption.save": "Enregistrer",
+    "photo.caption.skip": "Enregistrer sans texte",
+    "photo.caption.edit": "Modifier la légende",
+    "photo.caption.add": "Ajouter une légende",
+    "photo.caption.clear": "Supprimer la légende",
+  },
+  it: {
+    "photo.caption.title": "Didascalia della foto",
+    "photo.caption.ph": "Breve descrizione dell’avanzamento (facoltativo)",
+    "photo.caption.save": "Salva",
+    "photo.caption.skip": "Salva senza testo",
+    "photo.caption.edit": "Modifica didascalia",
+    "photo.caption.add": "Aggiungi didascalia",
+    "photo.caption.clear": "Rimuovi didascalia",
+  },
+  de: {
+    "photo.caption.title": "Fotobeschreibung",
+    "photo.caption.ph": "Kurze Beschreibung des Baufortschritts (optional)",
+    "photo.caption.save": "Speichern",
+    "photo.caption.skip": "Ohne Text speichern",
+    "photo.caption.edit": "Beschreibung bearbeiten",
+    "photo.caption.add": "Beschreibung hinzufügen",
+    "photo.caption.clear": "Beschreibung entfernen",
+  },
+};

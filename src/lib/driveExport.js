@@ -19,6 +19,7 @@
 
 import { dataUrlToBlob } from './blobs.js';
 import { DriveError, isFolderId } from './drive.js';
+import { cleanCaption } from './photos.js';
 
 export const PROJECTS_FOLDER = 'Proyectos';
 export const GLOBAL_RENDITIONS_FOLDER = 'Rendiciones_Globales'; // CUBRAX - Respaldos Obra / Rendiciones_Globales / Rendicion_Global_<date>.xlsx
@@ -60,7 +61,7 @@ const bytesOfBlob = async (blob) => (blob && typeof blob.arrayBuffer === 'functi
  * The image files of a project, as lazy items: { name, mimeType, load() -> Uint8Array | null }. Nothing is read from the device
  * until the upload of that very file starts.
  * @param sources {
- *   cameraPhotos: () => Promise<[{slot, dataUrl, at}]>      Cámara de Obra
+ *   cameraPhotos: () => Promise<[{slot, dataUrl, at, description?}]>      Cámara de Obra (the caption travels with the file as its Drive description)
  *   notePhoto: (noteId) => Promise<{blob, at}|null>          photo of a logbook note
  *   receiptPhoto: (receiptId) => Promise<{blob, at}|null>    photo of a receipt
  * }
@@ -72,7 +73,12 @@ export async function collectDossierImages(project, { cameraPhotos = async () =>
   for (const p of ((await cameraPhotos()) || []).filter(Boolean)) {
     const blob = dataUrlToBlob(p.dataUrl);
     if (!blob) continue;
-    photos.push({ name: `${joinName('Obra', ymd(p.at), String(Number(p.slot) + 1 || photos.length + 1), msPart(p.at))}.${extOf(blob.type)}`, mimeType: blob.type, load: async () => bytesOfBlob(blob) });
+    photos.push({
+      name: `${joinName('Obra', ymd(p.at), String(Number(p.slot) + 1 || photos.length + 1), msPart(p.at))}.${extOf(blob.type)}`,
+      mimeType: blob.type,
+      description: cleanCaption(p.description), // '' = no caption (and a caption that was removed is removed in Drive too)
+      load: async () => bytesOfBlob(blob),
+    });
   }
   for (const note of project.logbook || []) {
     if (note?.photo !== true || typeof note.id !== 'string') continue;
@@ -180,11 +186,25 @@ async function syncDossierNow({ client, title, documents = async () => [], image
             continue;
           }
           const known = existing.get(fileName);
+          // only the camera photos carry a caption (a string); the logbook / receipt photos have none: what Drive says about them is left alone
+          const caption = typeof item.description === 'string' ? item.description : null;
+          // the caption of a file that is ALREADY in Drive (edited afterwards): metadata only, the picture is not sent again. A failure here never fails the photo.
+          const recaption = async () => {
+            if (!known || caption === null || (known.description || '') === caption || typeof client.setDescription !== 'function') return;
+            try {
+              await client.setDescription(known.id, caption);
+            } catch (err) {
+              if (STOP.has(err?.code) || err?.status === 404) fatal = err; // otherwise silent: the next sync tries again
+            }
+          };
           if (known && known.size === bytes.length) {
+            await recaption();
             stats.unchanged += 1;
             continue;
           }
-          await client.uploadFile(projectFolder, { name: fileName, mimeType: item.mimeType, bytes, existingId: known?.id || '' });
+          // a NEW file is born with its caption in the very same request (atomic: the context never lags behind the file)
+          await client.uploadFile(projectFolder, { name: fileName, mimeType: item.mimeType, bytes, existingId: known?.id || '', description: caption || '' });
+          if (known) await recaption();
           stats.uploaded += 1; // reached only after the upload of THIS photo succeeded
         } catch (err) {
           if (STOP.has(err?.code) || err?.status === 404) fatal = err; // no coverage / no session / rate limit: stop, do not hammer

@@ -1,9 +1,10 @@
 import { useMemo, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
-import { MAX_PHOTOS, PHOTO_SLOTS, PhotoError, compressImage, putPhoto, removePhoto, shouldUseLiveCamera, slotLabel } from '../lib/photos.js';
+import { MAX_PHOTOS, PHOTO_SLOTS, PhotoError, cleanCaption, compressImage, describePhoto, putPhoto, removePhoto, shouldUseLiveCamera, slotLabel } from '../lib/photos.js';
 import { photoStoreFor } from '../lib/photoStore.js';
 import CameraModal from './CameraModal.jsx';
-import { EditToggle } from './EditControls.jsx';
+import { EditToggle, PencilIcon } from './EditControls.jsx';
+import PhotoCaptionSheet from './PhotoCaption.jsx';
 import PhotoLightbox from './PhotoLightbox.jsx';
 
 const CameraIcon = () => (
@@ -25,6 +26,8 @@ export function PhotoEditToggle({ active, onToggle, disabled = false }) {
  * Tap-to-Snap: a grid of photo tiles. Touching an EMPTY tile opens the camera DIRECTLY (the phone's camera app, or the in-app live camera on a
  * desktop) and the photo is stored in that tile: compressed on the device, saved locally, and printed in the reports. Touching a tile that
  * already has a photo opens the immersive gallery (PhotoLightbox) on it: swipe between the captured photos only, empty tiles are skipped.
+ * PHOTO-FIRST: right after a capture the photo is already saved and a light drop-up offers an optional caption (typed or dictated; "Guardar sin texto" is a
+ * one-tap exit). Every photo shows its caption underneath with a pencil to edit it later, at leisure.
  * Deleting is hidden behind the EDIT MODE (`editMode`, driven by the header toggle of the sheet; on its own, the grid shows its toggle):
  * only then does every photo wear its red remove badge, so a thumb on a muddy site can never delete a photo by accident.
  */
@@ -40,11 +43,26 @@ export default function SnapGrid({ photos, setPhotos, projectId = '_', editMode:
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState('');
   const [live, setLive] = useState(null);
+  const [captioning, setCaptioning] = useState(null); // slot whose caption sheet is open
   const liveCamera = useMemo(() => shouldUseLiveCamera(), []);
 
   const persist = async (slot, compressed) => {
     const saved = await store.save({ ...compressed, slot });
     setPhotos((prev) => putPhoto(prev, slot, saved));
+    setCaptioning(slot); // the photo is SAFE already; the caption is an optional extra
+  };
+  // the caption: the picture is not touched, only its text (and the moment it was edited) is written. Nothing changed = nothing written (instant exit).
+  const saveCaption = async (slot, text) => {
+    setCaptioning(null);
+    const current = photos[slot];
+    if (!current || (current.description || '') === cleanCaption(text)) return;
+    const next = describePhoto(photos, slot, text)[slot];
+    try {
+      await store.save(next);
+      setPhotos((prev) => describePhoto(prev, slot, text, next.descAt));
+    } catch (err) {
+      fail(err);
+    }
   };
   const fail = (err) => setError(err instanceof PhotoError ? t(`photo.err.${err.code}`) : t('photo.err.store'));
 
@@ -93,7 +111,7 @@ export default function SnapGrid({ photos, setPhotos, projectId = '_', editMode:
   };
 
   // only the captured photos, in tile order: what the gallery pages through
-  const taken = useMemo(() => PHOTO_SLOTS.map((_, slot) => (photos[slot] ? { slot, photo: photos[slot], label: slotLabel(t, slot) } : null)).filter(Boolean), [photos, t]);
+  const taken = useMemo(() => PHOTO_SLOTS.map((_, slot) => (photos[slot] ? { slot, photo: photos[slot], label: slotLabel(t, slot), description: photos[slot].description || '' } : null)).filter(Boolean), [photos, t]);
   const viewIndex = viewing === null ? -1 : taken.findIndex((x) => x.slot === viewing);
 
   return (
@@ -116,48 +134,66 @@ export default function SnapGrid({ photos, setPhotos, projectId = '_', editMode:
           const label = slotLabel(t, slot);
           const working = busy === slot;
           return (
-            <li key={key} className="relative aspect-[4/3] overflow-hidden rounded-xl border border-white/10 bg-black sm:rounded-2xl">
-              {photo ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setViewing(slot)}
-                    data-testid={`snap-view-${slot}`}
-                    aria-label={label}
-                    aria-haspopup="dialog"
-                    className="block h-full w-full"
-                  >
-                    <img src={photo.dataUrl} alt={label} width={photo.width} height={photo.height} decoding="async" draggable="false" className="h-full w-full object-cover" />
-                  </button>
-                  {isEditMode && (
+            <li key={key} className="flex min-w-0 flex-col gap-1">
+              <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-white/10 bg-black sm:rounded-2xl">
+                {photo ? (
+                  <>
                     <button
                       type="button"
-                      aria-label={`${t('photo.delete')}: ${label}`}
-                      data-testid={`snap-remove-${slot}`}
-                      onClick={() => remove(slot)}
-                      className="absolute right-1 top-1 flex h-10 w-10 items-center justify-center rounded-full border border-red-500 bg-black/80 text-red-400"
+                      onClick={() => setViewing(slot)}
+                      data-testid={`snap-view-${slot}`}
+                      aria-label={label}
+                      aria-haspopup="dialog"
+                      className="block h-full w-full"
                     >
-                      ✕
+                      <img src={photo.dataUrl} alt={label} width={photo.width} height={photo.height} decoding="async" draggable="false" className="h-full w-full object-cover" />
                     </button>
-                  )}
-                </>
-              ) : (
+                    {isEditMode && (
+                      <button
+                        type="button"
+                        aria-label={`${t('photo.delete')}: ${label}`}
+                        data-testid={`snap-remove-${slot}`}
+                        onClick={() => remove(slot)}
+                        className="absolute right-1 top-1 flex h-10 w-10 items-center justify-center rounded-full border border-red-500 bg-black/80 text-red-400"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={working}
+                    onClick={() => snap(slot)}
+                    data-testid={`snap-${slot}`}
+                    aria-label={`${t('photo.addTo', { slot: label })}`}
+                    className="flex h-full w-full flex-col items-center justify-center gap-1.5 border border-dashed border-white/15 text-neutral-400 transition hover:border-brand hover:text-brand active:bg-white/[0.04] disabled:opacity-60"
+                  >
+                    {working ? (
+                      <span className="text-sm font-semibold">{t('photo.processing')}</span>
+                    ) : (
+                      <>
+                        <CameraIcon />
+                        <span className="line-clamp-2 px-1.5 text-center text-xs font-semibold leading-tight sm:text-xs">{label}</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+              {photo && (
                 <button
                   type="button"
-                  disabled={working}
-                  onClick={() => snap(slot)}
-                  data-testid={`snap-${slot}`}
-                  aria-label={`${t('photo.addTo', { slot: label })}`}
-                  className="flex h-full w-full flex-col items-center justify-center gap-1.5 border border-dashed border-white/15 text-neutral-400 transition hover:border-brand hover:text-brand active:bg-white/[0.04] disabled:opacity-60"
+                  onClick={() => setCaptioning(slot)}
+                  data-testid={`snap-caption-${slot}`}
+                  aria-label={`${photo.description ? t('photo.caption.edit') : t('photo.caption.add')}: ${label}`}
+                  className="flex min-h-[44px] items-start gap-1.5 rounded-lg px-0.5 py-1 text-left transition active:opacity-70"
                 >
-                  {working ? (
-                    <span className="text-sm font-semibold">{t('photo.processing')}</span>
-                  ) : (
-                    <>
-                      <CameraIcon />
-                      <span className="line-clamp-2 px-1.5 text-center text-xs font-semibold leading-tight sm:text-xs">{label}</span>
-                    </>
-                  )}
+                  <span data-testid={`snap-caption-text-${slot}`} className={`line-clamp-2 min-w-0 flex-1 break-words text-xs font-light leading-tight ${photo.description ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                    {photo.description || t('photo.caption.add')}
+                  </span>
+                  <span className="mt-px shrink-0 text-neutral-500">
+                    <PencilIcon size={14} />
+                  </span>
                 </button>
               )}
             </li>
@@ -169,6 +205,16 @@ export default function SnapGrid({ photos, setPhotos, projectId = '_', editMode:
         <p role="alert" className="mt-2 text-sm font-semibold text-red-400">
           {error}
         </p>
+      )}
+      {captioning !== null && photos[captioning] && (
+        <PhotoCaptionSheet
+          key={`${captioning}-${photos[captioning].at}`}
+          photo={photos[captioning]}
+          label={slotLabel(t, captioning)}
+          initial={photos[captioning].description || ''}
+          onSave={(text) => saveCaption(captioning, text)}
+          onClose={() => setCaptioning(null)}
+        />
       )}
       {viewIndex >= 0 && <PhotoLightbox items={taken} start={viewIndex} onClose={() => setViewing(null)} />}
       {live !== null && (

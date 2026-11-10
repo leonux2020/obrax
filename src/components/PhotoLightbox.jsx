@@ -120,6 +120,11 @@ export default function PhotoLightbox({ items, start = 0, onClose }) {
           </div>
         ))}
       </div>
+      {current.description && (
+        <p data-testid="lightbox-description" className="mx-auto max-w-lg px-5 pb-1 pt-2 text-center text-sm font-light leading-snug text-neutral-300">
+          {current.description}
+        </p>
+      )}
       {items.length > 1 && (
         <div className="pointer-events-none absolute inset-x-0 top-1/2 hidden -translate-y-1/2 justify-between px-2 sm:flex">
           <button

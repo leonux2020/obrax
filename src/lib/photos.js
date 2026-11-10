@@ -5,8 +5,13 @@
 // compression pipeline so the rules are unit-testable in Node.
 
 import { INVOICE_LIMITS } from './invoice.js';
+import { sanitizeText } from './sanitize.js';
 
 export const MAX_PHOTOS = 12;
+/** The caption of a photo is a short note ("Armadura del eje B listo para hormigonar"), not an essay. */
+export const PHOTO_CAPTION_MAX = 280;
+/** A caption cleaned for storage: no markup / control characters, one line of single spaces, trimmed, at most PHOTO_CAPTION_MAX. Anything else = ''. */
+export const cleanCaption = (raw) => (typeof raw === 'string' ? sanitizeText(raw, PHOTO_CAPTION_MAX).trim() : '');
 // the first four keep their historical names (panoramic view, existing structure, details, logistics); the other eight are numbered progress shots
 export const PHOTO_SLOTS = Object.freeze(['panoramic', 'existing', 'details', 'logistics', 'extra5', 'extra6', 'extra7', 'extra8', 'extra9', 'extra10', 'extra11', 'extra12']);
 
@@ -75,7 +80,18 @@ export function normalizePhoto(obj) {
   const height = Math.round(Number(obj.height));
   if (!(width > 0 && width <= PHOTO_LIMITS.maxSide && height > 0 && height <= PHOTO_LIMITS.maxSide)) return null;
   const at = Number(obj.at);
-  return { slot, dataUrl: obj.dataUrl, width, height, bytes: dataUrlBytes(obj.dataUrl), at: Number.isFinite(at) ? at : 0 };
+  const description = cleanCaption(obj.description); // legacy photos have none: nothing is invented, nothing is lost
+  const descAt = Number(obj.descAt); // when the caption was last edited: the newest caption wins when two devices disagree
+  return {
+    slot,
+    dataUrl: obj.dataUrl,
+    width,
+    height,
+    bytes: dataUrlBytes(obj.dataUrl),
+    at: Number.isFinite(at) ? at : 0,
+    ...(description ? { description } : {}),
+    ...(Number.isFinite(descAt) && descAt > 0 ? { descAt } : {}),
+  };
 }
 
 export const emptySlots = () => Array(MAX_PHOTOS).fill(null);
@@ -104,7 +120,7 @@ export function diffPhotos(prev, next) {
     if (a[i] && !b[i]) {
       removed.push(i);
       changed = true;
-    } else if (b[i] && (!a[i] || a[i].dataUrl !== b[i].dataUrl)) changed = true;
+    } else if (b[i] && (!a[i] || a[i].dataUrl !== b[i].dataUrl || (a[i].description || '') !== (b[i].description || ''))) changed = true; // a new caption is a change too
   }
   return { changed, removed };
 }
@@ -125,6 +141,20 @@ export function putPhoto(slots, slot, photo) {
   if (!clean) return base;
   const next = [...base];
   next[slot] = clean;
+  return next;
+}
+
+/**
+ * Set (or clear, with an empty text) the caption of the photo in `slot`. The picture itself is untouched; `descAt` records the edit so it wins a merge.
+ * An empty slot or a bad index leaves everything as it was.
+ */
+export function describePhoto(slots, slot, text, now = Date.now()) {
+  const base = normalizeSlots(slots);
+  if (!Number.isInteger(slot) || slot < 0 || slot >= MAX_PHOTOS || !base[slot]) return base;
+  const { description: _old, ...rest } = base[slot];
+  const description = cleanCaption(text);
+  const next = [...base];
+  next[slot] = { ...rest, ...(description ? { description } : {}), descAt: Number.isFinite(now) ? now : Date.now() };
   return next;
 }
 

@@ -314,8 +314,20 @@ export function mergePhotoSlots(local, remote, photoTomb = {}) {
     const r = dead(r0, slot) ? null : r0;
     if (l0 && !l) dropLocal.push(slot); // deleted on another device after this one was taken
     if (l && r) {
-      if (l.dataUrl === r.dataUrl) slots[slot] = l;
-      else {
+      if (l.dataUrl === r.dataUrl) {
+        // the same picture: only its caption can differ. The newest edit wins (equal times: the longer text, so both devices settle on the same one)
+        const ld = l.description || '';
+        const rd = r.description || '';
+        if (ld === rd) slots[slot] = l;
+        else {
+          const lt = Number(l.descAt || 0);
+          const rt = Number(r.descAt || 0);
+          const remoteWins = rt !== lt ? rt > lt : rd > ld;
+          slots[slot] = remoteWins ? r : l;
+          if (remoteWins) fromRemote.push({ ...r, slot });
+          else localAhead = true;
+        }
+      } else {
         const lt = Number(l.at || 0);
         const rt = Number(r.at || 0);
         const remoteWins = rt !== lt ? rt > lt : r.dataUrl > l.dataUrl;

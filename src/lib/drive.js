@@ -48,6 +48,9 @@ export class DriveError extends Error {
  *                        transparently; only when it gives nothing does the error 'auth' reach the caller.
  * @param onAuthRejected  called with the token Drive refused (the app forgets it)
  */
+/** A Drive description: plain text, one line, at most 1000 characters ('' when there is nothing). */
+const captionOf = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, 1000) : '');
+
 export function createDriveClient({ getToken, refreshToken = null, onAuthRejected = () => {}, fetchImpl = (...a) => fetch(...a), timeouts = DRIVE_TIMEOUTS }) {
   let folderId = null;
   let creating = null; // the folder creation in flight: two parallel saves must not create it twice
@@ -287,15 +290,15 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
     return id;
   }
 
-  /** The plain files inside a folder as Map(name -> { id, size }) (all pages: one query per hundreds of files, not one per file). */
+  /** The plain files inside a folder as Map(name -> { id, size, description }) (all pages: one query per hundreds of files, not one per file). */
   async function listFiles(parentId) {
     const out = new Map();
     let pageToken = '';
     for (let page = 0; page < 20; page += 1) {
-      const params = new URLSearchParams({ q: `'${parentId}' in parents and mimeType!='${FOLDER_MIME}' and trashed=false`, fields: 'nextPageToken,files(id,name,size)', spaces: 'drive', pageSize: '1000' });
+      const params = new URLSearchParams({ q: `'${parentId}' in parents and mimeType!='${FOLDER_MIME}' and trashed=false`, fields: 'nextPageToken,files(id,name,size,description)', spaces: 'drive', pageSize: '1000' });
       if (pageToken) params.set('pageToken', pageToken);
       const data = await json(`${API}/files?${params}`);
-      for (const f of Array.isArray(data?.files) ? data.files : []) if (ID_RE.test(String(f?.id)) && !out.has(f.name)) out.set(f.name, { id: f.id, size: Number(f.size) || 0 });
+      for (const f of Array.isArray(data?.files) ? data.files : []) if (ID_RE.test(String(f?.id)) && !out.has(f.name)) out.set(f.name, { id: f.id, size: Number(f.size) || 0, description: typeof f.description === 'string' ? f.description : '' });
       pageToken = data?.nextPageToken || '';
       if (!pageToken) break;
     }
@@ -309,9 +312,10 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
    *   2. `parents: [parentId]` travels in the metadata part of the very same multipart/related POST: one request, one place, no PATCH afterwards.
    *   3. Drive's answer is checked (`fields=id,parents`): if it ever reports the file somewhere else, it is put in its folder at once (silent healing).
    * With `existingId` the content of a file that is already in its folder is replaced (its place is not touched).
+   * `description` (a photo's caption) travels in the same metadata part as `parents`: the context is born WITH the file, in the one request.
    * @returns {Promise<{ id: string }>}
    */
-  async function uploadFile(parentId, { name, mimeType = 'application/octet-stream', bytes, existingId = '' }) {
+  async function uploadFile(parentId, { name, mimeType = 'application/octet-stream', bytes, existingId = '', description = '' }) {
     if (!isFolderId(parentId) || !bytes || typeof bytes.length !== 'number') throw new DriveError('bad_response'); // nothing is sent without a destination folder
     if (existingId) {
       if (!ID_RE.test(String(existingId))) throw new DriveError('bad_response');
@@ -320,7 +324,7 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
     }
     const boundary = `cubrax${Math.random().toString(36).slice(2)}`;
     const enc = new TextEncoder();
-    const head = enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name, parents: [parentId], mimeType })}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`);
+    const head = enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name, parents: [parentId], mimeType, ...(captionOf(description) ? { description: captionOf(description) } : {}) })}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`);
     const tail = enc.encode(`\r\n--${boundary}--`);
     const body = new Uint8Array(head.length + bytes.length + tail.length);
     body.set(head, 0);
@@ -336,6 +340,16 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
       }
     }
     return { id: res.id };
+  }
+
+  /**
+   * Change ONLY the description of a file that is already in Drive (a caption edited after the photo went up). Metadata only: the content and the
+   * place of the file are not touched. Plain text, at most 1000 characters.
+   */
+  async function setDescription(fileId, description = '') {
+    if (!ID_RE.test(String(fileId))) throw new DriveError('bad_response');
+    await json(`${API}/files/${fileId}?fields=id`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description: captionOf(description) }) });
+    return { id: fileId };
   }
 
   // ---- live Google Sheets (Sheets API v4) -----------------------------------------------------------------------------------------
@@ -533,5 +547,5 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
     childIds.clear();
   };
 
-  return { findFolder, ensureFolder, ensureChildFolder, ensureFolderPath, listFiles, uploadFile, upsertSpreadsheet, forgetFolders, serial, findBackups, findExcelFiles, listVisible, listSheets, listFolders, trashFile, moveFile, saveBackup, latestBackup, peekBackup, forgetFolder: () => { folderId = null; } };
+  return { findFolder, ensureFolder, ensureChildFolder, ensureFolderPath, listFiles, uploadFile, setDescription, upsertSpreadsheet, forgetFolders, serial, findBackups, findExcelFiles, listVisible, listSheets, listFolders, trashFile, moveFile, saveBackup, latestBackup, peekBackup, forgetFolder: () => { folderId = null; } };
 }
