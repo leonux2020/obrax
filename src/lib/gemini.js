@@ -80,6 +80,63 @@ async function retryAfterOf(res, nowMs) {
 }
 
 /**
+ * The transport shared by every kind of request (documents, prices, the Copilot chat): ONE POST per model with the fallback list, the per-attempt and total
+ * time limits, the typed failures above and the 429 reading. Resolves with Google's raw JSON answer, or throws InvoiceError. No prompt, no key lookup:
+ * `bodyFor(model)` builds the request and `key` is already the clean user's key.
+ */
+export async function geminiGenerate({ bodyFor, key, fetchImpl = globalThis.fetch, signal, attemptMs = GEMINI_LIMITS.attemptMs, now = Date.now, deadline = now() + GEMINI_LIMITS.totalMs, models = [DEFAULT_MODEL, FALLBACK_MODEL] }) {
+  let last = new InvoiceError('upstream');
+  for (const model of models) {
+    if (signal?.aborted) throw new InvoiceError('cancelled');
+    const left = deadline - now();
+    if (left <= 0) throw new InvoiceError('timeout');
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), Math.min(attemptMs, left));
+    const onAbort = () => ctl.abort();
+    signal?.addEventListener?.('abort', onAbort);
+    let res;
+    try {
+      res = await fetchImpl(`${GEMINI_BASE}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(bodyFor(model)),
+        credentials: 'omit',
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer',
+        signal: ctl.signal,
+      });
+    } catch {
+      if (signal?.aborted) throw new InvoiceError('cancelled');
+      last = new InvoiceError(ctl.signal.aborted ? 'timeout' : 'network');
+      continue;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener?.('abort', onAbort);
+    }
+    if (res.status === 429) {
+      // typed, never fatal on its own: the other model may have its own quota; whoever catches it decides (queue + backoff, see ReceiptSheet / receiptSync)
+      const wait = await retryAfterOf(res, now());
+      last = new InvoiceError('rate_limited', { retryAfterMs: Math.max(wait, last?.retryAfterMs || 0) });
+      continue;
+    }
+    if (res.status === 413) throw new InvoiceError('too_large');
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) throw new InvoiceError('bad_key'); // another model will not change that
+      if (res.status === 400) throw new InvoiceError((await upstreamCode(res)) || 'upstream');
+      last = new InvoiceError('upstream');
+      if (RETRY_STATUS.has(res.status)) continue;
+      throw last;
+    }
+    try {
+      return await res.json();
+    } catch {
+      last = new InvoiceError('upstream');
+    }
+  }
+  throw last;
+}
+
+/**
  * ONE direct request to Gemini (model fallback included). Resolves with the model's parsed JSON, or throws InvoiceError.
  *
  * @param {object} o
@@ -116,57 +173,7 @@ export async function callGemini({
   const base = { mime: image?.mime, data: image?.data, currency: typeof currency === 'string' ? currency : '', kind: receipt ? 'receipt' : 'invoice', today: localDay(now()) };
 
   const deadline = now() + totalMs;
-  const attempt = async (bodyFor) => {
-    let last = new InvoiceError('upstream');
-    for (const model of models) {
-      if (signal?.aborted) throw new InvoiceError('cancelled');
-      const left = deadline - now();
-      if (left <= 0) throw new InvoiceError('timeout');
-      const ctl = new AbortController();
-      const timer = setTimeout(() => ctl.abort(), Math.min(attemptMs, left));
-      const onAbort = () => ctl.abort();
-      signal?.addEventListener?.('abort', onAbort);
-      let res;
-      try {
-        res = await fetchImpl(`${GEMINI_BASE}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(bodyFor(model)),
-          credentials: 'omit',
-          cache: 'no-store',
-          referrerPolicy: 'no-referrer',
-          signal: ctl.signal,
-        });
-      } catch {
-        if (signal?.aborted) throw new InvoiceError('cancelled');
-        last = new InvoiceError(ctl.signal.aborted ? 'timeout' : 'network');
-        continue;
-      } finally {
-        clearTimeout(timer);
-        signal?.removeEventListener?.('abort', onAbort);
-      }
-      if (res.status === 429) {
-        // typed, never fatal on its own: the other model may have its own quota; whoever catches it decides (queue + backoff, see ReceiptSheet / receiptSync)
-        const wait = await retryAfterOf(res, now());
-        last = new InvoiceError('rate_limited', { retryAfterMs: Math.max(wait, last?.retryAfterMs || 0) });
-        continue;
-      }
-      if (res.status === 413) throw new InvoiceError('too_large');
-      if (!res.ok) {
-        if (res.status === 401 || res.status === 403) throw new InvoiceError('bad_key'); // another model will not change that
-        if (res.status === 400) throw new InvoiceError((await upstreamCode(res)) || 'upstream');
-        last = new InvoiceError('upstream');
-        if (RETRY_STATUS.has(res.status)) continue;
-        throw last;
-      }
-      try {
-        return await res.json();
-      } catch {
-        last = new InvoiceError('upstream');
-      }
-    }
-    throw last;
-  };
+  const attempt = (bodyFor) => geminiGenerate({ bodyFor, key, fetchImpl, signal, attemptMs, deadline, models, now });
 
   const bodyFor = (grounded) => (model) => (prices ? buildPricesRequest({ regionCode: region.code, model, grounded, skip }) : buildGeminiRequest({ ...base, model }));
   const parsedOf = (payload) => (payload && !payload.promptFeedback?.blockReason ? parseModelJson(payload) : null);

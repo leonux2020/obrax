@@ -23,12 +23,12 @@ function DateField({ label, value, onChange, invalid }) {
       <label htmlFor={id} className="label tabular-nums">
         {label}
       </label>
-      <DateInput id={id} value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={invalid || undefined} />
+      <DateInput underline id={id} value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={invalid || undefined} />
     </div>
   );
 }
 
-const SectionTitle = ({ children }) => <h3 className="pt-2 text-xs font-semibold uppercase text-neutral-400">{children}</h3>;
+const SectionTitle = ({ children }) => <h3 className="pt-4 text-xs font-light uppercase text-neutral-400">{children}</h3>;
 
 /** Target / GPS crosshair of the city field: it pulses while the place is being looked up. */
 const TargetIcon = ({ busy }) => (
@@ -170,16 +170,16 @@ export default function ProjectSheet({ project, draftMode = false, onSave, onDel
 
   return (
     <BottomSheet fullscreen={editing} title={t(editing ? 'proj.edit.title' : 'proj.new.title')} onClose={onClose}>
-      <form onSubmit={submit} className={`mt-3 space-y-4 ${editing ? 'mx-auto max-w-lg pb-6' : ''}`} data-testid={editing ? 'edit-form' : 'new-form'}>
+      <form onSubmit={submit} className={`mt-4 space-y-8 ${editing ? 'mx-auto max-w-lg pb-8' : ''}`} data-testid={editing ? 'edit-form' : 'new-form'}>
         {editing && <SectionTitle>{t('edit.sectionBasics')}</SectionTitle>}
-        <TextField label={t('project.name')} placeholder={t('project.namePh')} value={form.name} sanitize={(v) => sanitizeText(v, 60)} onChange={set('name')} />
-        <TextField label={t('project.client')} placeholder={t('project.clientPh')} value={form.client} sanitize={(v) => sanitizeText(v, 60)} onChange={set('client')} />
+        <TextField underline label={t('project.name')} placeholder={t('project.namePh')} value={form.name} sanitize={(v) => sanitizeText(v, 60)} onChange={set('name')} />
+        <TextField underline label={t('project.client')} placeholder={t('project.clientPh')} value={form.client} sanitize={(v) => sanitizeText(v, 60)} onChange={set('client')} />
 
         {/* 1. the budget model comes FIRST: how the job is sold decides everything below (turnkey = one global value, detailed = partida by partida) */}
         {(!editing || draftMode) && (
           <div data-testid="budget-model-block">
             <p className="label">{t('newp.budget')}</p>
-            <div role="radiogroup" aria-label={t('newp.budget')} className="grid grid-cols-2 gap-3" data-testid="budget-model">
+            <div role="radiogroup" aria-label={t('newp.budget')} className="grid grid-cols-2 gap-4" data-testid="budget-model">
               {BUDGET_MODELS.map((m) => {
                 const on = form.budgetModel === m;
                 return (
@@ -211,7 +211,7 @@ export default function ProjectSheet({ project, draftMode = false, onSave, onDel
         {(editing || form.budgetModel) && (
           <div data-testid="work-type-block">
             {editing ? <SectionTitle>{t('newp.worktype')}</SectionTitle> : <p className="label">{t('newp.worktype')}</p>}
-            <div role="radiogroup" aria-label={t('newp.worktype')} className="mt-2 grid grid-cols-2 gap-2" data-testid="work-type">
+            <div role="radiogroup" aria-label={t('newp.worktype')} className="mt-2 grid grid-cols-2 gap-3" data-testid="work-type">
               {WORK_TYPES.map((w, i) => {
                 const on = form.workType === w;
                 return (
@@ -239,7 +239,7 @@ export default function ProjectSheet({ project, draftMode = false, onSave, onDel
             {[project.startDate, project.endDate].filter(Boolean).join(' → ')} · {t('proj.datesDerived')}
           </p>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-4">
             <DateField label={t('proj.start')} value={form.startDate} onChange={set('startDate')} />
             <DateField label={t('proj.end')} value={form.endDate} onChange={set('endDate')} invalid={badRange} />
           </div>
@@ -257,7 +257,7 @@ export default function ProjectSheet({ project, draftMode = false, onSave, onDel
               {t('newp.market')}: {REGIONS[form.regionCode]?.flag} {REGIONS[form.regionCode]?.currency} · {t('ws.locked')}
             </p>
           ) : (
-            <RegionCombobox label={t('newp.market')} value={form.regionCode} onChange={set('regionCode')} />
+            <RegionCombobox underline label={t('newp.market')} value={form.regionCode} onChange={set('regionCode')} />
           )}
           {!marketLocked && REGIONS[form.regionCode] && (
             <p className="mt-1.5 text-sm text-neutral-300" data-testid="project-market-hint">
@@ -279,6 +279,7 @@ export default function ProjectSheet({ project, draftMode = false, onSave, onDel
         <div>
           {editing && <SectionTitle>{t('loc.title')}</SectionTitle>}
           <TextField
+            underline
             label={t('project.city')}
             placeholder={t('project.city.ph')}
             value={form.cityOrRegion}

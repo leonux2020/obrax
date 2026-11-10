@@ -36,8 +36,9 @@ const navClass = (on) =>
  * @param locked  a new project (draft) is being written: the menu waits, the draft has its own save / discard bar
  * @param viewKey changes with the screen shown: the work panel returns to its top
  * @param banner  the app's status banners (offline / update), drawn on top of the work panel
+ * @param copilotReply  the agent behind the Copilot (see lib/copilot.js); without one the panel answers with the "Analizando..." echo
  */
-export default function DesktopLayout({ projects = [], openId = null, tab = 'projects', viewKey = '', locked = false, banner = null, onProjects, onAccounting, onSettings, onOpenProject, onNew, children }) {
+export default function DesktopLayout({ projects = [], openId = null, tab = 'projects', viewKey = '', locked = false, banner = null, copilotReply = undefined, onProjects, onAccounting, onSettings, onOpenProject, onNew, children }) {
   const { t } = useI18n();
   const [copilotOpen, setCopilotOpen] = useState(true);
   const scroller = useRef(null);
@@ -156,7 +157,7 @@ export default function DesktopLayout({ projects = [], openId = null, tab = 'pro
           </button>
         </div>
         {/* always mounted: folding the panel keeps the conversation */}
-        <AgentChat className={copilotOpen ? 'flex-1' : 'hidden'} />
+        <AgentChat reply={copilotReply} className={copilotOpen ? 'flex-1' : 'hidden'} />
       </aside>
     </div>
   );

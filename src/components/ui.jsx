@@ -232,7 +232,7 @@ export function openDatePicker(input) {
  * Every <input type="date"> of the app: the browser's small calendar icon is hidden by CSS (see .date-input in
  * index.css) and the WHOLE field opens the calendar on tap / click.
  */
-export function DateInput({ className = '', onClick, ...props }) {
+export function DateInput({ className = '', underline = false, onClick, ...props }) {
   return (
     <input
       type="date"
@@ -241,7 +241,7 @@ export function DateInput({ className = '', onClick, ...props }) {
         openDatePicker(e.currentTarget);
         onClick?.(e);
       }}
-      className={`field-input date-input cursor-pointer [color-scheme:dark] ${className}`}
+      className={`${underline ? UNDERLINE_INPUT : 'field-input'} date-input cursor-pointer [color-scheme:dark] ${className}`}
     />
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { REGIONS, CONTINENTS, regionName, searchRegions } from '../lib/regions.js';
+import { UNDERLINE_INPUT } from './ui.jsx';
 
 const pct = (rate) => `${Math.round(rate * 1000) / 10}%`;
 
@@ -8,7 +9,7 @@ const pct = (rate) => `${Math.round(rate * 1000) / 10}%`;
  * Compact, searchable country combobox (WAI-ARIA 1.2 pattern). One line when closed; the list opens
  * as an overlay, so it takes no vertical space. Filters by country (es/en), ISO code, currency or chain.
  */
-export default function RegionCombobox({ value, onChange, hideLabel = false, label }) {
+export default function RegionCombobox({ value, onChange, hideLabel = false, label, underline = false }) {
   const { t, lang } = useI18n();
   const id = useId();
   const listId = `${id}-list`;
@@ -107,9 +108,9 @@ export default function RegionCombobox({ value, onChange, hideLabel = false, lab
             setQuery(e.target.value.slice(0, 40));
           }}
           onKeyDown={onKeyDown}
-          className="field-input pr-12"
+          className={`${underline ? UNDERLINE_INPUT : 'field-input'} pr-12`}
         />
-        <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-neutral-400">
+        <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 flex items-center text-neutral-400 ${underline ? 'right-1' : 'right-4'}`}>
           ▾
         </span>
       </div>

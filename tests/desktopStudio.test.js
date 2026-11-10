@@ -2,7 +2,7 @@
 // CUBRAX Studio, phase 2 step 1: responsive switch (phone <1024 / desktop >=1024), three-column layout, Copilot mock chat, OLED markup.
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import App from '../src/App.jsx';
 import DesktopLayout from '../src/components/DesktopLayout.jsx';
@@ -15,6 +15,7 @@ import { projectStore } from '../src/lib/projectStore.js';
 import { DICT } from '../src/lib/dict.js';
 import { q, flush, click, createHost, createProjectViaDraft } from './helpers/appHarness.js';
 import { setViewport, PHONE, DESKTOP } from './helpers/viewport.js';
+import { geminiFetch, geminiReply, seedKey, TEST_KEY } from './helpers/gemini.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const h = React.createElement;
@@ -114,6 +115,40 @@ describe('AgentChat', () => {
     await draw(h(AgentChat, { reply: async () => null }));
     await send('otra');
     expect(scoped('agent-thinking')).toBeNull();
+  });
+
+  it('each failure of the agent has its own quiet sentence, is flagged and does NOT travel as part of the conversation', async () => {
+    const seen = [];
+    let n = 0;
+    const codes = ['no_key', 'bad_key', 'rate_limited', 'timeout'];
+    const reply = async (text, { history, signal }) => {
+      seen.push({ text, history, aborted: signal?.aborted });
+      if (n < codes.length) throw Object.assign(new Error('x'), { code: codes[n++] });
+      return 'respuesta real';
+    };
+    await draw(h(AgentChat, { reply }));
+    for (const text of ['uno', 'dos', 'tres', 'cuatro']) await send(text);
+    const agents = [...host.querySelectorAll('[data-role="agent"]')].map((el) => el.textContent);
+    expect(agents).toEqual(['no_key', 'bad_key', 'rate_limited', 'network'].map((k) => DICT.es[`studio.chat.err.${k}`]));
+    await send('cinco');
+    expect([...host.querySelectorAll('[data-role="agent"]')].pop().textContent).toBe('respuesta real');
+    // the apologies are in the panel, but the next question carries only real turns (here: the 4 user questions, no agent answers)
+    const last = seen.at(-1);
+    expect(last.history.filter((m) => m.error)).toHaveLength(0);
+    expect(last.history.every((m) => m.role === 'user')).toBe(true);
+    expect(seen.every((s) => s.aborted === false)).toBe(true);
+  });
+
+  it('closing the panel cancels the question in flight and nothing is painted afterwards', async () => {
+    let signal;
+    let release;
+    await draw(h(AgentChat, { reply: (text, ctx) => { signal = ctx.signal; return new Promise((r) => { release = r; }); } }));
+    await send('hola');
+    expect(signal.aborted).toBe(false);
+    await act(async () => root.unmount());
+    expect(signal.aborted).toBe(true);
+    release('tarde');
+    root = createRoot(host); // (afterEach unmounts it)
   });
 
   it('long input is bounded and HTML is only text', async () => {
@@ -250,6 +285,7 @@ describe('App: phone interface under 1024 px, CUBRAX Studio from 1024 px, live',
   });
   afterEach(async () => {
     h?.unmount();
+    vi.unstubAllGlobals();
     localStorage.clear();
     await setViewport(PHONE);
   });
@@ -303,12 +339,38 @@ describe('App: phone interface under 1024 px, CUBRAX Studio from 1024 px, live',
     expect(q('side-new').disabled).toBe(true);
   });
 
-  it('the copilot works inside the app: question in, "Analizando..." out', async () => {
-    await setViewport(DESKTOP);
-    await setNative(q('agent-input'), 'plazos');
+  const ask = async (question) => {
+    await setNative(q('agent-input'), question);
     await act(async () => q('agent-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
     await flush(700);
-    expect([...document.querySelectorAll('[data-role="agent"]')].pop().textContent).toBe('Analizando... plazos');
+    return [...document.querySelectorAll('[data-role="agent"]')].pop()?.textContent;
+  };
+
+  it('the copilot inside the app, without a Gemini key: a quiet sentence that points to Settings, and nothing leaves the device', async () => {
+    const seen = [];
+    vi.stubGlobal('fetch', geminiFetch((url, init) => (seen.push(init), geminiReply('x'))));
+    await setViewport(DESKTOP);
+    expect(await ask('plazos')).toBe(DICT.es['studio.chat.err.no_key']);
+    expect(seen).toHaveLength(0);
+  });
+
+  it('the copilot inside the app: Gemini with the user key + the data of the open project as hidden system context', async () => {
+    const calls = [];
+    vi.stubGlobal('fetch', geminiFetch((url, init) => (calls.push({ url: String(url), headers: init.headers, body: JSON.parse(init.body) }), geminiReply('El saldo es 1.000.'))));
+    seedKey();
+    await setViewport(DESKTOP);
+    expect(await createProjectViaDraft('Casa Norte')).toBe(true);
+    expect(q('project-workspace')).not.toBeNull();
+    expect(await ask('¿Cuánto me queda?')).toBe('El saldo es 1.000.');
+    expect(calls).toHaveLength(1);
+    const { body } = calls[0];
+    const system = body.systemInstruction.parts.map((p) => p.text).join('\n');
+    expect(system).toContain('Eres el analista financiero y técnico de CUBRAX. Tu trabajo es responder de forma concisa, profesional y analítica.');
+    expect(system).toContain('Casa Norte'); // the open project is injected as context
+    expect(body.contents.at(-1)).toEqual({ role: 'user', parts: [{ text: '¿Cuánto me queda?' }] });
+    expect(JSON.stringify(body)).not.toContain(TEST_KEY); // the key never travels inside the conversation
+    expect(calls[0].url).toContain('generativelanguage.googleapis.com'); // straight to Google, with the user's own key
+    expect(document.body.textContent).not.toContain(TEST_KEY); // the key is never painted
   });
 });
 
@@ -352,8 +414,8 @@ describe('Zero-Stress markup and languages', () => {
     }
     expect(read('components/DesktopLayout.jsx')).toContain('active:scale-95 active:opacity-70');
   });
-  it('the copilot has no network or key: nothing in the chat or copilot modules can leave the device yet', () => {
-    for (const f of ['components/AgentChat.jsx', 'lib/copilot.js']) expect(read(f), f).not.toMatch(/fetch\(|XMLHttpRequest|AIza|generativelanguage|apiKey/i);
+  it('the chat and copilot modules own no key, no URL and no raw request: the only way out is the shared Gemini transport with the user key', () => {
+    for (const f of ['components/AgentChat.jsx', 'lib/copilot.js', 'lib/copilotContext.js']) expect(read(f), f).not.toMatch(/fetch\(|XMLHttpRequest|AIza|generativelanguage|apiKey/i);
   });
   it('studio.* texts exist in the 6 languages with the same keys', () => {
     const keys = Object.keys(DICT.es).filter((k) => k.startsWith('studio.'));

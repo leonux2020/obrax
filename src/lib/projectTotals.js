@@ -20,9 +20,14 @@ const liveBookOf = (project) => {
   return applyNearby(currentBook(code), code, currentSuppliers(code), project.location); // the supplier prices within 50 km of the job
 };
 
+/** The light quote result of a project (the same rules as its total): `{ valid, partidas, quote, machinery, prices... }`. */
+export function projectQuote(project, now = Date.now()) {
+  return computeAll(project.draft, pricingTime(project.draft, now), { timeline: planningTimeline(project.draft, project), book: liveBookOf(project), chains: false });
+}
+
 /** Total with tax, or null while the project has no valid measures yet. */
 export function projectTotal(project, now = Date.now()) {
-  const r = computeAll(project.draft, pricingTime(project.draft, now), { timeline: planningTimeline(project.draft, project), book: liveBookOf(project), chains: false });
+  const r = projectQuote(project, now);
   return r.valid ? r.quote.total : null;
 }
 

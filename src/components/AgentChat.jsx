@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
-import { COPILOT_LIMITS, cleanReply, createEchoCopilot } from '../lib/copilot.js';
+import { COPILOT_LIMITS, cleanReply, copilotErrorKey, createEchoCopilot } from '../lib/copilot.js';
 import { sanitizeText } from '../lib/sanitize.js';
 
 const ECHO = createEchoCopilot();
@@ -14,8 +14,9 @@ const SendIcon = () => (
 
 /**
  * The Copilot chat: a quiet message history (yours on the right, the agent's on the left, rounded bubbles) and one input at the bottom.
- * `reply(text, { t, lang, history })` is the whole connection to the agent (see lib/copilot.js): for now it is the "Analizando..." echo, so the
- * state flow (send -> typing dots -> answer, one question at a time) is already the final one.
+ * `reply(text, { t, lang, history, signal })` is the whole connection to the agent (see lib/copilot.js): the app hands it the Gemini agent (BYOK + the local data
+ * of the job); without one the panel falls back to the "Analizando..." echo. A failure of the agent (no key, quota, no network...) is a quiet sentence of the
+ * panel, never an error screen, and it is not part of the conversation that travels with the next question.
  */
 export default function AgentChat({ reply = ECHO, className = '' }) {
   const { t, lang } = useI18n();
@@ -24,6 +25,7 @@ export default function AgentChat({ reply = ECHO, className = '' }) {
   const [thinking, setThinking] = useState(false);
   const seq = useRef(0);
   const alive = useRef(true);
+  const pending = useRef(null); // the AbortController of the question in flight
   const end = useRef(null);
   const text = sanitizeText(draft, COPILOT_LIMITS.inputChars).trim();
 
@@ -31,13 +33,14 @@ export default function AgentChat({ reply = ECHO, className = '' }) {
     alive.current = true; // (re-armed on purpose: React's strict mode runs the cleanup once before the real mount)
     return () => {
       alive.current = false;
+      pending.current?.abort(); // closing the panel / the page cancels the request in flight
     };
   }, []);
   useEffect(() => {
     end.current?.scrollIntoView?.({ block: 'end' }); // the newest message is always in sight
   }, [messages, thinking]);
 
-  const push = (role, body) => setMessages((list) => [...list, { id: (seq.current += 1), role, text: body }].slice(-COPILOT_LIMITS.historyMessages));
+  const push = (role, body, error = false) => setMessages((list) => [...list, { id: (seq.current += 1), role, text: body, ...(error ? { error: true } : {}) }].slice(-COPILOT_LIMITS.historyMessages));
 
   const send = async (event) => {
     event?.preventDefault();
@@ -45,14 +48,19 @@ export default function AgentChat({ reply = ECHO, className = '' }) {
     push('user', text);
     setDraft('');
     setThinking(true);
-    let answer;
+    const ctl = new AbortController();
+    pending.current = ctl;
+    let answer = '';
+    let failure = null;
     try {
-      answer = cleanReply(await reply(text, { t, lang, history: messages }));
-    } catch {
-      answer = ''; // a failing agent never breaks the panel: it says so, quietly
+      answer = cleanReply(await reply(text, { t, lang, history: messages.filter((m) => !m.error), signal: ctl.signal }));
+    } catch (err) {
+      failure = err; // a failing agent never breaks the panel: it says so, quietly
     }
+    pending.current = null;
     if (!alive.current) return;
-    push('agent', answer || t('studio.chat.error'));
+    if (answer) push('agent', answer);
+    else push('agent', t(copilotErrorKey(failure)), true);
     setThinking(false);
   };
 

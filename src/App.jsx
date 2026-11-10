@@ -70,6 +70,8 @@ import Dashboard from './components/Dashboard.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import DesktopLayout from './components/DesktopLayout.jsx';
 import { useIsDesktop } from './lib/useIsDesktop.js';
+import { createGeminiCopilot } from './lib/copilot.js';
+import { buildCopilotContext } from './lib/copilotContext.js';
 import ProjectSheet from './components/ProjectSheet.jsx';
 import SettingsView from './components/SettingsView.jsx';
 import { clearOAuthResult, clearSignInResult, connectDrive, peekOAuthResult, peekSignInResult } from './lib/oauthCallback.js';
@@ -1142,6 +1144,11 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   );
   const editing = sheet?.type === 'edit' ? projects?.find((p) => p.id === sheet.id) : null;
   const navActive = tab;
+  // The Copilot of CUBRAX Studio: Gemini with the user's own key + the local data of what is on screen. The data is read at the moment of every question from this
+  // ref (the projects the app holds = what it loaded from / saves to IndexedDB, plus the edits not yet written), so the agent never answers from a stale copy.
+  const copilotScope = useRef(null);
+  copilotScope.current = { projects, active, draft: draftProject, view: active ? (fromAccounting ? 'audit' : 'project') : draftProject ? 'draft' : tab };
+  const copilotReply = useMemo(() => createGeminiCopilot({ getContext: () => buildCopilotContext(copilotScope.current ?? {}) }), []);
   // The screen of the work area. On a phone it is the whole screen with the bottom navigation under it; on a desktop (>= 1024 px) the same screen is the CENTRE
   // column of CUBRAX Studio (DesktopLayout), beside the projects menu and the copilot.
   const body = projects === null ? (
@@ -1265,6 +1272,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
           {desktop ? (
             <DesktopLayout
               banner={<Header pwa={pwa} />}
+              copilotReply={copilotReply}
               projects={projects ?? []}
               openId={active?.id ?? null}
               tab={tab}
