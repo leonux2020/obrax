@@ -175,6 +175,9 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
       }, timeouts.transfer);
       return { id: res?.id ?? existing.id, folderId: folder, modifiedTime: typeof res?.modifiedTime === 'string' ? res.modifiedTime : '' };
     }
+    // ATOMIC: the file is born INSIDE the CUBRAX folder (`parents` in the metadata of this very POST). Never created in the root to be moved later: a
+    // death between the two steps would leave an orphan in "Mi unidad".
+    if (!ID_RE.test(String(folder))) throw new DriveError('bad_response');
     const boundary = `cubrax${Math.random().toString(36).slice(2)}`;
     const meta = JSON.stringify({ name: BACKUP_FILE, parents: [folder], mimeType: 'application/json' });
     const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${text}\r\n--${boundary}--`;
@@ -186,14 +189,25 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
     return { id: res?.id, folderId: folder, modifiedTime: typeof res?.modifiedTime === 'string' ? res.modifiedTime : '' };
   }
 
+  // One mutation of the backup file at a time per client: the save of the backup and the silent tidy-up (driveSanitizer.js) never interleave, so the
+  // concierge can never trash the very file that is being written. A failed task never blocks the next one.
+  let tail = Promise.resolve();
+  const serial = (task) => {
+    const run = tail.then(task, task);
+    tail = run.catch(() => {});
+    return run;
+  };
+
   async function saveBackup(text) {
-    try {
-      return await saveOnce(text);
-    } catch (err) {
-      if (err?.status !== 404) throw err; // the cached folder / file was deleted from Drive: look it up again once
-      folderId = null;
-      return saveOnce(text);
-    }
+    return serial(async () => {
+      try {
+        return await saveOnce(text);
+      } catch (err) {
+        if (err?.status !== 404) throw err; // the cached folder / file was deleted from Drive: look it up again once
+        folderId = null;
+        return saveOnce(text);
+      }
+    });
   }
 
   /**
@@ -437,11 +451,52 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
     }
   }
 
+  // ---- primitives of the silent tidy-up (driveSanitizer.js) ---------------------------------------------------------------------------
+  // With the drive.file scope Drive only ever shows the files THIS app created, and `'me' in owners` keeps even those to the user's own: the concierge
+  // can never touch anything else of the Drive.
+  const FILE_FIELDS = 'nextPageToken,files(id,name,mimeType,modifiedTime,size,parents)';
+  const asFile = (f) => ({ id: f.id, name: String(f.name ?? ''), modifiedTime: typeof f.modifiedTime === 'string' ? f.modifiedTime : '', size: Number(f.size) || 0, parents: Array.isArray(f.parents) ? f.parents.filter((x) => typeof x === 'string') : [] });
+  /** Every page (bounded) of a files query, newest first: [{ id, name, modifiedTime, size, parents }]. */
+  async function listAll(q) {
+    const out = [];
+    let pageToken = '';
+    for (let page = 0; page < 5; page += 1) {
+      const params = new URLSearchParams({ q, fields: FILE_FIELDS, spaces: 'drive', orderBy: 'modifiedTime desc', pageSize: '100' });
+      if (pageToken) params.set('pageToken', pageToken);
+      const data = await json(`${API}/files?${params}`);
+      for (const f of Array.isArray(data?.files) ? data.files : []) if (ID_RE.test(String(f?.id))) out.push(asFile(f));
+      pageToken = data?.nextPageToken || '';
+      if (!pageToken) break;
+    }
+    return out;
+  }
+  /** Every cubrax-backup.json of the user's Drive, wherever it is (root, the CUBRAX folder, the legacy folder), not in the trash. */
+  const findBackups = () => listAll(`name='${BACKUP_FILE}' and mimeType!='${FOLDER_MIME}' and trashed=false and 'me' in owners`);
+  /** The Spreadsheets directly inside `parentId` ('root' = My Drive), not in the trash. */
+  const listSheets = (parentId) => {
+    if (!okParent(parentId)) throw new DriveError('bad_response');
+    return listAll(`mimeType='${SHEET_MIME}' and '${parentId}' in parents and trashed=false and 'me' in owners`);
+  };
+  /** The folders directly inside `parentId`: [{ id, name }]. */
+  const listFolders = async (parentId) => {
+    if (!okParent(parentId)) throw new DriveError('bad_response');
+    return (await listAll(`mimeType='${FOLDER_MIME}' and '${parentId}' in parents and trashed=false and 'me' in owners`)).map((f) => ({ id: f.id, name: f.name }));
+  };
+  /** To the trash (recoverable for 30 days), never a permanent delete. */
+  async function trashFile(id) {
+    if (!ID_RE.test(String(id))) throw new DriveError('bad_response');
+    await json(`${API}/files/${id}?fields=id`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) });
+  }
+  const moveFile = (id, parentId) => {
+    if (!ID_RE.test(String(id)) || !okParent(parentId)) throw new DriveError('bad_response');
+    return moveInto(id, parentId);
+  };
+
   /** A cached folder was deleted from Drive (404): forget every cached id so the next try looks them up again. */
   const forgetFolders = () => {
     folderId = null;
     childIds.clear();
   };
 
-  return { findFolder, ensureFolder, ensureChildFolder, ensureFolderPath, listFiles, uploadFile, upsertSpreadsheet, forgetFolders, saveBackup, latestBackup, peekBackup, forgetFolder: () => { folderId = null; } };
+  return { findFolder, ensureFolder, ensureChildFolder, ensureFolderPath, listFiles, uploadFile, upsertSpreadsheet, forgetFolders, serial, findBackups, listSheets, listFolders, trashFile, moveFile, saveBackup, latestBackup, peekBackup, forgetFolder: () => { folderId = null; } };
 }

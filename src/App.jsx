@@ -35,6 +35,7 @@ import { ensureDriveToken, googleConfigured, GOOGLE_CONFIG_STATUS, localUser } f
 import { clearDriveToken, getDriveToken, isDriveLinked, needsDriveInteraction, subscribeDriveAuth, unlinkDriveAccount } from './lib/driveToken.js';
 import { createDriveClient } from './lib/drive.js';
 import { createDriveSync, getSeenRemote, setSeenRemote } from './lib/driveSync.js';
+import { scheduleSanitize } from './lib/driveSanitizer.js';
 import { mergeProjectLists, nextStamp, stampProject, stampProjects } from './lib/merge.js';
 import { markDeleted, mergeTomb } from './lib/tombstones.js';
 import { collectBackup, hasNoProjects, parseBackup, restoreBackup } from './lib/backup.js';
@@ -239,6 +240,18 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   );
   const [backup, setBackup] = useState(() => sync.getState());
   useEffect(() => sync.subscribe(setBackup), [sync]);
+  // The silent concierge of the Drive: after the first good sync of the session, in an idle moment and at most every 12 h, it moves what is lying in the
+  // root of "Mi unidad" into its folder and sends the duplicated backups / Sheets to the trash (driveSanitizer.js). No UI, never throws.
+  const tidyAsked = useRef(false);
+  useEffect(
+    () =>
+      sync.subscribe((st) => {
+        if (st.status !== 'synced' || tidyAsked.current) return;
+        tidyAsked.current = true;
+        scheduleSanitize(driveClient, { projectNames: () => (latest.current.projects || []).map((p) => projectTitle(p)) });
+      }),
+    [sync, driveClient]
+  );
   // "This device is connected to Google Drive": a consent was given here before (or a copy has gone up)
   const [linkedNow, setLinkedNow] = useState(false);
   const offerRef = useRef(null); // offerRestore (defined with the restore code below)

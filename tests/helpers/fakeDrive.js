@@ -131,10 +131,11 @@ export function createFakeDrive({ token: initialToken = 'tok-valid-123456' } = {
       const isFolder = !notFolder && q.includes('google-apps.folder');
       const onlySheets = q.includes(`mimeType='${SHEET_MIME}'`);
       const out = [...files.values()]
+        .filter((f) => !f.trashed) // every query of the app says trashed=false
         .filter((f) => !onlySheets || f.mimeType === SHEET_MIME)
         .filter((f) => (!name || f.name === name) && (!parent || f.parents.includes(parent)) && (isFolder ? f.mimeType.includes('folder') : !f.mimeType.includes('folder')))
         .sort((a, b) => b.modifiedTime - a.modifiedTime)
-        .map(({ id: fid, name: nm, modifiedTime, body }) => ({ id: fid, name: nm, size: String(String(body ?? '').length), modifiedTime: new Date(modifiedTime).toISOString() }));
+        .map(({ id: fid, name: nm, modifiedTime, body, parents }) => ({ id: fid, name: nm, size: String(String(body ?? '').length), modifiedTime: new Date(modifiedTime).toISOString(), parents: [...parents] }));
       return res({ files: out });
     }
     if (method === 'POST' && u.pathname === '/drive/v3/files') {
@@ -168,6 +169,16 @@ export function createFakeDrive({ token: initialToken = 'tok-valid-123456' } = {
     if (method === 'PATCH' && !mediaUpload && u.pathname.startsWith('/drive/v3/files/')) {
       const f = files.get(id);
       if (!f) return res({ error: 'not found' }, 404);
+      let patch = {};
+      try {
+        patch = init.body ? JSON.parse(init.body) : {};
+      } catch {
+        patch = {};
+      }
+      if (patch.trashed === true) {
+        f.trashed = true; // to the trash: recoverable, still in `files`
+        return res({ id: f.id });
+      }
       const add = (u.searchParams.get('addParents') || '').split(',').filter(Boolean);
       const drop = (u.searchParams.get('removeParents') || '').split(',').filter(Boolean);
       if (!add.every((pid) => files.has(pid) || pid === 'root')) return res({ error: 'parent not found' }, 404);
@@ -197,8 +208,17 @@ export function createFakeDrive({ token: initialToken = 'tok-valid-123456' } = {
       const f = [...files.values()].find((x) => x.mimeType === SHEET_MIME && x.name === title);
       return f ? { id: f.id, title: f.name, parents: f.parents, tabs: Object.fromEntries(grids.get(f.id).map((t) => [t.title, t.rows.map((r) => r || [])])), grids: grids.get(f.id) } : null;
     },
-    spreadsheets: () => [...files.values()].filter((f) => f.mimeType === SHEET_MIME),
-    backupFiles: () => [...files.values()].filter((f) => !f.mimeType.includes('folder')),
+    /** Seed a file as an older version / a crash would have left it: { name, mimeType, parents, body, modifiedTime(ms) } -> the stored file. */
+    seed: (f) => {
+      n += 1;
+      const rec = { id: f.id || `seed${n}xxxxxxx`, name: f.name, mimeType: f.mimeType || 'application/json', parents: f.parents || ['root'], body: f.body ?? '', modifiedTime: f.modifiedTime ?? (clock += 1) };
+      files.set(rec.id, rec);
+      if (rec.mimeType === SHEET_MIME) grids.set(rec.id, [{ sheetId: 1, title: 'Sheet1', rowCount: 100, columnCount: 10, rows: [] }]);
+      return rec;
+    },
+    spreadsheets: () => [...files.values()].filter((f) => f.mimeType === SHEET_MIME && !f.trashed),
+    backupFiles: () => [...files.values()].filter((f) => !f.mimeType.includes('folder') && !f.trashed),
+    trashed: () => [...files.values()].filter((f) => f.trashed),
     folders: () => [...files.values()].filter((f) => f.mimeType.includes('folder')),
   };
 }
