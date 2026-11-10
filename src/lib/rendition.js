@@ -131,11 +131,15 @@ export function buildRenditionSheets(projects, totals, { t, locale = 'es', curre
     for (const x of p.logbook) logbook.push(withProject([when(x.at, locale), x.text], p));
   }
 
+  // 0-based columns that hold AMOUNTS (the visual design of the live Sheet gives them the currency format, sheetFormat.js). In a consolidated
+  // rendición every tab starts with the project column, which shifts everything one place to the right.
+  const at = (...cols) => cols.map((c) => (single ? c : c + 1));
+  const cur = currency || '';
   return [
-    { name: t('xl.sheet.summary'), rows: summary, widths: single ? [34, 28, 14] : [28, 22, 10, 16, 16, 16, 16, 16, 16] },
-    { name: t('xl.sheet.expenses'), rows: expenses, widths: widthsWith([14, 16, 14, 24, 18, 36, 20, 10, 14, 14, 14, 14, 9, 16, 14, 10]) },
-    { name: t('xl.sheet.payments'), rows: payments, widths: widthsWith([14, 36, 14]) },
-    { name: t('xl.sheet.advances'), rows: advances, widths: widthsWith([14, 26, 14]) },
+    { name: t('xl.sheet.summary'), rows: summary, widths: single ? [34, 28, 14] : [28, 22, 10, 16, 16, 16, 16, 16, 16], moneyCols: single ? [1] : [3, 4, 5, 6, 7, 8], currency: cur },
+    { name: t('xl.sheet.expenses'), rows: expenses, widths: widthsWith([14, 16, 14, 24, 18, 36, 20, 10, 14, 14, 14, 14, 9, 16, 14, 10]), moneyCols: at(8, 9, 10, 11), currency: cur }, // unit price, net, tax, total paid
+    { name: t('xl.sheet.payments'), rows: payments, widths: widthsWith([14, 36, 14]), moneyCols: at(2), currency: cur },
+    { name: t('xl.sheet.advances'), rows: advances, widths: widthsWith([14, 26, 14]), moneyCols: at(2), currency: cur },
     { name: t('xl.sheet.logbook'), rows: logbook, widths: widthsWith([14, 80]) },
   ];
 }

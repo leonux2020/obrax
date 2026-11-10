@@ -54,7 +54,7 @@ describe('2. Create: POST spreadsheets (tabs in the same request) -> move into t
     drive.calls.length = 0;
     const out = await client.upsertSpreadsheet(folder, { title: 'rendicion-Casa', sheets: SH() });
     expect(out.created).toBe(true);
-    // lookup in the folder, lookup of an orphan in the root, create, read parents, move, write the data
+    // lookup in the folder, lookup of an orphan in the root, create, read parents, move, write the data, and (nice-to-have) the visual design AFTER the data
     expect(urls(drive)).toEqual([
       'GET /drive/v3/files',
       'GET /drive/v3/files',
@@ -62,6 +62,7 @@ describe('2. Create: POST spreadsheets (tabs in the same request) -> move into t
       `GET /drive/v3/files/${out.id}`,
       `PATCH /drive/v3/files/${out.id}`,
       `POST /v4/spreadsheets/${out.id}/values:batchUpdate`,
+      `POST /v4/spreadsheets/${out.id}:batchUpdate`,
     ]);
     const create = JSON.parse(drive.calls[2].body);
     expect(create.properties.title).toBe('rendicion-Casa');

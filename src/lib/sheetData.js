@@ -1,7 +1,9 @@
 // The DATA of a spreadsheet, as pure values: what goes to the Google Sheets API (drive.js, upsertSpreadsheet) and what the offline queue keeps
 // until it can go. Pure: no network, no React, no styles.
 //
-//   sheet  = { name: string, rows: (string | number)[][], widths?: number[] }
+//   sheet  = { name: string, rows: (string | number)[][], widths?: number[], moneyCols?: number[], currency?: string }
+//            widths = column widths in characters; moneyCols = 0-based columns that hold amounts; currency = ISO code of those amounts (sheetFormat.js
+//            turns them into the visual design of the live Sheet: frozen header, widths in pixels, currency format)
 //   cell   = a string or a finite number. Blank cells are ''.
 //
 // The accounting builders (rendition.js) still describe their cells with presentation hints ({ v, bold, head, title, money }); toValueSheets()
@@ -75,7 +77,9 @@ export function toValueSheets(sheets) {
   return list.map((s, i) => {
     const rows = (Array.isArray(s.rows) ? s.rows : []).slice(0, SHEET_LIMITS.maxRows).map((row) => trimRow((Array.isArray(row) ? row : []).slice(0, SHEET_LIMITS.maxCols).map(cleanCell)));
     const widths = (Array.isArray(s.widths) ? s.widths : []).slice(0, SHEET_LIMITS.maxCols).map((w) => (Number.isFinite(Number(w)) ? Math.max(4, Math.min(80, Math.round(Number(w)))) : 12));
-    return { name: names[i], rows, ...(widths.length ? { widths } : {}) };
+    const moneyCols = [...new Set((Array.isArray(s.moneyCols) ? s.moneyCols : []).filter((c) => typeof c === 'number' || (typeof c === 'string' && c.trim() !== '')).map(Number).filter((c) => Number.isInteger(c) && c >= 0 && c < SHEET_LIMITS.maxCols))].sort((a, b) => a - b);
+    const currency = typeof s.currency === 'string' && /^[A-Za-z]{3}$/.test(s.currency.trim()) ? s.currency.trim().toUpperCase() : '';
+    return { name: names[i], rows, ...(widths.length ? { widths } : {}), ...(moneyCols.length ? { moneyCols } : {}), ...(currency ? { currency } : {}) };
   });
 }
 

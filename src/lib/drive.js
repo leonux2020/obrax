@@ -7,6 +7,7 @@
 // Pure of the browser: `fetchImpl`, `getToken` and `refreshToken` are injected so everything runs in Node tests.
 
 import { gridFor, sheetTitle, toValueSheets } from './sheetData.js';
+import { formatSpreadsheet } from './sheetFormat.js';
 
 export const BACKUP_FOLDER = 'CUBRAX - Respaldos Obra';
 export const LEGACY_BACKUP_FOLDER = 'CUBRAX';
@@ -358,6 +359,8 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
    *   4. an existing Spreadsheet: add the missing tabs, grow the grids that are too small and clear the tabs we are about to rewrite (what the user
    *      typed in OTHER tabs or to the right of our columns is not touched, and a renamed tab is simply not ours any more);
    *   5. values:batchUpdate with valueInputOption RAW: text and numbers exactly as given, a text starting with "=" is data, never a formula.
+   *   6. the visual design (sheetFormat.js: frozen header, bold centred headers, widths in pixels, currency format) in a batchUpdate AFTER the data. It is
+   *      "nice-to-have": it can never fail the call (the data is already in the Sheet, a failed design must not send the export to the offline queue).
    * @param sheets  [{ name, rows: (string|number)[][] }]  (cleaned again here: only pure values ever leave the device)
    * @returns { id, created }
    */
@@ -368,15 +371,20 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
     let id = await findSheet(parentId, name);
     let created = false;
     let misplaced = false;
+    const sheetIds = new Map(); // tab title (lower case) -> the sheetId Google gave it: the design needs it
+    const rememberTab = (p) => {
+      if (p && typeof p.title === 'string' && Number.isInteger(p.sheetId)) sheetIds.set(p.title.toLowerCase(), p.sheetId);
+    };
     if (!id && parentId !== 'root') {
       id = await findSheet('root', name);
       misplaced = Boolean(id);
     }
     if (!id) {
-      const made = await post(`${SHEETS}?fields=spreadsheetId`, { properties: { title: name }, sheets: tabs.map((t) => ({ properties: { title: t.name, gridProperties: gridFor(t) } })) });
+      const made = await post(`${SHEETS}?fields=spreadsheetId,sheets.properties(sheetId,title)`, { properties: { title: name }, sheets: tabs.map((t) => ({ properties: { title: t.name, gridProperties: gridFor(t) } })) });
       if (!ID_RE.test(String(made?.spreadsheetId))) throw new DriveError('bad_response');
       id = made.spreadsheetId;
       created = true;
+      for (const sh of Array.isArray(made.sheets) ? made.sheets : []) rememberTab(sh?.properties);
       misplaced = true;
     }
     if (misplaced) await moveInto(id, parentId);
@@ -386,6 +394,7 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
       const have = new Map((Array.isArray(meta?.sheets) ? meta.sheets : []).map((s) => s?.properties).filter((p) => p && typeof p.title === 'string').map((p) => [p.title.toLowerCase(), p]));
       const requests = [];
       const clear = [];
+      for (const p of have.values()) rememberTab(p);
       for (const tab of tabs) {
         const grid = gridFor(tab);
         const mine = have.get(tab.name.toLowerCase());
@@ -400,11 +409,32 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
           requests.push({ updateSheetProperties: { properties: { sheetId: mine.sheetId, gridProperties: { rowCount: rows, columnCount: cols } }, fields: 'gridProperties.rowCount,gridProperties.columnCount' } });
         }
       }
-      if (requests.length) await post(`${SHEETS}/${id}:batchUpdate`, { requests });
+      if (requests.length) {
+        const answer = await post(`${SHEETS}/${id}:batchUpdate`, { requests });
+        requests.forEach((r, i) => rememberTab(r.addSheet && answer?.replies?.[i]?.addSheet?.properties)); // the tabs just added: Google answers each request in order
+      }
       if (clear.length) await post(`${SHEETS}/${id}/values:batchClear`, { ranges: clear });
     }
     for (const data of valueBatches(tabs)) await post(`${SHEETS}/${id}/values:batchUpdate`, { valueInputOption: 'RAW', data });
+    await designSpreadsheet(id, tabs, sheetIds); // never throws: the data is already safe
     return { id, created };
+  }
+
+  /** The visual design, right after the data. Silent by contract: whatever happens here, the export is a success (the values are in the Sheet). */
+  async function designSpreadsheet(id, tabs, sheetIds) {
+    try {
+      if (tabs.some((t) => !sheetIds.has(t.name.toLowerCase()))) {
+        // Google did not tell us every sheetId (a reply without them): read them once
+        const meta = await json(`${SHEETS}/${id}?fields=sheets.properties(sheetId,title)`);
+        for (const sh of Array.isArray(meta?.sheets) ? meta.sheets : []) if (sh?.properties && typeof sh.properties.title === 'string') sheetIds.set(sh.properties.title.toLowerCase(), sh.properties.sheetId);
+      }
+      const metadata = tabs.map((t) => ({ sheetId: sheetIds.get(t.name.toLowerCase()), widths: t.widths, moneyCols: t.moneyCols }));
+      const currency = tabs.find((t) => t.currency)?.currency || '';
+      const quick = (url, body) => json(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, timeouts.api); // decoration: never worth a long wait
+      await formatSpreadsheet({ post: quick }, id, metadata, currency);
+    } catch {
+      /* nice-to-have */
+    }
   }
 
   /** A cached folder was deleted from Drive (404): forget every cached id so the next try looks them up again. */

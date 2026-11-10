@@ -39,7 +39,7 @@ export function createFakeDrive({ token: initialToken = 'tok-valid-123456' } = {
         rows: [],
       }));
       grids.set(f.id, tabs);
-      return res({ spreadsheetId: f.id });
+      return res({ spreadsheetId: f.id, sheets: tabs.map((t) => ({ properties: { sheetId: t.sheetId, title: t.title } })) }); // like the real API with fields=spreadsheetId,sheets.properties(sheetId,title)
     }
     const m = /^\/v4\/spreadsheets\/([^/:]+)(\/values)?(?::(\w+))?$/.exec(u.pathname);
     const f = m && files.get(m[1]);
@@ -47,18 +47,36 @@ export function createFakeDrive({ token: initialToken = 'tok-valid-123456' } = {
     const tabs = grids.get(f.id);
     if (method === 'GET' && !m[2] && !m[3]) return res({ sheets: tabs.map((t) => ({ properties: { sheetId: t.sheetId, title: t.title, gridProperties: { rowCount: t.rowCount, columnCount: t.columnCount } } })) });
     if (method === 'POST' && !m[2] && m[3] === 'batchUpdate') {
+      const replies = [];
       for (const r of body.requests || []) {
         if (r.addSheet) {
           if (tabOf(f.id, r.addSheet.properties.title)) return res({ error: 'duplicate tab' }, 400);
           const g = r.addSheet.properties.gridProperties || {};
-          tabs.push({ sheetId: Math.max(0, ...tabs.map((t) => t.sheetId)) + 1, title: r.addSheet.properties.title, rowCount: g.rowCount || 1000, columnCount: g.columnCount || 26, rows: [] });
-        } else if (r.updateSheetProperties) {
+          const added = { sheetId: Math.max(0, ...tabs.map((t) => t.sheetId)) + 1, title: r.addSheet.properties.title, rowCount: g.rowCount || 1000, columnCount: g.columnCount || 26, rows: [] };
+          tabs.push(added);
+          replies.push({ addSheet: { properties: { sheetId: added.sheetId, title: added.title } } });
+          continue;
+        }
+        if (r.updateSheetProperties) {
           const t = tabs.find((x) => x.sheetId === r.updateSheetProperties.properties.sheetId);
           if (!t) return res({ error: 'no such sheet' }, 400);
+          if (!r.updateSheetProperties.fields) return res({ error: 'fields is required' }, 400);
           Object.assign(t, r.updateSheetProperties.properties.gridProperties);
+        } else if (r.repeatCell) {
+          // the design (sheetFormat.js): like the real API, `fields` is mandatory and the range must point at an existing sheet
+          const t = tabs.find((x) => x.sheetId === r.repeatCell.range?.sheetId);
+          if (!t || !r.repeatCell.fields || !r.repeatCell.cell?.userEnteredFormat) return res({ error: 'bad repeatCell' }, 400);
+          if (state.rejectCurrency && r.repeatCell.cell.userEnteredFormat.numberFormat?.type === 'CURRENCY') return res({ error: { message: 'Invalid number format pattern' } }, 400);
+          (t.format ??= []).push(r.repeatCell);
+        } else if (r.updateDimensionProperties) {
+          const u = r.updateDimensionProperties;
+          const t = tabs.find((x) => x.sheetId === u.range?.sheetId);
+          if (!t || !u.fields || u.range.dimension !== 'COLUMNS' || !(u.properties?.pixelSize > 0)) return res({ error: 'bad updateDimensionProperties' }, 400);
+          (t.dims ??= []).push(u);
         } else return res({ error: 'unsupported request' }, 400);
+        replies.push({});
       }
-      return res({ spreadsheetId: f.id });
+      return res({ spreadsheetId: f.id, replies });
     }
     if (method === 'POST' && m[2] && m[3] === 'batchClear') {
       for (const range of body.ranges || []) {
