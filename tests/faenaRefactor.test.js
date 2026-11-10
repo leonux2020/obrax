@@ -3,7 +3,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import ProjectForm from '../src/components/ProjectForm.jsx';
 import { I18nProvider } from '../src/lib/i18n.jsx';
 import PartidaList from '../src/components/workspace/PartidaList.jsx';
 import TaskPicker from '../src/components/TaskPicker.jsx';
@@ -158,8 +159,14 @@ describe('DimsForm: compact grid and live result', () => {
     await draw(React.createElement(DimsForm, { partida: partida('excavation', dims), validation: validateDims('excavation', dims), showErrors: false, onChange: () => {} }));
     const grid = q('dims-grid');
     expect(grid.className).toContain('grid-cols-3');
-    expect(grid.className).toContain('gap-2');
+    expect(grid.className).toContain('gap-x-5'); // the measures breathe: air between the columns and the rows
+    expect(grid.className).toContain('gap-y-4');
     expect(grid.querySelectorAll('input').length).toBeGreaterThanOrEqual(3);
+    // "Línea inferior": no fill, no box, only a hairline under the value that turns white on focus
+    for (const input of grid.querySelectorAll('input')) {
+      for (const c of ['bg-transparent', 'border-b', 'border-neutral-600', 'focus:border-white', 'rounded-none']) expect(input.className, c).toContain(c);
+      expect(input.className).not.toContain('field-input');
+    }
     expect(q('dims-result').textContent).toMatch(/40/); // 5 x 4 x 2 m3
     expect(host.textContent.toLowerCase()).not.toContain('calcular');
     expect(host.querySelector('button[data-testid="calculate"]')).toBeNull();
@@ -232,5 +239,94 @@ describe('PartidaList: trash icon top-right, materials and machinery in accordio
     expect(q('materials-acc-0-chips').querySelectorAll('li').length).toBeGreaterThan(0);
     expect(q('materials-0').className).not.toMatch(/\bborder\b|divide-/);
     expect(q('materials-0').querySelectorAll('li').length).toBeGreaterThan(0);
+  });
+});
+
+describe('ProjectForm: ONE form to create and to edit, progressive disclosure, underlined measures', () => {
+  const stored = { id: 'p1', name: 'Losa patio', task: 'slab', dims: { length: 6, width: 4 }, waste: 15 };
+  const nameInput = () => q('project-form-0').querySelector('input:not([data-numpad])');
+  const type = async (input, value) => {
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  };
+  const clickEl = async (el) => act(async () => el.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+
+  it('the same markup in both modes: only data-mode tells them apart', async () => {
+    const shape = async (mode) => {
+      await draw(React.createElement(ProjectForm, { mode, initialValues: stored }));
+      return { mode: q('project-form-0').dataset.mode, ids: [...q('project-form-0').querySelectorAll('[data-testid]')].map((n) => n.dataset.testid) };
+    };
+    const create = await shape('create');
+    const edit = await shape('edit');
+    expect(create.mode).toBe('create');
+    expect(edit.mode).toBe('edit');
+    expect(edit.ids).toEqual(create.ids);
+    for (const id of ['task-carousel', 'dims-grid', 'advanced-0']) expect(create.ids).toContain(id);
+    await draw(React.createElement(ProjectForm, { mode: 'whatever', initialValues: stored }));
+    expect(q('project-form-0').dataset.mode).toBe('create'); // anything else is create
+  });
+
+  it('initialValues seed the form: the stored name, trade and measures are what edit shows', async () => {
+    await draw(React.createElement(ProjectForm, { mode: 'edit', initialValues: { ...stored, task: 'masonry', dims: { length: 7, height: 2.4 } } }));
+    expect(nameInput().value).toBe('Losa patio');
+    expect(q('task-masonry').getAttribute('aria-checked')).toBe('true');
+    expect([...q('dims-grid').querySelectorAll('input')].map((i) => i.value)).toContain('7');
+  });
+
+  it('progressive disclosure: name, carousel and measures in sight; waste, materials and machinery behind "Ajustes avanzados", closed', async () => {
+    await draw(React.createElement(ProjectForm, { mode: 'create', initialValues: stored, advanced: React.createElement('p', { 'data-testid': 'logistics' }, 'materiales') }));
+    const adv = q('advanced-0');
+    expect(adv.open).toBe(false);
+    expect(adv.querySelector('summary').textContent).toContain(DICT.es['form.advanced']);
+    expect(DICT.es['form.advanced']).toBe('Ajustes avanzados');
+    expect(adv.contains(q('waste-0'))).toBe(true);
+    expect(adv.contains(q('logistics'))).toBe(true);
+    expect(adv.contains(q('task-carousel'))).toBe(false);
+    expect(adv.contains(q('dims-grid'))).toBe(false);
+    expect(adv.contains(nameInput())).toBe(false);
+    expect(q('advanced-0-chips').textContent).toContain('15%'); // the closed row still says which waste the quote uses
+  });
+
+  it('reports every change with the full values: name, measures, waste; a new trade comes with that trade\'s waste', async () => {
+    const seen = [];
+    await draw(React.createElement(ProjectForm, { mode: 'create', initialValues: stored, onChange: (v) => seen.push(v) }));
+    await type(nameInput(), 'Losa norte');
+    expect(seen.at(-1)).toMatchObject({ name: 'Losa norte', task: 'slab', waste: 15 });
+    await clickEl(q('waste-0-min'));
+    expect(seen.at(-1).waste).toBe(5);
+    expect(q('waste-0-value').textContent).toBe('5%');
+    await clickEl(q('task-pool'));
+    expect(seen.at(-1)).toMatchObject({ task: 'pool', waste: TASKS.pool.defaultWaste });
+    const n = seen.length;
+    await clickEl(q('task-pool')); // the trade that is already chosen is not a change
+    expect(seen).toHaveLength(n);
+  });
+
+  it('a change of the OUTSIDE (undo, another quote) is picked up: never stale numbers', async () => {
+    await draw(React.createElement(ProjectForm, { mode: 'edit', initialValues: stored }));
+    await draw(React.createElement(ProjectForm, { mode: 'edit', initialValues: { ...stored, name: 'Otra', waste: 30 } }));
+    expect(nameInput().value).toBe('Otra');
+    expect(q('waste-0-value').textContent).toBe('30%');
+  });
+
+  it('junk or legacy values heal quietly: no crash, no NaN, nothing stored is dropped', async () => {
+    for (const bad of [null, undefined, {}, { task: 'ghost' }, { name: 42, task: 'slab', dims: null, waste: 'x' }, { name: 'Vieja', task: 'slab', dims: { length: 3, custom: 'keep' }, waste: NaN }]) {
+      await draw(React.createElement(ProjectForm, { mode: 'edit', initialValues: bad }));
+      expect(host.textContent).not.toMatch(/NaN|undefined|Infinity/);
+      expect(q('waste-0-value').textContent).toMatch(/^\d+%$/);
+    }
+    const seen = [];
+    await draw(React.createElement(ProjectForm, { mode: 'edit', initialValues: { name: 'Vieja', task: 'slab', dims: { length: 3, custom: 'keep' }, waste: 15 }, onChange: (v) => seen.push(v) }));
+    await type(nameInput(), 'Vieja 2');
+    expect(seen.at(-1).dims.custom).toBe('keep');
+  });
+
+  it('no legacy edit form is left, and the unified form carries no boxes, borders or grey fills', () => {
+    for (const f of ['EditProject', 'EditFaena']) expect(existsSync(`src/components/${f}.jsx`)).toBe(false);
+    const src = readFileSync('src/components/ProjectForm.jsx', 'utf8');
+    expect(src).not.toMatch(/\bborder\b|\boutline\b|divide-|bg-(gray|neutral|zinc|slate|stone)-/);
+    expect(src).toContain('underline'); // the name is a line of a notebook, like the measures
   });
 });

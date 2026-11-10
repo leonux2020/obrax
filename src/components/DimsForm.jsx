@@ -20,7 +20,7 @@ export function headlineMetrics(taskId, validation) {
 
 /**
  * Measurement fields + closed options of one partida. Pure form: parent owns the data.
- * The numbers sit three to a row (Largo | Ancho | Alto), compact, and the result appears right under them as they are typed.
+ * The numbers sit three to a row (Largo | Ancho | Alto) as quiet underlined lines (no boxes), with air between them, and the result appears right under them as they are typed.
  */
 export default function DimsForm({ partida, validation, showErrors, onChange }) {
   const { t, num, unit } = useI18n();
@@ -37,12 +37,13 @@ export default function DimsForm({ partida, validation, showErrors, onChange }) 
   };
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-2" data-testid="dims-grid">
+    <div className="space-y-5">
+      <div className="grid grid-cols-3 gap-x-5 gap-y-4" data-testid="dims-grid">
         {task.fields.map((f) => (
           <NumberField
             key={`${partida.id}-${partida.task}-${f.key}`}
             compact
+            underline
             className="flex flex-col justify-end"
             label={fieldLabel(t, partida.task, f.key)}
             placeholder={f.required ? undefined : t('common.optional')}

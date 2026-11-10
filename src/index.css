@@ -82,6 +82,18 @@
   }
 }
 
+/* CUBRAX Studio (desktop only: the class lives on DesktopLayout, the phone never has it). Pure black against white text "halates" on a big monitor, so the
+   floor is anthracite and the screens drawn inside the floating cards get the card tone instead of #000; the faint greys are lifted for contrast. */
+.studio-surface .bg-black {
+  background-color: #262626;
+}
+.studio-surface .text-neutral-500 {
+  color: #a3a3a3;
+}
+.studio-surface .placeholder\:text-neutral-500::placeholder {
+  color: #a3a3a3;
+}
+
 /* Touch-friendly slider with green fill (value set through --p by the component) */
 input[type='range'].slider {
   -webkit-appearance: none;

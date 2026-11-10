@@ -6,6 +6,27 @@ const Icon = ({ children }) => (
   </svg>
 );
 
+/** The three section icons, shared by the phone's bottom navigation and the desktop sidebar of CUBRAX Studio. */
+export const ProjectsIcon = () => (
+  <Icon>
+    <rect x="3" y="3" width="7" height="7" rx="1.5" />
+    <rect x="14" y="3" width="7" height="7" rx="1.5" />
+    <rect x="3" y="14" width="7" height="7" rx="1.5" />
+    <rect x="14" y="14" width="7" height="7" rx="1.5" />
+  </Icon>
+);
+export const AccountingIcon = () => (
+  <Icon>
+    <path d="M4 20V10M10 20V4M16 20v-8M22 20H2" />
+  </Icon>
+);
+export const SettingsIcon = () => (
+  <Icon>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+  </Icon>
+);
+
 /**
  * Main navigation anchored to the bottom of the screen (one-handed use): Proyectos | Contabilidad Global | Ajustes.
  * "Nuevo proyecto" is not here any more: it is the floating button of the dashboard.
@@ -33,25 +54,9 @@ export default function BottomNav({ active, onProjects, onAccounting, onSettings
       className="no-print fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-black px-2 pt-2 [padding-bottom:max(0.5rem,env(safe-area-inset-bottom))]"
     >
       <div className="mx-auto grid max-w-lg grid-cols-3 items-center gap-1">
-        {item('projects', t('nav.projects'), onProjects, (
-          <Icon>
-            <rect x="3" y="3" width="7" height="7" rx="1.5" />
-            <rect x="14" y="3" width="7" height="7" rx="1.5" />
-            <rect x="3" y="14" width="7" height="7" rx="1.5" />
-            <rect x="14" y="14" width="7" height="7" rx="1.5" />
-          </Icon>
-        ))}
-        {item('accounting', t('nav.accountingShort'), onAccounting, (
-          <Icon>
-            <path d="M4 20V10M10 20V4M16 20v-8M22 20H2" />
-          </Icon>
-        ))}
-        {item('settings', t('nav.settings'), onSettings, (
-          <Icon>
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
-          </Icon>
-        ))}
+        {item('projects', t('nav.projects'), onProjects, <ProjectsIcon />)}
+        {item('accounting', t('nav.accountingShort'), onAccounting, <AccountingIcon />)}
+        {item('settings', t('nav.settings'), onSettings, <SettingsIcon />)}
       </div>
     </nav>
   );

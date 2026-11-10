@@ -125,6 +125,13 @@ export function Button({ variant = 'primary', className = '', type = 'button', .
  * slides up the app's own NumberPad (big keys, backspace, a giant "Confirm"). Every valid keystroke calls `onChange(n)` at once;
  * "Reset" empties the field (null). Emits a number (or null). Range validation is reported through `error` by the parent.
  */
+/**
+ * "Underline" input (a line of a notebook): no fill, no box, only a thin line under the value that turns white on focus (red when invalid).
+ * Used by the measures and the name of a faena, where a grid of filled boxes weighed too much.
+ */
+export const UNDERLINE_INPUT =
+  'w-full min-h-[48px] rounded-none border-0 border-b border-neutral-600 bg-transparent px-1 text-lg font-light text-neutral-100 placeholder:text-neutral-500 focus:border-white focus:outline-none focus:ring-0 aria-[invalid=true]:border-red-400/90';
+
 export function NumberField({
   label,
   unit,
@@ -137,6 +144,7 @@ export function NumberField({
   optional,
   hideLabel = false,
   compact = false,
+  underline = false,
   className = '',
   testId,
   'aria-label': ariaLabel,
@@ -178,10 +186,10 @@ export function NumberField({
           aria-describedby={error || (hint && !compact) ? `${id}-msg` : undefined}
           data-testid={testId}
           data-numpad="true"
-          className={`field-input cursor-pointer ${compact ? `!px-2.5 !text-base ${unit ? '!pr-8' : ''}` : unit ? 'pr-16' : ''}`}
+          className={`${underline ? UNDERLINE_INPUT : 'field-input'} cursor-pointer ${underline ? `${unit ? 'pr-9' : ''}` : compact ? `!px-2.5 !text-base ${unit ? '!pr-8' : ''}` : unit ? 'pr-16' : ''}`}
         />
         {unit && (
-          <span className={`pointer-events-none absolute inset-y-0 flex items-center text-neutral-300 ${compact ? 'right-2.5 text-sm font-light' : 'right-4 text-base font-semibold'}`}>
+          <span className={`pointer-events-none absolute inset-y-0 flex items-center text-neutral-300 ${underline ? 'right-1 text-sm font-light' : compact ? 'right-2.5 text-sm font-light' : 'right-4 text-base font-semibold'}`}>
             {unit}
           </span>
         )}
@@ -238,7 +246,7 @@ export function DateInput({ className = '', onClick, ...props }) {
   );
 }
 
-export function TextField({ label, value, onChange, onBlur, placeholder, maxLength = 80, optional, sanitize, testId, type = 'text', inputMode, end = null, flat = false, inputProps = null }) {
+export function TextField({ label, value, onChange, onBlur, placeholder, maxLength = 80, optional, sanitize, testId, type = 'text', inputMode, end = null, flat = false, underline = false, inputProps = null }) {
   const id = useId();
   return (
     <div>
@@ -259,7 +267,7 @@ export function TextField({ label, value, onChange, onBlur, placeholder, maxLeng
           onBlur={onBlur}
           {...inputProps}
           data-testid={testId}
-          className={`field-input ${end ? 'pr-12' : ''} ${flat ? 'border-transparent bg-neutral-900/50' : ''}`.trim()}
+          className={`${underline ? UNDERLINE_INPUT : 'field-input'} ${end ? 'pr-12' : ''} ${flat ? 'border-transparent bg-neutral-900/50' : ''}`.trim()}
         />
         {end && <span className="absolute inset-y-0 right-0 flex items-center">{end}</span>}
       </div>

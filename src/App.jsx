@@ -68,6 +68,8 @@ import GlobalAccounting from './components/GlobalAccounting.jsx';
 import AppShell from './components/AppShell.jsx';
 import Dashboard from './components/Dashboard.jsx';
 import BottomNav from './components/BottomNav.jsx';
+import DesktopLayout from './components/DesktopLayout.jsx';
+import { useIsDesktop } from './lib/useIsDesktop.js';
 import ProjectSheet from './components/ProjectSheet.jsx';
 import SettingsView from './components/SettingsView.jsx';
 import { clearOAuthResult, clearSignInResult, connectDrive, peekOAuthResult, peekSignInResult } from './lib/oauthCallback.js';
@@ -134,6 +136,7 @@ const projectCompany = (project, company) => documentCompany(project.company, co
 
 export default function App({ onSignedOut = goToStart, installed = isStandalone() }) {
   const pwa = usePWA();
+  const desktop = useIsDesktop(); // >= 1024 px: CUBRAX Studio (three columns); below: the phone interface with its bottom navigation
   const pro = usePro();
   const isEcoMode = useEcoBattery(); // battery <= 20 % and unplugged: animations off (class on <body>)
   // The interface follows the device's language (an Italian phone gets Italian) unless the user locked a language in the settings.
@@ -1139,6 +1142,97 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   );
   const editing = sheet?.type === 'edit' ? projects?.find((p) => p.id === sheet.id) : null;
   const navActive = tab;
+  // The screen of the work area. On a phone it is the whole screen with the bottom navigation under it; on a desktop (>= 1024 px) the same screen is the CENTRE
+  // column of CUBRAX Studio (DesktopLayout), beside the projects menu and the copilot.
+  const body = projects === null ? (
+    <AppShell />
+  ) : active && fromAccounting ? (
+    // opened from Contabilidad: AUDIT mode, the pure ledger (cockpit + receipt stack + "Cerrar Rendición"), also for finished projects
+    <ProjectWorkspace
+      key={active.id}
+      fromAccounting
+      project={active}
+      rendition={{ onClose: submitRendition, onRetry: exportSync.retry, onReconnect: reconnectDrive, needsReconnect: driveNeedsReconnect }}
+    />
+  ) : active ? (
+    isClosed(active) ? (
+      <PostMortem
+        key={active.id}
+        project={active}
+        parent={active.parentId ? projects.find((p) => p.id === active.parentId) ?? null : null}
+        company={projectCompany(active, company)}
+        photos={photos}
+        setDraft={setDraft}
+        onReopen={() => commit({ ...active, closedAt: 0, updatedAt: Date.now() })}
+        onExtend={() => createExtension(active)}
+      />
+    ) : (
+      <ProjectWorkspace
+        key={active.id}
+        project={active}
+        setProject={setProject}
+        setDraft={setDraft}
+        photos={photos}
+        setPhotos={changePhotos}
+        company={projectCompany(active, company)}
+        receipts={receipts}
+        enqueueReceipt={enqueueReceipt}
+        onSyncDossier={syncExpediente}
+        onSendSheet={submitProjectSheet}
+        dossierBusy={dossierBusy.includes(active.id)}
+        onBack={closeProject}
+        onEdit={() => setSheet({ type: 'edit', id: active.id })}
+        onPro={openPaywall}
+      />
+    )
+  ) : draftProject ? (
+    // "Nuevo proyecto": the project screen itself, on a draft that is not stored anywhere yet (see startDraft)
+    <ProjectWorkspace
+      key={draftProject.id}
+      project={draftProject}
+      setProject={setDraftProjectFn}
+      setDraft={setDraftQuote}
+      photos={draftPhotos}
+      setPhotos={() => {}}
+      company={projectCompany(draftProject, company)}
+      receipts={receipts}
+      enqueueReceipt={async () => null}
+      onEdit={() => setSheet({ type: 'editDraft' })}
+      onPro={openPaywall}
+      sandbox={{ onSave: saveDraft, onDiscard: discardDraft, onKeep: () => setLeaveAsk(false), leaveAsk }}
+    />
+  ) : tab === 'settings' ? (
+    <SettingsView
+      user={user}
+      company={company}
+      logo={logo}
+      regionCode={settings.region}
+      pwa={pwa}
+      drive={meta.drive}
+      onDriveChange={changeDrive}
+      onConnect={connectAndBackup}
+      onSaveProfile={async (data) => {
+        await saveProfile(data); // stays on Ajustes: email / phone / logo land in localStorage + IndexedDB and the PDFs
+      }}
+      onSignIn={signIn}
+      onChangeLang={changeLang}
+      onConfirmRegion={(code) => confirmRegion(code)}
+      onChangeRegion={() => setPickingRegion(true)}
+      backup={{ configured: googleConfigured, configStatus: GOOGLE_CONFIG_STATUS, enabled: backupOn, linked: driveLinked, held: Boolean(backup.held), state: backup }}
+      onLogout={logout}
+      onSwitchAccount={switchGoogleAccount}
+      projects={projects}
+    />
+  ) : tab === 'accounting' ? (
+    <GlobalAccounting projects={projects} onOpenProject={openProject} onExportGlobal={submitGlobalRendition} />
+  ) : (
+    <Dashboard projects={projects} receiptRows={receipts.rows} tab={dashTab} onTab={setDashTab} onNew={requestNewProject} onOpen={openProject} onPro={() => openPaywall('promo')} />
+  );
+  const showNav = projects === null || (!active && !draftProject); // the bottom navigation belongs to the top-level screens only
+  const goTab = (id) => {
+    closeProject();
+    setTab(id);
+  };
 
   return (
     <I18nProvider lang={settings.lang} regionCode={active ? active.draft.regionCode : settings.region}>
@@ -1168,103 +1262,27 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
         <Login onLogin={signIn} />
       ) : (
         <>
-          <Header pwa={pwa} />
-
-          {projects === null ? (
-            <>
-              <AppShell />
-              <BottomNav active={navActive} onProjects={() => setTab('projects')} onAccounting={() => setTab('accounting')} onSettings={() => setTab('settings')} />
-            </>
-          ) : active && fromAccounting ? (
-            // opened from Contabilidad: AUDIT mode, the pure ledger (cockpit + receipt stack + "Cerrar Rendición"), also for finished projects
-            <ProjectWorkspace
-              key={active.id}
-              fromAccounting
-              project={active}
-              rendition={{ onClose: submitRendition, onRetry: exportSync.retry, onReconnect: reconnectDrive, needsReconnect: driveNeedsReconnect }}
-            />
-          ) : active ? (
-            isClosed(active) ? (
-              <PostMortem
-                key={active.id}
-                project={active}
-                parent={active.parentId ? projects.find((p) => p.id === active.parentId) ?? null : null}
-                company={projectCompany(active, company)}
-                photos={photos}
-                setDraft={setDraft}
-                onReopen={() => commit({ ...active, closedAt: 0, updatedAt: Date.now() })}
-                onExtend={() => createExtension(active)}
-              />
-            ) : (
-              <ProjectWorkspace
-                key={active.id}
-                project={active}
-                setProject={setProject}
-                setDraft={setDraft}
-                photos={photos}
-                setPhotos={changePhotos}
-                company={projectCompany(active, company)}
-                receipts={receipts}
-                enqueueReceipt={enqueueReceipt}
-                onSyncDossier={syncExpediente}
-                onSendSheet={submitProjectSheet}
-                dossierBusy={dossierBusy.includes(active.id)}
-                onBack={closeProject}
-                onEdit={() => setSheet({ type: 'edit', id: active.id })}
-                onPro={openPaywall}
-              />
-            )
-          ) : draftProject ? (
-            // "Nuevo proyecto": the project screen itself, on a draft that is not stored anywhere yet (see startDraft)
-            <ProjectWorkspace
-              key={draftProject.id}
-              project={draftProject}
-              setProject={setDraftProjectFn}
-              setDraft={setDraftQuote}
-              photos={draftPhotos}
-              setPhotos={() => {}}
-              company={projectCompany(draftProject, company)}
-              receipts={receipts}
-              enqueueReceipt={async () => null}
-              onEdit={() => setSheet({ type: 'editDraft' })}
-              onPro={openPaywall}
-              sandbox={{ onSave: saveDraft, onDiscard: discardDraft, onKeep: () => setLeaveAsk(false), leaveAsk }}
-            />
+          {desktop ? (
+            <DesktopLayout
+              banner={<Header pwa={pwa} />}
+              projects={projects ?? []}
+              openId={active?.id ?? null}
+              tab={tab}
+              viewKey={active ? `p:${active.id}:${fromAccounting ? 'a' : 't'}` : draftProject ? `d:${draftProject.id}` : `tab:${tab}`}
+              locked={Boolean(draftProject)}
+              onProjects={() => goTab('projects')}
+              onAccounting={() => goTab('accounting')}
+              onSettings={() => goTab('settings')}
+              onOpenProject={(id) => openProject(id)}
+              onNew={requestNewProject}
+            >
+              {body}
+            </DesktopLayout>
           ) : (
             <>
-              {tab === 'settings' ? (
-                <SettingsView
-                  user={user}
-                  company={company}
-                  logo={logo}
-                  regionCode={settings.region}
-                  pwa={pwa}
-                  drive={meta.drive}
-                  onDriveChange={changeDrive}
-                  onConnect={connectAndBackup}
-                  onSaveProfile={async (data) => {
-                    await saveProfile(data); // stays on Ajustes: email / phone / logo land in localStorage + IndexedDB and the PDFs
-                  }}
-                  onSignIn={signIn}
-                  onChangeLang={changeLang}
-                  onConfirmRegion={(code) => confirmRegion(code)}
-                  onChangeRegion={() => setPickingRegion(true)}
-                  backup={{ configured: googleConfigured, configStatus: GOOGLE_CONFIG_STATUS, enabled: backupOn, linked: driveLinked, held: Boolean(backup.held), state: backup }}
-                  onLogout={logout}
-                  onSwitchAccount={switchGoogleAccount}
-                  projects={projects}
-                />
-              ) : tab === 'accounting' ? (
-                <GlobalAccounting projects={projects} onOpenProject={openProject} onExportGlobal={submitGlobalRendition} />
-              ) : (
-                <Dashboard projects={projects} receiptRows={receipts.rows} tab={dashTab} onTab={setDashTab} onNew={requestNewProject} onOpen={openProject} onPro={() => openPaywall('promo')} />
-              )}
-              <BottomNav
-                active={navActive}
-                onProjects={() => setTab('projects')}
-                onAccounting={() => setTab('accounting')}
-                onSettings={() => setTab('settings')}
-              />
+              <Header pwa={pwa} />
+              {body}
+              {showNav && <BottomNav active={navActive} onProjects={() => setTab('projects')} onAccounting={() => setTab('accounting')} onSettings={() => setTab('settings')} />}
             </>
           )}
 

@@ -251,7 +251,7 @@ function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, c
       />
 
       <div className="space-y-3 px-3 pt-3">
-        <PartidaList draft={draft} groups={groups} open={ui.open} locked={Boolean(locked)} onBlocked={blocked} showErrors onToggle={toggle} onUpdate={updatePartida} onTask={changeTask} onAdd={addPartida} onRemove={removePartida} onPrice={openPrice} result={result} setDraft={setDraft} projectLocation={location} />
+        <PartidaList draft={draft} groups={groups} open={ui.open} locked={Boolean(locked)} onBlocked={blocked} showErrors onToggle={toggle} onUpdate={updatePartida} onTask={changeTask} onAdd={addPartida} onRemove={removePartida} onPrice={openPrice} result={result} setDraft={setDraft} projectLocation={location} mode={sandbox ? 'create' : 'edit'} />
         {/* the quick-control grid (Android settings style): each circle opens its content in a bottom sheet */}
         <div className="grid grid-cols-3 gap-4 p-4" data-testid="ws-menu">
         <CrewBlock project={project} result={result} setProject={setProject} open={ui.open.crew} onToggle={toggle} geocode={geocode} />

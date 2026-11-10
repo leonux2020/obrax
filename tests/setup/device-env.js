@@ -19,3 +19,10 @@ if (typeof navigator !== 'undefined') {
   Object.defineProperty(proto, 'languages', { configurable: true, get: () => globalThis.__device.languages });
   Object.defineProperty(proto, 'language', { configurable: true, get: () => globalThis.__device.languages[0] });
 }
+
+// The app is mobile-first and every older test describes the PHONE interface: the default window is a phone (390 px wide). A test of the desktop frame
+// (CUBRAX Studio, >= 1024 px) sets `window.innerWidth` and fires `resize` itself (tests/helpers/viewport.js).
+if (typeof window !== 'undefined') {
+  window.innerWidth = 390;
+  window.innerHeight = 844;
+}
