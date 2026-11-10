@@ -13,10 +13,18 @@ const PAGE_H = 297;
 const MARGIN = 15;
 const CONTENT_W = PAGE_W - 2 * MARGIN;
 export const PHOTOS_PER_PAGE = 6; // 2 columns x 3 rows: twelve photos = two clean pages
+const PHOTO_IMG_H = 58; // mm: the picture cell
+const PHOTO_LABEL_H = 8; // mm under the picture for its label ("Avance 7")
+const PHOTO_ROW_GAP = 2; // mm between two rows
+export const CAPTION_PT = 8.5; // the caption under a photo: small, italic, dark grey
+const CAPTION_GAP = 1; // mm between the label and the first caption line
+const CAPTION_LINE_H = 3.7; // mm per caption line
+const CAPTION_MIN_IMG_H = 44; // mm: how far the pictures may shrink to make room for long captions
 
 const C = {
   text: [17, 17, 17],
   muted: [95, 95, 95],
+  caption: [64, 64, 64], // dark grey, not black: below the report's own text in the hierarchy
   accent: [21, 128, 61],
   line: [205, 205, 205],
   zebra: [245, 248, 246],
@@ -273,7 +281,11 @@ class Writer {
   /**
    * Photo record, up to MAX_PHOTOS (12) pictures: a balanced 2-column grid, PHOTOS_PER_PAGE (6 = 2 x 3) per page. The first group follows
    * the content already on the page; every next group starts a NEW page with the title repeated as "title (2/2)", so the pictures are
-   * never cut by a page break nor squeezed. Images are contained in equal cells with their caption below.
+   * never cut by a page break nor squeezed. Images are contained in equal cells with their label below.
+   * CAPTIONS: a photo that has a `description` prints it right under its label, centred, small italic dark grey (the hierarchy below the report's own text).
+   * Rows are as tall as their tallest caption (a row with no captions keeps exactly the height it always had, a photo with no description adds no space),
+   * and when the captions are long the pictures of that group shrink a little (never below CAPTION_MIN_IMG_H) so six still fit one page: nothing is cut, nothing collides
+   * with the row below.
    */
   photoGrid(title, photos) {
     if (!photos || photos.length === 0) return;
@@ -281,40 +293,69 @@ class Writer {
     const pages = Math.ceil(list.length / PHOTOS_PER_PAGE);
     const gutter = 6;
     const cellW = (CONTENT_W - gutter) / 2;
-    const imgH = 58;
-    const cellH = imgH + 8;
+    const bottom = PAGE_H - MARGIN - 8; // the same limit as ensure()
     for (let g = 0; g < pages; g += 1) {
       if (g > 0) {
         this.doc.addPage();
         this.y = MARGIN;
       } else {
-        this.ensure(14 + cellH);
+        this.ensure(14 + PHOTO_IMG_H + PHOTO_LABEL_H);
       }
       this.section(pages > 1 ? `${title} (${g + 1}/${pages})` : title);
-      list.slice(g * PHOTOS_PER_PAGE, (g + 1) * PHOTOS_PER_PAGE).forEach((p, i) => {
-        const col = i % 2;
-        if (col === 0 && i > 0) this.y += cellH + 2;
-        if (col === 0) this.ensure(cellH);
-        const x = MARGIN + col * (cellW + gutter);
-        const y = this.y;
-        this.doc.setDrawColor(...C.line);
-        this.doc.setLineWidth(0.3);
-        this.doc.rect(x, y, cellW, imgH);
-        const k = Math.min(cellW / p.width, imgH / p.height);
-        const w = p.width * k;
-        const h = p.height * k;
-        try {
-          this.doc.addImage(p.dataUrl, 'JPEG', x + (cellW - w) / 2, y + (imgH - h) / 2, w, h, undefined, 'FAST');
-        } catch {
-          /* an undecodable photo must never break the document */
-        }
-        this.font('normal', 8.5);
-        this.color(C.muted);
-        this.text(p.label, x, y + imgH + 4.5, { maxWidth: cellW });
+      const group = list.slice(g * PHOTOS_PER_PAGE, (g + 1) * PHOTOS_PER_PAGE);
+      // 1) the captions of every row (wrapped to the cell width, in the caption font)
+      const rows = [];
+      for (let r = 0; r < group.length; r += 2) {
+        const cells = group.slice(r, r + 2);
+        const lines = cells.map((p) => this.captionLines(p, cellW));
+        const longest = Math.max(...lines.map((l) => l.length));
+        rows.push({ cells, lines, capH: longest ? CAPTION_GAP + longest * CAPTION_LINE_H : 0 });
+      }
+      // 2) the picture height of this group: the usual one, or a little less when long captions would push a row off the page
+      const room = bottom - this.y - 4; // 4 mm of air under the last row: what follows the grid never forces an extra page by a hair
+      const fixed = rows.length * (PHOTO_LABEL_H + PHOTO_ROW_GAP) + rows.reduce((n, row) => n + row.capH, 0);
+      const ideal = (room - fixed) / rows.length;
+      const imgH = ideal >= PHOTO_IMG_H || ideal < CAPTION_MIN_IMG_H ? PHOTO_IMG_H : Math.floor(ideal * 10) / 10; // too little room even when shrunk: the old per-row page break
+      rows.forEach((row) => {
+        const rowH = imgH + PHOTO_LABEL_H + row.capH;
+        this.ensure(rowH);
+        row.cells.forEach((p, col) => {
+          const x = MARGIN + col * (cellW + gutter);
+          const y = this.y;
+          this.doc.setDrawColor(...C.line);
+          this.doc.setLineWidth(0.3);
+          this.doc.rect(x, y, cellW, imgH);
+          const k = Math.min(cellW / p.width, imgH / p.height);
+          const w = p.width * k;
+          const h = p.height * k;
+          try {
+            this.doc.addImage(p.dataUrl, 'JPEG', x + (cellW - w) / 2, y + (imgH - h) / 2, w, h, undefined, 'FAST');
+          } catch {
+            /* an undecodable photo must never break the document */
+          }
+          this.font('normal', 8.5);
+          this.color(C.muted);
+          this.text(p.label, x, y + imgH + 4.5, { maxWidth: cellW });
+          const lines = row.lines[col];
+          if (lines.length) {
+            this.font('italic', CAPTION_PT);
+            this.color(C.caption);
+            lines.forEach((line, n) => this.text(line, x + cellW / 2, y + imgH + PHOTO_LABEL_H + 0.5 + n * CAPTION_LINE_H, { align: 'center' }));
+          }
+        });
+        this.y += rowH + PHOTO_ROW_GAP;
       });
-      this.y += cellH + 4;
+      this.y += 2;
     }
     this.color(C.text);
+  }
+
+  /** The caption of a report photo as wrapped lines for the current font ([] when it has none: nothing is drawn and no space is reserved). */
+  captionLines(photo, width) {
+    const text = typeof photo?.description === 'string' ? photo.description.replace(/\s+/g, ' ').trim() : '';
+    if (!text) return [];
+    this.font('italic', CAPTION_PT); // wrapping depends on the font: measured in the face it is drawn in
+    return this.wrap(text, width);
   }
 
   footers(leftText) {
