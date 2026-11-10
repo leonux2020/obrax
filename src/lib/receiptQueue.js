@@ -1,6 +1,7 @@
 // Deferred receipt queue ("Cola Diferida para Boletas"). A receipt photographed WITHOUT a connection is not read
 // by any local OCR: the compressed picture is kept as a Blob in IndexedDB (store `receipt_queue`) with the state
-// "Pendiente de conexión", and receiptSync.js sends it silently to the AI proxy when the network is back.
+// "Pendiente de conexión", and receiptSync.js sends it silently to Gemini (the user's own key, BYOK) when the network is back. The same queue is
+// where a photo goes when Google answers 429 (rate limit / free quota): the user never sees that error, the photo waits and the queue backs off.
 //
 //   status  'pending'  waiting for a connection / for its retry time (nextAt)        shown as "Pendiente de conexión"
 //           'sending'  a drain run has it in flight (reset to 'pending' if the page dies: see recover())
@@ -8,11 +9,12 @@
 //           'failed'   permanently unreadable (not a receipt, bad image...): kept so the user can retry / delete
 //
 // One row = one photo. Rows hold NO personal data besides the picture itself; they never leave the device except
-// through the same proxy call the online scanner makes.
+// through the same direct Gemini call the online scanner makes.
 
 import { STORE_RECEIPTS, createRunner, hasIndexedDb } from './db.js';
 import { blobToDataUrl, dataUrlToBlob, isBlob } from './blobs.js';
 import { newEntryId } from './ledger.js';
+import { createRateGate } from './rateGate.js';
 
 export const QUEUE_LIMITS = Object.freeze({ maxItems: 40, maxBlobBytes: 1_200_000, maxAttempts: 8 });
 export const QUEUE_STATUSES = Object.freeze(['pending', 'sending', 'review', 'failed']);
@@ -72,7 +74,7 @@ export function idbQueueBackend(factory) {
   };
 }
 
-export function createReceiptQueue(primary = null) {
+export function createReceiptQueue(primary = null, gate = createRateGate()) {
   const fallback = memoryQueueBackend();
   let backend = primary || fallback;
   const listeners = new Set();
@@ -101,6 +103,8 @@ export function createReceiptQueue(primary = null) {
     get kind() {
       return backend.kind;
     },
+    /** The 429 cooling state of this queue (rateGate.js): the scanner parks photos while it is closed, the drain waits for it. */
+    gate,
     /** Current rows (oldest first). Never throws: an unreadable store is an empty queue. */
     async list() {
       try {
@@ -121,7 +125,8 @@ export function createReceiptQueue(primary = null) {
      */
     async enqueue({ projectId, image, regionCode = '', currency = '', lang = '', now = Date.now() }) {
       const blob = isBlob(image) ? image : dataUrlToBlob(image);
-      const row = normalizeQueued({ id: newEntryId(), projectId, regionCode, currency, lang, blob, status: 'pending', createdAt: now, attempts: 0, nextAt: 0 });
+      // while Google is rate-limiting us the photo is born already waiting for the gate to open (the drain never tries it earlier)
+      const row = normalizeQueued({ id: newEntryId(), projectId, regionCode, currency, lang, blob, status: 'pending', createdAt: now, attempts: 0, nextAt: gate.active(now) ? gate.until() : 0 });
       if (!row) throw new Error('bad_image');
       const current = await this.list();
       if (current.length >= QUEUE_LIMITS.maxItems) throw new Error('queue_full');
@@ -152,7 +157,7 @@ export function createReceiptQueue(primary = null) {
     async recover() {
       for (const r of (await this.list()).filter((x) => x.status === 'sending')) await this.update(r.id, { status: 'pending' });
     },
-    /** The picture of a row as a data URL (what the proxy call needs). */
+    /** The picture of a row as a data URL (what the Gemini request needs). */
     imageOf: (row) => blobToDataUrl(row.blob),
     /** Rows that are due now: pending and past their retry time. */
     due: (rows, now = Date.now()) => rows.filter((r) => r.status === 'pending' && r.nextAt <= now),

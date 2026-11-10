@@ -8,19 +8,24 @@
 //
 // Failure contract (stable `InvoiceError.code`, translated by the UI and used by the offline queue to decide "retry later" vs "never"):
 //   no_key        there is no key on this device (nothing is sent)        bad_key       Google rejected the key (400 API key / 401 / 403)
-//   rate_limited  free quota or rate limit (429)                          timeout / network / upstream   connectivity or Google trouble
+//   rate_limited  free quota or rate limit (429). `err.retryAfterMs` carries Google's own wait (Retry-After header / RetryInfo.retryDelay), 0 when it gave none.
+//                 It is NOT an error for the user: the receipt flow parks the photo in the queue and the queue backs off (rateGate.js).
+//                                                                         timeout / network / upstream   connectivity or Google trouble
 //   too_large     413                                                     bad_image     the picture is not a jpeg / png / webp data URL
 //   unreadable    Google blocked the content or answered nothing usable   cancelled     the caller aborted
 
 import { getGeminiKey } from './geminiKey.js';
 import { DEFAULT_MODEL, FALLBACK_MODEL, GEMINI_BASE, buildGeminiRequest, buildPricesRequest, parseModelJson } from './geminiRequests.js';
 import { normalizeBook } from './priceBook.js';
+import { parseRetryAfter, parseRetryDelay } from './rateGate.js';
 import { getRegion } from './regions.js';
 
 export class InvoiceError extends Error {
-  constructor(code) {
+  /** @param code see ERROR_CODES   @param extra { retryAfterMs } only for 'rate_limited': how long Google asked us to wait (0 = it did not say) */
+  constructor(code, { retryAfterMs = 0 } = {}) {
     super(`invoice:${code}`);
-    this.code = code; // see ERROR_CODES
+    this.code = code;
+    if (code === 'rate_limited') this.retryAfterMs = Number.isFinite(retryAfterMs) && retryAfterMs > 0 ? Math.round(retryAfterMs) : 0;
   }
 }
 
@@ -56,6 +61,22 @@ async function upstreamCode(res) {
     /* no body */
   }
   return /API[_ ]KEY|API_KEY_INVALID|PERMISSION_DENIED|UNAUTHENTICATED/i.test(text) ? 'bad_key' : '';
+}
+
+/** How long a 429 asks us to wait: the `Retry-After` header, else Google's `RetryInfo.retryDelay` in the JSON body ("32s"). 0 = it did not say. Never throws. */
+async function retryAfterOf(res, nowMs) {
+  const header = parseRetryAfter(res.headers?.get?.('retry-after'), nowMs);
+  if (header > 0) return header;
+  try {
+    const details = (await res.json())?.error?.details;
+    for (const d of Array.isArray(details) ? details : []) {
+      const ms = parseRetryDelay(d?.retryDelay);
+      if (ms > 0) return ms;
+    }
+  } catch {
+    /* no body */
+  }
+  return 0;
 }
 
 /**
@@ -125,7 +146,9 @@ export async function callGemini({
         signal?.removeEventListener?.('abort', onAbort);
       }
       if (res.status === 429) {
-        last = new InvoiceError('rate_limited');
+        // typed, never fatal on its own: the other model may have its own quota; whoever catches it decides (queue + backoff, see ReceiptSheet / receiptSync)
+        const wait = await retryAfterOf(res, now());
+        last = new InvoiceError('rate_limited', { retryAfterMs: Math.max(wait, last?.retryAfterMs || 0) });
         continue;
       }
       if (res.status === 413) throw new InvoiceError('too_large');
