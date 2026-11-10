@@ -49,13 +49,13 @@ describe('logbook model', () => {
 });
 
 describe('logbook PDF', () => {
-  it('is named Bitacora_<project>.pdf and contains every note in full, the author and a pointer to Fotos Obra (no image embedded)', async () => {
+  it('is named Bitacora_<project>.pdf and contains every note in full, the author and a pointer to the project folder (no image embedded)', async () => {
     const { doc, fileName } = await createLogbookPdf({ project: sample(), title: 'Casa Norte', company, i18n });
     expect(fileName).toBe('Bitacora_Casa-Norte.pdf');
     const text = pdfText(doc);
     expect(text.startsWith('%PDF')).toBe(true);
-    for (const word of ['Inicio de excavaci', 'losa del primer piso', 'FINALPARRAFO', 'Ana Ruiz', 'Casa Norte', 'Fotos Obra']) expect(text).toContain(word);
-    expect(text).not.toContain('/Subtype /Image'); // photos are separate files in Fotos Obra
+    for (const word of ['Inicio de excavaci', 'losa del primer piso', 'FINALPARRAFO', 'Ana Ruiz', 'Casa Norte', 'en la carpeta de la obra']) expect(text).toContain(word);
+    expect(text).not.toContain('/Subtype /Image'); // photos are separate files in the project folder
     expect(text.indexOf('Inicio de excavaci')).toBeLessThan(text.indexOf('FINALPARRAFO')); // chronological
   });
 

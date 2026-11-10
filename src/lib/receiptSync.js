@@ -11,7 +11,7 @@
 // queue pauses for `Retry-After` (or 60 s, doubling with every consecutive 429, rateGate.js), nothing is shown, the attempts of the photos are not spent; mark what can never succeed ('failed'); never
 // tabulate behind the user's back a receipt printed in ANOTHER currency whose only rate is an approximation ('review'; a real rate is frozen
 // into the project's base currency automatically, see fx.js); never run twice at once (in this tab, nor across tabs
-// when the Web Locks API exists); never send anything while offline.
+// when the Web Locks API exists), one photo at a time and in order; never send anything while offline.
 
 import { LEDGER_LIMITS, withProjectContext } from './ledger.js';
 import { asReceipts, batchExpenses, requestReceipt } from './receipt.js';
@@ -43,17 +43,36 @@ export const addExpenses = (project, expenses, now = Date.now()) => ({
   updatedAt: nextStamp(project.updatedAt, now), // strictly newer than what the project had: the Auto-Sync daemon and the merge always see this as a change
 });
 
+// QUEUE LOCK. `running` is the global "isSyncing": while one worker is emptying the queue, any other trigger (timer, `online`, visibility, a new photo, the
+// Background Sync wake-up) does NOT start a second one: it joins the running one, which is told to take one more look at the queue before it finishes
+// (`again`). Without that last look, a photo parked in the very instant the worker was reading its final (empty) list would wait for the next timer.
+// The rows are always processed in a `for...of` with an `await` each: one photo at a time, never a Promise.all.
 let running = null;
+let again = false;
+
+/** Two results of consecutive passes of the same run, as one. */
+const mergeResults = (a, b) => (!a ? b : !b ? a : { done: [...a.done, ...b.done], review: [...a.review, ...b.review], failed: [...a.failed, ...b.failed], deferred: a.deferred + b.deferred, skipped: a.skipped && b.skipped });
 
 /** Exclusive section: one drain at a time in this tab, and (when available) one per origin across tabs. */
 async function exclusive(fn) {
-  if (running) return running;
+  if (running) {
+    again = true; // someone knocked while the worker was busy: it will look once more before leaving
+    return running;
+  }
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : null;
+  const once = () => (locks?.request ? locks.request(SYNC_TAG, { ifAvailable: true }, (lock) => (lock ? fn() : null)) : fn());
   const job = (async () => {
-    const locks = typeof navigator !== 'undefined' ? navigator.locks : null;
-    if (locks?.request) return locks.request(SYNC_TAG, { ifAvailable: true }, (lock) => (lock ? fn() : null));
-    return fn();
+    let total = null;
+    do {
+      again = false;
+      const res = await once();
+      if (res === null) return total; // another tab holds the lock: it empties the queue
+      total = mergeResults(total, res);
+    } while (again);
+    return total;
   })().finally(() => {
     running = null;
+    again = false;
   });
   running = job;
   return job;

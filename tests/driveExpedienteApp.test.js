@@ -115,19 +115,18 @@ describe('Sincronizar Expediente a Drive', () => {
     expect(document.querySelectorAll('[data-testid="toast"]')).toHaveLength(1); // the SAME toast was updated, not a second one
 
     // the virtual tree
-    expect(drive.folders().map((f) => f.name).sort()).toEqual(['CUBRAX - Respaldos Obra', 'Comprobantes', "Casa D'Arcy", 'Fotos Obra', 'Proyectos'].sort());
+    expect(drive.folders().map((f) => f.name).sort()).toEqual(['CUBRAX - Respaldos Obra', "Casa D'Arcy", 'Proyectos'].sort()); // flat: no subfolder inside the project
     const root = drive.folders().find((f) => f.name === 'CUBRAX - Respaldos Obra');
     const proyectos = drive.folders().find((f) => f.name === 'Proyectos');
     const casa = drive.folders().find((f) => f.name === "Casa D'Arcy");
     expect(proyectos.parents).toEqual([root.id]);
     expect(casa.parents).toEqual([proyectos.id]);
-    // the live Google Sheet (bitácora + rendición tabs) and the readable Bitácora PDF side by side; no PDF Contratista: this quote is incomplete; no dates in the names
-    expect(names("Casa D'Arcy")).toEqual(['Bitacora_Casa-D-Arcy.pdf', 'rendicion-Casa-D-Arcy']);
+    // FLAT: the live Google Sheet (bitácora + rendición tabs), the readable Bitácora PDF and EVERY photo side by side, directly in the project folder
+    expect(names("Casa D'Arcy")).toEqual(['Bitacora_2026-10-02_Material-danado_nota0001.jpg', 'Bitacora_Casa-D-Arcy.pdf', 'Comprobante_2026-10-03_Ferreteria-Sur_rcpt0001.jpg', `Obra_2026-10-01_1_${Date.UTC(2026, 9, 1)}.jpg`, 'rendicion-Casa-D-Arcy']);
     expect(drive.sheet('rendicion-Casa-D-Arcy').parents).toEqual([casa.id]); // the live Sheet, moved into the project folder
     expect(drive.backupFiles().find((f) => f.name === 'Bitacora_Casa-D-Arcy.pdf').body.startsWith('%PDF')).toBe(true);
-    expect(names('Fotos Obra')).toEqual(['Bitacora_2026-10-02_Material-danado_nota00.jpg', 'Obra_2026-10-01_1.jpg']);
-    expect(names('Comprobantes')).toEqual(['Comprobante_2026-10-03_Ferreteria-Sur_rcpt00.jpg']);
-    const photo = drive.backupFiles().find((f) => f.name === 'Obra_2026-10-01_1.jpg');
+    for (const f of drive.backupFiles()) expect(f.parents).toEqual([casa.id]); // nothing outside the project folder
+    const photo = drive.backupFiles().find((f) => f.name.startsWith('Obra_2026-10-01_1_'));
     expect(photo.body.length).toBe(200); // the real bytes of the photo
     expect(drive.backupFiles().some((f) => f.name === 'cubrax-backup.json')).toBe(false); // the disaster-recovery file is a separate thing
   }, 30_000);

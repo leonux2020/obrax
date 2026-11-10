@@ -2,14 +2,21 @@
 // The silent concierge of the Drive (driveSanitizer.js) + atomic creation (drive.js): "Mi unidad" ends up clean by itself, nothing is ever deleted for good,
 // and nothing here can break the app.
 import fs from 'node:fs';
-import { describe, it, expect, vi } from 'vitest';
-import { createDriveClient, BACKUP_FILE } from '../src/lib/drive.js';
-import { GLOBAL_WORDS, RENDITION_PREFIXES, TIDY, TIDY_KEY, classifySheet, projectCandidates, sanitizeDrive, scheduleSanitize } from '../src/lib/driveSanitizer.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createDriveClient, BACKUP_FILE, XLSX_MIME } from '../src/lib/drive.js';
+import { GLOBAL_WORDS, RENDITION_PREFIXES, TIDY, TIDY_KEY, classifySheet, isLegacyRendition, projectCandidates, sanitizeDrive, scheduleSanitize } from '../src/lib/driveSanitizer.js';
 import { fileStem } from '../src/lib/sheetData.js';
 import { makeI18n } from '../src/lib/i18n.jsx';
 import { createFakeDrive } from './helpers/fakeDrive.js';
 
 const SHEET = 'application/vnd.google-apps.spreadsheet';
+const TWELVE_H = 12 * 3_600_000;
+// the developer log of the concierge is on (rollout phase): keep the test output clean
+beforeEach(() => {
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'table').mockImplementation(() => {});
+});
+afterEach(() => vi.restoreAllMocks());
 const make = (drive, opts = {}) => createDriveClient({ getToken: async () => drive.token, fetchImpl: drive.fetchImpl, ...opts });
 const backups = (drive) => drive.backupFiles().filter((f) => f.name === BACKUP_FILE);
 const sheetsNamed = (drive, name) => drive.spreadsheets().filter((f) => f.name === name);
@@ -300,11 +307,26 @@ describe('4. ZERO-STRESS: it never throws, never blocks, never fights the sync',
     await expect(sanitizeDrive(client)).resolves.toMatchObject({ ok: false });
   });
 
-  it('a 500 in the middle: the concierge reports it and carries on with what it can; never rejects', async () => {
-    const { r, drive } = await trouble((d) => { d.state.failNext = 1; d.state.status = 500; });
+  it('a 500 in the middle (the first write fails): the concierge reports it and carries on with what it can; never rejects', async () => {
+    const drive = createFakeDrive();
+    let failed = false;
+    const flaky = async (url, init = {}) => {
+      if (!failed && (init.method || 'GET') === 'PATCH') {
+        failed = true;
+        return { ok: false, status: 500, json: async () => ({ error: 'x' }), text: async () => 'x' };
+      }
+      return drive.fetchImpl(url, init);
+    };
+    const client = createDriveClient({ getToken: async () => drive.token, fetchImpl: flaky });
+    const master = await client.ensureFolder();
+    drive.seed({ id: 'old0000001', name: BACKUP_FILE, parents: ['root'], body: '{"v":1}', modifiedTime: 1 });
+    drive.seed({ id: 'new0000001', name: BACKUP_FILE, parents: [master], body: '{"v":2}', modifiedTime: 2 });
+    const r = await sanitizeDrive(client);
     expect(r.ok).toBe(false);
-    expect(Array.isArray(r.errors)).toBe(true);
+    expect(r.errors.length).toBeGreaterThan(0);
     expect(drive.files.get('new0000001').trashed).toBeUndefined(); // the newest is never the one that goes
+    expect((await sanitizeDrive(client)).ok).toBe(true); // the next run finishes the job
+    expect(drive.files.get('old0000001').trashed).toBe(true);
   });
 
   it('garbage in: no client, a client without the primitives, projectNames that throws or returns junk', async () => {
@@ -375,13 +397,23 @@ describe('5. the background entry: deferred, throttled, retried only when it did
     expect(storage.getItem(TIDY_KEY)).toBe('1000000');
   });
 
-  it('not twice within 12 h; again after', () => {
+  it('the gate (everyMs) still works when it is set: not twice within 12 h; again after', () => {
     const storage = mem();
     storage.setItem(TIDY_KEY, '1000000');
     const run = vi.fn();
-    expect(scheduleSanitize({}, { storage, now: () => 1_000_000 + TIDY.everyMs - 1, run })).toBe(false);
-    expect(scheduleSanitize({}, { storage, now: () => 1_000_000 + TIDY.everyMs, run })).toBe(true);
+    expect(scheduleSanitize({}, { storage, everyMs: TWELVE_H, now: () => 1_000_000 + TWELVE_H - 1, run })).toBe(false);
+    expect(scheduleSanitize({}, { storage, everyMs: TWELVE_H, now: () => 1_000_000 + TWELVE_H, run })).toBe(true);
     expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it('ROLLOUT PHASE: by default there is NO 12 h gate: it runs in the first sync of every session, even right after a clean run', () => {
+    expect(TIDY.everyMs).toBe(0);
+    const storage = mem();
+    storage.setItem(TIDY_KEY, String(Date.now())); // a clean run a moment ago
+    const run = vi.fn();
+    expect(scheduleSanitize({}, { storage, run })).toBe(true);
+    expect(scheduleSanitize({}, { storage, run })).toBe(true);
+    expect(run).toHaveBeenCalledTimes(2);
   });
 
   it('a run that was stopped (network / permissions) is NOT marked: it will be tried at the next sync', async () => {
@@ -406,5 +438,210 @@ describe('5. the background entry: deferred, throttled, retried only when it did
     expect(app).toMatch(/st\.status !== 'synced' \|\| tidyAsked\.current/);
     expect(app).toMatch(/scheduleSanitize\(driveClient, \{ projectNames/);
     expect(app).not.toMatch(/await scheduleSanitize/);
+  });
+});
+
+describe('6. legacy Excel (.xlsx): straight to the trash, in the root or in a project folder', () => {
+  const xlsx = (drive, f) => drive.seed({ mimeType: XLSX_MIME, modifiedTime: 100, body: 'PK', ...f });
+
+  it('isLegacyRendition: the Excel mimeType or the .xlsx extension AND the name of our rendiciones (any language, "-" or "_", any case)', () => {
+    for (const name of ['rendicion-Casa-2026-10-22.xlsx', 'Rendicion_2026-10-30.xlsx', 'Rendicion_Global_2026-10-30.xlsx', 'STATEMENT-casa-2026-10-22.XLSX', 'abrechnung-Haus.xlsx', 'rendiconto_cantiere.xlsx']) {
+      expect(isLegacyRendition({ name, mimeType: XLSX_MIME }), name).toBe(true);
+      expect(isLegacyRendition({ name, mimeType: 'application/octet-stream' }), `${name} (other mime, by extension)`).toBe(true);
+    }
+    expect(isLegacyRendition({ name: 'rendicion-Casa', mimeType: XLSX_MIME })).toBe(true); // Excel by mimeType even with no extension
+    for (const f of [{ name: 'presupuesto-familiar.xlsx', mimeType: XLSX_MIME }, { name: 'rendicion-Casa', mimeType: SHEET }, { name: 'rendicion-Casa.pdf', mimeType: 'application/pdf' }, { name: 'xlsx', mimeType: '' }, { name: '' }, {}, null, undefined]) expect(isLegacyRendition(f), JSON.stringify(f)).toBe(false);
+  });
+
+  it('the .xlsx in the root and in project folders go to the trash; the live Google Sheets stay', async () => {
+    const drive = createFakeDrive();
+    const client = make(drive);
+    const folder = await client.ensureFolderPath(['Proyectos', 'Casa']);
+    const globals = await client.ensureFolderPath(['Rendiciones_Globales']);
+    xlsx(drive, { id: 'xlsxroot01', name: 'rendicion-Casa-2026-10-22.xlsx', parents: ['root'] });
+    xlsx(drive, { id: 'xlsxproj01', name: 'Rendicion_2026-10-30.xlsx', parents: [folder] });
+    xlsx(drive, { id: 'xlsxglob01', name: 'Rendicion_Global_2026-10-30.xlsx', parents: [globals] });
+    drive.seed({ id: 'livesheet01', name: 'rendicion-Casa', mimeType: SHEET, parents: [folder], modifiedTime: 500 });
+    const r = await sanitizeDrive(client);
+    expect(r.ok).toBe(true);
+    expect(r.excel.trashed).toBe(3);
+    for (const id of ['xlsxroot01', 'xlsxproj01', 'xlsxglob01']) expect(drive.files.get(id).trashed, id).toBe(true);
+    expect(drive.files.get('livesheet01').trashed).toBeUndefined();
+    const trashCalls = drive.calls.filter((c) => c.method === 'PATCH' && c.body === JSON.stringify({ trashed: true })).map((c) => new URL(c.url).pathname.split('/').pop());
+    expect(trashCalls.sort()).toEqual(['xlsxglob01', 'xlsxproj01', 'xlsxroot01']);
+  });
+
+  it('an .xlsx uploaded by hand with another mimeType is found by its name; one that is not a rendición of ours is NOT touched', async () => {
+    const drive = createFakeDrive();
+    const client = make(drive);
+    xlsx(drive, { id: 'byhand0001', name: 'rendicion-Casa-2026-10-22.xlsx', mimeType: 'application/octet-stream', parents: ['root'] });
+    xlsx(drive, { id: 'foreign001', name: 'presupuesto-familiar.xlsx', parents: ['root'] });
+    const r = await sanitizeDrive(client);
+    expect(drive.files.get('byhand0001').trashed).toBe(true);
+    expect(drive.files.get('foreign001').trashed).toBeUndefined();
+    expect(r.excel).toEqual({ trashed: 1, left: 1 });
+  });
+
+  it('it never trashes a Google Sheet because of the Excel rule, and a second run finds nothing more to do', async () => {
+    const drive = createFakeDrive();
+    const client = make(drive);
+    xlsx(drive, { id: 'xlsxroot01', name: 'rendicion-Casa-2026-10-22.xlsx', parents: ['root'] });
+    await sanitizeDrive(client);
+    drive.calls.length = 0;
+    const again = await sanitizeDrive(client);
+    expect(again.excel.trashed).toBe(0);
+    expect(drive.calls.filter((c) => c.method !== 'GET')).toEqual([]);
+  });
+
+  it('a Drive with only legacy Excel and no backup: no master folder is created for nothing', async () => {
+    const drive = createFakeDrive();
+    xlsx(drive, { id: 'xlsxroot01', name: 'rendicion-Casa-2026-10-22.xlsx', parents: ['root'] });
+    await sanitizeDrive(make(drive));
+    expect(drive.folders()).toHaveLength(0);
+    expect(drive.files.get('xlsxroot01').trashed).toBe(true);
+  });
+
+  it('the Excel sweep respects the run budget and the stop-on-trouble rule', async () => {
+    const drive = createFakeDrive();
+    const client = make(drive);
+    for (let i = 0; i < TIDY.maxMutations + 5; i += 1) xlsx(drive, { id: `xl${String(i).padStart(7, '0')}`, name: `rendicion-Casa-${i}.xlsx`, parents: ['root'] });
+    const r = await sanitizeDrive(client);
+    expect(r.excel.trashed).toBe(TIDY.maxMutations);
+    expect(drive.trashed()).toHaveLength(TIDY.maxMutations);
+    await sanitizeDrive(client);
+    expect(drive.trashed()).toHaveLength(TIDY.maxMutations + 5);
+  });
+});
+
+describe('7. the developer log: what Drive shows and what was decided', () => {
+  it('prints a clear census: every file Drive shows with its decision (KEEP / MOVE / TRASH / IGNORE) and why', async () => {
+    const drive = createFakeDrive();
+    const client = make(drive);
+    const master = await client.ensureFolder();
+    drive.seed({ id: 'keepbackup1', name: BACKUP_FILE, parents: [master], body: '{"v":2}', modifiedTime: 900 });
+    drive.seed({ id: 'oldbackup01', name: BACKUP_FILE, parents: ['root'], body: '{"v":1}', modifiedTime: 100 });
+    drive.seed({ id: 'xlsxroot001', name: 'rendicion-Casa-2026-10-22.xlsx', mimeType: XLSX_MIME, parents: ['root'], body: 'PK', modifiedTime: 50 });
+    drive.seed({ id: 'foreign0001', name: 'presupuesto.xlsx', mimeType: XLSX_MIME, parents: ['root'], body: 'PK', modifiedTime: 50 });
+    drive.seed({ id: 'stranger001', name: 'Presupuesto familiar', mimeType: SHEET, parents: ['root'], modifiedTime: 50 });
+    const log = vi.fn();
+    await sanitizeDrive(client, { log });
+    const labels = log.mock.calls.map((c) => c[0]);
+    expect(labels[0]).toBe('start');
+    expect(labels.at(-1)).toBe('result');
+    const censusCall = log.mock.calls.find((c) => String(c[0]).startsWith('Drive shows'));
+    expect(censusCall[0]).toMatch(/Drive shows 5 file\(s\)/);
+    const by = Object.fromEntries(censusCall[1].map((d) => [d.id, d]));
+    expect(by.keepbackup1).toMatchObject({ action: 'KEEP', name: BACKUP_FILE });
+    expect(by.oldbackup01).toMatchObject({ action: 'TRASH', why: expect.stringContaining('older duplicate') });
+    expect(by.xlsxroot001).toMatchObject({ action: 'TRASH', why: expect.stringContaining('legacy Excel') });
+    expect(by.foreign0001).toMatchObject({ action: 'IGNORE', why: expect.stringContaining('not a rendición of ours') });
+    expect(by.stranger001).toMatchObject({ action: 'IGNORE' });
+    for (const d of censusCall[1]) expect(Object.keys(d).sort()).toEqual(['action', 'id', 'mimeType', 'modified', 'name', 'parents', 'why']);
+  });
+
+  it('the default log is console.log with the "[Conserje Drive]" prefix (and a table for the list)', async () => {
+    const drive = createFakeDrive();
+    const client = make(drive);
+    drive.seed({ id: 'stranger001', name: 'Presupuesto familiar', mimeType: SHEET, parents: ['root'], modifiedTime: 50 });
+    await sanitizeDrive(client);
+    const prefixes = console.log.mock.calls.map((c) => c[0]);
+    expect(prefixes.every((p) => String(p).startsWith('[Conserje Drive] '))).toBe(true);
+    expect(prefixes.some((p) => p.includes('Drive shows 1 file(s)'))).toBe(true);
+    expect(console.table).toHaveBeenCalled();
+  });
+
+  it('verbose:false is silent (and does not ask Drive for the census); a log that throws can never break the concierge', async () => {
+    const drive = createFakeDrive();
+    const client = make(drive);
+    drive.seed({ id: 'xlsxroot001', name: 'rendicion-Casa-2026-10-22.xlsx', mimeType: XLSX_MIME, parents: ['root'], body: 'PK', modifiedTime: 50 });
+    const quiet = vi.fn();
+    drive.calls.length = 0;
+    await sanitizeDrive(client, { log: quiet, verbose: false });
+    expect(quiet).not.toHaveBeenCalled();
+    expect(console.log).not.toHaveBeenCalled();
+    const asked = drive.calls.map((c) => new URL(c.url).searchParams.get('q') || '');
+    expect(asked.some((q) => q === "mimeType!='application/vnd.google-apps.folder' and trashed=false and 'me' in owners")).toBe(false);
+
+    const drive2 = createFakeDrive();
+    drive2.seed({ id: 'xlsxroot002', name: 'rendicion-Casa-2026-10-22.xlsx', mimeType: XLSX_MIME, parents: ['root'], body: 'PK', modifiedTime: 50 });
+    const r = await sanitizeDrive(make(drive2), { log: () => { throw new Error('console is broken'); } });
+    expect(r.ok).toBe(true);
+    expect(drive2.files.get('xlsxroot002').trashed).toBe(true);
+  });
+
+  it('a failing census (network) does not change the result of the tidy-up', async () => {
+    const drive = createFakeDrive();
+    const client = { ...make(drive), listVisible: async () => { throw Object.assign(new Error('x'), { code: 'offline' }); } };
+    const log = vi.fn();
+    const r = await sanitizeDrive(client, { log });
+    expect(r.ok).toBe(true);
+    expect(log.mock.calls.some((c) => c[0] === 'census failed')).toBe(true);
+  });
+
+  it('scheduleSanitize hands its log options to the worker', async () => {
+    const queue = [];
+    const sanitize = vi.fn(async () => ({ ok: true }));
+    const log = vi.fn();
+    scheduleSanitize({}, { storage: mem(), run: (fn) => queue.push(fn), sanitize, log, verbose: false });
+    await queue[0]();
+    expect(sanitize).toHaveBeenCalledWith({}, expect.objectContaining({ log, verbose: false }));
+  });
+});
+
+describe('10. the tree is FLAT: everything of a project lives directly in its folder', () => {
+  const img = (name, n) => ({ name, mimeType: 'image/jpeg', load: async () => Uint8Array.from({ length: n }, (_, i) => 65 + (i % 26)) });
+  const tree = (drive) => {
+    const all = [...drive.files.values()].filter((f) => !f.trashed);
+    const kids = (id) => Object.fromEntries(all.filter((f) => f.parents.includes(id)).sort((a, b) => a.name.localeCompare(b.name)).map((f) => [f.name, f.mimeType.includes('folder') ? kids(f.id) : null]));
+    return kids('root');
+  };
+
+  it('expediente + backup + an orphan Sheet in the root + the concierge = master / Proyectos / <obra> / files, with no subfolder at any level of the project', async () => {
+    const drive = createFakeDrive();
+    const client = make(drive);
+    await client.saveBackup('{"v":1}');
+    const { syncDossier } = await import('../src/lib/driveExport.js');
+    await syncDossier({ client, title: 'Casa Norte', documents: async () => [{ name: 'Informe.pdf', mimeType: 'application/pdf', bytes: Uint8Array.from([37, 80, 68, 70]) }], images: [img('Obra_2026-10-01_1.jpg', 20), img('Comprobante_2026-10-03_Ferreteria_rcpt01.jpg', 30)] });
+    drive.seed({ id: 'orphan0001', name: 'rendicion-Casa-Norte', mimeType: SHEET, parents: ['root'], modifiedTime: 100 });
+    const r = await sanitizeDrive(client);
+    expect(r).toMatchObject({ ok: true, sheets: { moved: 1 } });
+    expect(tree(drive)).toEqual({
+      'CUBRAX - Respaldos Obra': {
+        [BACKUP_FILE]: null,
+        Proyectos: { 'Casa Norte': { 'Comprobante_2026-10-03_Ferreteria_rcpt01.jpg': null, 'Informe.pdf': null, 'Obra_2026-10-01_1.jpg': null, 'rendicion-Casa-Norte': null } },
+      },
+    });
+  });
+
+  it('the concierge creates no folder under a project and never touches the photos or PDFs of the folder', async () => {
+    const drive = createFakeDrive();
+    const client = make(drive);
+    const folder = await client.ensureFolderPath(['Proyectos', 'Casa Norte']);
+    await client.uploadFile(folder, { name: 'Obra_2026-10-01_1.jpg', mimeType: 'image/jpeg', bytes: Uint8Array.from([1, 2, 3, 4, 5]) });
+    await client.uploadFile(folder, { name: 'Informe.pdf', mimeType: 'application/pdf', bytes: Uint8Array.from([37, 80, 68, 70]) });
+    drive.seed({ id: 'orphan0001', name: 'rendicion-Casa-Norte', mimeType: SHEET, parents: ['root'], modifiedTime: 100 });
+    const folders = drive.folders().length;
+    const mark = drive.calls.length;
+    await sanitizeDrive(client);
+    expect(drive.folders()).toHaveLength(folders); // not a single folder created
+    const writes = drive.calls.slice(mark).filter((c) => c.method !== 'GET');
+    const touched = writes.map((c) => new URL(c.url).pathname.split('/').pop());
+    expect(touched).toEqual(['orphan0001']); // only the orphan Sheet was moved
+    expect(drive.backupFiles().filter((f) => f.name.endsWith('.jpg') || f.name.endsWith('.pdf')).every((f) => f.parents.length === 1 && f.parents[0] === folder && !f.trashed)).toBe(true);
+  });
+
+  it('a subfolder of an earlier layout ("Fotos Obra") is not mistaken for a project: it and its photos are left alone', async () => {
+    const drive = createFakeDrive();
+    const client = make(drive);
+    const folder = await client.ensureFolderPath(['Proyectos', 'Casa Norte']);
+    const legacy = await client.ensureFolderPath(['Proyectos', 'Casa Norte', 'Fotos Obra']);
+    drive.seed({ id: 'oldphoto01', name: 'Obra_2026-10-01_1.jpg', mimeType: 'image/jpeg', parents: [legacy], body: 'x', modifiedTime: 50 });
+    drive.seed({ id: 'orphan0001', name: 'rendicion-Casa-Norte', mimeType: SHEET, parents: ['root'], modifiedTime: 100 });
+    const r = await sanitizeDrive(client);
+    expect(r.sheets.moved).toBe(1);
+    expect(drive.files.get('orphan0001').parents).toEqual([folder]); // to the project, never into the old subfolder
+    expect(drive.files.get(legacy).trashed).toBeUndefined();
+    expect(drive.files.get('oldphoto01')).toMatchObject({ parents: [legacy] });
+    expect(drive.files.get('oldphoto01').trashed).toBeUndefined();
   });
 });

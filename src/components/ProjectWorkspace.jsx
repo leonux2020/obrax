@@ -212,7 +212,7 @@ function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, c
   const saveExpenses = async (list, extra = {}) => {
     let lines = list;
     if (extra.image) {
-      // the receipt photo stays on the device (Blob) and its lines point at it: the expediente puts it in "Comprobantes"
+      // the receipt photo stays on the device (Blob) and its lines point at it: the expediente puts it in the project folder
       const receiptId = newEntryId();
       try {
         await receiptPhotosFor(project.id).put(receiptId, { ...extra.image, at: Date.now() });

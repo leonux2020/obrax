@@ -264,7 +264,7 @@ export function buildTechModel({ draft, result, company, region, t, num, unit, m
 /** Crew plan for the technical dossier: HH, dead technical time and the site duration, per partida. */
 /**
  * The Bitácora as a readable document: the notes in CHRONOLOGICAL order (oldest first), each with its date and time, its FULL text and
- * who wrote it. A note with a photo only says so (the picture itself lives in the "Fotos Obra" folder). Pure.
+ * who wrote it. A note with a photo only says so (the picture itself lives in the project folder). Pure.
  * The notes carry no author of their own (one profile per device), so every line shows the professional of the company profile.
  * @param whenOf (timestamp) => string   date and time in the user's language
  */

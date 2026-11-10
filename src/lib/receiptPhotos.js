@@ -1,6 +1,6 @@
 // The photo of a receipt (boleta / factura) behind the expenses of a project. Before this the picture was read by the AI and thrown
 // away; now the compressed image stays ON THE DEVICE as a Blob (IndexedDB `project_photos`, scope "<id>#receipts", DB v5, no schema
-// change) so the expediente exported to Google Drive can put it in the "Comprobantes" folder. The expense lines carry `receiptId`.
+// change) so the expediente exported to Google Drive can put it in the project folder. The expense lines carry `receiptId`.
 // Same rules as notePhotos.js: never base64 / localStorage on the device; memory fallback when IndexedDB is unavailable.
 
 import { createNotePhotoStore, idbNoteBackend } from './notePhotos.js';

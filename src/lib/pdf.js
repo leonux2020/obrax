@@ -593,7 +593,7 @@ export async function renderTechPdf(model, { t, money, num = (n) => String(n), l
 // ---- LOGBOOK (Bitácora) ------------------------------------------------------------------------------------
 /**
  * Clean, corporate list of the Bitácora: Date | Note | Author, oldest first, full text. A note with a photo says where the picture is
- * (the images themselves are not embedded: they are separate files in "Fotos Obra").
+ * (the images themselves are not embedded: they are separate files in the project folder).
  * @param model buildLogbookModel() result
  */
 export async function renderLogbookPdf(model, { t, logo = null, appName = 'CUBRAX' }) {

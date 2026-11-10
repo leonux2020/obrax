@@ -240,8 +240,8 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   );
   const [backup, setBackup] = useState(() => sync.getState());
   useEffect(() => sync.subscribe(setBackup), [sync]);
-  // The silent concierge of the Drive: after the first good sync of the session, in an idle moment and at most every 12 h, it moves what is lying in the
-  // root of "Mi unidad" into its folder and sends the duplicated backups / Sheets to the trash (driveSanitizer.js). No UI, never throws.
+  // The silent concierge of the Drive: in the first good sync of EVERY session (rollout phase: TIDY.everyMs = 0), at an idle moment, it moves what is lying in the
+  // root of "Mi unidad" into its folder and sends the duplicated backups / Sheets and the legacy .xlsx to the trash (driveSanitizer.js). No UI, never throws.
   const tidyAsked = useRef(false);
   useEffect(
     () =>
@@ -430,7 +430,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     if (dedup.skipped) pushToast({ key: dedup.skipped === 1 ? 'rcpt.dup.one' : 'rcpt.dup.many', params: { n: dedup.skipped }, tone: 'info', ms: 5000 });
     expenses = dedup.fresh;
     if (row?.blob) {
-      // the queued photo is kept with its lines (Comprobantes of the expediente) before the queue row is dropped
+      // the queued photo is kept with its lines (a Comprobante_ file of the expediente) before the queue row is dropped
       try {
         await receiptPhotosFor(projectId).put(row.id, { blob: row.blob, at: row.createdAt });
         expenses = expenses.map((e) => ({ ...e, receiptId: row.id }));
@@ -775,7 +775,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   }, [sync]);
 
   // ---- "Sincronizar Expediente a Drive" -----------------------------------------------------------------------
-  // Proyectos/<name>/ with the PDF + Excel, "Fotos Obra" and "Comprobantes". Runs in the background (async, never blocks the screen):
+  // Proyectos/<name>/ (FLAT) with the PDF, the live Sheet and every photo. Runs in the background (async, never blocks the screen):
   // a toast says "Sincronizando expediente en Drive..." while the user keeps working, then turns into the result.
   const [dossierBusy, setDossierBusy] = useState([]); // ids of the projects being synced
   const dossierRunning = useRef(new Set());

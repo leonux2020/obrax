@@ -7,6 +7,7 @@ export function createFakeDrive({ token: initialToken = 'tok-valid-123456' } = {
   let token = initialToken; // the token Drive accepts; rotate() = the old one expired
   const files = new Map(); // id -> { id, name, mimeType, parents, body, modifiedTime }
   const calls = [];
+  const created = []; // every file created through the upload API, with the `parents` of its metadata
   let n = 0;
   let clock = 1_000;
   const state = { offline: false, failNext: 0, status: 0, noSheetsScope: false, failNextSheets: 0 };
@@ -130,12 +131,16 @@ export function createFakeDrive({ token: initialToken = 'tok-valid-123456' } = {
       const notFolder = q.includes('mimeType!=');
       const isFolder = !notFolder && q.includes('google-apps.folder');
       const onlySheets = q.includes(`mimeType='${SHEET_MIME}'`);
+      const mime = /mimeType='([^']+)'/.exec(q)?.[1];
+      const contains = /name contains '([^']*)'/.exec(q)?.[1]?.toLowerCase();
       const out = [...files.values()]
         .filter((f) => !f.trashed) // every query of the app says trashed=false
+        .filter((f) => !mime || f.mimeType === mime)
+        .filter((f) => !contains || f.name.toLowerCase().includes(contains))
         .filter((f) => !onlySheets || f.mimeType === SHEET_MIME)
         .filter((f) => (!name || f.name === name) && (!parent || f.parents.includes(parent)) && (isFolder ? f.mimeType.includes('folder') : !f.mimeType.includes('folder')))
         .sort((a, b) => b.modifiedTime - a.modifiedTime)
-        .map(({ id: fid, name: nm, modifiedTime, body, parents }) => ({ id: fid, name: nm, size: String(String(body ?? '').length), modifiedTime: new Date(modifiedTime).toISOString(), parents: [...parents] }));
+        .map(({ id: fid, name: nm, modifiedTime, body, parents, mimeType }) => ({ id: fid, name: nm, mimeType, size: String(String(body ?? '').length), modifiedTime: new Date(modifiedTime).toISOString(), parents: [...parents] }));
       return res({ files: out });
     }
     if (method === 'POST' && u.pathname === '/drive/v3/files') {
@@ -151,9 +156,10 @@ export function createFakeDrive({ token: initialToken = 'tok-valid-123456' } = {
       const body = parts[1].split('\r\n\r\n').slice(1).join('\r\n\r\n').replace(/\r\n$/, '');
       if (!meta.parents?.every((pid) => files.has(pid))) return res({ error: 'parent not found' }, 404);
       n += 1;
-      const f = { id: `fil${n}xxxxxx`, name: meta.name, mimeType: meta.mimeType, parents: meta.parents, body, modifiedTime: (clock += 1) };
+      const f = { id: `fil${n}xxxxxx`, name: meta.name, mimeType: meta.mimeType, parents: state.misplaceUploads ? ['root'] : meta.parents, body, modifiedTime: (clock += 1) };
       files.set(f.id, f);
-      return res({ id: f.id });
+      created.push({ id: f.id, name: meta.name, parents: [...(meta.parents || [])] }); // where it was ASKED to be born
+      return res({ id: f.id, parents: [...f.parents] });
     }
     if (method === 'PATCH' && mediaUpload) {
       const f = files.get(id);
@@ -201,6 +207,7 @@ export function createFakeDrive({ token: initialToken = 'tok-valid-123456' } = {
     },
     files,
     calls,
+    created,
     state,
     fetchImpl,
     /** A created Spreadsheet: { id, title, parents, tabs: { <tab name>: rows[][] } } (null when there is none by that title). */

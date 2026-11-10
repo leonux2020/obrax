@@ -17,9 +17,12 @@ const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
 const SHEETS = 'https://sheets.googleapis.com/v4/spreadsheets';
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
 const SHEET_MIME = 'application/vnd.google-apps.spreadsheet';
+export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'; // the hand-made Excel of the old versions
 const SHEET_CHUNK_ROWS = 500; // rows per range written
 const SHEET_CALL_CELLS = 40_000; // cells per values:batchUpdate request (the API recommends <= 2 MB per request)
 const ID_RE = /^[A-Za-z0-9_-]{5,200}$/;
+/** A real folder id: never empty, never the 'root' alias (a media file is never created in the root of the Drive). */
+export const isFolderId = (id) => typeof id === 'string' && id !== 'root' && ID_RE.test(id);
 
 /**
  * Time limits per request (ms). A request that exceeds its limit is aborted and counts as "offline" (the sync keeps the change pending and
@@ -299,9 +302,19 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
     return out;
   }
 
-  /** Create (or overwrite, when `existingId` is given) a binary file. `bytes` is a Uint8Array. Resolves { id }. */
+  /**
+   * ATOMIC SAFE CREATION of a media file (photo, PDF, legacy xlsx): it is born INSIDE its folder, never in the root to be moved later.
+   *   1. `parentId` must be a real folder id BEFORE a single byte leaves the device: an empty / unknown / 'root' parent is refused (a `parents` that is
+   *      empty or "root" is exactly how a file ends up lying in "Mi unidad").
+   *   2. `parents: [parentId]` travels in the metadata part of the very same multipart/related POST: one request, one place, no PATCH afterwards.
+   *   3. Drive's answer is checked (`fields=id,parents`): if it ever reports the file somewhere else, it is put in its folder at once (silent healing).
+   * With `existingId` the content of a file that is already in its folder is replaced (its place is not touched).
+   * @returns {Promise<{ id: string }>}
+   */
   async function uploadFile(parentId, { name, mimeType = 'application/octet-stream', bytes, existingId = '' }) {
+    if (!isFolderId(parentId) || !bytes || typeof bytes.length !== 'number') throw new DriveError('bad_response'); // nothing is sent without a destination folder
     if (existingId) {
+      if (!ID_RE.test(String(existingId))) throw new DriveError('bad_response');
       const res = await json(`${UPLOAD}/files/${existingId}?uploadType=media&fields=id`, { method: 'PATCH', headers: { 'Content-Type': mimeType }, body: bytes }, timeouts.transfer);
       return { id: res?.id ?? existingId };
     }
@@ -313,8 +326,15 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
     body.set(head, 0);
     body.set(bytes, head.length);
     body.set(tail, head.length + bytes.length);
-    const res = await json(`${UPLOAD}/files?uploadType=multipart&fields=id`, { method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body }, timeouts.transfer);
+    const res = await json(`${UPLOAD}/files?uploadType=multipart&fields=id,parents`, { method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body }, timeouts.transfer);
     if (!ID_RE.test(String(res?.id))) throw new DriveError('bad_response');
+    if (Array.isArray(res.parents) && !(res.parents.length === 1 && res.parents[0] === parentId)) {
+      try {
+        await moveInto(res.id, parentId); // it is not where it was asked to be: home, silently
+      } catch {
+        /* the file exists; the concierge / the next sync deal with it */
+      }
+    }
     return { id: res.id };
   }
 
@@ -455,7 +475,7 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
   // With the drive.file scope Drive only ever shows the files THIS app created, and `'me' in owners` keeps even those to the user's own: the concierge
   // can never touch anything else of the Drive.
   const FILE_FIELDS = 'nextPageToken,files(id,name,mimeType,modifiedTime,size,parents)';
-  const asFile = (f) => ({ id: f.id, name: String(f.name ?? ''), modifiedTime: typeof f.modifiedTime === 'string' ? f.modifiedTime : '', size: Number(f.size) || 0, parents: Array.isArray(f.parents) ? f.parents.filter((x) => typeof x === 'string') : [] });
+  const asFile = (f) => ({ id: f.id, name: String(f.name ?? ''), mimeType: typeof f.mimeType === 'string' ? f.mimeType : '', modifiedTime: typeof f.modifiedTime === 'string' ? f.modifiedTime : '', size: Number(f.size) || 0, parents: Array.isArray(f.parents) ? f.parents.filter((x) => typeof x === 'string') : [] });
   /** Every page (bounded) of a files query, newest first: [{ id, name, modifiedTime, size, parents }]. */
   async function listAll(q) {
     const out = [];
@@ -472,6 +492,21 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
   }
   /** Every cubrax-backup.json of the user's Drive, wherever it is (root, the CUBRAX folder, the legacy folder), not in the trash. */
   const findBackups = () => listAll(`name='${BACKUP_FILE}' and mimeType!='${FOLDER_MIME}' and trashed=false and 'me' in owners`);
+  /**
+   * The Excel files (.xlsx) of the user's Drive that this app can see, wherever they are (root, project folders), not in the trash. Two queries, merged:
+   * by Excel mimeType, and by name (an .xlsx uploaded by hand may carry another mimeType).
+   */
+  async function findExcelFiles() {
+    const [byMime, byName] = await Promise.all([
+      listAll(`mimeType='${XLSX_MIME}' and trashed=false and 'me' in owners`),
+      listAll(`name contains 'xlsx' and mimeType!='${FOLDER_MIME}' and trashed=false and 'me' in owners`),
+    ]);
+    const seen = new Set();
+    return [...byMime.map((f) => ({ ...f, mimeType: XLSX_MIME })), ...byName].filter((f) => (seen.has(f.id) ? false : seen.add(f.id))).filter((f) => f.mimeType === XLSX_MIME || /\.xlsx$/i.test(f.name));
+  }
+  /** EVERYTHING (not a folder, not in the trash) that Drive shows this app: only for the developer's log of the concierge (what it "sees"). */
+  const listVisible = () => listAll(`mimeType!='${FOLDER_MIME}' and trashed=false and 'me' in owners`);
+
   /** The Spreadsheets directly inside `parentId` ('root' = My Drive), not in the trash. */
   const listSheets = (parentId) => {
     if (!okParent(parentId)) throw new DriveError('bad_response');
@@ -498,5 +533,5 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
     childIds.clear();
   };
 
-  return { findFolder, ensureFolder, ensureChildFolder, ensureFolderPath, listFiles, uploadFile, upsertSpreadsheet, forgetFolders, serial, findBackups, listSheets, listFolders, trashFile, moveFile, saveBackup, latestBackup, peekBackup, forgetFolder: () => { folderId = null; } };
+  return { findFolder, ensureFolder, ensureChildFolder, ensureFolderPath, listFiles, uploadFile, upsertSpreadsheet, forgetFolders, serial, findBackups, findExcelFiles, listVisible, listSheets, listFolders, trashFile, moveFile, saveBackup, latestBackup, peekBackup, forgetFolder: () => { folderId = null; } };
 }
