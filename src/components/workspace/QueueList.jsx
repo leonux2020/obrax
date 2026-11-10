@@ -7,7 +7,14 @@ export default function QueueList({ rows, onRetry, onDiscard, onAccept }) {
   const { t, locale } = useI18n();
   if (!rows.length) return null;
   const when = (ms) => (ms ? new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(ms)) : '');
-  const label = (r) => (r.status === 'failed' ? t('q.state.failed') : r.status === 'review' ? t('q.state.review') : r.status === 'sending' ? t('q.sending') : r.lastError === 'rate_limited' ? t('q.pending.rate') : t('q.pending'));
+  const label = (r) => (r.status === 'failed' ? t('q.state.failed') : r.status === 'review' ? t('q.state.review') : r.status === 'sending' ? t('q.sending') : r.lastError === 'rate_limited' ? t('q.pending.rate') : r.lastError === 'network' || r.lastError === 'timeout' ? t('q.pending.net') : t('q.pending'));
+  // why the AI could not read it (a blurry photo, not a receipt...): quiet, under the state; nothing for the rows that simply wait
+  const why = (r) => {
+    if (r.status !== 'failed' || !r.lastError) return '';
+    const key = r.lastError === 'not_invoice' ? 'inv.err.not_receipt' : `inv.err.${r.lastError}`;
+    const text = t(key);
+    return text === key ? '' : text;
+  };
   const btn = 'min-h-[44px] rounded-lg border border-white/10 bg-white/5 px-3 text-xs font-medium text-neutral-200 active:bg-white/10';
   return (
     <ul className="mb-3 space-y-2" data-testid="queue-list" aria-label={t('q.title')}>
@@ -16,6 +23,11 @@ export default function QueueList({ rows, onRetry, onDiscard, onAccept }) {
           <p style={{ color: TONE[r.status] }} className="text-sm font-semibold">
             🧾 {label(r)}
           </p>
+          {why(r) && (
+            <p data-testid={`queued-why-${r.id}`} className="text-xs font-light text-neutral-400">
+              {why(r)}
+            </p>
+          )}
           <p className="text-xs text-neutral-400 tabular-nums">{when(r.createdAt)}</p>
           <div className="mt-1 flex flex-wrap gap-2">
             {r.status === 'review' && (

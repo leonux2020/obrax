@@ -443,12 +443,14 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     [settings.lang, settings.region]
   );
   const receipts = useReceiptSync({ apply: applyReceipt, notify: notifyUser, enabled: stage === 'app' && projects !== null });
+  const drainNow = receipts.run;
   const enqueueReceipt = useCallback(async (job) => {
-    const row = await receiptQueue.enqueue(job);
+    const row = await receiptQueue.enqueue(job); // Queue-first: this is all the scanner waits for (an IndexedDB write)
     registerBackgroundSync(); // Chromium: wakes the page when the connection returns (the online event covers the rest)
     askNotifyPermission(); // we are inside the user's tap: the only moment the browser lets us ask
+    drainNow().catch(() => {}); // fire-and-forget: the worker starts reading at once, in the background (a drain already running picks this row up on its next pass)
     return row;
-  }, []);
+  }, [drainNow]);
 
   // Navigation context of the detail view: opened from Proyectos = tactical mode; from Contabilidad (`{ fromAccounting: true }`) = audit mode (ledger)
   const [fromAccounting, setFromAccounting] = useState(false);

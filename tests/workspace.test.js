@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import React, { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { I18nProvider } from '../src/lib/i18n.jsx';
+import { I18nProvider, makeI18n } from '../src/lib/i18n.jsx';
 import ProjectWorkspace from '../src/components/ProjectWorkspace.jsx';
 import ReceiptSheet from '../src/components/ReceiptSheet.jsx';
 import ToastHost from '../src/components/workspace/ToastHost.jsx';
@@ -16,7 +16,7 @@ import { LEVEL_COLOR } from '../src/components/levelStyle.js';
 import { currentBook, resetRegistry } from '../src/lib/priceRegistry.js';
 import { flushUserPrices } from '../src/lib/priceFeed.js';
 import { priceStore } from '../src/lib/priceStore.js';
-import { resetToasts } from '../src/lib/notify.js';
+import { getToasts, resetToasts } from '../src/lib/notify.js';
 import { freezeQuote } from '../src/lib/signature.js';
 import { InvoiceError } from '../src/lib/invoice.js';
 import { seedKey } from './helpers/gemini.js';
@@ -453,7 +453,7 @@ describe('no way out to the old editor + queue list', () => {
     expect(q('dock-queued').textContent).toBe('1'); // only this project's pending one
     await click(q('ws-expenses'));
     expect(qa('queue-list')).toHaveLength(1);
-    expect(q('queued-abcd1').textContent).toContain('Pendiente de conexión');
+    expect(q('queued-abcd1').textContent).toContain('En cola · se procesa en segundo plano');
     expect(q('queued-abcd2').textContent).toContain('No se pudo leer');
     expect(q('queued-zzzz9')).toBeNull();
     await click(q('queued-discard-abcd1'));
@@ -463,7 +463,7 @@ describe('no way out to the old editor + queue list', () => {
   });
 });
 
-describe('Escáner IA offline: the photo is parked, never read locally', () => {
+describe('Escáner IA queue-first: the photo is stored, never awaited', () => {
   const prepare = async () => ({ dataUrl: 'data:image/jpeg;base64,AAAA', width: 1, height: 1 });
   const pick = async () => {
     const input = q('receipt-camera-input');
@@ -475,34 +475,63 @@ describe('Escáner IA offline: the photo is parked, never read locally', () => {
   };
   const sheet = (props) => act(async () => root.render(React.createElement(I18nProvider, { lang: 'es', regionCode: 'CL' }, React.createElement(ReceiptSheet, { onSave: () => {}, onClose: () => {}, prepareImage: prepare, ...props }))));
 
-  it('no connection: the compressed image goes to onQueue, the proxy is NOT called, the user sees "Pendiente de conexión"', async () => {
+  it('online or not, the compressed image goes to onQueue; the AI is NOT called from the sheet and there is no "reading" screen', async () => {
     const onQueue = vi.fn(async () => {});
     const fetchImpl = vi.fn();
+    await sheet({ onQueue, fetchImpl });
+    await pick();
+    expect(onQueue).toHaveBeenCalledWith('data:image/jpeg;base64,AAAA');
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(q('receipt-reading')).toBeNull();
+    expect(q('receipt-sheet').getAttribute('data-phase')).toBe('pick'); // the camera is free again
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
     try {
-      await sheet({ onQueue, fetchImpl });
       await pick();
-      expect(onQueue).toHaveBeenCalledWith('data:image/jpeg;base64,AAAA');
+      expect(onQueue).toHaveBeenCalledTimes(2);
       expect(fetchImpl).not.toHaveBeenCalled();
-      expect(q('receipt-queued').textContent).toMatch(/pendiente de conexión/i);
     } finally {
       Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
     }
   });
 
-  it('the line dies while reading: the photo is parked instead of failing', async () => {
-    const onQueue = vi.fn(async () => {});
-    const fetchImpl = vi.fn(async () => {
-      throw new TypeError('Failed to fetch');
-    });
-    await sheet({ onQueue, fetchImpl });
+  it('a green "Guardada. Procesando en segundo plano..." toast and a quiet counter', async () => {
+    await sheet({ onQueue: vi.fn(async () => {}) });
     await pick();
-    expect(fetchImpl).toHaveBeenCalled();
-    expect(onQueue).toHaveBeenCalledTimes(1);
-    expect(q('receipt-queued')).not.toBeNull();
+    expect(getToasts().at(-1)).toMatchObject({ key: 'q.saved', tone: 'ok' });
+    expect(makeI18n('es', 'CL').t('q.saved')).toBe('Guardada. Procesando en segundo plano...');
+    expect(q('receipt-saved').dataset.count).toBe('1');
+    await pick();
+    expect(q('receipt-saved').dataset.count).toBe('2');
+    expect(q('receipt-error')).toBeNull();
   });
 
-  it('without onQueue (old screens) the behaviour is unchanged: a network error is shown as an error', async () => {
+  it('a SLOW network does not matter: the sheet is back at once even if the AI would never answer', async () => {
+    const onQueue = vi.fn(async () => {});
+    const fetchImpl = vi.fn(() => new Promise(() => {})); // a dead 4G line: it never resolves
+    await sheet({ onQueue, fetchImpl });
+    const t0 = Date.now();
+    await pick();
+    expect(Date.now() - t0).toBeLessThan(500);
+    expect(q('receipt-sheet').getAttribute('data-phase')).toBe('pick');
+    expect(q('receipt-saved')).not.toBeNull();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('burst: photos taken one after another, without waiting, are all stored and the screen is never blocked', async () => {
+    let release;
+    const gateOpen = new Promise((r) => { release = r; });
+    const onQueue = vi.fn(() => gateOpen); // the IndexedDB writes are still in flight
+    await sheet({ onQueue });
+    for (let i = 0; i < 6; i += 1) await pick();
+    expect(onQueue).toHaveBeenCalledTimes(6); // each tap went through while the previous ones were pending
+    expect(q('receipt-sheet').getAttribute('data-phase')).toBe('pick');
+    expect(q('receipt-camera').disabled).toBeFalsy();
+    await act(async () => { release(); await Promise.resolve(); });
+    await flush(10);
+    expect(q('receipt-saved').dataset.count).toBe('6');
+  });
+
+  it('without onQueue (a screen with no queue) the synchronous flow stays as a fallback: a network error is shown as an error', async () => {
     const fetchImpl = vi.fn(async () => {
       throw new TypeError('Failed to fetch');
     });
@@ -512,17 +541,18 @@ describe('Escáner IA offline: the photo is parked, never read locally', () => {
     expect(new InvoiceError('network').code).toBe('network');
   });
 
-  it('a full queue is reported to the user', async () => {
+  it('a full queue is reported to the user, and the next photo clears the message', async () => {
+    let full = true;
     const onQueue = vi.fn(async () => {
-      throw new Error('queue_full');
+      if (full) throw new Error('queue_full');
     });
-    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
-    try {
-      await sheet({ onQueue });
-      await pick();
-      expect(q('receipt-error').getAttribute('data-code')).toBe('queue_full');
-    } finally {
-      Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
-    }
+    await sheet({ onQueue });
+    await pick();
+    expect(q('receipt-error').getAttribute('data-code')).toBe('queue_full');
+    expect(q('receipt-saved')).toBeNull();
+    full = false;
+    await pick();
+    expect(q('receipt-error')).toBeNull();
+    expect(q('receipt-saved').dataset.count).toBe('1');
   });
 });

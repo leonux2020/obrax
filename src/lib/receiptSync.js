@@ -1,4 +1,7 @@
-// Receipt sync engine: drains the deferred queue (receiptQueue.js) when the network is back. No UI, no React.
+// Receipt sync engine: the BACKGROUND WORKER of the queue-first scanner. No UI, no React.
+// The scanner (ReceiptSheet.jsx) only stores the photo as "pending" and returns control at once; the call to Gemini is EXCLUSIVELY this module's job
+// (it also drains whatever waited for the network). A good read becomes expenses in the project (applyReceipt in App.jsx -> Auto-Sync -> Excel / Sheet); a bad one
+// (blurry photo, not a receipt) stays in the list of pending receipts with its error ('failed') for the user to review later: nothing is ever shown at scan time.
 //
 //   queue row -> data URL -> Gemini with the user's own key (requestReceipt, same call the online scanner makes) -> expenses
 //   -> `apply(projectId, expenses)` (the app writes them into the project) -> row removed -> user notified.
@@ -57,7 +60,7 @@ async function exclusive(fn) {
 }
 
 /**
- * Process every due row once.
+ * Process every due row once (plus the ones that arrive while it runs: queue-first, the user keeps photographing).
  * @param apply async (projectId, expenses, row) => boolean   false = the project no longer exists (the row is dropped)
  * @returns {Promise<{done: {row, count}[], review: object[], failed: object[], deferred: number, skipped: boolean}|null>}
  */
@@ -65,7 +68,8 @@ export function drainReceiptQueue({ queue = receiptQueue, apply, request = reque
   return exclusive(async () => {
     const result = { done: [], review: [], failed: [], deferred: 0, skipped: false };
     if (!online()) return { ...result, skipped: true };
-    const rows = force ? (await queue.list()).filter((r) => r.status === 'pending') : queue.due(await queue.list(), now());
+    const pick = async () => (force ? (await queue.list()).filter((r) => r.status === 'pending') : queue.due(await queue.list(), now()));
+    let rows = await pick();
     const gate = queue.gate;
     if (gate && !force && rows.length && gate.active(now())) {
       // Google asked us to wait and the time has not passed: no request at all. The due rows are moved to the moment the gate opens, which also
@@ -74,61 +78,68 @@ export function drainReceiptQueue({ queue = receiptQueue, apply, request = reque
       return { ...result, deferred: rows.length };
     }
 
-    for (const row of rows) {
-      if (!online()) {
-        result.deferred += 1;
-        continue;
-      }
-      await queue.update(row.id, { status: 'sending' });
-      try {
-        const image = await queue.imageOf(row);
-        const answer = await request(image, { currency: row.currency, lang: row.lang, ...(fetchImpl ? { fetchImpl } : {}) });
-        gate?.reset(); // Google answered: the cooling (429) is over
-        const receipts = asReceipts(answer); // one photo can hold several receipts: each one becomes its own group of expenses
-        // printed in another currency: frozen into the project's base currency with the rate of this moment (fx.js). A real rate (service /
-        // last known) is applied silently; with only the approximate reference rate (or none) the user is asked, nothing is tabulated behind their back
-        const fx = await convertToBase(batchExpenses(receipts, { now: now() }), { base: row.currency, resolve, now: now(), ...(fetchImpl ? { fetchImpl } : {}) });
-        if (fx.missing.length || fx.approximate.length) {
-          await queue.update(row.id, { status: 'review', result: { receipts }, lastError: 'currency' });
-          result.review.push(row);
+    // Queue-first: the user keeps photographing while this runs, so photos that arrive DURING the drain are picked up by the next pass of the same run
+    // (a row is processed once per run: whatever failed has a later `nextAt` or a final status and is not due again).
+    const seen = new Set();
+    pass: while (rows.length) {
+      for (const row of rows) {
+        seen.add(row.id);
+        if (!online()) {
+          result.deferred += 1;
           continue;
         }
-        const expenses = fx.expenses;
-        const applied = await apply(row.projectId, expenses, row);
-        await queue.remove(row.id); // applied, or the project is gone: either way the picture is no longer needed
-        if (applied) result.done.push({ row, count: expenses.length });
-      } catch (err) {
-        const code = typeof err?.code === 'string' ? err.code : 'unexpected';
-        if (code === THROTTLED && gate) {
-          // 429: pause the WHOLE queue (this photo and the ones behind it). Google's Retry-After when it sent one, else 60 s doubling with each consecutive 429.
-          // The photo keeps its attempts (it is not its fault) and nobody is told: it simply happens later.
-          const pause = gate.hit({ retryAfterMs: err.retryAfterMs, now: now() });
-          const nextAt = now() + pause;
-          await queue.update(row.id, { status: 'pending', lastError: code, nextAt });
-          const rest = rows.slice(rows.indexOf(row) + 1);
-          for (const r of rest) await queue.update(r.id, { nextAt });
-          result.deferred += 1 + rest.length;
-          break;
-        }
-        if (PERMANENT.includes(code)) {
-          await queue.update(row.id, { status: 'failed', lastError: code, attempts: row.attempts + 1 });
-          result.failed.push(row);
-          continue;
-        }
-        const waiting = WAITING_FOR_USER.includes(code);
-        const attempts = waiting ? row.attempts : row.attempts + 1; // a missing / rejected key is not the photo's fault: never burn its attempts
-        const exhausted = attempts >= QUEUE_LIMITS.maxAttempts;
-        await queue.update(row.id, exhausted ? { status: 'failed', lastError: code, attempts } : { status: 'pending', lastError: code, attempts, nextAt: now() + (waiting ? BACKOFF.maxMs : backoffMs(attempts)) });
-        if (exhausted) result.failed.push(row);
-        else result.deferred += 1;
-        if (RETRYABLE.includes(code)) {
-          // connectivity / service trouble: the rest would fail the same way, so they wait for the same retry time
-          const rest = rows.slice(rows.indexOf(row) + 1);
-          for (const r of rest) await queue.update(r.id, { nextAt: now() + (waiting ? BACKOFF.maxMs : backoffMs(attempts)) });
-          result.deferred += rest.length;
-          break;
+        await queue.update(row.id, { status: 'sending' });
+        try {
+          const image = await queue.imageOf(row);
+          const answer = await request(image, { currency: row.currency, lang: row.lang, ...(fetchImpl ? { fetchImpl } : {}) });
+          gate?.reset(); // Google answered: the cooling (429) is over
+          const receipts = asReceipts(answer); // one photo can hold several receipts: each one becomes its own group of expenses
+          // printed in another currency: frozen into the project's base currency with the rate of this moment (fx.js). A real rate (service /
+          // last known) is applied silently; with only the approximate reference rate (or none) the user is asked, nothing is tabulated behind their back
+          const fx = await convertToBase(batchExpenses(receipts, { now: now() }), { base: row.currency, resolve, now: now(), ...(fetchImpl ? { fetchImpl } : {}) });
+          if (fx.missing.length || fx.approximate.length) {
+            await queue.update(row.id, { status: 'review', result: { receipts }, lastError: 'currency' });
+            result.review.push(row);
+            continue;
+          }
+          const expenses = fx.expenses;
+          const applied = await apply(row.projectId, expenses, row);
+          await queue.remove(row.id); // applied, or the project is gone: either way the picture is no longer needed
+          if (applied) result.done.push({ row, count: expenses.length });
+        } catch (err) {
+          const code = typeof err?.code === 'string' ? err.code : 'unexpected';
+          if (code === THROTTLED && gate) {
+            // 429: pause the WHOLE queue (this photo and the ones behind it). Google's Retry-After when it sent one, else 60 s doubling with each consecutive 429.
+            // The photo keeps its attempts (it is not its fault) and nobody is told: it simply happens later.
+            const pause = gate.hit({ retryAfterMs: err.retryAfterMs, now: now() });
+            const nextAt = now() + pause;
+            await queue.update(row.id, { status: 'pending', lastError: code, nextAt });
+            const rest = rows.slice(rows.indexOf(row) + 1);
+            for (const r of rest) await queue.update(r.id, { nextAt });
+            result.deferred += 1 + rest.length;
+            break pass;
+          }
+          if (PERMANENT.includes(code)) {
+            await queue.update(row.id, { status: 'failed', lastError: code, attempts: row.attempts + 1 });
+            result.failed.push(row);
+            continue;
+          }
+          const waiting = WAITING_FOR_USER.includes(code);
+          const attempts = waiting ? row.attempts : row.attempts + 1; // a missing / rejected key is not the photo's fault: never burn its attempts
+          const exhausted = attempts >= QUEUE_LIMITS.maxAttempts;
+          await queue.update(row.id, exhausted ? { status: 'failed', lastError: code, attempts } : { status: 'pending', lastError: code, attempts, nextAt: now() + (waiting ? BACKOFF.maxMs : backoffMs(attempts)) });
+          if (exhausted) result.failed.push(row);
+          else result.deferred += 1;
+          if (RETRYABLE.includes(code)) {
+            // connectivity / service trouble: the rest would fail the same way, so they wait for the same retry time
+            const rest = rows.slice(rows.indexOf(row) + 1);
+            for (const r of rest) await queue.update(r.id, { nextAt: now() + (waiting ? BACKOFF.maxMs : backoffMs(attempts)) });
+            result.deferred += rest.length;
+            break pass;
+          }
         }
       }
+      rows = online() ? (await pick()).filter((r) => !seen.has(r.id)) : [];
     }
     return result;
   });

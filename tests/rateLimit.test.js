@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // Rate limiting (Google's HTTP 429) in the BYOK receipt flow, with zero stress for the user:
 //   1. gemini.js raises a typed InvoiceError('rate_limited') that carries Google's own wait (Retry-After / RetryInfo);
-//   2. the receipt sheet never shows a red "wait a minute": it parks the photo in the queue and says (green) "Boleta en cola";
+//   2. the receipt sheet (queue-first) never even meets the 429 and never shows a red "wait a minute": it stores the photo and says (green) "Guardada";
 //   3. the queue pauses ITSELF (60 s, doubling, or what Google asked), in silence, without ever spending a photo's attempts.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import React, { act } from 'react';
@@ -121,37 +121,20 @@ describe('3. ReceiptSheet: the photo is parked; the user only sees "guardado en 
     host.remove();
   });
 
-  it('429 while reading: queued (no red error, no "espera un minuto"), a GREEN toast, and the gate closes', async () => {
-    const gate = createRateGate();
-    const onQueue = vi.fn(async () => {});
-    const fetchImpl = vi.fn(async () => throttled({ 'retry-after': '30' }));
-    await mount({ onQueue, fetchImpl, gate });
-    await pick();
-    expect(onQueue).toHaveBeenCalledTimes(1);
-    expect(onQueue).toHaveBeenCalledWith(PHOTO);
-    expect(q('receipt-error')).toBeNull();
-    expect(q('receipt-queued').dataset.reason).toBe('rate');
-    expect(q('receipt-queued').textContent).toContain('Boleta en cola');
-    expect(host.textContent).not.toMatch(/espera un minuto|demasiadas lecturas/i);
-    expect(getToasts().at(-1)).toMatchObject({ key: 'q.queued', tone: 'ok' });
-    expect(makeI18n('es', 'CL').t('q.queued')).toBe('Boleta en cola. Se procesará automáticamente en breve');
-    expect(gate.active(Date.now())).toBe(true);
-  });
-
-  it('TEN photos in a row: only the first one asks Google; every one answers "en cola" and nothing is red', async () => {
-    const gate = createRateGate();
+  it('queue-first: the sheet never meets the 429 (the worker does): ten photos in a row, ten green "guardada", nothing red, no request from the sheet', async () => {
     const onQueue = vi.fn(async () => {});
     const fetchImpl = vi.fn(async () => throttled());
-    await mount({ onQueue, fetchImpl, gate });
+    await mount({ onQueue, fetchImpl });
     for (let i = 0; i < 10; i += 1) {
       await pick();
-      expect(q('receipt-queued'), `photo ${i + 1}`).not.toBeNull();
-      expect(q('receipt-error')).toBeNull();
-      expect(getToasts().at(-1)).toMatchObject({ key: 'q.queued', tone: 'ok' });
-      await act(async () => q('receipt-another').click()); // "Escanear otra"
+      expect(q('receipt-error'), `photo ${i + 1}`).toBeNull();
+      expect(getToasts().at(-1)).toMatchObject({ key: 'q.saved', tone: 'ok' });
     }
     expect(onQueue).toHaveBeenCalledTimes(10);
-    expect(fetchImpl).toHaveBeenCalledTimes(2); // the first photo: one request per model; the other nine never went out
+    expect(onQueue).toHaveBeenCalledWith(PHOTO);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(host.textContent).not.toMatch(/espera un minuto|demasiadas lecturas/i);
+    expect(q('receipt-saved').dataset.count).toBe('10');
   });
 
   it('the photos parked while the gate is closed are born waiting for it (the drain does not try them earlier)', async () => {
@@ -165,36 +148,10 @@ describe('3. ReceiptSheet: the photo is parked; the user only sees "guardado en 
     expect(free.nextAt).toBe(0);
   });
 
-  it('a good answer reopens the gate; the other errors keep their old behaviour (a real error is still shown)', async () => {
-    const gate = createRateGate();
-    gate.hit({ now: Date.now() - 10 * 60_000 }); // closed a long time ago: open now
-    const onQueue = vi.fn(async () => {});
-    const fetchImpl = vi.fn(async () => geminiError(401));
-    await mount({ onQueue, fetchImpl, gate });
-    await pick();
-    expect(fetchImpl).toHaveBeenCalled(); // the gate was open: it tried
-    expect(q('receipt-error').dataset.code).toBe('bad_key');
-    expect(onQueue).not.toHaveBeenCalled();
-  });
-
   it('screens without a queue keep telling the truth: the (calm) rate-limit message', async () => {
-    await mount({ fetchImpl: vi.fn(async () => throttled()), gate: createRateGate() });
+    await mount({ fetchImpl: vi.fn(async () => throttled()) });
     await pick();
     expect(q('receipt-error').dataset.code).toBe('rate_limited');
-  });
-
-  it('offline parking still says "pendiente de conexión" (the rate-limit texts are a separate variant)', async () => {
-    const onQueue = vi.fn(async () => {});
-    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
-    try {
-      await mount({ onQueue, fetchImpl: vi.fn(), gate: createRateGate() });
-      await pick();
-      expect(q('receipt-queued').dataset.reason).toBe('offline');
-      expect(q('receipt-queued').textContent).toMatch(/pendiente de conexión/i);
-      expect(getToasts().some((t) => t.key === 'q.queued')).toBe(false);
-    } finally {
-      Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
-    }
   });
 
   it('the privacy line describes BYOK in every language: the phone talks to Gemini with the user\'s key; no "our server"', () => {
@@ -210,7 +167,7 @@ describe('3. ReceiptSheet: the photo is parked; the user only sees "guardado en 
   it('the new texts exist in the six languages', () => {
     for (const lang of ['es', 'en', 'pt', 'fr', 'it', 'de']) {
       const t = makeI18n(lang, 'CL').t;
-      for (const key of ['q.queued', 'q.parked.rate', 'q.parkedHint.rate', 'q.pending.rate']) expect(t(key), `${lang} ${key}`).not.toBe(key);
+      for (const key of ['q.saved', 'q.savedCount', 'q.pending', 'q.pending.net', 'q.pending.rate']) expect(t(key), `${lang} ${key}`).not.toBe(key);
     }
   });
 });

@@ -6,28 +6,28 @@ import { PhotoError, compressInvoiceImage } from '../lib/photos.js';
 import { pushToast } from '../lib/notify.js';
 import { dropDuplicateReceipts, expensesFromRows, receiptMeta, receiptSumCheck, requestReceipt } from '../lib/receipt.js';
 import { applyRates, resolveRate } from '../lib/fx.js';
-import { receiptQueue } from '../lib/receiptQueue.js';
 import { Button, DateInput, NumberField } from './ui.jsx';
 import BottomSheet from './BottomSheet.jsx';
 import Hourglass from './Hourglass.jsx';
 
 /**
- * Offline: when `onQueue` is given and there is no connection (or the request dies on the network), the compressed photo
- * is parked in the deferred queue (phase 'queued') instead of failing; it is read later, silently, by receiptSync.js.
- * Rate limit (Google's 429, the free tier of the user's own key): the same, and it is NOT an error. The photo is parked, a green toast says
- * "Boleta en cola", and while the queue's gate (rateGate.js) is closed the next photos go straight to the queue without waiting for another failed
- * request: ten photos in a row always answer "guardado en cola"; the queue reads them in the background with its own backoff (receiptSync.js).
- * "Escanear Boleta con IA" (PRO): photo -> the AI tabulates the lines at once -> the user glances at them -> they are
- * stored in the project as expenses for the rendición. Rented tools / machinery come with the day they go back, which
- * is what lights the hourglass on the project card.
- * The photo is compressed on the device and sent straight to Google with the user's own key (BYOK, lib/gemini.js); no server of ours sees it.
+ * QUEUE-FIRST (fire-and-forget). With `onQueue` (the app always passes it) the sheet NEVER waits for the AI: the photo is compressed on the device
+ * (local, instant), written to the deferred queue (receiptQueue.js, IndexedDB, status "pending") and the camera is free again at once, with a green
+ * "Guardada. Procesando en segundo plano..." toast. The network is not the sheet's business any more: receiptSync.js (the background worker) calls Gemini
+ * with the user's key, writes the expenses into the project (-> Auto-Sync -> Excel / Sheet) or, when the AI cannot read the photo, leaves it in the
+ * list of pending receipts with its error, to be reviewed later. Offline, 429, a slow 4G line: all the same thing for the user: "guardada".
+ * Without `onQueue` (a screen with no queue) the old synchronous flow stays as a fallback: read -> review -> save.
+ *
+ * "Escanear Boleta con IA" (PRO): photo -> the AI tabulates the lines -> they are stored in the project as expenses for the rendición. Rented tools /
+ * machinery come with the day they go back, which is what lights the hourglass on the project card.
+ * The photo is compressed on the device and sent straight to Google with the user's own key (BYOK, lib/gemini.js); no intermediate server sees it.
  * Without a key the sheet is not even opened: the soft key request (GeminiKey.jsx, KeyGate) comes first.
  */
-export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], prepareImage = compressInvoiceImage, fetchImpl, today = Date.now, resolveFx = resolveRate, gate = receiptQueue.gate }) {
+export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], prepareImage = compressInvoiceImage, fetchImpl, today = Date.now, resolveFx = resolveRate }) {
   const { t, region, lang, money, moneyIn } = useI18n();
-  const [phase, setPhase] = useState('pick'); // 'pick' | 'reading' | 'review'
+  const [phase, setPhase] = useState('pick'); // 'pick' | 'reading' | 'review' (the last two only without a queue: the fallback flow)
   const [error, setError] = useState('');
-  const [queuedWhy, setQueuedWhy] = useState('offline'); // why the photo was parked: 'offline' (no connection) | 'rate' (Google is limiting the readings)
+  const [saved, setSaved] = useState(0); // photos of this session already in the queue (quiet confirmation, queue-first flow)
   const [receipts, setReceipts] = useState([]); // ONE photo can hold several receipts: each is an independent record
   const [image, setImage] = useState(null); // the compressed photo that was read: it stays with the expenses (Comprobantes)
   const [rows, setRows] = useState([]);
@@ -47,6 +47,21 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
     };
   }, []);
 
+  // QUEUE-FIRST: nothing here waits for the network. The sheet never leaves 'pick', so the next photo can be taken while this one is still being stored.
+  const capture = async (file) => {
+    setError('');
+    try {
+      const img = await prepareImage(file); // local compression
+      await onQueue(img.dataUrl); // IndexedDB write: the photo is "pending"; receiptSync.js reads it later, silently
+      pushToast({ key: 'q.saved', tone: 'ok' }); // calm and green: nothing went wrong, it just happens in the background
+      if (alive.current) setSaved((n) => n + 1);
+    } catch (err) {
+      if (!alive.current) return;
+      setError(err instanceof PhotoError ? 'photo' : err?.message === 'queue_full' ? 'queue_full' : 'upstream');
+    }
+  };
+
+  // Fallback without a queue: the synchronous flow (read -> review -> save)
   const read = async (file) => {
     setError('');
     setPhase('reading');
@@ -54,27 +69,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
     abortRef.current = ctl;
     try {
       const img = await prepareImage(file);
-      const park = async (why) => {
-        await onQueue(img.dataUrl); // the photo waits in the queue; the AI reads it later, silently (receiptSync.js)
-        if (!alive.current) return;
-        setQueuedWhy(why);
-        setPhase('queued');
-        if (why === 'rate') pushToast({ key: 'q.queued', tone: 'ok' }); // calm and green: nothing went wrong, it just happens in the background
-      };
-      if (onQueue && typeof navigator !== 'undefined' && navigator.onLine === false) return await park('offline'); // no connection: no OCR here
-      if (onQueue && gate?.active(Date.now())) return await park('rate'); // Google asked us to slow down a moment ago: no request, no waiting, straight to the queue
-      let batch;
-      try {
-        batch = await requestReceipt(img.dataUrl, { currency: region.currency, lang, signal: ctl.signal, ...(fetchImpl ? { fetchImpl } : {}) });
-        gate?.reset();
-      } catch (err) {
-        if (onQueue && err instanceof InvoiceError && (err.code === 'network' || err.code === 'timeout')) return await park('offline'); // the line died while reading
-        if (onQueue && err instanceof InvoiceError && err.code === 'rate_limited') {
-          gate?.hit({ retryAfterMs: err.retryAfterMs }); // closes the gate: the next photos do not even try; the queue's backoff takes it from here
-          return await park('rate');
-        }
-        throw err;
-      }
+      let batch = await requestReceipt(img.dataUrl, { currency: region.currency, lang, signal: ctl.signal, ...(fetchImpl ? { fetchImpl } : {}) });
       if (!alive.current) return;
       // Smart deduplication: a paper already stored in the project (same total + date + shop) is dropped from the batch without asking anything
       const { fresh, skipped } = dropDuplicateReceipts(batch.receipts, existing);
@@ -96,7 +91,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
         setPhase('pick');
         return;
       }
-      setError(err instanceof PhotoError ? 'photo' : err instanceof InvoiceError ? err.code : err?.message === 'queue_full' ? 'queue_full' : 'upstream');
+      setError(err instanceof PhotoError ? 'photo' : err instanceof InvoiceError ? err.code : 'upstream');
       setPhase('pick');
     }
   };
@@ -104,7 +99,7 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
   const onFile = (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (file) read(file);
+    if (file) (onQueue ? capture : read)(file);
   };
 
   // A receipt printed in another currency is frozen into the project's BASE currency when it is saved (fx.js). The rate is looked up in the
@@ -164,6 +159,11 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
                 {t(error === 'not_invoice' ? 'inv.err.not_receipt' : `inv.err.${error}`)}
               </p>
             )}
+            {saved > 0 && (
+              <p role="status" data-testid="receipt-saved" data-count={saved} className="text-center text-sm font-light text-[#e8c35f]/90">
+                {t('q.saved')} · {t('q.savedCount', { n: saved })}
+              </p>
+            )}
             <Button className="w-full" onClick={() => cameraRef.current?.click()} data-testid="receipt-camera">
               {t('inv.camera')}
             </Button>
@@ -171,19 +171,6 @@ export default function ReceiptSheet({ onSave, onClose, onQueue, existing = [], 
               {t('inv.upload')}
             </Button>
             <p className="pt-2 text-xs text-neutral-400">{t('inv.privacy')}</p>
-          </div>
-        )}
-
-        {phase === 'queued' && (
-          <div className="space-y-4 py-10 text-center" role="status" data-testid="receipt-queued" data-reason={queuedWhy}>
-            <p className="text-lg font-medium text-[#e8c35f]">{t(queuedWhy === 'rate' ? 'q.parked.rate' : 'q.parked')}</p>
-            <p className="text-sm text-neutral-300">{t(queuedWhy === 'rate' ? 'q.parkedHint.rate' : 'q.parkedHint')}</p>
-            <Button className="w-full" onClick={() => setPhase('pick')} data-testid="receipt-another">
-              {t('q.another')}
-            </Button>
-            <Button variant="secondary" className="w-full" onClick={onClose}>
-              {t('common.close')}
-            </Button>
           </div>
         )}
 
