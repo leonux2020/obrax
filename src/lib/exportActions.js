@@ -4,12 +4,13 @@
 //   'client'  PDF Cliente      Imprevistos and Utilidad are NOT shown: their money is prorated into the visible lines
 //                              (reports.js buildClientModel). Generating it FREEZES the quote (prices + dates stop moving).
 //   'tech'    PDF Contratista  the technical dossier: Imprevistos and Utilidad are itemised with their percentages.
-//   'xlsx'    Excel Rendición  the accounting statement (payments, expenses, advances, balance).
+//   'xlsx'    Rendición (Google Sheets)  the accounting statement (payments, expenses, advances, balance) as a live Google Sheet in the project's
+//                              Drive folder (Sheets API, or the offline queue when there is no connection). Nothing is downloaded or shared.
 
 import { freezeQuote } from './signature.js';
 import { photosForReport } from './photos.js';
 import { createLogbookPdf, createReportPdf, pdfToFile } from './reportPdf.js';
-import { buildRenditionFile } from './rendition.js';
+import { buildRenditionData, renditionTitle } from './rendition.js';
 import { shareOrDownload } from './shareFile.js';
 import { projectTitle } from './projects.js';
 
@@ -20,8 +21,9 @@ const stableName = (name) => String(name).replace(/[-_ ]?\d{4}-\d{2}-\d{2}(?=\.[
 
 /**
  * The documents that go to the root of the project's Drive folder (see driveExport.js): the technical PDF (when the quote is complete),
- * the Bitácora PDF (when there are notes) and the Excel rendición (payments, expenses, advances and the Bitácora as tables). Same engines as the export sheet,
- * but nothing is shared or downloaded and the quote is NOT frozen. Resolves [{ name, mimeType, bytes }].
+ * the Bitácora PDF (when there are notes) and the rendición as a live Google Sheet (payments, expenses, advances and the Bitácora as tabs of pure values:
+ * `{ name, sheets }`, created / refreshed in place by driveExport.js). Same engines as the export sheet, but nothing is shared or downloaded and the quote
+ * is NOT frozen. Resolves [{ name, mimeType, bytes } | { name, sheets }].
  */
 export async function buildDossierDocuments({ project, result, total, company, photos, i18n }) {
   const { t, locale, region } = i18n;
@@ -39,24 +41,25 @@ export async function buildDossierDocuments({ project, result, total, company, p
       /* skipped */
     }
   }
-  const sheet = buildRenditionFile([project], new Map([[project.id, result.valid ? total : null]]), { t, locale, currency: region.currency, digits: region.digits });
-  docs.push({ name: stableName(sheet.name), mimeType: sheet.type || 'application/octet-stream', bytes: new Uint8Array(await sheet.arrayBuffer()) });
+  const sheets = buildRenditionData([project], new Map([[project.id, result.valid ? total : null]]), { t, locale, currency: region.currency });
+  docs.push({ name: renditionTitle([project], { t }), sheets });
   return docs;
 }
 
 /**
  * @param kind  'client' | 'tech' | 'xlsx'
- * @param ctx   { project, result, total, priceTime, company, photos, i18n, setDraft }
- * @returns {Promise<'shared'|'downloaded'|'cancelled'>}
+ * @param ctx   { project, result, total, priceTime, company, photos, i18n, setDraft, sendSheet }   sendSheet: async () => { status, reason? } | null (the app's delivery of the Sheet)
+ * @returns {Promise<'shared'|'downloaded'|'cancelled'|'sent'|'queued'>}  ('sent' / 'queued' only for 'xlsx': it went to Drive / it waits for the connection)
  */
-export async function runExport(kind, { project, result, total, priceTime, company, photos, i18n, setDraft }) {
+export async function runExport(kind, { project, result, total, priceTime, company, photos, i18n, setDraft, sendSheet = null }) {
   if (!EXPORT_KINDS.includes(kind)) throw new Error(`unknown export kind: ${kind}`);
-  const { t, locale, region } = i18n;
+  const { t } = i18n;
   const draft = project.draft;
 
   if (kind === 'xlsx') {
-    const file = buildRenditionFile([project], new Map([[project.id, result.valid ? total : null]]), { t, locale, currency: region.currency, digits: region.digits });
-    return shareOrDownload(file, { title: t('xl.shareTitle', { name: projectTitle(project) || t('proj.untitled') }) });
+    if (typeof sendSheet !== 'function') throw new Error('no destination for the sheet');
+    const out = await sendSheet(); // the app delivers it (and toasts the outcome); a busy / failed delivery returns null
+    return out?.status === 'uploaded' ? 'sent' : out?.status === 'queued' ? 'queued' : 'cancelled';
   }
 
   if (!result.valid) throw new Error('quote incomplete');

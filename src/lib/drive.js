@@ -2,15 +2,22 @@
 // user's Drive when it does not exist) holding ONE consolidated JSON file. The backup is written ONLY inside that folder
 // (`parents`) and restored from it; the folder of the first versions ("CUBRAX") is only READ as a fallback so nobody loses
 // the copy they already had.
-// Scope is drive.file, so the app can only ever see the files it created itself (never the rest of the user's Drive).
+// Scopes: drive.file (the app only ever sees the files it created itself, never the rest of the user's Drive) + spreadsheets (the Google Sheets
+// API, for the live rendición Spreadsheets: see upsertSpreadsheet).
 // Pure of the browser: `fetchImpl`, `getToken` and `refreshToken` are injected so everything runs in Node tests.
+
+import { gridFor, sheetTitle, toValueSheets } from './sheetData.js';
 
 export const BACKUP_FOLDER = 'CUBRAX - Respaldos Obra';
 export const LEGACY_BACKUP_FOLDER = 'CUBRAX';
 export const BACKUP_FILE = 'cubrax-backup.json';
 const API = 'https://www.googleapis.com/drive/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
+const SHEETS = 'https://sheets.googleapis.com/v4/spreadsheets';
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
+const SHEET_MIME = 'application/vnd.google-apps.spreadsheet';
+const SHEET_CHUNK_ROWS = 500; // rows per range written
+const SHEET_CALL_CELLS = 40_000; // cells per values:batchUpdate request (the API recommends <= 2 MB per request)
 const ID_RE = /^[A-Za-z0-9_-]{5,200}$/;
 
 /**
@@ -65,6 +72,18 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
     }
   }
 
+  async function reason403(res) {
+    try {
+      const body = await res.json();
+      const text = JSON.stringify(body?.error ?? '').toLowerCase();
+      if (text.includes('scope_insufficient') || text.includes('insufficient authentication scopes') || text.includes('insufficientpermissions')) return 'scope';
+      if (text.includes('service_disabled') || text.includes('has not been used') || text.includes('is disabled')) return 'disabled';
+    } catch {
+      /* no readable body */
+    }
+    return 'limit';
+  }
+
   async function call(url, init = {}, limitMs = timeouts.api) {
     const token = await getToken();
     if (!token) throw new DriveError('auth');
@@ -79,7 +98,17 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
         throw new DriveError('auth', 401);
       }
     }
-    if (res.status === 403 || res.status === 429) throw new DriveError('quota', res.status);
+    if (res.status === 403) {
+      // 403 is three different things: the token lacks a scope (the user must consent again), the API is switched off in the Google Cloud project
+      // (retrying later cannot fix it: a plain failure), or a rate / quota limit (retry later). Unreadable body = the old rule: quota.
+      const why = await reason403(res);
+      if (why === 'scope') {
+        onAuthRejected(token); // this token can never do it: forget it so the next session asks Google for the full set of scopes
+        throw new DriveError('auth', 403);
+      }
+      throw new DriveError(why === 'disabled' ? 'http' : 'quota', 403);
+    }
+    if (res.status === 429) throw new DriveError('quota', 429);
     if (!res.ok) throw new DriveError('http', res.status);
     return res;
   }
@@ -274,11 +303,115 @@ export function createDriveClient({ getToken, refreshToken = null, onAuthRejecte
     return { id: res.id };
   }
 
+  // ---- live Google Sheets (Sheets API v4) -----------------------------------------------------------------------------------------
+  // The rendición is not a file we build: it is a Spreadsheet that lives in the user's Drive (a real, editable database).
+  const quoteTab = (name) => `'${String(name).replace(/'/g, "''")}'`; // A1 notation: a whole tab, or  'Tab'!A1
+  const post = (url, body) => json(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, timeouts.transfer);
+  const okParent = (id) => id === 'root' || ID_RE.test(String(id));
+
+  const findSheet = async (parentId, title) => {
+    const [f] = await list(`mimeType='${SHEET_MIME}' and name='${esc(title)}' and '${parentId}' in parents and trashed=false`, 'files(id,name)');
+    return f?.id ?? null;
+  };
+
+  /** The Sheets API always creates in the root of the Drive: move the file into its folder (add the new parent, drop the old ones). */
+  async function moveInto(id, parentId) {
+    if (parentId === 'root') return;
+    const meta = await json(`${API}/files/${id}?fields=parents`);
+    const current = Array.isArray(meta?.parents) ? meta.parents.filter((x) => typeof x === 'string') : [];
+    if (current.length === 1 && current[0] === parentId) return;
+    const params = new URLSearchParams({ addParents: parentId, fields: 'id' });
+    const drop = current.filter((x) => x !== parentId);
+    if (drop.length) params.set('removeParents', drop.join(','));
+    await json(`${API}/files/${id}?${params}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  }
+
+  /** Every range of every tab, in requests of a bounded size. */
+  function valueBatches(tabs) {
+    const batches = [];
+    let cur = [];
+    let cells = 0;
+    for (const tab of tabs) {
+      for (let i = 0; i < tab.rows.length; i += SHEET_CHUNK_ROWS) {
+        const values = tab.rows.slice(i, i + SHEET_CHUNK_ROWS);
+        const size = values.reduce((n, r) => n + Math.max(1, r.length), 0);
+        if (cur.length && cells + size > SHEET_CALL_CELLS) {
+          batches.push(cur);
+          cur = [];
+          cells = 0;
+        }
+        cur.push({ range: `${quoteTab(tab.name)}!A${i + 1}`, majorDimension: 'ROWS', values });
+        cells += size;
+      }
+    }
+    if (cur.length) batches.push(cur);
+    return batches;
+  }
+
+  /**
+   * Create (or refresh in place) the Google Spreadsheet `title` inside the folder `parentId`.
+   *   1. look for it by name in the folder (a second close refreshes the SAME Spreadsheet: never a duplicate);
+   *   2. not there: POST spreadsheets (the tabs and their grid sizes go in the same request) -> spreadsheetId. A Spreadsheet created by an earlier attempt
+   *      that died before moving it is adopted from the root instead of creating a second one;
+   *   3. the Sheets API creates in the root of the Drive: PATCH it into `parentId` (drive v3 addParents / removeParents), BEFORE writing any data,
+   *      so a retry after a failure always finds it in its folder;
+   *   4. an existing Spreadsheet: add the missing tabs, grow the grids that are too small and clear the tabs we are about to rewrite (what the user
+   *      typed in OTHER tabs or to the right of our columns is not touched, and a renamed tab is simply not ours any more);
+   *   5. values:batchUpdate with valueInputOption RAW: text and numbers exactly as given, a text starting with "=" is data, never a formula.
+   * @param sheets  [{ name, rows: (string|number)[][] }]  (cleaned again here: only pure values ever leave the device)
+   * @returns { id, created }
+   */
+  async function upsertSpreadsheet(parentId, { title, sheets }) {
+    const tabs = toValueSheets(sheets);
+    if (!okParent(parentId) || !tabs.length) throw new DriveError('bad_response');
+    const name = sheetTitle(title);
+    let id = await findSheet(parentId, name);
+    let created = false;
+    let misplaced = false;
+    if (!id && parentId !== 'root') {
+      id = await findSheet('root', name);
+      misplaced = Boolean(id);
+    }
+    if (!id) {
+      const made = await post(`${SHEETS}?fields=spreadsheetId`, { properties: { title: name }, sheets: tabs.map((t) => ({ properties: { title: t.name, gridProperties: gridFor(t) } })) });
+      if (!ID_RE.test(String(made?.spreadsheetId))) throw new DriveError('bad_response');
+      id = made.spreadsheetId;
+      created = true;
+      misplaced = true;
+    }
+    if (misplaced) await moveInto(id, parentId);
+
+    if (!created) {
+      const meta = await json(`${SHEETS}/${id}?fields=sheets.properties(sheetId,title,gridProperties(rowCount,columnCount))`);
+      const have = new Map((Array.isArray(meta?.sheets) ? meta.sheets : []).map((s) => s?.properties).filter((p) => p && typeof p.title === 'string').map((p) => [p.title.toLowerCase(), p]));
+      const requests = [];
+      const clear = [];
+      for (const tab of tabs) {
+        const grid = gridFor(tab);
+        const mine = have.get(tab.name.toLowerCase());
+        if (!mine) {
+          requests.push({ addSheet: { properties: { title: tab.name, gridProperties: grid } } });
+          continue;
+        }
+        clear.push(quoteTab(mine.title));
+        const rows = Math.max(Number(mine.gridProperties?.rowCount) || 0, grid.rowCount);
+        const cols = Math.max(Number(mine.gridProperties?.columnCount) || 0, grid.columnCount);
+        if (rows !== Number(mine.gridProperties?.rowCount) || cols !== Number(mine.gridProperties?.columnCount)) {
+          requests.push({ updateSheetProperties: { properties: { sheetId: mine.sheetId, gridProperties: { rowCount: rows, columnCount: cols } }, fields: 'gridProperties.rowCount,gridProperties.columnCount' } });
+        }
+      }
+      if (requests.length) await post(`${SHEETS}/${id}:batchUpdate`, { requests });
+      if (clear.length) await post(`${SHEETS}/${id}/values:batchClear`, { ranges: clear });
+    }
+    for (const data of valueBatches(tabs)) await post(`${SHEETS}/${id}/values:batchUpdate`, { valueInputOption: 'RAW', data });
+    return { id, created };
+  }
+
   /** A cached folder was deleted from Drive (404): forget every cached id so the next try looks them up again. */
   const forgetFolders = () => {
     folderId = null;
     childIds.clear();
   };
 
-  return { findFolder, ensureFolder, ensureChildFolder, ensureFolderPath, listFiles, uploadFile, forgetFolders, saveBackup, latestBackup, peekBackup, forgetFolder: () => { folderId = null; } };
+  return { findFolder, ensureFolder, ensureChildFolder, ensureFolderPath, listFiles, uploadFile, upsertSpreadsheet, forgetFolders, saveBackup, latestBackup, peekBackup, forgetFolder: () => { folderId = null; } };
 }

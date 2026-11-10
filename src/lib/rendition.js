@@ -4,7 +4,7 @@
 import { cashSummary, expensesByCategory, expensesTotal, laborPool, locationLabel, supplierTotals } from './ledger.js';
 import { projectClient, projectTitle } from './projects.js';
 import { getRegion } from './regions.js';
-import { buildXlsx, fileStem, xlsxToFile } from './xlsx.js';
+import { fileStem, toValueSheets } from './sheetData.js';
 
 const head = (v) => ({ v, head: true });
 const money = (v, bold = false) => ({ v, money: true, bold });
@@ -140,26 +140,29 @@ export function buildRenditionSheets(projects, totals, { t, locale = 'es', curre
   ];
 }
 
-/** The .xlsx of the rendición for these projects as raw bytes (Uint8Array): what goes to Drive / the offline queue. */
-export function buildRenditionBytes(projects, totals, ctx) {
-  return buildXlsx(buildRenditionSheets(projects, totals, ctx), { digits: ctx.digits ?? 2 });
+/**
+ * The rendición as PURE VALUES (strings / finite numbers only; every style hint of the builders above is stripped): the exact payload of the
+ * Google Sheets API and of the offline queue. [{ name, rows: (string|number)[][], widths }]
+ */
+export function buildRenditionData(projects, totals, ctx) {
+  return toValueSheets(buildRenditionSheets(projects, totals, ctx));
 }
 
 /**
- * The consolidated Excel of several projects as raw bytes (what goes to Drive / the offline queue; it is never downloaded).
- * One grand total only when every project shares the currency; the money format follows the first project's market.
+ * The consolidated rendición of several projects as pure values (it goes to Drive / the offline queue; it is never downloaded).
+ * One grand total only when every project shares the currency.
  */
-export function buildGlobalRenditionBytes(projects, totals, { t, locale = 'es' }) {
+export function buildGlobalRenditionData(projects, totals, { t, locale = 'es' }) {
   const currencies = new Set(projects.map((p) => getRegion(p.draft.regionCode)?.currency));
   const first = getRegion(projects[0]?.draft.regionCode);
-  return buildRenditionBytes(projects, totals, { t, locale, currency: currencies.size === 1 ? first?.currency ?? '' : '', digits: first?.digits ?? 2 });
+  return buildRenditionData(projects, totals, { t, locale, currency: currencies.size === 1 ? first?.currency ?? '' : '' });
 }
 
-/** The .xlsx File of the rendición for these projects. */
-export function buildRenditionFile(projects, totals, ctx) {
-  const sheets = buildRenditionSheets(projects, totals, ctx);
-  const bytes = buildXlsx(sheets, { digits: ctx.digits ?? 2 });
-  const day = new Date().toISOString().slice(0, 10);
-  const stem = projects.length === 1 ? fileStem(projectTitle(projects[0]), 'obra') : fileStem(ctx.t('xl.file.global'), 'global');
-  return xlsxToFile(bytes, `${fileStem(ctx.t('xl.file.prefix'), 'rendicion')}-${stem}-${day}.xlsx`);
+/**
+ * The title of the living spreadsheet of these projects (no date: the same job keeps ONE Sheet that is refreshed, never a new file per day).
+ * "rendicion-Casa-Norte", or "rendicion-global" for a consolidated one.
+ */
+export function renditionTitle(projects, { t, global = false }) {
+  const stem = !global && projects.length === 1 ? fileStem(projectTitle(projects[0]), 'obra') : fileStem(t('xl.file.global'), 'global');
+  return `${fileStem(t('xl.file.prefix'), 'rendicion')}-${stem}`;
 }

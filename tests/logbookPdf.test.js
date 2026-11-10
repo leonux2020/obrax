@@ -74,11 +74,11 @@ describe('logbook PDF', () => {
 
 describe('the dossier documents', () => {
   const ctx = (project) => ({ project, result: { valid: false }, total: 0, company, photos: [], i18n });
-  it('a project with notes also gets Bitacora_<name>.pdf, built in memory, next to the Excel', async () => {
+  it('a project with notes also gets Bitacora_<name>.pdf, built in memory, next to the live Google Sheet', async () => {
     const docs = await buildDossierDocuments(ctx(sample()));
     const names = docs.map((d) => d.name);
     expect(names).toContain('Bitacora_Casa-Norte.pdf');
-    expect(names.some((n) => n.endsWith('.xlsx'))).toBe(true);
+    expect(names).toContain('rendicion-Casa-Norte');
     const pdf = docs.find((d) => d.name.startsWith('Bitacora_'));
     expect(pdf.mimeType).toBe('application/pdf');
     expect(pdf.bytes).toBeInstanceOf(Uint8Array);
@@ -88,6 +88,9 @@ describe('the dossier documents', () => {
   it('a project without notes gets NO logbook PDF (no empty files)', async () => {
     const docs = await buildDossierDocuments(ctx(withLog([])));
     expect(docs.some((d) => d.name.startsWith('Bitacora_'))).toBe(false);
-    expect(docs.some((d) => d.name.endsWith('.xlsx'))).toBe(true);
+    const sheet = docs.find((d) => Array.isArray(d.sheets));
+    expect(sheet.name).toBe('rendicion-Casa-Norte');
+    expect(sheet.bytes).toBeUndefined();
+    expect(sheet.sheets).toHaveLength(5);
   });
 });

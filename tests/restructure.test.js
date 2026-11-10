@@ -2,7 +2,6 @@
 // The libraries behind the restructured flow: ledger, dashboard levels, frozen quote, quote overheads,
 // receipts, spreadsheet export, native sharing, geo detection and the Drive consent request.
 import { describe, it, expect, vi } from 'vitest';
-import { unzipSync, strFromU8 } from 'fflate';
 import {
   normalizePayments,
   normalizeAdvances,
@@ -22,8 +21,8 @@ import { newDraft, normalizeDraft } from '../src/lib/draft.js';
 import { computeAll } from '../src/lib/engine.js';
 import { freezeQuote, pricingTime, planningTimeline, normalizeFrozen } from '../src/lib/signature.js';
 import { normalizeReceipt, expensesFromRows, receiptMeta } from '../src/lib/receipt.js';
-import { buildXlsx, columnName, sheetNames, fileStem } from '../src/lib/xlsx.js';
-import { buildRenditionSheets, buildRenditionFile, projectBalance } from '../src/lib/rendition.js';
+import { cleanCell, columnName, sheetNames, fileStem, toValueSheets } from '../src/lib/sheetData.js';
+import { buildRenditionSheets, buildRenditionData, renditionTitle, projectBalance } from '../src/lib/rendition.js';
 import { shareOrDownload } from '../src/lib/shareFile.js';
 import { detectRegionCode, detectLang, currentPosition } from '../src/lib/geo.js';
 import { requestDriveAccess } from '../src/lib/auth.js';
@@ -263,28 +262,25 @@ describe('receipt reading: the model output is data, never trusted', () => {
   });
 });
 
-describe('xlsx writer', () => {
-  const unzip = (bytes) => Object.fromEntries(Object.entries(unzipSync(bytes)).map(([k, v]) => [k, strFromU8(v)]));
-
-  it('produces a valid package: content types, workbook, rels, styles and one part per sheet', () => {
-    const files = unzip(buildXlsx([{ name: 'Uno', rows: [['a', 1]] }, { name: 'Dos', rows: [] }]));
-    expect(Object.keys(files).sort()).toEqual(['[Content_Types].xml', '_rels/.rels', 'xl/_rels/workbook.xml.rels', 'xl/styles.xml', 'xl/workbook.xml', 'xl/worksheets/sheet1.xml', 'xl/worksheets/sheet2.xml']);
-    expect(files['xl/workbook.xml']).toContain('name="Uno"');
-    expect(files['xl/worksheets/sheet1.xml']).toContain('<c r="B1"><v>1</v></c>');
+describe('sheet data (pure values for the Google Sheets API)', () => {
+  it('cleanCell: only strings and finite numbers survive; style objects give their value; NaN / null / undefined / objects are blank', () => {
+    expect([cleanCell('a'), cleanCell(5), cleanCell({ v: 7, money: true, bold: true }), cleanCell({ v: 'T', head: true })]).toEqual(['a', 5, 7, 'T']);
+    expect([cleanCell(NaN), cleanCell(Infinity), cleanCell(null), cleanCell(undefined), cleanCell({ v: NaN }), cleanCell({}), cleanCell([1]), cleanCell(() => 1)]).toEqual(['', '', '', '', '', '', '', '']);
+    expect(cleanCell('a\u0001b')).toBe('ab');
+    expect(cleanCell('=HYPERLINK("http://x")')).toBe('=HYPERLINK("http://x")'); // data: the API receives RAW values, it is never evaluated
+    expect(cleanCell('x'.repeat(9000))).toHaveLength(5000);
   });
 
-  it('text is inline and escaped: "=" cells are data, markup cannot break the XML, control chars are dropped', () => {
-    const sheet = unzip(buildXlsx([{ name: 'S', rows: [['=HYPERLINK("http://x")', '<b>&</b>', 'a\u0001b', { v: 5, money: true, bold: true }, { v: NaN }]] }]))['xl/worksheets/sheet1.xml'];
-    expect(sheet).toContain('t="inlineStr"');
-    expect(sheet).toContain('=HYPERLINK(&quot;http://x&quot;)');
-    expect(sheet).not.toContain('<f>');
-    expect(sheet).toContain('&lt;b&gt;&amp;&lt;/b&gt;');
-    expect(sheet).toContain('ab');
-    expect(sheet).toContain('s="4"');
-    expect(sheet).not.toContain('NaN');
+  it('toValueSheets: bounded, unique valid tab names, trailing blanks trimmed; garbage in = [] out (never throws)', () => {
+    const out = toValueSheets([{ name: 'A/B', rows: [['a', { v: 1, bold: true }, null, '']], widths: [10, 'x', 500] }, { name: 'a b', rows: 'nope' }, null, 7]);
+    expect(out).toEqual([{ name: 'A B', rows: [['a', 1]], widths: [10, 12, 80] }, { name: 'a b (2)', rows: [] }]);
+    expect(toValueSheets(undefined)).toEqual([]);
+    expect(toValueSheets('x')).toEqual([]);
+    expect(toValueSheets(Array.from({ length: 30 }, (_, i) => ({ name: `T${i}`, rows: [] })))).toHaveLength(12);
+    expect(toValueSheets([{ name: 'big', rows: Array.from({ length: 25_000 }, () => [1]) }])[0].rows).toHaveLength(20_000);
   });
 
-  it('helpers: column letters, sheet-name rules, file stems', () => {
+  it('helpers: column letters, tab-name rules, file stems', () => {
     expect([0, 25, 26, 27, 701, 702].map(columnName)).toEqual(['A', 'Z', 'AA', 'AB', 'ZZ', 'AAA']);
     expect(sheetNames(['A/B:C', 'x'.repeat(40), 'dup', 'DUP', ''])).toEqual(['A B C', 'x'.repeat(31), 'dup', 'DUP (2)', 'Sheet5']);
     expect(fileStem('Casa López 2/3')).toBe('Casa-Lopez-2-3');
@@ -432,13 +428,14 @@ describe('rendición (individual and consolidated Excel)', () => {
     expect(row[1]).toBe('');
   });
 
-  it('buildRenditionFile returns a real .xlsx File with a safe name', async () => {
+  it('buildRenditionData returns pure-value tabs and renditionTitle a safe, dateless Sheet title', () => {
     const p = project('Casa López');
-    const file = buildRenditionFile([p], new Map([[p.id, 1000]]), { t, locale: 'es', currency: 'CLP' });
-    expect(file.name).toMatch(/^[A-Za-z0-9_-]+\.xlsx$/);
-    expect(file.name).toContain('Casa-Lopez');
-    expect(file.type).toContain('spreadsheetml');
-    expect(Object.keys(unzipSync(new Uint8Array(await file.arrayBuffer())))).toContain('xl/workbook.xml');
+    const data = buildRenditionData([p], new Map([[p.id, 1000]]), { t, locale: 'es', currency: 'CLP' });
+    expect(data).toHaveLength(5);
+    expect(data.every((sheet) => sheet.rows.every((row) => row.every((c) => typeof c === 'string' || Number.isFinite(c))))).toBe(true);
+    expect(renditionTitle([p], { t })).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(renditionTitle([p], { t })).toBe('rendicion-Casa-Lopez');
+    expect(renditionTitle([p], { t, global: true })).toBe('rendicion-consolidado');
   });
 });
 
@@ -501,7 +498,7 @@ describe('Google Drive consent (native OAuth, no passwords)', () => {
       oauth2: {
         hasGrantedAllScopes: () => true,
         initTokenClient: (cfg) => {
-          expect(cfg.scope).toBe('https://www.googleapis.com/auth/drive.file');
+          expect(cfg.scope).toBe('https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets');
           return { requestAccessToken: () => cfg.callback(resp) };
         },
         ...extra,

@@ -113,9 +113,9 @@ const STOP = new Set(['auth', 'offline', 'quota']); // errors that mean "stop se
 
 /**
  * Build / verify the folder tree and upload the expediente of ONE project.
- * @param client     createDriveClient(...) (ensureFolderPath, ensureChildFolder, listFiles, uploadFile, forgetFolders)
+ * @param client     createDriveClient(...) (ensureFolderPath, ensureChildFolder, listFiles, uploadFile, upsertSpreadsheet, forgetFolders)
  * @param title      the folder name (the project's name)
- * @param documents  () => Promise<[{ name, mimeType, bytes }]>  PDF / Excel for the project folder (an empty list is fine)
+ * @param documents  () => Promise<[{ name, mimeType, bytes } | { name, sheets }]>  PDFs (bytes) and live Google Sheets (pure-value tabs) for the project folder (an empty list is fine)
  * @param images     { obra: Item[], comprobantes: Item[] }       from collectDossierImages
  * @param onProgress ({ done, total }) => void                    called after every file
  * @returns {Promise<{ folderId, documents, uploaded, unchanged, failed, total }>} throws a DriveError for auth / offline / quota
@@ -136,18 +136,22 @@ export async function syncDossier({ client, title, documents = async () => [], i
       onProgress({ done, total });
     };
 
-    // the documents: always replaced (their content moves with the project)
-    for (const doc of docs) {
-      if (fatal) break;
+    // the documents: always replaced (their content moves with the project). A Google Sheet (`doc.sheets`) is refreshed IN PLACE (found by name:
+    // never a copy) and goes LAST, after the photos: it needs the extra Sheets scope, and a device that has not granted it yet must not hold back the rest.
+    const isSheet = (d) => Array.isArray(d.sheets);
+    const sendDoc = async (doc) => {
+      if (fatal) return;
       try {
-        await client.uploadFile(projectFolder, { ...doc, existingId: rootFiles.get(doc.name)?.id || '' });
+        if (isSheet(doc)) await client.upsertSpreadsheet(projectFolder, { title: doc.name, sheets: doc.sheets });
+        else await client.uploadFile(projectFolder, { ...doc, existingId: rootFiles.get(doc.name)?.id || '' });
         stats.documents += 1;
       } catch (err) {
         if (STOP.has(err?.code) || err?.status === 404) fatal = err;
         else stats.failed += 1;
       }
       tick();
-    }
+    };
+    for (const doc of docs.filter((d) => !isSheet(d))) await sendDoc(doc);
 
     // the images: 3 at a time; a file whose name and size are already in the folder is not sent again
     const sendAll = async (items, folder, existing) =>
@@ -177,6 +181,7 @@ export async function syncDossier({ client, title, documents = async () => [], i
       });
     if (!fatal) await sendAll(images.obra, obraFolder, obraFiles);
     if (!fatal) await sendAll(images.comprobantes, receiptsFolder, receiptFiles);
+    for (const doc of docs.filter(isSheet)) await sendDoc(doc);
     if (fatal) throw fatal;
     return stats;
   };

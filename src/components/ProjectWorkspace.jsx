@@ -77,7 +77,7 @@ export default function ProjectWorkspace({ fromAccounting = false, rendition = n
   return <TacticalWorkspace {...props} />;
 }
 
-function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, company, receipts, enqueueReceipt, onEdit, onPro, onSyncDossier = null, dossierBusy = false, geocode, sandbox = null }) {
+function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, company, receipts, enqueueReceipt, onEdit, onPro, onSyncDossier = null, onSendSheet = null, dossierBusy = false, geocode, sandbox = null }) {
   const i18n = useI18n();
   const { t, region } = i18n;
   const draft = project.draft;
@@ -175,7 +175,7 @@ function TacticalWorkspace({ project, setProject, setDraft, photos, setPhotos, c
   const padItem = padId ? result.quote?.items?.find((x) => x.id === padId) : null;
 
   // ---- export (always through lib/exportActions.js) + the client's signature -------------------------------------------------------
-  const exportCtx = (p) => ({ project: p, result, total, priceTime, company, photos, i18n, setDraft });
+  const exportCtx = (p) => ({ project: p, result, total, priceTime, company, photos, i18n, setDraft, sendSheet: onSendSheet ? () => onSendSheet(p.id) : null });
   const deliverClientPdf = async (p) => {
     try {
       await runExport('client', exportCtx(p));

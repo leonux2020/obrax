@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // Three structural repairs: (1) anti-flicker OLED (solid #000000 base layers), (2) offline never freezes the UI (the connection is read
 // synchronously, every network step is time-limited, the loading state is released in a finally), (3) the consolidated Excel goes to
-// CUBRAX - Respaldos Obra / Rendiciones_Globales / Rendicion_Global_<date>.xlsx through the same offline queue and is never downloaded.
+// CUBRAX - Respaldos Obra / Rendiciones_Globales / rendicion-consolidado (a live Google Sheet) through the same offline queue and is never downloaded.
 import 'fake-indexeddb/auto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -9,10 +9,9 @@ import { Blob as NodeBlob } from 'node:buffer';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { unzipSync } from 'fflate';
 import { I18nProvider, makeI18n } from '../src/lib/i18n.jsx';
 import { createExportQueue } from '../src/lib/exportQueue.js';
-import { closeGlobalRendition, closeRendition, deliverRendition, drainExportQueue, globalRenditionFileName, settleWithin, uploadRendition, withTimeout } from '../src/lib/exportSync.js';
+import { closeGlobalRendition, closeRendition, deliverRendition, drainExportQueue, settleWithin, uploadRendition, withTimeout } from '../src/lib/exportSync.js';
 import { newProject } from '../src/lib/projects.js';
 import { normalizeExpenses } from '../src/lib/ledger.js';
 import { createDriveClient } from '../src/lib/drive.js';
@@ -57,7 +56,7 @@ describe('1. Anti-flicker OLED: html, body and #root are solid #000000', () => {
 });
 
 describe('2. Offline never leaves the UI hanging', () => {
-  const file = { fileName: 'Rendicion_2026-10-30.xlsx', bytes: Uint8Array.from([80, 75, 3, 4]) };
+  const file = { fileName: 'rendicion-Casa', sheets: [{ name: 'Resumen', rows: [['Total', 1]] }] };
   const proj = { id: 'proyecto01', title: 'Casa' };
   afterEach(() => vi.useRealTimers());
 
@@ -151,7 +150,7 @@ describe('2. Offline never leaves the UI hanging', () => {
   });
 });
 
-describe('3. Excel consolidado global -> Rendiciones_Globales (same offline queue, never downloaded)', () => {
+describe('3. Rendición consolidada global (Google Sheet) -> Rendiciones_Globales (same offline queue, never downloaded)', () => {
   let drive;
   let client;
   let queue;
@@ -167,25 +166,28 @@ describe('3. Excel consolidado global -> Rendiciones_Globales (same offline queu
 
   const a = mkProject('Uno');
   const b = mkProject('Dos');
-  const deps = () => ({ upload: ({ kind, title, fileName, bytes }) => uploadRendition({ client, kind, title, fileName, bytes }), ensureToken: async () => 'tok', queue });
+  const deps = () => ({ upload: ({ kind, title, fileName, sheets, bytes }) => uploadRendition({ client, kind, title, fileName, sheets, bytes }), ensureToken: async () => 'tok', queue });
 
-  it('the file is named Rendicion_Global_<date>.xlsx', () => {
-    expect(globalRenditionFileName(NOW)).toBe('Rendicion_Global_2026-10-30.xlsx');
+  it('the Sheet is titled rendicion-consolidado: ONE living file, never one per day, and never a project name', async () => {
+    const out = await closeGlobalRendition({ projects: [a], totals: totalsOf(a), i18n, now: NOW, online: () => false, ...deps() });
+    expect(out.status).toBe('queued');
+    expect((await queue.list())[0].fileName).toBe('rendicion-consolidado');
   });
 
-  it('online: CUBRAX - Respaldos Obra / Rendiciones_Globales / Rendicion_Global_<date>.xlsx, a consolidated workbook, no download', async () => {
+  it('online: CUBRAX - Respaldos Obra / Rendiciones_Globales / rendicion-consolidado, a consolidated Google Sheet, no download', async () => {
     let sent = null;
     const d = deps();
     const out = await closeGlobalRendition({ projects: [a, b], totals: totalsOf(a, b), i18n, now: NOW, online: () => true, ...d, upload: (arg) => { sent = arg; return d.upload(arg); } });
     expect(out).toEqual({ status: 'uploaded' });
-    expect(sent).toMatchObject({ kind: 'global', fileName: 'Rendicion_Global_2026-10-30.xlsx' });
+    expect(sent).toMatchObject({ kind: 'global', fileName: 'rendicion-consolidado' });
     const [root, folder] = ['CUBRAX - Respaldos Obra', 'Rendiciones_Globales'].map((n) => drive.folders().find((f) => f.name === n));
     expect(folder.parents).toEqual([root.id]);
-    const files = drive.backupFiles().filter((f) => f.name === 'Rendicion_Global_2026-10-30.xlsx');
+    const files = drive.spreadsheets().filter((f) => f.name === 'rendicion-consolidado');
     expect(files).toHaveLength(1);
     expect(files[0].parents).toEqual([folder.id]);
     expect(drive.folders().some((f) => f.name === 'Proyectos')).toBe(false);
-    expect(Object.keys(unzipSync(sent.bytes))).toContain('xl/worksheets/sheet2.xml');
+    expect(Object.keys(drive.sheet('rendicion-consolidado').tabs)).toHaveLength(5);
+    expect(sent.bytes).toBeUndefined();
     expect(download).not.toHaveBeenCalled();
     expect(await queue.list()).toHaveLength(0);
   });
@@ -200,7 +202,7 @@ describe('3. Excel consolidado global -> Rendiciones_Globales (same offline queu
     expect(download).not.toHaveBeenCalled();
     const rows = await queue.list();
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ kind: 'global', projectId: '', fileName: 'Rendicion_Global_2026-10-30.xlsx', status: 'pending' });
+    expect(rows[0]).toMatchObject({ kind: 'global', projectId: '', fileName: 'rendicion-consolidado', status: 'pending' });
   });
 
   it('a global row does not collide with a project row and removing a project keeps the global one', async () => {
@@ -216,9 +218,9 @@ describe('3. Excel consolidado global -> Rendiciones_Globales (same offline queu
     await closeRendition({ project: a, totals: totalsOf(a), i18n, now: NOW, online: () => false, ...deps() });
     const res = await drainExportQueue({ queue, upload: deps().upload, ensureToken: async () => 'tok', online: () => true });
     expect(res.done).toHaveLength(2);
-    const parentOf = (name) => drive.folders().find((f) => f.id === drive.backupFiles().find((x) => x.name === name).parents[0]).name;
-    expect(parentOf('Rendicion_Global_2026-10-30.xlsx')).toBe('Rendiciones_Globales');
-    expect(parentOf('Rendicion_2026-10-30.xlsx')).toBe('Uno');
+    const parentOf = (name) => drive.folders().find((f) => f.id === drive.spreadsheets().find((x) => x.name === name).parents[0]).name;
+    expect(parentOf('rendicion-consolidado')).toBe('Rendiciones_Globales');
+    expect(parentOf('rendicion-Uno')).toBe('Uno');
     expect(await queue.list()).toHaveLength(0);
   });
 

@@ -87,8 +87,13 @@ export const localUser = (name = '') => ({
 });
 
 // ---- Google Drive consent (the same native Google OAuth as the sign-in; no password is ever typed here) ----------
-// `drive.file` only gives access to files the app itself creates, never to the rest of the user's Drive.
-export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+// `drive.file` only gives access to files the app itself creates, never to the rest of the user's Drive: folders, PDFs, photos, the backup, and
+// the folder each Spreadsheet is moved into. `spreadsheets` is the Google Sheets API: it creates and fills the live rendición Spreadsheets.
+// Google takes the scopes of ONE request as a space-separated string (DRIVE_SCOPE); both must be granted (hasGrantedAllScopes).
+export const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+export const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
+export const DRIVE_SCOPES = Object.freeze([DRIVE_FILE_SCOPE, SHEETS_SCOPE]);
+export const DRIVE_SCOPE = DRIVE_SCOPES.join(' ');
 
 const driveError = (code) => Object.assign(new Error(`drive:${code}`), { code });
 
@@ -130,7 +135,7 @@ export async function requestDriveAccess({ clientId = GOOGLE_CLIENT_ID, enabled 
       scope: DRIVE_SCOPE,
       ...(hint ? { hint } : {}),
       callback: (resp) => {
-        const ok = resp?.access_token && !resp.error && (typeof oauth.hasGrantedAllScopes !== 'function' || oauth.hasGrantedAllScopes(resp, DRIVE_SCOPE));
+        const ok = resp?.access_token && !resp.error && (typeof oauth.hasGrantedAllScopes !== 'function' || oauth.hasGrantedAllScopes(resp, ...DRIVE_SCOPES));
         if (ok) {
           setDriveToken(resp.access_token, resp.expires_in); // kept for this session only: it is what the silent backup uses
           resolve({ granted: true });

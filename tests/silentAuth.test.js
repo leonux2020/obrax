@@ -138,10 +138,10 @@ describe('ensureDriveToken: silent or abort, remembered until a tap', () => {
 });
 
 describe('who may ask visibly: the offline queue', () => {
-  const file = { fileName: 'Rendicion_2026-10-30.xlsx', bytes: Uint8Array.from([80, 75, 3, 4]) };
+  const file = { fileName: 'rendicion-Casa', sheets: [{ name: 'Resumen', rows: [['Total', 1]] }] };
   it('the background drain asks its token with interactive:false (silent), the tap of "Enviar a Drive" with interactive:true', async () => {
     const queue = createExportQueue();
-    await queue.enqueue({ projectId: 'proyecto01', title: 'Casa', fileName: file.fileName, blob: new Blob([file.bytes]), now: 1 });
+    await queue.enqueue({ projectId: 'proyecto01', title: 'Casa', fileName: file.fileName, sheets: file.sheets, now: 1 });
     const bg = vi.fn(async () => null);
     await drainExportQueue({ queue, upload: vi.fn(), ensureToken: bg, online: () => true });
     expect(bg).toHaveBeenCalledWith({ interactive: false });
@@ -153,7 +153,7 @@ describe('who may ask visibly: the offline queue', () => {
 
   it('with no Google session in the background the files simply wait (nothing opened, nothing lost)', async () => {
     const queue = createExportQueue();
-    await queue.enqueue({ projectId: 'proyecto01', title: 'Casa', fileName: file.fileName, blob: new Blob([file.bytes]), now: 1 });
+    await queue.enqueue({ projectId: 'proyecto01', title: 'Casa', fileName: file.fileName, sheets: file.sheets, now: 1 });
     const upload = vi.fn();
     await drainExportQueue({ queue, upload, ensureToken: async () => null, online: () => true });
     expect(upload).not.toHaveBeenCalled();
@@ -177,7 +177,7 @@ describe('RenditionBar (audit ledger): "Reconectar Drive" is the user-driven way
   });
   const mount = async (props) => {
     const queue = createExportQueue();
-    await queue.enqueue({ projectId: props.project.id, title: 'Casa', fileName: 'Rendicion_2026-10-30.xlsx', blob: new Blob([Uint8Array.from([80, 75, 3, 4])]), now: 1 });
+    await queue.enqueue({ projectId: props.project.id, title: 'Casa', fileName: 'rendicion-Casa', sheets: [{ name: 'Resumen', rows: [['Total', 1]] }], now: 1 });
     await act(async () => root.render(React.createElement(I18nProvider, { lang: 'es', regionCode: 'CL' }, React.createElement(RenditionBar, { projectId: props.project.id, onClose: async () => {}, queue, ...Object.fromEntries(Object.entries(props).filter(([k]) => k !== 'project')) }))));
     await flush(20);
   };

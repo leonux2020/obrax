@@ -1,4 +1,4 @@
-// The Google Drive access token (OAuth, scope drive.file). Google Identity Services issues NO refresh token to a browser app
+// The Google Drive access token (OAuth, scopes drive.file + spreadsheets). Google Identity Services issues NO refresh token to a browser app
 // (that needs a server secret), so the token is short-lived (≈1 h) and the "persistent login" is built from two pieces:
 //   - the token itself, kept while it is valid: in memory, mirrored in sessionStorage (a reload / OAuth redirect keeps it) and in
 //     localStorage (closing and reopening the PWA keeps it). It is bound to its own expiry: an expired, refused (401) or signed-out

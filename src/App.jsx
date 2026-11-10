@@ -810,10 +810,10 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
   );
 
   // ---- Contabilidad: the financial command center of ONE project + "Cerrar Rendición" -----------------------------------------
-  // The card of Contabilidad opens the project in AUDIT mode (its checkbox only picks the project for the consolidated Excel). "Cerrar Rendición"
-  // builds the Excel and sends it straight to Drive with the app's own Drive client / token; with no connection (or when Drive fails) the file is
-  // parked in IndexedDB (exportQueue) and uploaded by the background sync below. Nothing is ever downloaded to the phone.
-  const renditionUpload = useCallback(({ kind, title, fileName, bytes }) => uploadRendition({ client: driveClient, kind, title, fileName, bytes }), [driveClient]);
+  // The card of Contabilidad opens the project in AUDIT mode (its checkbox only picks the project for the consolidated rendición). "Cerrar Rendición"
+  // turns the accounts into a live Google Sheet (Sheets API, with the app's own Drive client / token) inside the project's Drive folder; with no connection
+  // (or when Google fails) the DATA is parked in IndexedDB (exportQueue) and the Sheet is created by the background sync below. Nothing is ever downloaded.
+  const renditionUpload = useCallback(({ kind, title, fileName, sheets, bytes }) => uploadRendition({ client: driveClient, kind, title, fileName, sheets, bytes }), [driveClient]);
   const renditionRef = useRef(false);
   // The one way a rendición (of a project or the global one) leaves the app: Drive or the offline queue, never a download. `run` builds + delivers;
   // whatever happens (offline, hanging network, throw), this settles, the guard is released and the user gets a toast.
@@ -845,7 +845,16 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
     if (!project) return null;
     return sendRendition((deps) => closeRendition({ project, totals: projectTotals([project], Date.now()), i18n: makeI18n(settings.lang, project.draft.regionCode), ...deps }));
   }, [settings.lang, sendRendition]);
-  // the consolidated Excel of the chosen projects -> CUBRAX - Respaldos Obra / Rendiciones_Globales (or the same offline queue)
+  // "Rendición en Google Sheets" of the export sheet of a project: the same Sheet and the same delivery (Drive, or the offline queue) as "Cerrar Rendición"
+  const submitProjectSheet = useCallback(
+    async (projectId) => {
+      const project = projectsRef.current.find((p) => p.id === projectId);
+      if (!project) return null;
+      return sendRendition((deps) => closeRendition({ project, totals: projectTotals([project], Date.now()), i18n: makeI18n(settings.lang, project.draft.regionCode), ...deps }));
+    },
+    [settings.lang, sendRendition]
+  );
+  // the consolidated rendición of the chosen projects -> CUBRAX - Respaldos Obra / Rendiciones_Globales (or the same offline queue)
   const submitGlobalRendition = useCallback(
     async (ids) => {
       const chosen = projectsRef.current.filter((p) => ids.includes(p.id));
@@ -1183,6 +1192,7 @@ export default function App({ onSignedOut = goToStart, installed = isStandalone(
                 receipts={receipts}
                 enqueueReceipt={enqueueReceipt}
                 onSyncDossier={syncExpediente}
+                onSendSheet={submitProjectSheet}
                 dossierBusy={dossierBusy.includes(active.id)}
                 onBack={closeProject}
                 onEdit={() => setSheet({ type: 'edit', id: active.id })}

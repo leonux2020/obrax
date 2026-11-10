@@ -8,12 +8,11 @@ import { Blob as NodeBlob } from 'node:buffer';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { unzipSync, strFromU8 } from 'fflate';
 import { I18nProvider, makeI18n } from '../src/lib/i18n.jsx';
 import { DB_VERSION, STORE_EXPORTS, STORE_PROJECTS, createRunner } from '../src/lib/db.js';
-import { createExportQueue, idbExportBackend, normalizeExportRow, EXPORT_QUEUE_LIMITS } from '../src/lib/exportQueue.js';
-import { closeRendition, deliverRendition, drainExportQueue, renditionFileName, uploadRendition, backoffMs } from '../src/lib/exportSync.js';
-import { buildRenditionSheets, buildRenditionBytes } from '../src/lib/rendition.js';
+import { createExportQueue, idbExportBackend, memoryExportBackend, normalizeExportRow, EXPORT_QUEUE_LIMITS } from '../src/lib/exportQueue.js';
+import { closeRendition, deliverRendition, drainExportQueue, uploadRendition, backoffMs } from '../src/lib/exportSync.js';
+import { buildRenditionSheets, buildRenditionData, renditionTitle } from '../src/lib/rendition.js';
 import { expensesByCategory, newFundEntry, normalizeExpenses, normalizePayments, profitability } from '../src/lib/ledger.js';
 import { newProject } from '../src/lib/projects.js';
 import { DriveError } from '../src/lib/drive.js';
@@ -40,7 +39,8 @@ const project = (extra = {}) => {
   return Object.assign(p, extra);
 };
 const totals = (p) => new Map([[p.id, 1_000_000]]);
-const xlsx = (bytes) => unzipSync(bytes);
+// the data of a Sheet (tabs of pure values): what the queue parks and the Sheets API receives
+const SH = (extra = 'x') => [{ name: 'Resumen', rows: [['Total', 100], [extra]] }, { name: 'Gastos', rows: [['Fecha', 'Monto']] }];
 
 describe('Adelantos / Caja chica (the fund of a project)', () => {
   it('newFundEntry: a stored payment with the picked day (at local noon), the amount and a clean description', () => {
@@ -107,60 +107,91 @@ describe('Excel: Hoja 1 financial summary, Hoja 2 expense detail (the fiscal tab
     expect(s[0].rows.at(-1)[0].v).toBe('Total');
   });
 
-  it('buildRenditionBytes is a real .xlsx with the five sheets in order', () => {
-    const files = xlsx(buildRenditionBytes([project()], totals(project()), { t: i18n.t, locale: 'es', currency: 'CLP', digits: 0 }));
-    const wb = strFromU8(files['xl/workbook.xml']);
-    expect([...wb.matchAll(/<sheet name="([^"]+)"/g)].map((m) => m[1]).slice(0, 2)).toEqual(['Resumen financiero', 'Detalle de gastos']);
-    expect(Object.keys(files).filter((f) => f.startsWith('xl/worksheets/'))).toHaveLength(5);
+  it('buildRenditionData: the five tabs in order, PURE values only (no style objects, no NaN / null / undefined) and a living-sheet title', () => {
+    const p = project({ logbook: [{ id: 'nota0001', at: Date.UTC(2026, 9, 3), text: '=HYPERLINK("http://x")' }] });
+    const data = buildRenditionData([p], totals(p), { t: i18n.t, locale: 'es', currency: 'CLP' });
+    expect(data.map((s) => s.name).slice(0, 2)).toEqual(['Resumen financiero', 'Detalle de gastos']);
+    expect(data).toHaveLength(5);
+    for (const sheet of data) for (const row of sheet.rows) for (const cell of row) expect(['string', 'number']).toContain(typeof cell);
+    for (const sheet of data) for (const row of sheet.rows) for (const cell of row) if (typeof cell === 'number') expect(Number.isFinite(cell)).toBe(true);
+    expect(JSON.stringify(data)).not.toMatch(/"(bold|head|money|title)"|"v":/);
+    expect(JSON.stringify(data)).toContain('=HYPERLINK'); // data, kept as text (the API gets RAW values)
+    expect(renditionTitle([p], { t: i18n.t })).toBe('rendicion-Casa-Soto');
+    expect(renditionTitle([p, project()], { t: i18n.t })).toMatch(/^rendicion-/);
   });
 });
 
 describe('exportQueue (IndexedDB store export_queue, DB v6)', () => {
-  const xl = () => new Blob([Uint8Array.from([80, 75, 3, 4, 1, 2, 3])], { type: 'application/octet-stream' });
+  const xl = () => SH();
   const P = 'proyecto01';
   let queue;
   beforeEach(() => {
     queue = createExportQueue();
   });
 
-  it('keeps the Excel blob and its Drive destination; a hostile row is dropped', async () => {
-    const row = await queue.enqueue({ projectId: P, title: 'Casa Soto', fileName: 'Rendicion_2026-10-30.xlsx', blob: xl(), now: 5 });
+  it('keeps the tabs of values and its Drive destination; a hostile row is dropped', async () => {
+    const row = await queue.enqueue({ projectId: P, title: 'Casa Soto', fileName: 'Rendicion_2026-10-30.xlsx', sheets: xl(), now: 5 });
     expect(row).toMatchObject({ status: 'pending', attempts: 0, title: 'Casa Soto', fileName: 'Rendicion_2026-10-30.xlsx' });
-    expect((await queue.bytesOf(row)).length).toBe(7);
+    expect(row.sheets).toEqual(SH());
+    expect(row.blob).toBeUndefined();
+    expect(await queue.bytesOf(row)).toBeNull();
     expect(normalizeExportRow({ ...row, fileName: '../../etc/passwd' })).toBeNull();
-    expect(normalizeExportRow({ ...row, fileName: 'x.exe' })).toBeNull();
-    expect(normalizeExportRow({ ...row, blob: 'not a blob' })).toBeNull();
+    expect(normalizeExportRow({ ...row, fileName: 'x/y' })).toBeNull();
+    expect(normalizeExportRow({ ...row, sheets: 'not sheets' })).toBeNull();
+    expect(normalizeExportRow({ ...row, sheets: [] })).toBeNull();
     expect(normalizeExportRow({ ...row, projectId: 'x' })).toBeNull();
-    await expect(queue.enqueue({ projectId: P, fileName: 'nope.txt', blob: xl() })).rejects.toThrow('bad_file');
+    await expect(queue.enqueue({ projectId: P, fileName: 'no/pe', sheets: xl() })).rejects.toThrow('bad_file');
+    await expect(queue.enqueue({ projectId: P, fileName: 'nada', sheets: [] })).rejects.toThrow('bad_file');
   });
 
   it('closing the same project the same day REPLACES the waiting file; another project / day is a new row', async () => {
-    await queue.enqueue({ projectId: P, title: 'A', fileName: 'Rendicion_2026-10-30.xlsx', blob: xl() });
-    await queue.enqueue({ projectId: P, title: 'A', fileName: 'Rendicion_2026-10-30.xlsx', blob: xl() });
-    await queue.enqueue({ projectId: P, title: 'A', fileName: 'Rendicion_2026-10-31.xlsx', blob: xl() });
-    await queue.enqueue({ projectId: 'proyecto02', title: 'B', fileName: 'Rendicion_2026-10-30.xlsx', blob: xl() });
+    await queue.enqueue({ projectId: P, title: 'A', fileName: 'Rendicion_2026-10-30.xlsx', sheets: xl() });
+    await queue.enqueue({ projectId: P, title: 'A', fileName: 'Rendicion_2026-10-30.xlsx', sheets: xl() });
+    await queue.enqueue({ projectId: P, title: 'A', fileName: 'Rendicion_2026-10-31.xlsx', sheets: xl() });
+    await queue.enqueue({ projectId: 'proyecto02', title: 'B', fileName: 'Rendicion_2026-10-30.xlsx', sheets: xl() });
     expect(await queue.list()).toHaveLength(3);
     await queue.removeProject(P);
     expect((await queue.list()).map((r) => r.projectId)).toEqual(['proyecto02']);
   });
 
   it('is bounded (queue_full) and a page that died mid-send puts the row back to pending', async () => {
-    for (let i = 0; i < EXPORT_QUEUE_LIMITS.maxItems; i += 1) await queue.enqueue({ projectId: P, fileName: `Rendicion_2026-01-${String(i + 1).padStart(2, '0')}.xlsx`, blob: xl() });
-    await expect(queue.enqueue({ projectId: P, fileName: 'Rendicion_2027-01-01.xlsx', blob: xl() })).rejects.toThrow('queue_full');
+    for (let i = 0; i < EXPORT_QUEUE_LIMITS.maxItems; i += 1) await queue.enqueue({ projectId: P, fileName: `Rendicion_2026-01-${String(i + 1).padStart(2, '0')}.xlsx`, sheets: xl() });
+    await expect(queue.enqueue({ projectId: P, fileName: 'Rendicion_2027-01-01.xlsx', sheets: xl() })).rejects.toThrow('queue_full');
     const [first] = await queue.list();
     await queue.update(first.id, { status: 'sending' });
     await queue.recover();
     expect((await queue.list())[0].status).toBe('pending');
   });
 
-  it('persists in IndexedDB: the blob survives a reload of the queue', async () => {
+  it('persists in IndexedDB: the values survive a reload of the queue', async () => {
     const factory = new IDBFactory();
     const a = createExportQueue(idbExportBackend(factory));
-    await a.enqueue({ projectId: P, title: 'Casa', fileName: 'Rendicion_2026-10-30.xlsx', blob: xl(), now: 9 });
+    await a.enqueue({ projectId: P, title: 'Casa', fileName: 'Rendicion_2026-10-30.xlsx', sheets: xl(), now: 9 });
     const b = createExportQueue(idbExportBackend(factory)); // "the app was closed and reopened"
     const [row] = await b.list();
     expect(row.fileName).toBe('Rendicion_2026-10-30.xlsx');
-    expect((await b.bytesOf(row))[0]).toBe(80);
+    expect(row.sheets).toEqual(SH());
+  });
+
+  it('a row parked by an OLDER version (an .xlsx Blob, no sheets) is still read, and its bytes come back; a row with sheets never carries a blob', async () => {
+    const legacy = { id: 'abcd1234', kind: 'project', projectId: P, title: 'A', fileName: 'Rendicion_2026-10-30.xlsx', blob: new Blob([Uint8Array.from([80, 75, 3, 4])]), status: 'pending', createdAt: 1, attempts: 0, nextAt: 0 };
+    const backend = memoryExportBackend();
+    await backend.put(legacy);
+    const q = createExportQueue(backend);
+    const [row] = await q.list();
+    expect(row.sheets).toBeUndefined();
+    expect(Array.from(await q.bytesOf(row))).toEqual([80, 75, 3, 4]);
+    expect(normalizeExportRow({ ...legacy, sheets: SH() })).toMatchObject({ sheets: SH() });
+    expect(normalizeExportRow({ ...legacy, sheets: SH() }).blob).toBeUndefined();
+    const upload = vi.fn(async () => {});
+    expect((await drainExportQueue({ queue: q, upload, online: () => true, ensureToken: async () => 'tok' })).done).toHaveLength(1);
+    expect(upload.mock.calls[0][0].sheets).toBeUndefined();
+    expect(upload.mock.calls[0][0].bytes).toBeInstanceOf(Uint8Array);
+  });
+
+  it('a garbage payload is cleaned, never stored raw: style objects, NaN, null and control characters become plain values', async () => {
+    const row = await queue.enqueue({ projectId: P, title: 'A', fileName: 'x', sheets: [{ name: 'a/b:c', rows: [[{ v: 'T', bold: true }, { v: NaN }, null, undefined, Infinity, 'ok\u0000', 3, { v: 7, money: true }, '']] }] });
+    expect(row.sheets).toEqual([{ name: 'a b c', rows: [['T', '', '', '', '', 'ok', 3, 7]] }]);
   });
 
   it('DB v5 -> v6 adds export_queue and loses nothing', async () => {
@@ -187,7 +218,7 @@ describe('exportQueue (IndexedDB store export_queue, DB v6)', () => {
 });
 
 describe('deliverRendition / closeRendition: Drive or the queue, never a download', () => {
-  const file = { fileName: 'Rendicion_2026-10-30.xlsx', bytes: Uint8Array.from([80, 75, 3, 4]) };
+  const file = { fileName: 'rendicion-Casa-Soto', sheets: SH() };
   const proj = { id: 'proyecto01', title: 'Casa Soto' };
   let queue;
   let download;
@@ -203,20 +234,20 @@ describe('deliverRendition / closeRendition: Drive or the queue, never a downloa
     const upload = vi.fn(async () => {});
     const out = await deliverRendition({ file, project: proj, upload, ensureToken: async () => 'tok', queue, online: () => true });
     expect(out).toEqual({ status: 'uploaded' });
-    expect(upload).toHaveBeenCalledWith({ kind: 'project', title: 'Casa Soto', fileName: 'Rendicion_2026-10-30.xlsx', bytes: file.bytes });
+    expect(upload).toHaveBeenCalledWith({ kind: 'project', title: 'Casa Soto', fileName: 'rendicion-Casa-Soto', sheets: file.sheets });
     expect(await queue.list()).toHaveLength(0);
     expect(download).not.toHaveBeenCalled();
   });
 
-  it('offline: NOT downloaded, NOT sent: the Blob waits in the queue ("Sin conexión")', async () => {
+  it('offline: NOT downloaded, NOT sent: the values wait in the queue ("Sin conexión")', async () => {
     const upload = vi.fn();
     const out = await deliverRendition({ file, project: proj, upload, ensureToken: async () => 'tok', queue, online: () => false });
     expect(out).toEqual({ status: 'queued', reason: 'offline' });
     expect(upload).not.toHaveBeenCalled();
     expect(download).not.toHaveBeenCalled();
     const [row] = await queue.list();
-    expect(row).toMatchObject({ projectId: 'proyecto01', title: 'Casa Soto', fileName: 'Rendicion_2026-10-30.xlsx', status: 'pending' });
-    expect((await queue.bytesOf(row)).length).toBe(4);
+    expect(row).toMatchObject({ projectId: 'proyecto01', title: 'Casa Soto', fileName: 'rendicion-Casa-Soto', status: 'pending' });
+    expect(row.sheets).toEqual(SH());
   });
 
   it('Drive fails (offline error, 500, quota) or there is no Google session: parked, never downloaded', async () => {
@@ -238,55 +269,68 @@ describe('deliverRendition / closeRendition: Drive or the queue, never a downloa
     expect(await deliverRendition({ file, project: proj, upload: vi.fn(), ensureToken: async () => 'tok', queue: full, online: () => false })).toEqual({ status: 'failed', reason: 'queue_full' });
   });
 
-  it('closeRendition builds the real Excel and names it Rendicion_<date>.xlsx', async () => {
+  it('closeRendition builds the tabs as pure values and titles the living Sheet rendicion-<project> (no date, no extension)', async () => {
     const p = project();
     const upload = vi.fn(async () => {});
     const now = new Date(2026, 9, 30, 12).getTime();
     const out = await closeRendition({ project: p, totals: totals(p), i18n, now, upload, ensureToken: async () => 'tok', queue, online: () => true });
     expect(out.status).toBe('uploaded');
     const arg = upload.mock.calls[0][0];
-    expect(arg.fileName).toBe('Rendicion_2026-10-30.xlsx');
-    expect(renditionFileName(now)).toBe('Rendicion_2026-10-30.xlsx');
+    expect(arg.fileName).toBe('rendicion-Casa-Soto');
     expect(arg.title).toBe('Casa Soto');
-    expect(Object.keys(xlsx(arg.bytes))).toContain('xl/worksheets/sheet2.xml');
+    expect(arg.bytes).toBeUndefined();
+    expect(arg.sheets).toHaveLength(5);
+    expect(arg.sheets[1].rows.length).toBeGreaterThan(4); // the four expenses + the header
+  });
+
+  it('offline closeRendition parks the VALUES (a JSON-able payload, no Blob) and nothing is sent', async () => {
+    const p = project();
+    const upload = vi.fn();
+    const out = await closeRendition({ project: p, totals: totals(p), i18n, upload, ensureToken: async () => 'tok', queue, online: () => false });
+    expect(out).toEqual({ status: 'queued', reason: 'offline' });
+    expect(upload).not.toHaveBeenCalled();
+    const [row] = await queue.list();
+    expect(row.blob).toBeUndefined();
+    expect(row.sheets).toHaveLength(5);
+    expect(JSON.parse(JSON.stringify(row.sheets))).toEqual(row.sheets); // survives IndexedDB / JSON as it is
   });
 });
 
-describe('Drive destination: CUBRAX - Respaldos Obra / Proyectos / <project> / Rendicion_<date>.xlsx', () => {
+describe('Drive destination: CUBRAX - Respaldos Obra / Proyectos / <project> / rendicion-<project> (a live Google Sheet)', () => {
   let drive;
   let client;
   beforeEach(() => {
     drive = createFakeDrive();
     client = createDriveClient({ getToken: async () => drive.token, fetchImpl: drive.fetchImpl });
   });
-  const byName = (n) => drive.backupFiles().filter((f) => f.name === n);
+  const sheetsIn = (n) => drive.spreadsheets().filter((f) => f.name === n);
 
-  it('creates the folder path with the existing Drive client and replaces the same-day file instead of piling copies', async () => {
-    const bytes = Uint8Array.from([80, 75, 3, 4, 9]);
-    await uploadRendition({ client, title: 'Casa Soto', fileName: 'Rendicion_2026-10-30.xlsx', bytes });
-    await uploadRendition({ client, title: 'Casa Soto', fileName: 'Rendicion_2026-10-30.xlsx', bytes: Uint8Array.from([80, 75, 3, 4, 9, 9]) });
-    await uploadRendition({ client, title: 'Casa Soto', fileName: 'Rendicion_2026-10-31.xlsx', bytes });
+  it('creates the folder path, creates the Spreadsheet there (moved out of the root) and REFRESHES it in place instead of piling copies', async () => {
+    await uploadRendition({ client, title: 'Casa Soto', fileName: 'rendicion-Casa-Soto', sheets: SH('uno') });
+    await uploadRendition({ client, title: 'Casa Soto', fileName: 'rendicion-Casa-Soto', sheets: SH('dos') });
     const [root, proyectos, casa] = ['CUBRAX - Respaldos Obra', 'Proyectos', 'Casa Soto'].map((n) => drive.folders().find((f) => f.name === n));
     expect(proyectos.parents).toEqual([root.id]);
     expect(casa.parents).toEqual([proyectos.id]);
-    expect(byName('Rendicion_2026-10-30.xlsx')).toHaveLength(1);
-    expect(byName('Rendicion_2026-10-30.xlsx')[0].body.length).toBe(6); // the second one won
-    expect(byName('Rendicion_2026-10-31.xlsx')).toHaveLength(1);
-    expect(byName('Rendicion_2026-10-30.xlsx')[0].parents).toEqual([casa.id]);
+    expect(sheetsIn('rendicion-Casa-Soto')).toHaveLength(1);
+    const sheet = drive.sheet('rendicion-Casa-Soto');
+    expect(sheet.parents).toEqual([casa.id]);
+    expect(sheet.tabs.Resumen).toEqual([['Total', 100], ['dos']]); // the second one won
+    expect(sheet.tabs.Gastos).toEqual([['Fecha', 'Monto']]);
   });
 
   it('a folder deleted from Drive behind our back (404) is looked up again once', async () => {
-    await uploadRendition({ client, title: 'Casa Soto', fileName: 'Rendicion_2026-10-30.xlsx', bytes: Uint8Array.from([1, 2, 3, 4, 5]) });
+    await uploadRendition({ client, title: 'Casa Soto', fileName: 'rendicion-Casa-Soto', sheets: SH() });
     for (const f of drive.folders().filter((x) => x.name === 'Casa Soto')) drive.files.delete(f.id);
-    await uploadRendition({ client, title: 'Casa Soto', fileName: 'Rendicion_2026-10-31.xlsx', bytes: Uint8Array.from([1, 2, 3, 4, 5]) });
-    expect(byName('Rendicion_2026-10-31.xlsx')).toHaveLength(1);
+    await uploadRendition({ client, title: 'Casa Soto', fileName: 'rendicion-Casa-Soto-2', sheets: SH() });
+    expect(sheetsIn('rendicion-Casa-Soto-2')).toHaveLength(1);
+    expect(drive.sheet('rendicion-Casa-Soto-2').parents[0]).not.toBe('root');
   });
 });
 
 describe('drainExportQueue: the background sync (receiptSync twin)', () => {
-  const blob = () => new Blob([Uint8Array.from([80, 75, 3, 4])]);
+  const blob = () => SH();
   let queue;
-  const park = (name = 'Rendicion_2026-10-30.xlsx', projectId = 'proyecto01') => queue.enqueue({ projectId, title: 'Casa', fileName: name, blob: blob(), now: 1 });
+  const park = (name = 'Rendicion_2026-10-30.xlsx', projectId = 'proyecto01') => queue.enqueue({ projectId, title: 'Casa', fileName: name, sheets: blob(), now: 1 });
   beforeEach(() => {
     queue = createExportQueue();
   });
@@ -308,7 +352,8 @@ describe('drainExportQueue: the background sync (receiptSync twin)', () => {
     expect(res.done).toHaveLength(2);
     expect(upload.mock.calls.map((c) => c[0].fileName).sort()).toEqual(['Rendicion_2026-10-30.xlsx', 'Rendicion_2026-10-31.xlsx']);
     expect(upload.mock.calls[0][0]).toMatchObject({ title: 'Casa' });
-    expect(upload.mock.calls[0][0].bytes).toBeInstanceOf(Uint8Array);
+    expect(upload.mock.calls[0][0].sheets).toEqual(SH());
+    expect(upload.mock.calls[0][0].bytes).toBeUndefined();
     expect(await queue.list()).toHaveLength(0);
   });
 
@@ -549,7 +594,7 @@ describe('ProjectAudit (ledger) + RenditionBar + the Contabilidad card', () => {
     const close = vi.fn(async () => gate);
     const queue = createExportQueue();
     const p = project();
-    await queue.enqueue({ projectId: p.id, title: 'Casa', fileName: 'Rendicion_2026-10-30.xlsx', blob: new Blob([Uint8Array.from([1, 2, 3])]) });
+    await queue.enqueue({ projectId: p.id, title: 'Casa', fileName: 'Rendicion_2026-10-30.xlsx', sheets: SH() });
     await mount(React.createElement(RenditionBar, { projectId: p.id, onClose: close, onRetryQueue: () => {}, queue }));
     expect(q('fin-queued').textContent).toContain('En cola: 1');
     await click(q('fin-close'));
@@ -565,7 +610,7 @@ describe('ProjectAudit (ledger) + RenditionBar + the Contabilidad card', () => {
     const queue = createExportQueue();
     const a = project();
     const b = project();
-    await queue.enqueue({ projectId: b.id, title: 'Otra', fileName: 'Rendicion_2026-10-30.xlsx', blob: new Blob([Uint8Array.from([1])]) });
+    await queue.enqueue({ projectId: b.id, title: 'Otra', fileName: 'Rendicion_2026-10-30.xlsx', sheets: SH() });
     await mount(React.createElement(RenditionBar, { projectId: a.id, onClose: async () => {}, queue }));
     expect(q('fin-queued')).toBeNull();
   });

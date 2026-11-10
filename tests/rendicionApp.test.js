@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // The real App: Contabilidad -> tap the BODY of a card -> the project in AUDIT mode (cockpit + profitability x-ray) -> "Cerrar Rendición".
-// The Excel goes to Drive (CUBRAX - Respaldos Obra / Proyectos / <name> / Rendicion_<date>.xlsx); offline it waits in IndexedDB and the background sync
+// The rendición goes to Drive as a Google Sheet (CUBRAX - Respaldos Obra / Proyectos / <name> / rendicion-<name>); offline it waits in IndexedDB and the background sync
 // uploads it when the connection returns. It is never downloaded.
 import 'fake-indexeddb/auto';
 import { Blob as NodeBlob } from 'node:buffer';
@@ -12,7 +12,7 @@ import { clearDriveToken } from '../src/lib/driveToken.js';
 import { resetToasts } from '../src/lib/notify.js';
 import { projectStore } from '../src/lib/projectStore.js';
 import { exportQueue } from '../src/lib/exportQueue.js';
-import { renditionFileName } from '../src/lib/exportSync.js';
+const SHEET_TITLE = 'rendicion-Casa-Soto'; // the living Google Sheet of the project: one per job, refreshed in place
 import { newProject } from '../src/lib/projects.js';
 import { normalizeExpenses, normalizePayments } from '../src/lib/ledger.js';
 
@@ -178,7 +178,7 @@ describe('Contabilidad -> project in AUDIT mode (pure ledger)', () => {
 });
 
 describe('Cerrar Rendición (Enviar a Drive)', () => {
-  it('online: the Excel lands in CUBRAX - Respaldos Obra / Proyectos / Casa Soto as Rendicion_<date>.xlsx; nothing is downloaded', async () => {
+  it('online: a Google Sheet lands in CUBRAX - Respaldos Obra / Proyectos / Casa Soto as rendicion-Casa-Soto; nothing is downloaded', async () => {
     const download = vi.spyOn(URL, 'createObjectURL');
     h = createHost(App);
     await h.mount();
@@ -188,20 +188,25 @@ describe('Cerrar Rendición (Enviar a Drive)', () => {
     await flush(400);
     expect(q('toast').textContent).toBe('Rendición enviada a Drive ✓');
     expect(q('toast').dataset.tone).toBe('ok');
-    expect(folderFiles('Casa Soto')).toEqual([renditionFileName()]);
+    expect(folderFiles('Casa Soto')).toEqual([SHEET_TITLE]);
     const proyectos = drive.folders().find((f) => f.name === 'Proyectos');
     const root = drive.folders().find((f) => f.name === 'CUBRAX - Respaldos Obra');
     expect(proyectos.parents).toEqual([root.id]);
-    expect(drive.backupFiles().find((f) => f.name === renditionFileName()).body.startsWith('PK')).toBe(true); // a real .xlsx (zip)
+    const sheet = drive.sheet(SHEET_TITLE);
+    expect(sheet.parents).toEqual([drive.folders().find((f) => f.name === 'Casa Soto').id]); // moved out of the root, into the project folder
+    expect(Object.keys(sheet.tabs)).toHaveLength(5);
+    expect(sheet.tabs['Detalle de gastos'].length).toBeGreaterThan(0);
+    expect(drive.calls.some((c) => c.url.includes('values:batchUpdate') && JSON.parse(c.body).valueInputOption === 'RAW')).toBe(true);
     expect(await exportQueue.list()).toHaveLength(0);
     expect(download).not.toHaveBeenCalled();
-    // closing again the same day replaces the file
+    // closing again refreshes the SAME Sheet in place (never a second one)
     await click(q('fin-close'));
     await flush(400);
-    expect(folderFiles('Casa Soto')).toEqual([renditionFileName()]);
+    expect(folderFiles('Casa Soto')).toEqual([SHEET_TITLE]);
+    expect(drive.spreadsheets()).toHaveLength(1);
   }, 30_000);
 
-  it('offline: calm toast, the Blob waits in IndexedDB (no download, no network); when the connection returns it goes up by itself', async () => {
+  it('offline: calm toast, the data waits in IndexedDB (no download, no network); when the connection returns it goes up by itself', async () => {
     const download = vi.spyOn(URL, 'createObjectURL');
     h = createHost(App);
     await h.mount();
@@ -216,13 +221,13 @@ describe('Cerrar Rendición (Enviar a Drive)', () => {
     expect(download).not.toHaveBeenCalled();
     const rows = await exportQueue.list();
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ projectId: project.id, title: 'Casa Soto', fileName: renditionFileName(), status: 'pending' });
+    expect(rows[0]).toMatchObject({ projectId: project.id, title: 'Casa Soto', fileName: SHEET_TITLE, status: 'pending' });
     expect(q('fin-queued').textContent).toContain('En cola: 1');
 
     setOnline(true);
     await act_online();
     await flush(500);
-    expect(folderFiles('Casa Soto')).toEqual([renditionFileName()]);
+    expect(folderFiles('Casa Soto')).toEqual([SHEET_TITLE]);
     expect(await exportQueue.list()).toHaveLength(0);
     expect(q('fin-queued')).toBeNull();
     expect(document.body.textContent).toContain('Rendiciones subidas a Drive: 1');
@@ -245,7 +250,58 @@ describe('Cerrar Rendición (Enviar a Drive)', () => {
     drive.state.failNext = 0;
     await click(q('fin-queued-retry')); // forced retry
     await flush(500);
-    expect(folderFiles('Casa Soto')).toEqual([renditionFileName()]);
+    expect(folderFiles('Casa Soto')).toEqual([SHEET_TITLE]);
+    expect(await exportQueue.list()).toHaveLength(0);
+  }, 30_000);
+});
+
+describe('Exportar -> "Rendición en Google Sheets" (the same Sheet and delivery from the project screen)', () => {
+  const openExport = async () => {
+    await click(h.host.querySelector('[data-testid="project-card"]'));
+    await click(q('dock-export'));
+  };
+
+  it('online: the export sheet creates / refreshes the live Sheet in the project folder, toasts, closes and downloads nothing', async () => {
+    const download = vi.spyOn(URL, 'createObjectURL');
+    h = createHost(App);
+    await h.mount();
+    await flush(100);
+    await openExport();
+    expect(q('export-xlsx').textContent).toContain('Google Sheets');
+    await click(q('export-xlsx'));
+    await flush(500);
+    expect(q('export-sheet')).toBeNull();
+    expect(q('toast').textContent).toBe('Rendición enviada a Drive ✓');
+    expect(folderFiles('Casa Soto')).toEqual([SHEET_TITLE]);
+    expect(Object.keys(drive.sheet(SHEET_TITLE).tabs)).toHaveLength(5);
+    expect(download).not.toHaveBeenCalled();
+    // the same Sheet as "Cerrar Rendición": a second delivery refreshes it
+    await click(q('dock-export')); // still on the project screen
+    await click(q('export-xlsx'));
+    await flush(500);
+    expect(drive.spreadsheets()).toHaveLength(1);
+  }, 30_000);
+
+  it('offline: nothing is downloaded or sent; the data is queued and the Sheet appears when the connection returns', async () => {
+    const download = vi.spyOn(URL, 'createObjectURL');
+    h = createHost(App);
+    await h.mount();
+    await flush(100);
+    await openExport();
+    setOnline(false);
+    await click(q('export-xlsx'));
+    await flush(100);
+    expect(q('toast').textContent).toBe('Sin conexión. La rendición está en cola y se subirá automáticamente a Drive');
+    expect(drive.calls).toHaveLength(0);
+    expect(download).not.toHaveBeenCalled();
+    const [row] = await exportQueue.list();
+    expect(row).toMatchObject({ projectId: project.id, fileName: SHEET_TITLE, status: 'pending' });
+    expect(row.sheets).toHaveLength(5);
+    expect(row.blob).toBeUndefined();
+    setOnline(true);
+    await act_online();
+    await flush(500);
+    expect(folderFiles('Casa Soto')).toEqual([SHEET_TITLE]);
     expect(await exportQueue.list()).toHaveLength(0);
   }, 30_000);
 });
