@@ -21,6 +21,9 @@ export const MACHINE_RULES = Object.freeze({
   scaffoldMinWallHeightM: 3, // working height above which a certified scaffold replaces ladders
   scaffoldBayM: 6, // one set covers ~6 m of wall / ridge
   maxSets: 12,
+  excavatorMinVolumeM3: 3, // below this the hole is dug by hand
+  excavatorM3PerDay: 80, // a backhoe moves ~10 m3 an hour
+  breakerMinVolumeM3: 0.3, // below this a hand tool does it
 });
 
 const metric = (p, key) => p.calc?.metrics?.find((m) => m.key === key)?.value ?? 0;
@@ -85,6 +88,16 @@ export function suggestMachinery(partidas, siteDays = null) {
         break;
       case 'roof':
         push('scaffold', sets(metric(p, 'ridgeLength')), days + MACHINE_USE.scaffoldSetupDays); // always: work at height
+        break;
+      case 'excavation':
+        if (metric(p, 'earthVolume') >= MACHINE_RULES.excavatorMinVolumeM3) push('excavator', 1, Math.max(MACHINE_USE.minDays, Math.ceil(metric(p, 'earthVolume') / MACHINE_RULES.excavatorM3PerDay - 1e-9)));
+        break;
+      case 'pool':
+        if (metric(p, 'waterVolume') >= MACHINE_RULES.excavatorMinVolumeM3) push('excavator', 1, Math.max(MACHINE_USE.minDays, Math.ceil(metric(p, 'waterVolume') / MACHINE_RULES.excavatorM3PerDay - 1e-9)));
+        if (metric(p, 'volume') >= MACHINE_RULES.mixerMinVolumeM3) push('mixer', 1, Math.max(MACHINE_USE.minDays, Math.ceil(share * MACHINE_USE.mixerShare - 1e-9)));
+        break;
+      case 'demolition':
+        if (metric(p, 'demoVolume') >= MACHINE_RULES.breakerMinVolumeM3) push('breaker', 1, Math.max(MACHINE_USE.minDays, Math.ceil(metric(p, 'hours') / 8 - 1e-9))); // the hours of work are the real driver
         break;
       case 'masonry':
       case 'drywall':

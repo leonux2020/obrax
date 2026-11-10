@@ -5,6 +5,7 @@ import { withCapsuleRent } from '../../lib/capsule.js';
 import { flushUserPrices } from '../../lib/priceFeed.js';
 import { partidaMachines, priceCaption, setMachineOn } from '../../lib/workspaceModel.js';
 import LockedZone from './LockedZone.jsx';
+import Collapsible from './Collapsible.jsx';
 import SupplierPad from './SupplierPad.jsx';
 import { TractorIcon } from './icons.jsx';
 
@@ -23,19 +24,20 @@ export default function PartidaMachinery({ draft, result, index, regionCode, pro
 
   return (
     <div data-testid={`partida-machinery-${index}`}>
-      <p className="label">{t('ws.mach.inUse')}</p>
+      {/* closed: one row + chips with the machines that are in the quote; open: rates and switches */}
+      <Collapsible title={t('ws.mach.inUse')} chips={machines.filter((m) => m.included).map((m) => t(`mach.${m.id}`))} testId={`machinery-acc-${index}`}>
       {machines.length === 0 ? (
         <p className="text-sm font-normal text-neutral-400" data-testid={`partida-machinery-none-${index}`}>
           {t('mach.none')}
         </p>
       ) : (
         <LockedZone locked={locked} onBlocked={onBlocked} className="">
-          <ul className="divide-y divide-white/10">
+          <ul className="space-y-2">
             {machines.map((m) => {
               const on = m.included;
               const row = m.row;
               return (
-                <li key={m.id} data-testid={`partida-machine-${index}-${m.id}`} data-included={on ? 'true' : 'false'} className="flex items-center gap-3 py-3 text-neutral-200">
+                <li key={m.id} data-testid={`partida-machine-${index}-${m.id}`} data-included={on ? 'true' : 'false'} className="flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2 text-neutral-200">
                   <span className={on ? 'text-neutral-200' : 'text-neutral-500'}>
                     <TractorIcon size={22} />
                   </span>
@@ -54,7 +56,7 @@ export default function PartidaMachinery({ draft, result, index, regionCode, pro
                     data-testid={`partida-machine-rate-${index}-${m.id}`}
                     data-source={m.source}
                     aria-label={`${t('ws.mach.rate')}: ${money(m.rate)}`}
-                    className="min-h-[44px] rounded-lg border border-white/15 px-3 text-right text-sm font-normal tabular-nums active:border-white/50"
+                    className="min-h-[44px] rounded-lg bg-black/60 px-3 text-right text-sm font-normal tabular-nums transition active:scale-95 active:opacity-70"
                   >
                     {money(m.rate)}
                   </button>
@@ -67,7 +69,7 @@ export default function PartidaMachinery({ draft, result, index, regionCode, pro
                     data-testid={`partida-machine-toggle-${index}-${m.id}`}
                     className={`flex min-h-[44px] min-w-[84px] items-center justify-end gap-2 text-sm font-normal ${on ? 'text-neutral-200' : 'text-neutral-500'}`}
                   >
-                    <span aria-hidden="true" className={`h-2 w-2 rounded-full ${on ? 'bg-brand' : 'border border-neutral-500'}`} />
+                    <span aria-hidden="true" className={`h-2 w-2 rounded-full ${on ? 'bg-brand' : 'bg-white/30'}`} />
                     {t(on ? 'ws.mach.on' : 'ws.mach.off')}
                   </button>
                 </li>
@@ -76,6 +78,7 @@ export default function PartidaMachinery({ draft, result, index, regionCode, pro
           </ul>
         </LockedZone>
       )}
+      </Collapsible>
 
       {target && MACHINE_IDS.includes(target.id) && (
         <SupplierPad

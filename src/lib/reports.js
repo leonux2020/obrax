@@ -43,7 +43,7 @@ export function companyInfo(company, region, t) {
   };
 }
 
-const AREA_METRIC = { slab: 'area', roof: 'roofArea' };
+const AREA_METRIC = { slab: 'area', roof: 'roofArea', excavation: 'area', pool: 'area', waterproofing: 'treatedArea', demolition: 'area' };
 
 /** Short, geometry-only description of a partida (safe to show to the client). */
 export function scopeText(p, t, num) {
@@ -58,6 +58,8 @@ export function scopeText(p, t, num) {
     slope: num(v.slope ?? 0),
     format: v.format ? t(`opt.floor.format.${v.format}`) : '',
     coats: num(v.coats ?? 0),
+    volume: num(metric('earthVolume') || metric('demoVolume') || metric('waterVolume')),
+    points: num(metric('points')),
   });
 }
 

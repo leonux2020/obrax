@@ -136,6 +136,7 @@ export function NumberField({
   placeholder,
   optional,
   hideLabel = false,
+  compact = false,
   className = '',
   testId,
   'aria-label': ariaLabel,
@@ -174,19 +175,19 @@ export function NumberField({
           aria-haspopup="dialog"
           aria-invalid={error ? 'true' : 'false'}
           aria-label={hideLabel ? ariaLabel || label : undefined}
-          aria-describedby={error || hint ? `${id}-msg` : undefined}
+          aria-describedby={error || (hint && !compact) ? `${id}-msg` : undefined}
           data-testid={testId}
           data-numpad="true"
-          className={`field-input cursor-pointer ${unit ? 'pr-16' : ''}`}
+          className={`field-input cursor-pointer ${compact ? `!px-2.5 !text-base ${unit ? '!pr-8' : ''}` : unit ? 'pr-16' : ''}`}
         />
         {unit && (
-          <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-base font-semibold text-neutral-300">
+          <span className={`pointer-events-none absolute inset-y-0 flex items-center text-neutral-300 ${compact ? 'right-2.5 text-sm font-light' : 'right-4 text-base font-semibold'}`}>
             {unit}
           </span>
         )}
       </div>
-      {(error || hint) && (
-        <p id={`${id}-msg`} className={`mt-1.5 text-sm ${error ? 'font-semibold text-red-400' : 'text-neutral-400'}`}>
+      {(error || (hint && !compact)) && (
+        <p id={`${id}-msg`} className={`mt-1.5 ${compact ? 'text-xs' : 'text-sm'} ${error ? 'font-semibold text-red-400/90' : 'text-neutral-400'}`}>
           {error || hint}
         </p>
       )}

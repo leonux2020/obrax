@@ -3,5 +3,7 @@ export const MACHINES = Object.freeze({
   mixer: { id: 'mixer', usd: 30 }, // trompo hormigonero
   compactor: { id: 'compactor', usd: 45 }, // placa compactadora
   scaffold: { id: 'scaffold', usd: 12, perSet: true }, // andamio certificado
+  excavator: { id: 'excavator', usd: 180 }, // retroexcavadora con operador
+  breaker: { id: 'breaker', usd: 40 }, // martillo demoledor
 });
 export const MACHINE_IDS = Object.freeze(Object.keys(MACHINES));

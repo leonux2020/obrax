@@ -1,4 +1,4 @@
-import { validateDims, runCalculation } from './tasks.js';
+import { validateDims, runCalculation, effectiveWaste } from './tasks.js';
 import { resolvePrices, buildQuote, chainTotals, marketBucket, planAll } from './pricing.js';
 import { spanDays } from './schedule.js';
 import { planMachinery, DEFAULT_MACHINERY } from './machinery.js';
@@ -25,7 +25,7 @@ export function computeAll(draft, now = Date.now(), { timeline = null, book: liv
       id: p.id,
       name: p.name,
       task: p.task,
-      waste: p.waste,
+      waste: effectiveWaste(p.waste, p.task), // a missing / NaN waste falls back to the task's default, never to NaN or a silent 0
       validation,
       values: validation.values,
       calc: validation.valid ? runCalculation(p.task, validation.values) : null,

@@ -184,6 +184,149 @@ export function calcPaint({ length, height, openings = 0, coats = 2, primer = 1,
   };
 }
 
+// ---- excavation / earthworks ---------------------------------------------------------
+// Excavated soil swells once it is dug: the volume to HAUL is bigger than the hole (foisonnement / esponjamiento).
+export const EARTH = Object.freeze({ swell: { soft: 1.15, medium: 1.25, hard: 1.4 }, beddingM: 0.1, skipM3: 6 });
+
+export function calcExcavation({ length, width, depth, soil = 'medium', bedding = 0 }) {
+  const area = length * width;
+  const volume = area * depth;
+  const haul = volume * (EARTH.swell[soil] ?? EARTH.swell.medium);
+  const lines = [{ id: 'skip_bin', qty: haul }];
+  if (Number(bedding) === 1) lines.push({ id: 'gravel', qty: area * EARTH.beddingM });
+  return {
+    metrics: [
+      { key: 'area', value: r2(area), unit: 'm2' },
+      { key: 'earthVolume', value: r3(volume), unit: 'm3' },
+      { key: 'haulVolume', value: r3(haul), unit: 'm3' },
+    ],
+    lines,
+  };
+}
+
+// ---- pools and exteriors ------------------------------------------------------------------
+// Reinforced concrete shell: floor slab + perimeter walls of the same thickness (corners ignored, the waste % covers them).
+export const POOL = Object.freeze({ coatingKgPerM2: 1.5, meshFactor: 1.1 });
+
+export function calcPool({ length, width, depth, thickness, lining = 1 }) {
+  const area = length * width;
+  const perimeter = 2 * (length + width);
+  const wallArea = perimeter * depth;
+  const surface = area + wallArea; // what the water touches
+  const shell = (surface * thickness) / 100;
+  const lines = [
+    { id: 'cement_bag', qty: shell * CONCRETE.cementBagsPerM3 },
+    { id: 'sand', qty: shell * CONCRETE.sandM3PerM3 },
+    { id: 'gravel', qty: shell * CONCRETE.gravelM3PerM3 },
+    { id: 'mesh', qty: surface * POOL.meshFactor },
+    { id: 'poly', qty: area * 1.15 },
+  ];
+  if (Number(lining) === 1) lines.push({ id: 'wp_coating', qty: surface * POOL.coatingKgPerM2 });
+  return {
+    metrics: [
+      { key: 'area', value: r2(area), unit: 'm2' },
+      { key: 'wallArea', value: r2(wallArea), unit: 'm2' },
+      { key: 'waterVolume', value: r3(area * depth), unit: 'm3' },
+      { key: 'volume', value: r3(shell), unit: 'm3' },
+    ],
+    lines,
+  };
+}
+
+// ---- waterproofing ----------------------------------------------------------------------------
+export const WATERPROOF = Object.freeze({ primerM2PerLiter: 4, coatingKgPerM2PerLayer: 1.2 });
+
+export function calcWaterproofing({ length, width, upturn = 0, system = 'membrane', layers = 1 }) {
+  const area = length * width;
+  const treated = area + (2 * (length + width) * upturn) / 100; // the floor plus the upturn along the perimeter
+  const lines =
+    system === 'coating'
+      ? [{ id: 'wp_coating', qty: treated * layers * WATERPROOF.coatingKgPerM2PerLayer }]
+      : [
+          { id: 'bit_primer', qty: treated / WATERPROOF.primerM2PerLiter },
+          { id: 'membrane_roll', qty: treated * layers },
+        ];
+  return {
+    metrics: [
+      { key: 'area', value: r2(area), unit: 'm2' },
+      { key: 'treatedArea', value: r2(treated), unit: 'm2' },
+    ],
+    lines,
+  };
+}
+
+// ---- demolition ---------------------------------------------------------------------------------
+// Productivity of a worker with a breaker (m3 of element per hour) and the swell of the rubble that goes to the skip.
+export const DEMOLITION = Object.freeze({ swell: 1.5, m3PerHour: { masonry: 1.5, concrete: 0.5, mixed: 0.9 }, hoursPerDay: 8 });
+
+export function calcDemolition({ length, width, thickness, material = 'masonry', containment = 1 }) {
+  const area = length * width;
+  const volume = (area * thickness) / 100;
+  const debris = volume * DEMOLITION.swell;
+  const hours = volume / (DEMOLITION.m3PerHour[material] ?? DEMOLITION.m3PerHour.mixed);
+  const lines = [{ id: 'skip_bin', qty: debris }];
+  if (Number(containment) === 1) lines.push({ id: 'poly', qty: area * 1.15 });
+  return {
+    metrics: [
+      { key: 'area', value: r2(area), unit: 'm2' },
+      { key: 'demoVolume', value: r3(volume), unit: 'm3' },
+      { key: 'debrisVolume', value: r3(debris), unit: 'm3' },
+      { key: 'hours', value: Math.round(hours * 10) / 10, unit: 'h' },
+    ],
+    lines,
+  };
+}
+
+// ---- electrical (points) ----------------------------------------------------------------------------
+// Outlets run on 2.5 mm2 (phase, neutral, earth), lights on 1.5 mm2; every point has a box and its device; the panel takes one breaker per circuit.
+export const ELECTRICAL = Object.freeze({ conductors: 3, outletsPerBreaker: 8, lightsPerBreaker: 10 });
+
+export function calcElectrical({ outlets = 0, lights = 0, run = 6, panel = 1 }) {
+  const points = outlets + lights;
+  const lines = [
+    { id: 'cable_25', qty: outlets * run * ELECTRICAL.conductors },
+    { id: 'cable_15', qty: lights * run * ELECTRICAL.conductors },
+    { id: 'conduit', qty: points * run },
+    { id: 'elec_box', qty: points },
+    { id: 'socket', qty: outlets },
+    { id: 'switch', qty: lights },
+  ];
+  if (Number(panel) === 1 && points > 0) {
+    lines.push({ id: 'breaker', qty: Math.ceil(outlets / ELECTRICAL.outletsPerBreaker) + Math.ceil(lights / ELECTRICAL.lightsPerBreaker) }, { id: 'elec_panel', qty: 1 });
+  }
+  return {
+    metrics: [
+      { key: 'points', value: points, unit: 'unit' },
+      { key: 'cableLength', value: r2((outlets + lights) * run * ELECTRICAL.conductors), unit: 'm' },
+      { key: 'conduitLength', value: r2(points * run), unit: 'm' },
+    ],
+    lines: lines.filter((l) => l.qty > 0),
+  };
+}
+
+// ---- plumbing (points) -----------------------------------------------------------------------------------
+export const PLUMBING = Object.freeze({ hotShare: 0.6, drainShare: 0.8, fittingsPerPoint: 4 });
+
+export function calcPlumbing({ points = 0, run = 5, hotWater = 1, drain = 1 }) {
+  const cold = points * run;
+  const hot = Number(hotWater) === 1 ? points * run * PLUMBING.hotShare : 0;
+  const drains = Number(drain) === 1 ? points * run * PLUMBING.drainShare : 0;
+  const lines = [
+    { id: 'pipe_pex', qty: cold + hot },
+    { id: 'pvc_drain', qty: drains },
+    { id: 'fittings', qty: points * PLUMBING.fittingsPerPoint },
+    { id: 'valve', qty: points },
+  ];
+  return {
+    metrics: [
+      { key: 'points', value: points, unit: 'unit' },
+      { key: 'supplyLength', value: r2(cold + hot), unit: 'm' },
+      { key: 'drainLength', value: r2(drains), unit: 'm' },
+    ],
+    lines: lines.filter((l) => l.qty > 0),
+  };
+}
+
 export const CALCULATORS = Object.freeze({
   slab: calcSlab,
   masonry: calcMasonry,
@@ -191,4 +334,10 @@ export const CALCULATORS = Object.freeze({
   roof: calcRoof,
   floor: calcFloor,
   paint: calcPaint,
+  excavation: calcExcavation,
+  pool: calcPool,
+  waterproofing: calcWaterproofing,
+  demolition: calcDemolition,
+  electrical: calcElectrical,
+  plumbing: calcPlumbing,
 });

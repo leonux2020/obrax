@@ -67,6 +67,32 @@ export const CATALOG = Object.freeze({
   paint_bucket: { base: 'l', sale: 'bucket', size: 18.925, usd: 62 },
   primer: { base: 'l', sale: 'gallon', size: 3.785, usd: 14 },
   putty: { base: 'kg', sale: 'bucket', size: 20, usd: 11 },
+
+  // ---- earthworks / demolition ------------------------------------------------------------------
+  // Skip (volquete) of 6 m3: hauling is bought per load.
+  skip_bin: { base: 'm3', sale: 'unit', size: 6, usd: 120 },
+
+  // ---- waterproofing / pools ----------------------------------------------------------------------
+  // Asphalt membrane 1 x 10 m roll: effective cover after the 10 cm laps = 8 m2.
+  membrane_roll: { base: 'm2', sale: 'roll', size: 8, usd: 38 },
+  bit_primer: { base: 'l', sale: 'gallon', size: 3.785, usd: 19 },
+  wp_coating: { base: 'kg', sale: 'bucket', size: 20, usd: 55 },
+
+  // ---- electrical -----------------------------------------------------------------------------------
+  cable_25: { base: 'm', sale: 'roll', size: 100, usd: 62 },
+  cable_15: { base: 'm', sale: 'roll', size: 100, usd: 42 },
+  conduit: { base: 'm', sale: 'roll', size: 50, usd: 14 },
+  elec_box: { base: 'unit', sale: 'unit', size: 1, usd: 0.9 },
+  socket: { base: 'unit', sale: 'unit', size: 1, usd: 3.2 },
+  switch: { base: 'unit', sale: 'unit', size: 1, usd: 2.8 },
+  breaker: { base: 'unit', sale: 'unit', size: 1, usd: 7 },
+  elec_panel: { base: 'unit', sale: 'unit', size: 1, usd: 38 },
+
+  // ---- plumbing ---------------------------------------------------------------------------------------
+  pipe_pex: { base: 'm', sale: 'roll', size: 50, usd: 38 },
+  pvc_drain: { base: 'm', sale: 'piece', size: 3, usd: 6 },
+  fittings: { base: 'unit', sale: 'box', size: 10, usd: 14 },
+  valve: { base: 'unit', sale: 'unit', size: 1, usd: 6.5 },
 });
 
 export const MATERIAL_IDS = Object.freeze(Object.keys(CATALOG));

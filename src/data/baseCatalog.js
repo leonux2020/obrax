@@ -168,6 +168,86 @@ export default {
    "sale": "bucket",
    "size": 20,
    "usd": 11
+  },
+  "skip_bin": {
+   "sale": "unit",
+   "size": 6,
+   "usd": 120
+  },
+  "membrane_roll": {
+   "sale": "roll",
+   "size": 8,
+   "usd": 38
+  },
+  "bit_primer": {
+   "sale": "gallon",
+   "size": 3.785,
+   "usd": 19
+  },
+  "wp_coating": {
+   "sale": "bucket",
+   "size": 20,
+   "usd": 55
+  },
+  "cable_25": {
+   "sale": "roll",
+   "size": 100,
+   "usd": 62
+  },
+  "cable_15": {
+   "sale": "roll",
+   "size": 100,
+   "usd": 42
+  },
+  "conduit": {
+   "sale": "roll",
+   "size": 50,
+   "usd": 14
+  },
+  "elec_box": {
+   "sale": "unit",
+   "size": 1,
+   "usd": 0.9
+  },
+  "socket": {
+   "sale": "unit",
+   "size": 1,
+   "usd": 3.2
+  },
+  "switch": {
+   "sale": "unit",
+   "size": 1,
+   "usd": 2.8
+  },
+  "breaker": {
+   "sale": "unit",
+   "size": 1,
+   "usd": 7
+  },
+  "elec_panel": {
+   "sale": "unit",
+   "size": 1,
+   "usd": 38
+  },
+  "pipe_pex": {
+   "sale": "roll",
+   "size": 50,
+   "usd": 38
+  },
+  "pvc_drain": {
+   "sale": "piece",
+   "size": 3,
+   "usd": 6
+  },
+  "fittings": {
+   "sale": "box",
+   "size": 10,
+   "usd": 14
+  },
+  "valve": {
+   "sale": "unit",
+   "size": 1,
+   "usd": 6.5
   }
  }
 };

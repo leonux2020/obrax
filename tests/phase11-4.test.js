@@ -10,7 +10,7 @@ import PartidaList from '../src/components/workspace/PartidaList.jsx';
 import { newProject } from '../src/lib/projects.js';
 import { computeAll } from '../src/lib/engine.js';
 import { partidaGroups } from '../src/lib/workspaceModel.js';
-import { WASTE_LIMITS } from '../src/lib/tasks.js';
+import { WASTE_LIMITS, WASTE_PRESETS, TASKS } from '../src/lib/tasks.js';
 import { resetRegistry } from '../src/lib/priceRegistry.js';
 import { DICT } from '../src/lib/dict.js';
 
@@ -84,7 +84,7 @@ describe('Fase 11.4: waste is a 3-pill selector, the slider is gone for good', (
     await render();
     const pills = ['min', 'normal', 'critical'].map((id) => q(`waste-0-${id}`));
     expect(pills.every(Boolean)).toBe(true);
-    expect(pills.map((b) => b.textContent)).toEqual(['Mínimo', 'Normal', 'Crítico']);
+    expect(pills.map((b) => b.textContent)).toEqual(['Mínimo5%', 'Normal15%', 'Crítico30%']); // the label carries its real figure
     const group = pills[0].parentElement;
     expect(group.getAttribute('role')).toBe('radiogroup');
     expect(group.className).toContain('flex-row');
@@ -97,7 +97,7 @@ describe('Fase 11.4: waste is a 3-pill selector, the slider is gone for good', (
     }
   });
 
-  it('the values come from WASTE_LIMITS: Minimum = min, Critical = max, Normal in between and inside the limits', async () => {
+  it('the values come from WASTE_PRESETS: Minimum is a REAL 5 % (never the 0 floor), Critical = max, Normal in between and inside the limits', async () => {
     await render();
     const read = async (id) => {
       updates.length = 0;
@@ -109,11 +109,14 @@ describe('Fase 11.4: waste is a 3-pill selector, the slider is gone for good', (
     const lo = await read('min');
     const mid = await read('normal');
     const hi = await read('critical');
-    expect(lo).toBe(WASTE_LIMITS.min);
+    expect(lo).toBe(5);
+    expect(lo).toBe(WASTE_PRESETS.min);
+    expect(lo).toBeGreaterThan(WASTE_LIMITS.min);
     expect(hi).toBe(WASTE_LIMITS.max);
     expect(mid).toBeGreaterThan(lo);
     expect(mid).toBeLessThan(hi);
     expect(Number.isInteger((mid - WASTE_LIMITS.min) / WASTE_LIMITS.step)).toBe(true);
+    expect([lo, mid, hi].every((v) => v > 0 && Number.isFinite(v))).toBe(true);
   });
 
   it('the active pill turns brand-coloured (aria-checked); a legacy / per-task value lights the NEAREST pill and nothing is rewritten', async () => {
@@ -132,11 +135,13 @@ describe('Fase 11.4: waste is a 3-pill selector, the slider is gone for good', (
     expect(updates).toHaveLength(0);
   });
 
-  it('a missing / NaN waste does not crash and lights no pill', async () => {
-    await render({ waste: NaN });
+  it('a missing / NaN waste does not crash and shows the task default (never a silent 0 %)', async () => {
+    const { draft } = await render({ waste: NaN });
+    const def = TASKS[draft.partidas[0].task].defaultWaste;
+    expect(def).toBeGreaterThan(0);
+    expect(q('waste-0-value').textContent).toBe(`${def}%`);
     const on = ['min', 'normal', 'critical'].filter((id) => q(`waste-0-${id}`).getAttribute('aria-checked') === 'true');
-    expect(on).toHaveLength(0);
-    expect(q('waste-0-value').textContent).toBe(`${WASTE_LIMITS.min}%`);
+    expect(on).toHaveLength(1); // the pill is the honest reading of the figure the quote uses
   });
 });
 

@@ -10,6 +10,7 @@ const YES_NO = [0, 1];
 export const TASKS = Object.freeze({
   slab: {
     id: 'slab',
+    headline: ['volume', 'area'],
     chapter: 'foundation',
     defaultWaste: 5,
     fields: [
@@ -21,6 +22,7 @@ export const TASKS = Object.freeze({
   },
   masonry: {
     id: 'masonry',
+    headline: ['netArea'],
     chapter: 'walls',
     defaultWaste: 8,
     openingsAgainst: ['length', 'height'],
@@ -34,6 +36,7 @@ export const TASKS = Object.freeze({
   },
   drywall: {
     id: 'drywall',
+    headline: ['plateArea', 'netArea'],
     chapter: 'walls',
     defaultWaste: 10,
     openingsAgainst: ['length', 'height'],
@@ -47,6 +50,7 @@ export const TASKS = Object.freeze({
   },
   roof: {
     id: 'roof',
+    headline: ['roofArea'],
     chapter: 'roof',
     defaultWaste: 10,
     fields: [
@@ -63,6 +67,7 @@ export const TASKS = Object.freeze({
   },
   floor: {
     id: 'floor',
+    headline: ['netArea'],
     chapter: 'finishes',
     defaultWaste: 10,
     openingsAgainst: ['length', 'width'],
@@ -78,6 +83,7 @@ export const TASKS = Object.freeze({
   },
   paint: {
     id: 'paint',
+    headline: ['paintArea', 'netArea'],
     chapter: 'finishes',
     defaultWaste: 5,
     openingsAgainst: ['length', 'height'],
@@ -92,10 +98,106 @@ export const TASKS = Object.freeze({
       { key: 'putty', values: YES_NO, default: 0 },
     ],
   },
+  excavation: {
+    id: 'excavation',
+    chapter: 'earthworks',
+    defaultWaste: 5,
+    headline: ['earthVolume', 'area'],
+    fields: [
+      { key: 'length', unit: 'm', min: 0.1, max: 500, decimals: 2, required: true },
+      { key: 'width', unit: 'm', min: 0.1, max: 500, decimals: 2, required: true },
+      { key: 'depth', unit: 'm', min: 0.1, max: 15, decimals: 2, required: true, default: 1 },
+    ],
+    options: [
+      { key: 'soil', values: ['soft', 'medium', 'hard'], default: 'medium' },
+      { key: 'bedding', values: YES_NO, default: 0 },
+    ],
+  },
+  pool: {
+    id: 'pool',
+    chapter: 'exteriors',
+    defaultWaste: 8,
+    headline: ['waterVolume', 'area'],
+    fields: [
+      { key: 'length', unit: 'm', min: 1, max: 100, decimals: 2, required: true },
+      { key: 'width', unit: 'm', min: 1, max: 100, decimals: 2, required: true },
+      { key: 'depth', unit: 'm', min: 0.5, max: 6, decimals: 2, required: true, default: 1.5 },
+      { key: 'thickness', unit: 'cm', min: 10, max: 60, decimals: 1, required: true, default: 20 },
+    ],
+    options: [{ key: 'lining', values: YES_NO, default: 1 }],
+  },
+  waterproofing: {
+    id: 'waterproofing',
+    chapter: 'finishes',
+    defaultWaste: 10,
+    headline: ['treatedArea'],
+    fields: [
+      { key: 'length', unit: 'm', min: 0.1, max: 500, decimals: 2, required: true },
+      { key: 'width', unit: 'm', min: 0.1, max: 500, decimals: 2, required: true },
+      { key: 'upturn', unit: 'cm', min: 0, max: 100, decimals: 1, required: false, default: 20 },
+    ],
+    options: [
+      { key: 'system', values: ['membrane', 'coating'], default: 'membrane' },
+      { key: 'layers', values: [1, 2], default: 1 },
+    ],
+  },
+  demolition: {
+    id: 'demolition',
+    chapter: 'earthworks',
+    defaultWaste: 5,
+    headline: ['demoVolume', 'hours'],
+    fields: [
+      { key: 'length', unit: 'm', min: 0.1, max: 500, decimals: 2, required: true },
+      { key: 'width', unit: 'm', min: 0.1, max: 500, decimals: 2, required: true },
+      { key: 'thickness', unit: 'cm', min: 5, max: 100, decimals: 1, required: true, default: 15 },
+    ],
+    options: [
+      { key: 'material', values: ['masonry', 'concrete', 'mixed'], default: 'masonry' },
+      { key: 'containment', values: YES_NO, default: 1 },
+    ],
+  },
+  electrical: {
+    id: 'electrical',
+    chapter: 'installations',
+    defaultWaste: 10,
+    headline: ['points', 'cableLength'],
+    fields: [
+      { key: 'outlets', unit: 'unit', min: 0, max: 300, decimals: 0, required: true, default: 10 },
+      { key: 'lights', unit: 'unit', min: 0, max: 300, decimals: 0, required: true, default: 8 },
+      { key: 'run', unit: 'm', min: 1, max: 40, decimals: 1, required: false, default: 6 },
+    ],
+    options: [{ key: 'panel', values: YES_NO, default: 1 }],
+  },
+  plumbing: {
+    id: 'plumbing',
+    chapter: 'installations',
+    defaultWaste: 10,
+    headline: ['points', 'supplyLength'],
+    fields: [
+      { key: 'points', unit: 'unit', min: 1, max: 200, decimals: 0, required: true, default: 6 },
+      { key: 'run', unit: 'm', min: 1, max: 30, decimals: 1, required: false, default: 5 },
+    ],
+    options: [
+      { key: 'hotWater', values: YES_NO, default: 1 },
+      { key: 'drain', values: YES_NO, default: 1 },
+    ],
+  },
 });
 
 export const TASK_IDS = Object.freeze(Object.keys(TASKS));
 export const WASTE_LIMITS = Object.freeze({ min: 0, max: 30, step: 1 });
+/**
+ * The three waste presets of the partida card. They are NOT derived from WASTE_LIMITS: the model may allow 0 %, but "Minimum" is the least a real
+ * site works with, 5 % (a preset built on the limits injected 0 % into the quote).
+ */
+export const WASTE_PRESETS = Object.freeze({ min: 5, normal: 15, critical: 30 });
+
+/** The waste % a partida really uses: a stored number inside the limits (an explicit 0 is a real choice), otherwise the default of its task. Never NaN. */
+export function effectiveWaste(raw, taskId) {
+  const n = typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : raw;
+  if (typeof n === 'number' && Number.isFinite(n) && n >= WASTE_LIMITS.min && n <= WASTE_LIMITS.max) return n;
+  return TASKS[taskId]?.defaultWaste ?? WASTE_PRESETS.min;
+}
 
 /** Return the allowed option value matching `raw` (string/number tolerant) or the option default. */
 export function pickOption(option, raw) {

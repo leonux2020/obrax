@@ -48,6 +48,36 @@ export const HSE = Object.freeze({
     ergonomics: ['overhead', 'wrist', 'ladder', 'ventilation', 'breaks'],
     waste: ['paint_hazard', 'paint_leftover', 'brush_water', 'packaging', 'inventory'],
   },
+  excavation: {
+    ppe: { mandatory: ['helmet', 'glasses', 'gloves', 'boots', 'hivis'], recommended: ['hearing', 'mask', 'knee_pads', 'sun'] },
+    ergonomics: ['lift', 'spine', 'cart', 'heat', 'breaks'],
+    waste: ['rubble', 'aggregates', 'inventory'],
+  },
+  pool: {
+    ppe: { mandatory: ['helmet', 'glasses', 'gloves_chem', 'boots_rubber', 'mask'], recommended: ['hearing', 'hivis', 'knee_pads', 'sun', 'sleeves'] },
+    ergonomics: ['lift', 'bags', 'cart', 'spine', 'heat', 'breaks'],
+    waste: ['washout', 'cement_bags', 'rubble', 'metal', 'inventory'],
+  },
+  waterproofing: {
+    ppe: { mandatory: ['glasses', 'gloves_chem', 'boots', 'respirator'], recommended: ['coverall', 'helmet', 'knee_pads', 'sun', 'sleeves'] },
+    ergonomics: ['kneel', 'lift', 'heat', 'ventilation', 'breaks'],
+    waste: ['paint_hazard', 'packaging', 'adhesive', 'inventory'],
+  },
+  demolition: {
+    ppe: { mandatory: ['helmet', 'glasses', 'gloves', 'boots', 'respirator', 'hearing'], recommended: ['hivis', 'knee_pads', 'coverall', 'sleeves'] },
+    ergonomics: ['lift', 'spine', 'wrist', 'cart', 'breaks'],
+    waste: ['rubble', 'metal', 'wood', 'dust', 'inventory'],
+  },
+  electrical: {
+    ppe: { mandatory: ['glasses', 'gloves', 'boots', 'helmet'], recommended: ['knee_pads', 'hearing', 'sleeves'] },
+    ergonomics: ['overhead', 'wrist', 'ladder', 'breaks'],
+    waste: ['metal', 'packaging', 'inventory'],
+  },
+  plumbing: {
+    ppe: { mandatory: ['glasses', 'gloves', 'boots'], recommended: ['knee_pads', 'helmet', 'sleeves'] },
+    ergonomics: ['kneel', 'wrist', 'spine', 'breaks'],
+    waste: ['metal', 'packaging', 'adhesive', 'inventory'],
+  },
 });
 
 /** HSE guide of a task, as translation keys ready for t(). Unknown tasks return null. */
